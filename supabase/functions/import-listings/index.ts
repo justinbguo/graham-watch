@@ -73,22 +73,29 @@ async function resolveDealer(
   const host = new URL(sourceUrl).hostname.replace(/^www\./, '');
   const website = `https://${host}`;
 
+  // Not contact_email: that column is revoked from `authenticated`, and asking
+  // for it fails the whole select, which used to leave every re-import inserting
+  // a dealer that already exists.
   const { data: existing } = await supabase
     .from('dealers')
-    .select('id, name, contact_email')
+    .select('id, name')
     .eq('website', website)
     .maybeSingle();
 
   if (existing) {
     // Dealers imported before we could read the shop's real name are stuck with
-    // their hostname on every card. Re-running the import repairs that, and
-    // fills in an address we could not find the first time.
-    const repairs: Record<string, string> = {};
-    if (name && existing.name === host) repairs.name = name;
-    if (email && !existing.contact_email) repairs.contact_email = email;
-
-    if (Object.keys(repairs).length) {
-      await supabase.from('dealers').update(repairs).eq('id', existing.id);
+    // their hostname on every card. Re-running the import repairs that.
+    if (name && existing.name === host) {
+      await supabase.from('dealers').update({ name }).eq('id', existing.id);
+    }
+    // Fill an address we could not find the first time without ever reading the
+    // one already there — the `is null` filter is what makes this not overwrite.
+    if (email) {
+      await supabase
+        .from('dealers')
+        .update({ contact_email: email })
+        .eq('id', existing.id)
+        .is('contact_email', null);
     }
     return existing.id;
   }
