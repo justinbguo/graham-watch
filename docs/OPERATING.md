@@ -77,7 +77,17 @@ Migrations are append-only once they have run. Never edit one; add a new file.
 Two interfaces worth bookmarking:
 
 - **Studio** http://127.0.0.1:54323 — browse and edit rows
-- **Mailpit** http://127.0.0.1:54324 — catches sign-in emails, read your 6-digit code here
+- **Mailpit** http://127.0.0.1:54324 — every email the app sends
+
+## Signing in locally
+
+No email ever leaves your machine. Supabase runs a fake mail server, so sign-in codes
+land in Mailpit instead of a real inbox — checking Gmail will never show one.
+
+1. Type any address in the app. `a@b.c` works as well as your real one.
+2. Open http://127.0.0.1:54324 and read the 6-digit code from the newest message.
+
+The account is created on first use. Codes expire after an hour.
 
 ## Importing listings
 
