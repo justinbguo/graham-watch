@@ -102,5 +102,9 @@ with a module count means the code compiled and any problem is at runtime.
 
 ## Known limits
 
-Apple and Google sign-in do not work in Expo Go — they need native code it cannot
-load, which requires a development build. Email codes work everywhere.
+Only email codes are enabled. Apple and Google are written but switched off until
+they have credentials, so neither button appears. See the README for what turning
+them on takes.
+
+Apple additionally cannot run in Expo Go — it needs native code Expo Go cannot load,
+which means a development build.

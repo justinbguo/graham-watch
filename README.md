@@ -24,16 +24,30 @@ Docker comes from Colima, not Docker Desktop. Install once with
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
 
-Apple and Google sign-in need a development build, not Expo Go, because both rely on
-native modules and the `graham://` URL scheme. Email codes work anywhere.
+Only email codes are enabled. Apple and Google are written but switched off, because
+neither has credentials yet — see "Enabling Apple and Google" below.
 
 ## Sign-in during local development
 
 Email codes go to the local mail catcher at http://127.0.0.1:54324 rather than a real
 inbox. Enter any email, then read the 6-digit code there.
 
-Google needs OAuth credentials in `supabase/config.toml` under `[auth.external.google]`.
-Apple needs a paid Apple Developer account and a Services ID.
+## Enabling Apple and Google
+
+Both are implemented and both are off. Turning either on takes three matching changes,
+and skipping one gives you `provider is not enabled` from the auth server.
+
+**Google** — create an OAuth client in Google Cloud, then set
+`[auth.external.google] enabled = true` in `supabase/config.toml`, export
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `..._SECRET`, and flip
+`GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
+
+**Apple** — needs the paid Apple Developer Program and a Services ID, plus
+`[auth.external.apple] enabled = true`. It cannot run in Expo Go at all; the button
+hides itself there because the native view is missing, so testing it needs a
+development build.
+
+If you ship on iOS offering Google, App Store review requires Sign in with Apple too.
 
 ## Importing listings
 

@@ -10,7 +10,8 @@ Graham never touches the money. It introduces a buyer to a dealer and gets out o
 
 In:
 
-1. Auth — email OTP, Apple, Google.
+1. Auth — email one-time codes. Apple and Google are built but disabled until
+   someone creates the credentials; see `GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
 2. Deck — swipe through listings. Left passes, right saves.
 3. Saved — the list of right-swipes.
 4. Inquiry — from a saved watch, deliberately contact the dealer.
