@@ -1,5 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
@@ -21,7 +21,14 @@ export default function SignIn() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const styles = useThemedStyles(signInStyles);
+
+  useEffect(() => {
+    isAppleSignInAvailable()
+      .then(setAppleAvailable)
+      .catch(() => setAppleAvailable(false));
+  }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -111,7 +118,7 @@ export default function SignIn() {
               <View style={styles.rule} />
             </View>
 
-            {isAppleSignInAvailable() ? (
+            {appleAvailable ? (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                 buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}

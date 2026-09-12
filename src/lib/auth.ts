@@ -2,8 +2,6 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
-
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -39,7 +37,10 @@ export async function verifyEmailCode(email: string, token: string) {
   if (error) throw error;
 }
 
-export const isAppleSignInAvailable = () => Platform.OS === 'ios';
+// Ask the module, not the platform. Apple Sign In is missing in Expo Go and on
+// older iOS, and rendering its button without the native view logs "Unable to
+// get the view config" and draws nothing.
+export const isAppleSignInAvailable = () => AppleAuthentication.isAvailableAsync();
 
 export async function signInWithApple() {
   const credential = await AppleAuthentication.signInAsync({
