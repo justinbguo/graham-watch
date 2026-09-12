@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -43,6 +44,7 @@ export function SwipeCard({
   isTop: boolean;
 }) {
   const styles = useThemedStyles(cardStyles);
+  const [expanded, setExpanded] = useState(false);
   // Raw finger travel, and the resisted distance the card actually moves.
   const dragX = useSharedValue(0);
   const cardX = useSharedValue(0);
@@ -128,6 +130,20 @@ export function SwipeCard({
               </Text>
             ) : null}
           </View>
+
+          {/* Last in the block so opening it grows downward and leaves the price
+              where the eye already found it. */}
+          {card.description ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={expanded ? 'Collapse description' : 'Read the full description'}
+              disabled={!isTop}
+              onPress={() => setExpanded((open) => !open)}>
+              <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>
+                {card.description}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </Animated.View>
     </GestureDetector>
@@ -178,6 +194,11 @@ const cardStyles = (theme: Theme) => ({
     color: theme.color.brass,
     flexShrink: 1,
     textAlign: 'right' as const,
+  },
+  description: {
+    ...type.caption,
+    color: theme.color.textMuted,
+    paddingTop: space.sm,
   },
   // Colour is the only cue that a drag has caught, so it has to reach the edges
   // of the card. Kept faint: the photograph is the point, not the feedback.

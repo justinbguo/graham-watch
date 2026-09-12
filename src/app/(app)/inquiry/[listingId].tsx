@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
-import { inset, stack, type, type Theme } from '@/lib/theme';
+import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -59,6 +59,9 @@ export default function InquiryScreen() {
           <Eyebrow>{card.brand}</Eyebrow>
           <Text style={styles.model}>{card.model ?? 'Unknown model'}</Text>
           <Message text={`Sold by ${card.dealer?.name ?? 'an unlisted dealer'}`} />
+          {card.description ? (
+            <Text style={styles.description}>{card.description}</Text>
+          ) : null}
         </View>
 
         <Field
@@ -101,6 +104,13 @@ const inquiryStyles = (theme: Theme) => ({
   model: {
     ...type.title,
     color: theme.color.text,
+  },
+  // In full here. You are about to write to a dealer and this is what you have
+  // to go on when deciding what to ask.
+  description: {
+    ...type.body,
+    color: theme.color.textMuted,
+    paddingTop: space.sm,
   },
   messageField: {
     minHeight: 128,
