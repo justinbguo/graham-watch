@@ -61,7 +61,7 @@ async function plainFetch(url: string): Promise<string> {
 }
 
 export async function scrape(url: string): Promise<ScrapeResult> {
-  const provider = (Deno.env.get('SCRAPE_PROVIDER') ?? 'fetch') as ScrapeProvider;
+  const provider = (Deno.env.get('SCRAPE_PROVIDER') ?? 'jina') as ScrapeProvider;
 
   const run = { firecrawl, jina, fetch: plainFetch }[provider];
   if (!run) throw new Error(`Unknown SCRAPE_PROVIDER "${provider}".`);

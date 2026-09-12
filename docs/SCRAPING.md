@@ -8,17 +8,17 @@ Code lives in `supabase/functions/import-listings/scrape.ts`.
 
 | Provider | Cost | Handles JS / anti-bot | Effort |
 | --- | --- | --- | --- |
-| `fetch` (built in) | free | no | none — current default |
-| `jina` | free, key raises limits | partial | one env var |
+| `jina` | free, key raises limits | partial | none — current default |
+| `fetch` (built in) | free | no | none |
 | `firecrawl` | ~$16/mo, free tier | yes, plus proxies | one API key |
 | Browserbase + Stagehand | usage-based | yes, plus clicks and logins | a rewrite of the fetch step |
 | Apify | per result | yes, prebuilt site actors | actor picking and tuning |
 
-**`fetch`** is the default so the pipeline runs with no accounts. It pulls the HTML
-and strips tags. Fine for a static dealer page, useless on anything React-rendered.
+**`jina`** is the default — `GET https://r.jina.ai/<url>` returns markdown, no signup
+needed. The cheapest way to test on real sites. It gives up on heavy anti-bot pages.
 
-**`jina`** — `GET https://r.jina.ai/<url>` returns markdown. No signup needed. The
-cheapest way to test on real sites. It gives up on heavy anti-bot pages.
+**`fetch`** pulls the HTML and strips tags, with no network dependency beyond the
+target site. Fine for a static dealer page, useless on anything React-rendered.
 
 **`firecrawl`** — my recommended default once you're spending money. One call to
 `POST /v2/scrape` with `formats: ['markdown']`, `onlyMainContent: true`. Renders JS,
