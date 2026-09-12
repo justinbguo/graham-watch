@@ -196,22 +196,22 @@ export type Database = {
           id: string
           listing_id: string
           position: number
-          source_url: string | null
-          url: string
+          source_url: string
+          storage_path: string | null
         }
         Insert: {
           id?: string
           listing_id: string
           position?: number
-          source_url?: string | null
-          url: string
+          source_url: string
+          storage_path?: string | null
         }
         Update: {
           id?: string
           listing_id?: string
           position?: number
-          source_url?: string | null
-          url?: string
+          source_url?: string
+          storage_path?: string | null
         }
         Relationships: [
           {

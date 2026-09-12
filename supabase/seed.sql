@@ -46,7 +46,7 @@ with seeded as (
     ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'https://vintagevault.test/6', 'Cartier', 'Tank Must', 'Ref. 5057001', 1988, 'Quartz', 30.0, 'Excellent', true, true, 420000, 'USD', 'Vermeil case, original deployant.')
   returning id, reference
 )
-insert into public.listing_photos (listing_id, url, position)
+insert into public.listing_photos (listing_id, source_url, position)
 select
   seeded.id,
   format('https://picsum.photos/seed/%s/900/1200', seeded.reference),

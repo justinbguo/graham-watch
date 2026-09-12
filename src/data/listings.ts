@@ -1,10 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 
-import type { DeckCard, Listing, ListingPhoto } from '@/lib/models';
+import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
+
+const PHOTO_BUCKET = 'listing-photos';
+
+/** Our copy when we have one, the dealer's own file when a copy failed. */
+function display(photo: ListingPhoto): DeckPhoto {
+  const url = photo.storage_path
+    ? supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path).data.publicUrl
+    : photo.source_url;
+
+  return { ...photo, url };
+}
 
 /** Listings carry only a dealer_id; cards need the dealer's name and link too. */
 export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
@@ -28,10 +39,10 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
   if (photos.error) throw photos.error;
   if (dealers.error) throw dealers.error;
 
-  const photosByListing = new Map<string, ListingPhoto[]>();
+  const photosByListing = new Map<string, DeckPhoto[]>();
   for (const photo of photos.data ?? []) {
     const bucket = photosByListing.get(photo.listing_id) ?? [];
-    bucket.push(photo);
+    bucket.push(display(photo));
     photosByListing.set(photo.listing_id, bucket);
   }
 

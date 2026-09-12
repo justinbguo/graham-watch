@@ -10,6 +10,13 @@ export type Profile = Tables['profiles']['Row'];
 export type Dealer = Tables['dealers']['Row'];
 export type Listing = Tables['listings']['Row'];
 export type ListingPhoto = Tables['listing_photos']['Row'];
+
+/**
+ * A photo row plus the URL to actually display. The database stores where the
+ * photo came from and where our copy lives, never a ready-made URL — that would
+ * bake one environment's hostname into the data.
+ */
+export type DeckPhoto = ListingPhoto & { url: string };
 export type ImportJob = Tables['import_jobs']['Row'];
 export type Inquiry = Tables['inquiries']['Row'];
 
@@ -21,6 +28,6 @@ export type SwipeDirection = Enums['swipe_direction'];
 
 /** A listing plus the photos and dealer a card needs to render. */
 export type DeckCard = Listing & {
-  photos: ListingPhoto[];
+  photos: DeckPhoto[];
   dealer: Pick<Dealer, 'id' | 'name' | 'website'> | null;
 };

@@ -12,15 +12,15 @@ const EXTENSIONS: Record<string, string> = {
 };
 
 export type CopiedPhoto = {
-  url: string;
   source_url: string;
+  storage_path: string | null;
   position: number;
 };
 
 /**
- * Copies one photo into storage and returns the row to insert. Returns the
- * original URL on any failure: a missing photo is worth far less than a failed
- * import, and hot-linking is what we did before anyway.
+ * Copies one photo into storage and returns the row to insert. A failed copy
+ * leaves storage_path null and the reader falls back to the dealer's own URL: a
+ * hot-linked photo is worth far more than a failed import.
  */
 async function copyOne(
   admin: SupabaseClient,
@@ -28,7 +28,7 @@ async function copyOne(
   sourceUrl: string,
   position: number
 ): Promise<CopiedPhoto> {
-  const fallback = { url: sourceUrl, source_url: sourceUrl, position };
+  const fallback = { source_url: sourceUrl, storage_path: null, position };
 
   try {
     const response = await fetch(sourceUrl, {
@@ -52,8 +52,7 @@ async function copyOne(
     });
     if (error) return fallback;
 
-    const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
-    return { url: data.publicUrl, source_url: sourceUrl, position };
+    return { source_url: sourceUrl, storage_path: path, position };
   } catch {
     return fallback;
   }
