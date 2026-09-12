@@ -14,8 +14,11 @@ In:
 2. Deck — swipe through listings. Left passes, right saves.
 3. Saved — the list of right-swipes.
 4. Inquiry — from a saved watch, deliberately contact the dealer.
-5. Import — paste a dealer URL, AI scrapes it, listings appear.
-6. Profile — who you are, what you imported, sign out.
+5. Profile — who you are, appearance, sign out.
+
+Importing is an operator job run from the terminal (`npm run import`), not a screen
+in the app. A buyer has no reason to paste a URL, and giving them one invites
+un-permissioned inventory into the deck.
 
 Out, deliberately, for now: payments and checkout, in-app messaging, admin tooling,
 moderation and reports, ratings, shipping, analytics.
@@ -57,7 +60,8 @@ The only way a listing gets into Graham right now.
 
 1. Someone pastes a URL — a shop page, a collection page, or a single listing.
 2. A dealer row is found or created from the hostname, starting at `pending`.
-3. The app creates an `import_jobs` row and calls the `import-listings` edge function.
+3. `npm run import -- <url>` calls the `import-listings` edge function, which creates
+   an `import_jobs` row.
 4. The function fetches the page through a scrape provider, which returns clean text.
 5. An LLM extracts a typed array of watches against a JSON schema.
 6. Rows land in `listings` and `listing_photos`, attributed to the dealer.
@@ -109,7 +113,8 @@ can approve a dealer through the app.
 
 ## 8. Client
 
-Expo, React Native, TypeScript, Expo Router. Four tabs: Deck, Saved, Import, Profile.
+Expo, React Native, TypeScript, Expo Router. Three tabs: Deck, Saved, Profile. Above
+900px wide the deck becomes a browsable grid; see [DESIGN.md](DESIGN.md).
 Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
 foreground. Supabase types are generated from the schema, not hand-written.
 

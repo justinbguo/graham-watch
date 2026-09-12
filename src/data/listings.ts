@@ -78,18 +78,6 @@ async function fetchSaved(actorId: string): Promise<DeckCard[]> {
   return hydrate(ordered);
 }
 
-async function fetchImported(userId: string): Promise<DeckCard[]> {
-  if (isDemo) return demo.imported();
-
-  const { data, error } = await supabase
-    .from('listings')
-    .select('*')
-    .eq('imported_by', userId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return hydrate(data ?? []);
-}
-
 async function fetchListing(listingId: string): Promise<DeckCard | null> {
   if (isDemo) return demo.listing(listingId);
 
@@ -120,14 +108,6 @@ export function useSaved(userId: string | null) {
   return useQuery({
     queryKey: keys.saved(userId ?? 'anonymous'),
     queryFn: () => fetchSaved(userId!),
-    enabled: Boolean(userId),
-  });
-}
-
-export function useImportedListings(userId: string | null) {
-  return useQuery({
-    queryKey: keys.imported(userId ?? 'anonymous'),
-    queryFn: () => fetchImported(userId!),
     enabled: Boolean(userId),
   });
 }

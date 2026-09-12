@@ -6,9 +6,6 @@
 export const keys = {
   deck: ['deck'] as const,
   saved: (userId: string) => ['saved', userId] as const,
-  imported: (userId: string) => ['imported', userId] as const,
   listing: (listingId: string) => ['listing', listingId] as const,
-  importJobs: (userId: string) => ['import-jobs', userId] as const,
   inquiries: (userId: string) => ['inquiries', userId] as const,
-  dealers: ['dealers'] as const,
 };

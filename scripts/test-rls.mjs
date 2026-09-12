@@ -9,21 +9,11 @@
  * Run with `npm run test:rls` while `supabase start` is up.
  */
 
-import { execSync } from 'node:child_process';
+import { config, serviceKey } from './_supabase.mjs';
 
-const env = Object.fromEntries(
-  execSync('supabase status -o env', { encoding: 'utf8' })
-    .split('\n')
-    .filter((line) => line.includes('='))
-    .map((line) => {
-      const [key, ...rest] = line.split('=');
-      return [key.trim(), rest.join('=').trim().replace(/^"|"$/g, '')];
-    })
-);
-
-const URL = env.API_URL;
-const ANON = env.ANON_KEY;
-const SERVICE = env.SERVICE_ROLE_KEY;
+const URL = config().url;
+const ANON = config().anonKey;
+const SERVICE = serviceKey();
 
 let failures = 0;
 

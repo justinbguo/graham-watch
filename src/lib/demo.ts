@@ -1,4 +1,4 @@
-import type { DeckCard, ImportJob, SwipeDirection } from './models';
+import type { DeckCard, SwipeDirection } from './models';
 
 /**
  * Demo mode runs the whole app against in-memory fixtures, with no Supabase at
@@ -128,7 +128,6 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
 // Swipes live for the life of the process, so the deck and Saved stay in sync
 // while you use the app. A reload starts over, which is what you want in a demo.
 const swiped = new Map<string, SwipeDirection>();
-const demoJobs: ImportJob[] = [];
 
 export const demo = {
   deck: () => CARDS.filter((card) => !swiped.has(card.id)),
@@ -145,25 +144,4 @@ export const demo = {
   },
 
   listing: (listingId: string) => CARDS.find((card) => card.id === listingId) ?? null,
-
-  imported: () => [] as DeckCard[],
-
-  importJobs: () => [...demoJobs],
-
-  startImport: (sourceUrl: string): ImportJob => {
-    const job: ImportJob = {
-      id: `demo-job-${demoJobs.length}`,
-      user_id: DEMO_USER_ID,
-      dealer_id: DEALER.id,
-      source_url: sourceUrl,
-      provider: 'demo',
-      status: 'succeeded',
-      error: null,
-      listings_created: 0,
-      created_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
-    };
-    demoJobs.unshift(job);
-    return job;
-  },
 };
