@@ -44,6 +44,7 @@ export default function Saved() {
           <ListingRow
             card={item}
             actionLabel="Contact"
+            onPress={() => router.push(`/listing/${item.id}`)}
             onAction={() => router.push(`/inquiry/${item.id}`)}
             onLongPress={() => unsave.mutate(item.id)}
           />

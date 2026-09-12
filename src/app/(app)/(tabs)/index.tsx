@@ -48,7 +48,7 @@ export default function Deck() {
 
   if (isPending) {
     return (
-      <Screen title="Deck">
+      <Screen title="Buy">
         <Spinner />
       </Screen>
     );
@@ -56,7 +56,7 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Deck" action={actions}>
+      <Screen title="Buy" action={actions}>
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="secondary" onPress={() => refetch()} />
@@ -67,7 +67,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Deck" action={actions}>
+      <Screen title="Buy" action={actions}>
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -100,7 +100,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Deck" action={actions}>
+      <Screen title="Buy" action={actions}>
         <DeckGrid
           cards={cards}
           onSwipe={(card, direction) => swipe.mutate({ listingId: card.id, direction })}
@@ -117,7 +117,7 @@ export default function Deck() {
   const visible = ordered.slice(0, 3).reverse();
 
   return (
-    <Screen title="Deck" action={actions}>
+    <Screen title="Buy" action={actions}>
       <View style={styles.stage}>
         {visible.map((card, index) => (
           <SwipeCard
@@ -125,6 +125,7 @@ export default function Deck() {
             card={card}
             isTop={index === visible.length - 1}
             onSwipe={(direction) => swipe.mutate({ listingId: card.id, direction })}
+            onOpen={() => router.push(`/listing/${card.id}`)}
           />
         ))}
       </View>

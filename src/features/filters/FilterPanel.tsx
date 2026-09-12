@@ -5,7 +5,9 @@ import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { useFilters, type Surface } from './provider';
-import { ERA_PRESETS, PRICE_PRESETS, SIZE_PRESETS, activeCount, humanize } from './types';
+import { humanize } from '@/lib/format';
+
+import { ERA_PRESETS, PRICE_PRESETS, SIZE_PRESETS, activeCount } from './types';
 
 function Chip({
   label,

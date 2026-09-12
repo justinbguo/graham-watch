@@ -87,7 +87,7 @@ uppercase text also loses the word shapes that make a line quick to skim.
 - Sentence case for everything we write — headings, buttons, labels, hints.
   "Email me a code", not "EMAIL ME A CODE" or "Email Me A Code".
 - Title case only for proper nouns and the words on our own chrome that are
-  already names: the "Graham" wordmark, tab names like "Deck" and "Saved".
+  already names: the "Graham" wordmark, tab names like "Buy" and "Saved".
 - The `eyebrow` separates itself from the title under it by weight and colour,
   not by capitals.
 - Listing text is dealer data, printed as imported. An initialism like IWC or a
@@ -192,7 +192,7 @@ Only offer a filter something can match. Options come from `listing_facets`, so 
 appears once a visible listing is that brand. A filter that can only return nothing is a
 dead end the user has to reverse out of.
 
-One filter set for the whole app. Narrowing in Search and finding the Deck unchanged
+One filter set for the whole app. Narrowing in Search and finding Buy unchanged
 would read as the filter not having applied.
 
 ## Photo carousel
@@ -211,6 +211,27 @@ in card view rather than saving it — there is one way to save, and it is a swi
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
+## Two targets on a card
+
+The photograph pages through the dealer's other shots. The block beneath it opens the
+watch full screen. Both are taps, so they must not overlap: one photo, one panel, a line
+between them and a chevron on the half that navigates.
+
+The description is not on the card. Two lines of prose is a paragraph cut in half — long
+enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
+screen or not at all.
+
+Full screen is the right weight for that screen. A sheet leaves the deck showing behind it
+and invites a swipe to dismiss, which is the gesture that means save.
+
+## Dealer reputation is a placeholder
+
+The panel shows stars, a review count, years trading, watches sold, and a reply time. None
+of it is real: dealers have no accounts and buyers cannot leave feedback. The numbers are
+seeded from the dealer id so they never shuffle, and the panel carries a "Sample" badge and
+a line saying so. `placeholderReputation` in `src/features/dealers/reputation.ts` is the
+one function to replace.
+
 ## The end of the deck
 
 Running out is not an error, so the empty deck offers the only move left: start over, which
@@ -222,7 +243,10 @@ With nothing to put back the offer is a plain refresh instead.
 
 ## No labels on the deck
 
-A drag shows its direction in colour alone: green wash for save, red for pass, both faint
-enough that the photograph stays the subject. The words "Save" and "Pass" are gone, and so
-is the instruction under the deck. A first swipe teaches the gesture faster than a caption,
-and the caption never stops taking up room.
+A drag shows its direction in colour alone: green for save, red for pass. The words "Save"
+and "Pass" are gone, and so is the instruction under the deck. A first swipe teaches the
+gesture faster than a caption, and the caption never stops taking up room.
+
+The colour lands on the card's edge, as a 2px outline that fades in with the drag. A tint
+across the whole card colours the watch itself, which is the one thing on screen that has
+to stay true — a green Submariner is a different watch.

@@ -97,9 +97,3 @@ export function toRpcArgs(filters: Filters) {
     p_year_max: era?.max ?? undefined,
   };
 }
-
-/** Enum values reach the app as snake_case; nobody wants to read "rose_gold". */
-export function humanize(value: string): string {
-  const words = value.replace(/_/g, ' ');
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}

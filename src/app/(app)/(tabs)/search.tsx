@@ -55,7 +55,7 @@ export default function Search() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
-            <ListingRow card={item} onPress={() => router.push(`/inquiry/${item.id}`)} />
+            <ListingRow card={item} onPress={() => router.push(`/listing/${item.id}`)} />
           )}
         />
       )}

@@ -14,3 +14,9 @@ export function formatSpecs(card: Pick<DeckCard, 'reference' | 'year' | 'case_si
     .filter(Boolean)
     .join(' · ');
 }
+
+/** Database enum to something you would say out loud: `yellow_gold` to `Yellow gold`. */
+export function humanize(value: string): string {
+  const words = value.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

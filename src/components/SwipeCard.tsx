@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -13,14 +13,12 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, motion, radius, space, stack, type, type Theme } from '@/lib/theme';
-import { useThemedStyles } from '@/providers/theme';
+import { inset, motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const OFF_SCREEN = SCREEN_WIDTH * 1.5;
-// Worklets only see module-scope values. Keep this faint: the photo stays the point.
-const WASH_OPACITY = 0.22;
 const FLING_VELOCITY = 800;
 // Past the commit point the card returns a third of the finger's travel, so the
 // drag builds tension instead of running away with the thumb.
@@ -37,14 +35,16 @@ function resist(travel: number) {
 export function SwipeCard({
   card,
   onSwipe,
+  onOpen,
   isTop,
 }: {
   card: DeckCard;
   onSwipe: (direction: SwipeDirection) => void;
+  onOpen: () => void;
   isTop: boolean;
 }) {
   const styles = useThemedStyles(cardStyles);
-  const [expanded, setExpanded] = useState(false);
+  const { save, danger, textFaint } = useTheme().color;
   // Raw finger travel, and the resisted distance the card actually moves.
   const dragX = useSharedValue(0);
   const cardX = useSharedValue(0);
@@ -89,12 +89,11 @@ export function SwipeCard({
     ],
   }));
 
-  const saveWashStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(cardX.value, [0, SWIPE_THRESHOLD], [0, WASH_OPACITY], 'clamp'),
-  }));
-
-  const passWashStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(cardX.value, [-SWIPE_THRESHOLD, 0], [WASH_OPACITY, 0], 'clamp'),
+  // One ring for both directions. It is invisible at centre, so the colour
+  // swapping as the card crosses zero is never seen.
+  const edgeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(Math.abs(cardX.value), [0, SWIPE_THRESHOLD], [0, 1], 'clamp'),
+    borderColor: cardX.value > 0 ? save : danger,
   }));
 
   return (
@@ -102,16 +101,16 @@ export function SwipeCard({
       <Animated.View style={[styles.card, cardStyle]}>
         <PhotoCarousel photos={card.photos} active={isTop} />
 
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.wash, styles.saveWash, saveWashStyle]}
-        />
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.wash, styles.passWash, passWashStyle]}
-        />
+        <Animated.View pointerEvents="none" style={[styles.edge, edgeStyle]} />
 
-        <View style={styles.info}>
+        {/* The photo takes taps for paging, so the block under it is what opens
+            the watch in full. Two targets, two jobs, no ambiguity. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${card.brand} ${card.model ?? ''}, open full details`}
+          disabled={!isTop}
+          onPress={onOpen}
+          style={({ pressed }) => [styles.info, pressed && styles.infoPressed]}>
           <Text style={styles.brand} numberOfLines={1}>
             {card.brand}
           </Text>
@@ -131,20 +130,15 @@ export function SwipeCard({
             ) : null}
           </View>
 
-          {/* Last in the block so opening it grows downward and leaves the price
-              where the eye already found it. */}
-          {card.description ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={expanded ? 'Collapse description' : 'Read the full description'}
-              disabled={!isTop}
-              onPress={() => setExpanded((open) => !open)}>
-              <Text style={styles.description} numberOfLines={expanded ? undefined : 2}>
-                {card.description}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+          <View style={styles.moreRow}>
+            <Text style={styles.more}>Details and dealer</Text>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={size.tabIcon}
+              color={textFaint}
+            />
+          </View>
+        </Pressable>
       </Animated.View>
     </GestureDetector>
   );
@@ -164,6 +158,9 @@ const cardStyles = (theme: Theme) => ({
     gap: stack.tight,
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
+  },
+  infoPressed: {
+    backgroundColor: theme.color.surfaceSunken,
   },
   brand: {
     ...type.eyebrow,
@@ -195,20 +192,21 @@ const cardStyles = (theme: Theme) => ({
     flexShrink: 1,
     textAlign: 'right' as const,
   },
-  description: {
-    ...type.caption,
-    color: theme.color.textMuted,
+  moreRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
     paddingTop: space.sm,
   },
-  // Colour is the only cue that a drag has caught, so it has to reach the edges
-  // of the card. Kept faint: the photograph is the point, not the feedback.
-  wash: {
+  more: {
+    ...type.caption,
+    color: theme.color.textFaint,
+  },
+  // The drag reads at the edge, not across the photograph. Two pixels so the
+  // tint survives against a busy image without colouring the watch itself.
+  edge: {
     ...StyleSheet.absoluteFill,
-  },
-  saveWash: {
-    backgroundColor: theme.color.save,
-  },
-  passWash: {
-    backgroundColor: theme.color.danger,
+    borderRadius: radius.lg,
+    borderWidth: 2,
   },
 });
