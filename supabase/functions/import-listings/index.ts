@@ -2,7 +2,7 @@ import { withSupabase } from 'npm:@supabase/server@^1';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { extractListings } from './extract.ts';
-import { scrape } from './scrape.ts';
+import { resolveProvider, scrape } from './scrape.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
 const MAX_PHOTOS_PER_LISTING = 6;
@@ -146,7 +146,7 @@ export default {
       );
     }
 
-    const provider = Deno.env.get('SCRAPE_PROVIDER') ?? 'jina';
+    const provider = resolveProvider();
     const { data: job, error } = await ctx.supabase
       .from('import_jobs')
       .insert({

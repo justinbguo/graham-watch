@@ -6,19 +6,27 @@ Code lives in `supabase/functions/import-listings/scrape.ts`.
 
 ## Fetch step
 
+The provider is chosen automatically: `firecrawl` if `FIRECRAWL_API_KEY` is set,
+otherwise `jina` if `JINA_API_KEY` is set, otherwise `fetch`. Set `SCRAPE_PROVIDER`
+to override.
+
 | Provider | Cost | Handles JS / anti-bot | Effort |
 | --- | --- | --- | --- |
-| `jina` | free, key raises limits | partial | none — current default |
-| `fetch` (built in) | free | no | none |
+| `fetch` (built in) | free | no | none — current default |
+| `jina` | free tier | partial | one API key |
 | `firecrawl` | ~$16/mo, free tier | yes, plus proxies | one API key |
 | Browserbase + Stagehand | usage-based | yes, plus clicks and logins | a rewrite of the fetch step |
 | Apify | per result | yes, prebuilt site actors | actor picking and tuning |
 
-**`jina`** is the default — `GET https://r.jina.ai/<url>` returns markdown, no signup
-needed. The cheapest way to test on real sites. It gives up on heavy anti-bot pages.
+**`fetch`** is the default because it needs nothing configured. It pulls the HTML and
+converts it to text, keeping `<img>` and `<a>` targets as absolute URLs — strip those
+first and the photos are gone before the model ever sees them. Fine for a static
+dealer page, useless on anything React-rendered. When a page returns under 200
+characters, that is the symptom.
 
-**`fetch`** pulls the HTML and strips tags, with no network dependency beyond the
-target site. Fine for a static dealer page, useless on anything React-rendered.
+**`jina`** — `GET https://r.jina.ai/<url>` returns clean markdown. It used to work
+anonymously; it now answers 401 without `JINA_API_KEY`. The free tier is generous and
+this is the cheapest good option.
 
 **`firecrawl`** — my recommended default once you're spending money. One call to
 `POST /v2/scrape` with `formats: ['markdown']`, `onlyMainContent: true`. Renders JS,
@@ -55,6 +63,6 @@ Browserbase clicking through — is the next step if paging matters.
 
 ## Recommendation
 
-Start on `jina` to test against real dealer sites at no cost. Move to `firecrawl`
+Start on `fetch` to test against static dealer sites at no cost. Move to `firecrawl`
 when you hit pages it can't render. Only reach for Browserbase or Apify if a
 specific site you want defeats both.
