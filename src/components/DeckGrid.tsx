@@ -3,7 +3,7 @@ import { FlatList, Image, Platform, Pressable, Text, View, useWindowDimensions }
 
 import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const MIN_TILE_WIDTH = 280;
@@ -157,7 +157,7 @@ const gridStyles = (theme: Theme) => ({
     ...type.caption,
     color: theme.color.textFaint,
     textAlign: 'center' as const,
-    paddingBottom: space.lg,
+    paddingBottom: inset.screen,
   },
   tile: {
     flex: 1,
@@ -184,8 +184,8 @@ const gridStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
   },
   info: {
-    padding: space.lg,
-    gap: space.xs / 2,
+    padding: inset.card,
+    gap: stack.tight,
   },
   brand: {
     ...type.eyebrow,
@@ -193,8 +193,6 @@ const gridStyles = (theme: Theme) => ({
   },
   model: {
     ...type.title,
-    fontSize: 18,
-    lineHeight: 24,
     color: theme.color.text,
     paddingTop: space.xs,
   },
@@ -211,7 +209,6 @@ const gridStyles = (theme: Theme) => ({
   },
   price: {
     ...type.price,
-    fontSize: 16,
     color: theme.color.text,
   },
   dealer: {
@@ -235,8 +232,7 @@ const gridStyles = (theme: Theme) => ({
     backgroundColor: theme.color.border,
   },
   actionLabel: {
-    ...type.label,
-    fontSize: 13,
+    ...type.control,
   },
   saveLabel: {
     color: theme.color.save,

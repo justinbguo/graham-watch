@@ -100,6 +100,30 @@ let dealerId;
   });
   const approved = selfApprove.status < 300 && selfApprove.body?.length > 0;
   check('a user cannot approve their own dealer', !approved, `status ${selfApprove.status}`);
+
+  const rename = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { name: 'Renamed Shop' },
+    prefer: 'return=representation',
+  });
+  check(
+    'an importer can rename a dealer they added',
+    rename.body?.[0]?.name === 'Renamed Shop',
+    `status ${rename.status}`
+  );
+
+  const hijack = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { name: 'Hijacked' },
+    prefer: 'return=representation',
+  });
+  check(
+    'a user cannot rename a dealer someone else added',
+    !(hijack.status < 300 && hijack.body?.length > 0),
+    `status ${hijack.status}`
+  );
 }
 
 console.log('\nlistings');
@@ -172,6 +196,23 @@ console.log('\nswipes');
   const others = await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}`, { token: importer.token });
   check("a user cannot read another user's swipes", others.body?.length === 0);
 }
+
+// The tests approve a dealer to prove the deck respects permission, which put
+// fixtures in front of real users. Clean up rather than leave them there.
+async function cleanUp() {
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+
+  if (dealerId) {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}`, { method: 'DELETE', headers: admin });
+  }
+  for (const user of [importer, buyer]) {
+    if (user?.id) {
+      await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
+    }
+  }
+}
+
+await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);
 process.exit(failures === 0 ? 0 : 1);

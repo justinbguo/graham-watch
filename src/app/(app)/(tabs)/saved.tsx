@@ -5,7 +5,7 @@ import { ListingRow } from '@/components/ListingRow';
 import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { useUnsave } from '@/data/swipes';
-import { space, type, type Theme } from '@/lib/theme';
+import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -66,7 +66,7 @@ export default function Saved() {
 
 const savedStyles = (theme: Theme) => ({
   list: {
-    paddingHorizontal: space.lg,
+    paddingHorizontal: inset.screen,
     flexGrow: 1,
   },
   separator: {

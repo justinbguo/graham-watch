@@ -66,13 +66,12 @@ export const font = {
   bold: 'EBGaramond_700Bold',
 } as const;
 
-/** letterSpacing. Garamond runs wide; tighten everything except all-caps. */
+/** letterSpacing. Garamond runs wide, so every style pulls in a little. */
 export const tracking = {
   display: -1.1,
   title: -0.6,
   body: -0.35,
   label: -0.25,
-  caps: 0.8,
 } as const;
 
 export const type = {
@@ -136,12 +135,13 @@ export const type = {
     lineHeight: 14,
     letterSpacing: tracking.label,
   },
+  // A run-in above a title. Sentence case, so weight and colour do the
+  // separating that capitals used to do.
   eyebrow: {
     fontFamily: font.semibold,
-    fontSize: 12,
-    lineHeight: 16,
-    letterSpacing: tracking.caps,
-    textTransform: 'uppercase',
+    fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: tracking.label,
   },
 } satisfies Record<string, TextStyle>;
 
@@ -188,11 +188,12 @@ export const motion = {
   spring: { damping: 18, stiffness: 180 },
 } as const;
 
+/** Minimum tappable area. Anything smaller needs hitSlop to reach it. */
+export const HIT_TARGET = 44;
+
 export const size = {
   thumb: 72,
   tabIcon: 24,
-  appleButton: 52,
+  appleButton: HIT_TARGET + space.sm,
+  controlMin: HIT_TARGET + space.sm,
 } as const;
-
-/** Minimum tappable area. Anything smaller needs hitSlop to reach it. */
-export const HIT_TARGET = 44;

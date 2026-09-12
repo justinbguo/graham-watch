@@ -7,6 +7,8 @@ import { extractFields, extractListings, type ExtractedFields } from './extract.
 import { copyPhotos } from './photos.ts';
 import { mapPool } from './pool.ts';
 import { resolveProvider, scrape } from './scrape.ts';
+import { fetchShopifyItems } from './shopify.ts';
+import type { SourceItem } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
@@ -57,7 +59,8 @@ async function resolveDealer(
   supabase: SupabaseClient,
   userId: string,
   sourceUrl: string,
-  dealerId?: string
+  dealerId?: string,
+  name?: string
 ): Promise<string> {
   if (dealerId) return dealerId;
 
@@ -66,14 +69,24 @@ async function resolveDealer(
 
   const { data: existing } = await supabase
     .from('dealers')
-    .select('id')
+    .select('id, name')
     .eq('website', website)
     .maybeSingle();
-  if (existing) return existing.id;
+
+  if (existing) {
+    // Dealers imported before we could read the shop's real name are stuck with
+    // their hostname on every card. Re-running the import repairs that.
+    if (name && existing.name === host) {
+      await supabase.from('dealers').update({ name }).eq('id', existing.id);
+    }
+    return existing.id;
+  }
 
   const { data, error } = await supabase
     .from('dealers')
-    .insert({ name: host, website, created_by: userId, permission: 'pending' })
+    // The hostname is a poor name to show on a card, but it is the only one we
+    // have when the caller cannot read the shop's own.
+    .insert({ name: name || host, website, created_by: userId, permission: 'pending' })
     .select('id')
     .single();
 
@@ -92,11 +105,25 @@ type PreparedListing = {
  * ask the model only to type the prose. Otherwise we scrape the page and ask the
  * model to find the watches too, which is the same job with worse inputs.
  */
+const ADAPTERS: Record<string, (url: string, limit: number) => Promise<SourceItem[] | null>> = {
+  shopify: fetchShopifyItems,
+  squarespace: fetchSquarespaceItems,
+};
+
 async function prepare(
   sourceUrl: string,
   limit: number
 ): Promise<{ provider: string; listings: PreparedListing[] }> {
-  const items = await fetchSquarespaceItems(sourceUrl, limit);
+  let items: SourceItem[] | null = null;
+  let adapter = '';
+
+  for (const [name, run] of Object.entries(ADAPTERS)) {
+    items = await run(sourceUrl, limit);
+    if (items?.length) {
+      adapter = name;
+      break;
+    }
+  }
 
   if (items?.length) {
     const failures: unknown[] = [];
@@ -127,7 +154,7 @@ async function prepare(
     // every item identically and must be reported rather than read as "0 found".
     if (!listings.length && failures.length) throw failures[0];
 
-    return { provider: 'squarespace', listings };
+    return { provider: adapter, listings };
   }
 
   const { markdown, provider } = await scrape(sourceUrl);
@@ -237,16 +264,58 @@ export default {
     if (!userId) return Response.json({ error: 'Not signed in.' }, { status: 401 });
 
     let sourceUrl: string;
-    let dealerId: string;
     let limit: number;
+    let dryRun: boolean;
+    let dealerName: string | undefined;
+    let requestedDealerId: string | undefined;
     try {
       const body = await req.json();
-      sourceUrl = assertPublicHttpUrl(String(body?.sourceUrl ?? ''));
-      dealerId = await resolveDealer(ctx.supabase, userId, sourceUrl, body?.dealerId);
       const requested = Number(body?.limit ?? MAX_LISTINGS_PER_IMPORT);
+
+      sourceUrl = assertPublicHttpUrl(String(body?.sourceUrl ?? ''));
       limit = Math.min(
         Math.max(Number.isFinite(requested) ? Math.trunc(requested) : MAX_LISTINGS_PER_IMPORT, 1),
         MAX_LISTINGS_PER_IMPORT
+      );
+      dryRun = Boolean(body?.dryRun);
+      dealerName = typeof body?.dealerName === 'string' ? body.dealerName.trim() : undefined;
+      requestedDealerId = typeof body?.dealerId === 'string' ? body.dealerId : undefined;
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : 'Bad request.' },
+        { status: 400 }
+      );
+    }
+
+    // A preview has to leave nothing behind, so it runs before any dealer row
+    // exists and answers in the request rather than queueing a job.
+    if (dryRun) {
+      try {
+        const { provider, listings } = await prepare(sourceUrl, limit);
+        return Response.json({
+          provider,
+          listings: listings.map((item) => ({
+            ...item.fields,
+            source_url: item.sourceUrl,
+            photo_count: item.photoUrls.length,
+          })),
+        });
+      } catch (error) {
+        return Response.json(
+          { error: error instanceof Error ? error.message : 'Preview failed.' },
+          { status: 502 }
+        );
+      }
+    }
+
+    let dealerId: string;
+    try {
+      dealerId = await resolveDealer(
+        ctx.supabase,
+        userId,
+        sourceUrl,
+        requestedDealerId,
+        dealerName
       );
     } catch (error) {
       return Response.json(

@@ -1,30 +1,14 @@
 import { mapPool } from './pool.ts';
 import { htmlToText } from './scrape.ts';
-
-/**
- * One watch as the dealer's own site describes it, before any model has guessed
- * at it. Facts here are read from the site's data, not inferred.
- */
-export type SourceItem = {
-  title: string;
-  text: string;
-  sourceUrl: string;
-  photoUrls: string[];
-  priceCents: number | null;
-  currency: string | null;
-};
+import { fetchJson, type Json, type SourceItem } from './source.ts';
 
 // Squarespace serves originals at 4000px and several megabytes. A phone deck
 // never needs more than this, and we pay for every byte we copy into storage.
 const PHOTO_WIDTH = '1500w';
-const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
 
 // Product pages are fetched one per listing. Four at a time is brisk for us and
 // unremarkable traffic for the dealer.
 const HYDRATE_CONCURRENCY = 4;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Json = any;
 
 function toCents(money: Json): number | null {
   const value = Number(money?.value);
@@ -66,19 +50,6 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     priceCents: toCents(money),
     currency: typeof money?.currency === 'string' ? money.currency : null,
   };
-}
-
-async function fetchJson(url: URL): Promise<Json | null> {
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
 }
 
 /**

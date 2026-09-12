@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Button, Eyebrow, Message, Screen } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { signOut } from '@/lib/auth';
-import { radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemeContext, useThemedStyles, type ThemePreference } from '@/providers/theme';
 
@@ -60,18 +60,18 @@ export default function Profile() {
 const profileStyles = (theme: Theme) => ({
   body: {
     flex: 1,
-    paddingHorizontal: space.lg,
-    gap: space.xxl,
+    paddingHorizontal: inset.screen,
+    gap: stack.section,
   },
   identity: {
-    gap: space.xs,
+    gap: stack.tight,
   },
   email: {
     ...type.title,
     color: theme.color.text,
   },
   section: {
-    gap: space.md,
+    gap: stack.related,
   },
   segmented: {
     flexDirection: 'row' as const,
@@ -100,6 +100,6 @@ const profileStyles = (theme: Theme) => ({
   },
   footer: {
     marginTop: 'auto' as const,
-    paddingBottom: space.lg,
+    paddingBottom: inset.screen,
   },
 });

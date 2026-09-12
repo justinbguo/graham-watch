@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 
-import { font, space } from '@/lib/theme';
+import { size, type } from '@/lib/theme';
 import { useTheme } from '@/providers/theme';
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -28,10 +28,7 @@ export default function TabsLayout() {
           borderTopColor: theme.color.border,
         },
         tabBarLabelStyle: {
-          fontFamily: font.text.medium,
-          fontSize: 11,
-          letterSpacing: 0.2,
-          paddingTop: space.xs / 2,
+          ...type.tab,
         },
         tabBarIcon: ({ color, focused }) => {
           const icon = ICONS[route.name];
@@ -39,7 +36,7 @@ export default function TabsLayout() {
           return (
             <MaterialCommunityIcons
               name={focused ? icon.active : icon.idle}
-              size={24}
+              size={size.tabIcon}
               color={color}
             />
           );

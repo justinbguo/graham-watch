@@ -11,7 +11,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { motion, radius, space, type, type Theme } from '@/lib/theme';
+import { inset, motion, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -138,8 +138,8 @@ const cardStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
   },
   info: {
-    padding: space.lg,
-    gap: space.xs / 2,
+    padding: inset.card,
+    gap: stack.tight,
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
   },
@@ -180,7 +180,7 @@ const cardStyles = (theme: Theme) => ({
     top: space.xl,
     borderWidth: 1,
     borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
+    paddingHorizontal: inset.controlX,
     paddingVertical: space.sm,
     backgroundColor: theme.color.surface,
   },
@@ -194,9 +194,9 @@ const cardStyles = (theme: Theme) => ({
     borderColor: theme.color.danger,
     transform: [{ rotate: '8deg' }],
   },
+  // Bigger than an eyebrow: this has to read at a glance while the card moves.
   stampLabel: {
-    ...type.eyebrow,
-    fontSize: 13,
+    ...type.title,
   },
   saveLabel: {
     color: theme.color.save,

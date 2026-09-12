@@ -5,9 +5,28 @@ typed listings out of it. The fetch step is pluggable — set `SCRAPE_PROVIDER`.
 Code lives in `supabase/functions/import-listings/scrape.ts`.
 
 Before either step it tries a platform adapter, which is always better when it
-applies. Only Squarespace exists so far.
+applies. Shopify and Squarespace exist so far; they covered three of the first four
+dealers we looked at.
 
 ## Platform adapters
+
+Adapters are tried in order and each returns null when the URL is not its platform.
+All of them reduce to the same `SourceItem` in `source.ts`, so the importer never
+learns which shop software it is talking to.
+
+### Shopify
+
+`shopify.ts` — every Shopify store answers `/products.json` publicly, 250 per page.
+It is the richest source we have: `vendor` states the brand outright, so that is the
+one field the model never guesses. Prices, SKUs and full galleries come with it.
+
+A collection URL reads `/collections/<handle>/products.json` rather than the whole
+shop. Dealers also sell straps, books and tools, so products whose `product_type`
+does not look like a watch are skipped — but an untyped product is kept, because
+plenty of shops leave the field blank. Currency lives in `/meta.json`, never in
+`products.json`. Images take `?width=1500`, which cut a sample from 592KB to 415KB.
+
+### Squarespace
 
 `squarespace.ts` — adding `?format=json` to any Squarespace URL returns the page's
 own data: title, prose, price, and the full image gallery. No markup parsing, no
@@ -25,6 +44,20 @@ as null.
 
 This costs one HTTP request per listing. Imports are capped at 40, and requests run
 four at a time, so a dealer sees ordinary traffic.
+
+## Finding the catalog
+
+`scripts/discover.mjs` turns a bare domain into a catalog URL. Product pages vastly
+outnumber everything else in a sitemap, so the directory holding the most URLs is the
+catalog. Squarespace nests products as `/<collection>/p/<slug>`, so a trailing `/p`
+is dropped — the importable URL is the collection.
+
+It runs in the CLI, not the edge function: it needs no secrets, and the operator has
+to be able to see and override what it guessed with `--url`.
+
+Shop names come from Shopify's `/meta.json`, then `<title>`, then `og:site_name`.
+Title beats `og:site_name` because shops truncate it — Goldfinger's Vintage publishes
+just "Goldfinger" there.
 
 ## Fetch step
 

@@ -6,7 +6,7 @@ import { Button, Centered, Heading, Message, Screen, Spinner } from '@/component
 import { useDeck } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
 import { useIsWide } from '@/lib/layout';
-import { space, type, type Theme } from '@/lib/theme';
+import { inset, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -82,13 +82,13 @@ export default function Deck() {
 const deckStyles = (theme: Theme) => ({
   stage: {
     flex: 1,
-    marginHorizontal: space.lg,
-    marginBottom: space.lg,
+    marginHorizontal: inset.screen,
+    marginBottom: inset.screen,
   },
   hint: {
     ...type.caption,
     color: theme.color.textFaint,
     textAlign: 'center' as const,
-    paddingBottom: space.lg,
+    paddingBottom: inset.screen,
   },
 });

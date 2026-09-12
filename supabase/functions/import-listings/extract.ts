@@ -58,9 +58,12 @@ const PAGE_SCHEMA = objectSchema({
 const ITEM_SCHEMA = objectSchema(FIELDS);
 
 const SHARED_RULES = `Never invent a value: if the text does not state something, return
-null. Prices are in minor units (cents). Vintage dealers date most watches to a decade;
-when only a decade is given, return its first year (\"1960's\" becomes 1960). Read titles
-closely, they usually carry brand, model and reference.`;
+null. Prices are in minor units (cents). Read titles closely, they usually carry brand,
+model and reference.
+
+For year: if a specific year is stated, return exactly that year — "1975 Rolex Datejust"
+is 1975, not 1970. Only when a decade alone is given ("1960's", "mid sixties") return the
+first year of that decade. Circa dates are specific years: "c. 1948" is 1948.`;
 
 const PAGE_PROMPT = `You extract vintage watch listings from scraped web pages.
 Return one entry per watch actually for sale on the page. Ignore navigation, blog

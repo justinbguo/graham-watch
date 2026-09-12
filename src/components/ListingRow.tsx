@@ -2,7 +2,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 
 import { formatPrice } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
-import { radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 export function ListingRow({
@@ -43,7 +43,7 @@ export function ListingRow({
       </View>
 
       {actionLabel && onAction ? (
-        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={12} style={styles.action}>
+        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={space.md} style={styles.action}>
           <Text style={styles.actionLabel}>{actionLabel}</Text>
         </Pressable>
       ) : null}
@@ -59,8 +59,8 @@ const rowStyles = (theme: Theme) => ({
     paddingVertical: space.md,
   },
   thumb: {
-    width: 72,
-    height: 72,
+    width: size.thumb,
+    height: size.thumb,
     borderRadius: radius.sm,
     backgroundColor: theme.color.surfaceSunken,
   },
@@ -70,7 +70,7 @@ const rowStyles = (theme: Theme) => ({
   },
   body: {
     flex: 1,
-    gap: 1,
+    gap: stack.tight,
   },
   brand: {
     ...type.eyebrow,
@@ -79,7 +79,7 @@ const rowStyles = (theme: Theme) => ({
   model: {
     ...type.bodyStrong,
     color: theme.color.text,
-    paddingTop: space.xs / 2,
+    paddingTop: space.xs,
   },
   price: {
     ...type.caption,
@@ -93,12 +93,11 @@ const rowStyles = (theme: Theme) => ({
     borderWidth: 1,
     borderColor: theme.color.borderStrong,
     borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
+    paddingHorizontal: inset.controlX,
     paddingVertical: space.sm,
   },
   actionLabel: {
-    ...type.label,
-    fontSize: 13,
+    ...type.control,
     color: theme.color.text,
   },
 });

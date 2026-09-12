@@ -1,11 +1,9 @@
-// Imported per weight, not from the package root: the root re-exports all 36
-// weights and Metro then bundles every one of them (3.6MB of unused TTFs).
-import { Archivo_400Regular } from '@expo-google-fonts/archivo/400Regular';
-import { Archivo_500Medium } from '@expo-google-fonts/archivo/500Medium';
-import { Archivo_600SemiBold } from '@expo-google-fonts/archivo/600SemiBold';
-import { Fraunces_400Regular } from '@expo-google-fonts/fraunces/400Regular';
-import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
-import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
+// Imported per weight, not from the package root: the root re-exports every
+// cut and Metro then bundles unused TTFs.
+import { EBGaramond_400Regular } from '@expo-google-fonts/eb-garamond/400Regular';
+import { EBGaramond_500Medium } from '@expo-google-fonts/eb-garamond/500Medium';
+import { EBGaramond_600SemiBold } from '@expo-google-fonts/eb-garamond/600SemiBold';
+import { EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond/700Bold';
 import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -26,12 +24,10 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Fraunces_400Regular,
-    Fraunces_600SemiBold,
-    Fraunces_700Bold,
-    Archivo_400Regular,
-    Archivo_500Medium,
-    Archivo_600SemiBold,
+    EBGaramond_400Regular,
+    EBGaramond_500Medium,
+    EBGaramond_600SemiBold,
+    EBGaramond_700Bold,
   });
 
   // A failed font load must not block the app — fall through to system faces.

@@ -54,10 +54,18 @@ If you ship on iOS offering Google, App Store review requires Sign in with Apple
 Importing is an operator job, so it runs from the terminal rather than the app:
 
 ```
-npm run import -- https://dealer.example.com/watches
-npm run dealers                      # list dealers and their permission
-npm run dealers -- approve <id|host> # publish their listings to the deck
+npm run dealers -- add goldfingersvintage.com   # the whole flow, from a domain
+npm run dealers                                 # list dealers and their permission
+npm run dealers -- approve <id|host>            # publish their listings
+npm run dealers -- revoke  <id|host>            # pull them back
 ```
+
+`add` finds the dealer's catalog from their sitemap, reads their shop name, prints a
+few watches it extracted, and waits for you before writing anything. Then it imports
+and approves in one step. Flags: `--limit 10`, `--url <catalog>`, `--name "Shop"`.
+
+Use `npm run import -- <url> --limit 10` to re-run a dealer you have already added.
+Listings already imported are skipped, so it is safe to repeat.
 
 Imported listings stay invisible to everyone but the importer until the dealer is
 approved, and RLS makes self-approval impossible. That is deliberate: it keeps a shop's
@@ -102,5 +110,6 @@ supabase/functions  import-listings edge function
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
 | `npm run db:reset` | Re-apply migrations and seed |
 | `npm run db:types` | Regenerate `src/lib/database.types.ts` from the live schema |
-| `npm run import -- <url>` | Import a dealer's listings |
+| `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
+| `npm run import -- <url>` | Re-import a dealer you already added |
 | `npm run dealers` | List, approve, or revoke dealers |

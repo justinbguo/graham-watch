@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
-import { space, type, type Theme } from '@/lib/theme';
+import { inset, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -91,12 +91,12 @@ export default function InquiryScreen() {
 const inquiryStyles = (theme: Theme) => ({
   body: {
     flex: 1,
-    paddingHorizontal: space.lg,
-    paddingBottom: space.lg,
-    gap: space.lg,
+    paddingHorizontal: inset.screen,
+    paddingBottom: inset.screen,
+    gap: stack.related,
   },
   summary: {
-    gap: space.xs,
+    gap: stack.tight,
   },
   model: {
     ...type.title,
@@ -108,6 +108,6 @@ const inquiryStyles = (theme: Theme) => ({
   },
   actions: {
     marginTop: 'auto' as const,
-    gap: space.sm,
+    gap: stack.related,
   },
 });

@@ -1,34 +1,38 @@
 ---
 description: Design system rules for any UI work
-globs: src/app/**/*.tsx,src/components/**/*.tsx,src/lib/theme.ts,src/providers/theme.tsx
+globs: src/app/**/*.tsx,src/components/**/*.tsx,src/lib/theme.ts,src/lib/design.ts,src/providers/theme.tsx
 alwaysApply: false
 ---
 
 # Design
 
-Read `docs/DESIGN.md` before changing anything visual. It is the source of truth
-for colour, type, space, and motion; this rule only enforces the parts that are
-easiest to break.
+Read `docs/DESIGN.md` before changing anything visual. Encode every number in
+`src/lib/design.ts` in the same change. Markdown that is not a token is a rule
+nobody follows.
 
 ## Never
 
-- A literal hex value, `fontSize`, `fontFamily`, or raw pixel gap in a component.
-  Everything comes from `src/lib/theme.ts`.
+- A literal hex value, `fontSize`, `fontFamily`, `letterSpacing`, or raw pixel
+  gap in a component. Everything comes from `src/lib/design.ts`.
 - `StyleSheet.create` at module scope with colours in it. Colours change when the
   scheme flips, so styles come from `useThemedStyles(factory)`.
-- A third font family, or a system font beside Fraunces and Archivo.
+- A second font family, or a system font beside EB Garamond.
+- `textTransform: 'uppercase'`, or a string literal written in caps. Copy we
+  write is sentence case; only proper nouns take a capital. Dealer data
+  (brand, model, reference) is printed as imported and never re-cased.
 - An icon from outside `MaterialCommunityIcons`.
 - `save` or `danger` colour used for anything but saving and passing.
 
 ## Always
 
-- Spread a style from `type` rather than setting size and family by hand.
-- Use `space` and `radius` tokens. If the design needs a value that is not in the
-  scale, change the scale deliberately and write down why.
+- Spread a style from `type` rather than setting size, family, or tracking by hand.
+- Use `space`, `inset`, `stack`, and `radius`. If the design needs a value that
+  is not in the scale, change the scale deliberately and write down why.
 - Check both schemes. Dark mode is a warm charcoal, not an inversion.
 - Keep tappable areas at `HIT_TARGET` or give them `hitSlop`.
 
 ## When the rules do not cover it
 
-Decide, build it, and add the rule to `docs/DESIGN.md` in the same change. An
-undocumented one-off becomes the thing the next screen copies.
+Decide, build it, and add the rule to `docs/DESIGN.md` and `src/lib/design.ts`
+in the same change. An undocumented one-off becomes the thing the next screen
+copies.

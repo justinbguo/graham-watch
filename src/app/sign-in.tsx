@@ -11,7 +11,7 @@ import {
   signInWithGoogle,
   verifyEmailCode,
 } from '@/lib/auth';
-import { radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 type Stage = 'email' | 'code';
@@ -149,11 +149,11 @@ const signInStyles = (theme: Theme) => ({
   container: {
     flex: 1,
     justifyContent: 'center' as const,
-    paddingHorizontal: space.xl,
-    gap: space.xxl,
+    paddingHorizontal: inset.screen,
+    gap: stack.section,
   },
   header: {
-    gap: space.sm,
+    gap: stack.tight,
   },
   wordmark: {
     ...type.wordmark,
@@ -164,7 +164,7 @@ const signInStyles = (theme: Theme) => ({
     color: theme.color.textMuted,
   },
   form: {
-    gap: space.md,
+    gap: stack.related,
   },
   codeField: {
     // A code is read back digit by digit, so give it room to breathe.
@@ -186,6 +186,6 @@ const signInStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
   },
   appleButton: {
-    height: 52,
+    height: size.appleButton,
   },
 });

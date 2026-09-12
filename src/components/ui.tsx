@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HIT_TARGET, radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export function Screen({ title, children }: PropsWithChildren<{ title?: string }>) {
@@ -116,9 +116,9 @@ const screenStyles = (theme: Theme) => ({
   title: {
     ...type.display,
     color: theme.color.text,
-    paddingHorizontal: space.lg,
-    paddingTop: space.sm,
-    paddingBottom: space.lg,
+    paddingHorizontal: inset.screen,
+    paddingTop: space.md,
+    paddingBottom: space.xl,
   },
 });
 
@@ -126,11 +126,11 @@ const buttonStyles = (theme: Theme) => ({
   base: {
     backgroundColor: theme.color.accent,
     borderRadius: radius.md,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.xl,
+    paddingVertical: inset.controlY,
+    paddingHorizontal: inset.controlX,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    minHeight: HIT_TARGET + 8,
+    minHeight: size.controlMin,
     borderWidth: 1,
     borderColor: theme.color.accent,
   },
@@ -164,10 +164,10 @@ const fieldStyles = (theme: Theme) => ({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: radius.md,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.lg,
+    paddingHorizontal: inset.controlX,
+    paddingVertical: inset.controlY,
     color: theme.color.text,
-    minHeight: HIT_TARGET + 8,
+    minHeight: size.controlMin,
   },
 });
 
@@ -196,7 +196,7 @@ const messageStyles = (theme: Theme) => ({
     flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    padding: space.xl,
-    gap: space.sm,
+    padding: space.xxl,
+    gap: stack.related,
   },
 });

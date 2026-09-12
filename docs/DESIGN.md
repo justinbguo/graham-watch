@@ -1,8 +1,10 @@
 # Graham design system
 
-The rules the interface follows. Tokens live in `src/lib/theme.ts`; this file
-says what they mean and when to reach for each one. Change this file and the
-tokens together — a rule nobody encoded is a rule nobody follows.
+The rules the interface follows. Tokens live in `src/lib/design.ts`; this file
+says what they mean and when to reach for each one. Change them together — a
+rule nobody encoded is a rule nobody follows.
+
+`src/lib/theme.ts` re-exports the tokens so existing imports keep working.
 
 ## Principle
 
@@ -43,15 +45,13 @@ Rules:
 
 ## Typography
 
-Two families, and that is the whole system.
+One family: **EB Garamond**. It is an old-style book serif, so the wordmark, the
+watch name, and the price all come from the same cut. Never introduce a second
+family. Never use a system font next to it; the mismatch is more visible than
+any weight you would gain.
 
-**Fraunces** (display) is an old-style serif with real character. It carries the
-wordmark, screen titles, and watch model names — the words a person came to
-read. **Archivo** (text) is a grotesque that stays quiet underneath and has the
-figures that prices, reference numbers, and case sizes need.
-
-Never introduce a third family. Never use a system font next to these; the
-mismatch is more visible than any weight you would gain.
+Garamond's default tracking is wide, so every style pulls in a little with
+negative `letterSpacing` from `tracking` in `src/lib/design.ts`.
 
 | Style | Use |
 | --- | --- |
@@ -59,24 +59,51 @@ mismatch is more visible than any weight you would gain.
 | `display` | Screen titles |
 | `title` | Watch model, section headings, empty-state headlines |
 | `body` / `bodyStrong` | Paragraphs and input text |
-| `label` | Buttons and controls |
+| `label` | Buttons |
+| `control` | Compact actions: row chips, tile buttons |
 | `caption` | Specs, helper text, hints |
-| `price` | Prices, in Archivo so digits align |
-| `eyebrow` | Uppercase run-in above a title — the brand, a section name |
+| `price` | Prices |
+| `tab` | Tab bar labels |
+| `eyebrow` | Run-in above a title — the brand, a section name |
 
 Rules:
 
-- Never set `fontSize` or `fontFamily` directly. Spread a style from `type`.
-- Line length caps around 65 characters. Past that, split the paragraph.
+- Never set `fontSize`, `fontFamily`, or `letterSpacing` directly. Spread a
+  style from `type`.
+- Line length stays around 65 characters. Past that, split the paragraph.
 - One `display` per screen. Two headlines means neither is the headline.
+
+## Capitalization
+
+Nothing is set in all caps. No `textTransform: 'uppercase'`, no shouting string
+literals. Garamond is a book face: capitals sit too wide and too loud in it, and
+uppercase text also loses the word shapes that make a line quick to skim.
+
+- Sentence case for everything we write — headings, buttons, labels, hints.
+  "Email me a code", not "EMAIL ME A CODE" or "Email Me A Code".
+- Title case only for proper nouns and the words on our own chrome that are
+  already names: the "Graham" wordmark, tab names like "Deck" and "Saved".
+- The `eyebrow` separates itself from the title under it by weight and colour,
+  not by capitals.
+- Listing text is dealer data, printed as imported. An initialism like IWC or a
+  reference like `ST 145.022` is correct in caps, so we never re-case a brand,
+  model, or reference — normalizing that would mangle more rows than it fixed.
 
 ## Space and shape
 
-Spacing comes from `space` — `xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32,
-`xxxl` 48. Nothing in between. If a layout needs 18px, the layout is wrong.
+Spacing comes from `space` — `xs` 4, `sm` 8, `md` 16, `lg` 24, `xl` 32, `xxl` 48,
+`xxxl` 72. Nothing in between. If a layout needs 20px, the layout is wrong.
 
-`lg` (16) is the screen gutter and the default gap between related things. `xxl`
-separates unrelated sections.
+Named jobs sit on top of that scale so a screen does not guess:
+
+- `inset.screen` (24) is the page gutter. Cards use `inset.card` (also 24).
+- `inset.controlY` / `inset.controlX` pad buttons and fields. Do not use
+  `space.lg` inside a control — that token is for the page, not the chrome.
+- `stack.tight` groups a title with its caption. `stack.related` groups a field
+  with its button. `stack.section` separates unrelated blocks.
+
+The room around a watch is the product. Prefer the next larger step over
+squeezing copy in.
 
 Radius comes from `radius` — `sm` 8 for thumbnails and inner controls, `md` 14
 for buttons, fields, and tiles, `lg` 22 for the swipe card, `pill` for badges and
@@ -106,8 +133,8 @@ things look bloated.
 ## Iconography
 
 One family: `MaterialCommunityIcons`. Outline when idle, solid when active. Size
-24 in the tab bar. Mixing icon families is the fastest way to make an interface
-look assembled rather than designed.
+comes from `size.tabIcon`. Mixing icon families is the fastest way to make an
+interface look assembled rather than designed.
 
 ## Platform
 
@@ -120,7 +147,7 @@ share the hooks, rewrite the layout.
 
 Things we have not decided yet. Move them up into rules once we do.
 
-- A real wordmark or logotype, versus Fraunces set large.
+- A real wordmark or logotype, versus EB Garamond set large.
 - Photo treatment: do listing images get a consistent crop and background?
 - An empty-state illustration, or stay typographic.
 - Haptics on swipe commit.
