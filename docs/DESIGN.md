@@ -286,6 +286,26 @@ you can still see in Saved, and replaying it risks losing a save to a stray thum
 The count is in the copy — "the 20 you passed on" — so the button is a promise, not a guess.
 With nothing to put back the offer is a plain refresh instead.
 
+## Undo goes back one
+
+Start over is the cure for a long afternoon of passing. The cure for a thumb slip is the undo
+arrow in the deck header, which takes back the last pass and only the last pass. Deeper history
+would need a stack the user has no way to see the bottom of, and a watch two swipes ago is not
+what anyone is reaching for.
+
+Only passes. A save is already sitting in Saved with an undo of its own, so a right swipe
+retires the offer rather than queueing behind it — the arrow greys out, which is the honest
+answer to "what would this bring back?".
+
+The arrow never leaves the header. Showing it only when it works would shift the other two
+controls sideways on every swipe, and the deck is the one screen that has to sit still under a
+moving thumb. Faint means unavailable, the same language the view toggle already speaks.
+
+The row is deleted, not flipped to a third direction. The watch has to be genuinely unjudged
+afterwards, or it stays out of the deck on the next fetch and the undo turns out to have been
+a lie. It comes back on top of the pile rather than wherever the server would rank it, because
+the user is correcting a mistake and expects that same watch.
+
 ## No labels on the deck
 
 A drag shows its direction in colour alone: green for save, red for pass. The words "Save"

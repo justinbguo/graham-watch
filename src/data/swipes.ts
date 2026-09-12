@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useFilters } from '@/features/filters/provider';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
@@ -81,6 +82,39 @@ export function useRecordSwipe(actorId: string | null) {
       if (!actorId) return;
       const affected = direction === 'right' ? keys.saved(actorId) : keys.passes(actorId);
       queryClient.invalidateQueries({ queryKey: affected });
+    },
+  });
+}
+
+/**
+ * A pass is the only swipe with nothing to show for it — a save is still sitting
+ * in Saved, waiting to be undone there. The row is deleted rather than flipped,
+ * so the watch is genuinely unjudged and returns to any freshly fetched deck.
+ */
+export function useUndoPass(actorId: string | null) {
+  const queryClient = useQueryClient();
+  const { filters } = useFilters('deck');
+  const deckKey = keys.deck(filters);
+
+  return useMutation({
+    mutationFn: (card: DeckCard) => {
+      if (!actorId) throw new Error('Not signed in.');
+      return deleteSwipe(actorId, card.id);
+    },
+    onMutate: (card) => {
+      // Onto the top of the pile, not wherever the server would rank it. The
+      // user is correcting a thumb slip and expects that same watch back.
+      queryClient.setQueryData<DeckCard[]>(deckKey, (deck) =>
+        !deck || deck.some((entry) => entry.id === card.id) ? deck : [card, ...deck]
+      );
+    },
+    onError: (_error, card) => {
+      queryClient.setQueryData<DeckCard[]>(deckKey, (deck) =>
+        (deck ?? []).filter((entry) => entry.id !== card.id)
+      );
+    },
+    onSuccess: () => {
+      if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
 }

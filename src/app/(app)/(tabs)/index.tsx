@@ -5,13 +5,15 @@ import { View } from 'react-native';
 import { DeckGrid } from '@/components/DeckGrid';
 import { FilterButton } from '@/components/FilterButton';
 import { SwipeCard } from '@/components/SwipeCard';
+import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck, usePrimeListing } from '@/data/listings';
-import { usePassCount, useRecordSwipe, useStartOver } from '@/data/swipes';
+import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useIsWide } from '@/lib/layout';
+import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -23,6 +25,7 @@ export default function Deck() {
   const primeListing = usePrimeListing();
   const { data: passes = 0 } = usePassCount(userId);
   const startOver = useStartOver(userId);
+  const undoPass = useUndoPass(userId);
   const isWide = useIsWide();
   const styles = useThemedStyles(deckStyles);
   const router = useRouter();
@@ -31,6 +34,21 @@ export default function Deck() {
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [lastPass, setLastPass] = useState<DeckCard | null>(null);
+
+  // One step back, and only for a pass. A save is recoverable from the Saved
+  // tab, so a right swipe retires the offer instead of queueing behind it.
+  const judge = (card: DeckCard, direction: SwipeDirection) => {
+    swipe.mutate({ listingId: card.id, direction });
+    setLastPass(direction === 'left' ? card : null);
+  };
+
+  const undo = lastPass
+    ? () => {
+        undoPass.mutate(lastPass);
+        setLastPass(null);
+      }
+    : undefined;
 
   // Opening a watch from the grid puts it on top of the pile. Once it is swiped
   // away it leaves `cards` and the natural order resumes on its own.
@@ -42,6 +60,7 @@ export default function Deck() {
 
   const actions = (
     <View style={styles.actions}>
+      <UndoButton onPress={undo} />
       <FilterButton count={count} onPress={() => router.push('/filters/deck')} />
       <ViewToggle value={view} onChange={setView} />
     </View>
@@ -104,7 +123,7 @@ export default function Deck() {
       <Screen title="Buy" action={actions}>
         <DeckGrid
           cards={cards}
-          onSwipe={(card, direction) => swipe.mutate({ listingId: card.id, direction })}
+          onSwipe={judge}
           onOpen={(card) => {
             setFocusId(card.id);
             setView('cards');
@@ -125,7 +144,7 @@ export default function Deck() {
             key={card.id}
             card={card}
             isTop={index === visible.length - 1}
-            onSwipe={(direction) => swipe.mutate({ listingId: card.id, direction })}
+            onSwipe={(direction) => judge(card, direction)}
             onOpen={() => {
               primeListing(card);
               router.push(`/listing/${card.id}`);

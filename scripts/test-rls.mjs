@@ -269,6 +269,31 @@ console.log('\nswipes');
     'starting over clears the passes and keeps the saves',
     mine.body?.length === 1 && mine.body[0].direction === 'right'
   );
+
+  // Undo is that same delete narrowed to one row. The watch has to be genuinely
+  // unjudged afterwards, not merely hidden by the client.
+  await api('/rest/v1/swipes', {
+    token: buyer.token,
+    method: 'POST',
+    body: { actor_id: buyer.id, listing_id: passedId, direction: 'left' },
+  });
+  await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}&listing_id=eq.${passedId}`, {
+    token: buyer.token,
+    method: 'DELETE',
+  });
+  const undone = await api('/rest/v1/rpc/get_deck', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 50 },
+  });
+  check(
+    'undoing a pass puts the watch back in the deck',
+    undone.body?.some((row) => row.id === passedId)
+  );
+  check(
+    'undoing a pass leaves the saved watch out of the deck',
+    !undone.body?.some((row) => row.id === listingId)
+  );
 }
 
 console.log('\ndealer contact and stats');
