@@ -89,15 +89,45 @@ land in Mailpit instead of a real inbox — checking Gmail will never show one.
 
 The account is created on first use. Codes expire after an hour.
 
-## Importing listings
+## Managing dealers
 
 ```
-npm run import -- https://dealer.example.com/watches
-npm run dealers
-npm run dealers -- approve <id-or-hostname>
+npm run dealers                          # who is in, and whether we can email them
+npm run dealers -- add <domain>          # discover, preview, import, approve
+npm run dealers -- set <id|host>         # re-read their name and address from their site
+npm run dealers -- stats <id|host>       # saves and inquiries per watch
+npm run dealers -- remove <id|host>      # delete them, their listings and their photos
+npm run dealers -- approve <id|host>
+npm run dealers -- revoke <id|host>
 ```
 
 Nothing a dealer owns reaches another user's deck until you approve them.
+
+`add` reads a contact address off the dealer's site — a `mailto:` link, the contact
+page, sometimes the terms page. A dealer without one shows a warning in `list`, and
+inquiries for their watches fail with "we have no address for this dealer yet".
+Fix it with `set --email`.
+
+`remove` deletes the photo files too. Foreign keys cascade the rows; storage has no
+idea the listing is gone, so the CLI clears it.
+
+## Inquiry email
+
+A buyer swipes right to save. Sending an inquiry is a separate, deliberate act, and
+it is the only thing that emails a dealer. The mail comes from Graham with the
+buyer's address as Reply-To, so the dealer's reply goes straight to them.
+
+Locally the mail lands in Mailpit (http://127.0.0.1:54324), same inbox as sign-in
+codes. In production set `RESEND_API_KEY` and the function uses Resend instead.
+
+A send that fails leaves the inquiry at `failed`. The buyer can try again — the
+second attempt reuses the same row rather than being told they already asked.
+
+## What a dealer may know
+
+`npm run dealers -- stats` shows counts only: how many people saved a watch and how
+many asked about it. It never shows who. Buyers' swipes stay private to them, and
+the function refuses to run for anyone but the person who added the dealer.
 
 ## Before committing
 

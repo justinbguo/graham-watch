@@ -74,7 +74,7 @@ console.log('\nprofiles');
 console.log('\ndealers');
 let dealerId;
 {
-  const escalation = await api('/rest/v1/dealers', {
+  const escalation = await api('/rest/v1/dealers?select=id,name,permission', {
     token: importer.token,
     method: 'POST',
     body: { name: 'Self Approved', website: `https://evil-${stamp}.test`, created_by: importer.id, permission: 'approved' },
@@ -82,7 +82,7 @@ let dealerId;
   });
   check('a user cannot create a pre-approved dealer', escalation.status >= 400, `got ${escalation.status}`);
 
-  const created = await api('/rest/v1/dealers', {
+  const created = await api('/rest/v1/dealers?select=id,name,permission', {
     token: importer.token,
     method: 'POST',
     body: { name: 'Vintage Vault', website: `https://vault-${stamp}.test`, created_by: importer.id },
@@ -92,7 +92,7 @@ let dealerId;
   dealerId = created.body?.[0]?.id;
   check('the new dealer starts pending', created.body?.[0]?.permission === 'pending');
 
-  const selfApprove = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+  const selfApprove = await api(`/rest/v1/dealers?id=eq.${dealerId}&select=id,permission`, {
     token: importer.token,
     method: 'PATCH',
     body: { permission: 'approved' },
@@ -101,7 +101,7 @@ let dealerId;
   const approved = selfApprove.status < 300 && selfApprove.body?.length > 0;
   check('a user cannot approve their own dealer', !approved, `status ${selfApprove.status}`);
 
-  const rename = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+  const rename = await api(`/rest/v1/dealers?id=eq.${dealerId}&select=id,name`, {
     token: importer.token,
     method: 'PATCH',
     body: { name: 'Renamed Shop' },
@@ -113,7 +113,7 @@ let dealerId;
     `status ${rename.status}`
   );
 
-  const hijack = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+  const hijack = await api(`/rest/v1/dealers?id=eq.${dealerId}&select=id,name`, {
     token: buyer.token,
     method: 'PATCH',
     body: { name: 'Hijacked' },
@@ -195,6 +195,47 @@ console.log('\nswipes');
 
   const others = await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}`, { token: importer.token });
   check("a user cannot read another user's swipes", others.body?.length === 0);
+}
+
+console.log('\ndealer contact and stats');
+{
+  const leak = await api(`/rest/v1/dealers?id=eq.${dealerId}&select=contact_email`, {
+    token: buyer.token,
+  });
+  check("a buyer cannot read a dealer's contact address", leak.status >= 400, `got ${leak.status}`);
+
+  const visible = await api(`/rest/v1/dealers?id=eq.${dealerId}&select=id,name`, {
+    token: buyer.token,
+  });
+  check('a buyer can still read a dealer name', visible.body?.length === 1);
+
+  const own = await api('/rest/v1/rpc/dealer_stats', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check('an importer sees stats for their own dealer', own.status === 200, `got ${own.status}`);
+  check(
+    'stats count the swipe without naming who made it',
+    own.body?.some((row) => row.saves === 1) && !JSON.stringify(own.body).includes(buyer.id)
+  );
+
+  const stranger = await api('/rest/v1/rpc/dealer_stats', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    "a user cannot read stats for someone else's dealer",
+    stranger.status >= 400,
+    `got ${stranger.status}`
+  );
+
+  const signedOut = await api('/rest/v1/rpc/dealer_stats', {
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check('a signed-out visitor cannot read stats', signedOut.status >= 400, `got ${signedOut.status}`);
 }
 
 // The tests approve a dealer to prove the deck respects permission, which put

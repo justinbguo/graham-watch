@@ -3,6 +3,9 @@
  *
  *   npm run dealers                       list every dealer
  *   npm run dealers -- add <domain>       find, preview, import and approve
+ *   npm run dealers -- set <id|host>      change --email or --name
+ *   npm run dealers -- stats <id|host>    saves and inquiries per watch
+ *   npm run dealers -- remove <id|host>   delete them, their listings and photos
  *   npm run dealers -- approve <id|host>  publish their listings
  *   npm run dealers -- revoke  <id|host>  pull them back
  *
@@ -54,6 +57,7 @@ async function list() {
     const mark = dealer.permission === 'approved' ? '●' : '○';
     console.log(`  ${mark} ${dealer.permission.padEnd(9)} ${String(count).padStart(3)} listings  ${dealer.name}`);
     console.log(`    ${dealer.website ?? 'no website'}  ${dealer.id}`);
+    console.log(`    ${dealer.contact_email ?? '⚠ no contact address — inquiries cannot send'}`);
   }
   console.log('\n  ● live in the deck   ○ hidden from everyone but the importer\n');
 }
@@ -111,9 +115,11 @@ async function add() {
 
   const name = typeof flags.name === 'string' ? flags.name : found.name;
   const catalogUrl = typeof flags.url === 'string' ? flags.url : found.catalogUrl;
+  const email = typeof flags.email === 'string' ? flags.email : found.email;
 
   console.log(`\n  ${name}`);
   console.log(`  ${found.platform} · ${catalogUrl}`);
+  console.log(`  ${email ?? 'no contact address found — set one with --email'}`);
   if (found.productCount) console.log(`  about ${found.productCount} products listed in their sitemap`);
   if (!found.sawSitemap) console.log('  no sitemap, so the catalog URL is a guess — pass --url to set it');
   if (found.platform === 'generic') {
@@ -137,7 +143,7 @@ async function add() {
   console.log('');
   printSample(sample.listings);
 
-  if (!(await confirm(`\nImport ${limit} listings from ${name} and publish them?`))) {
+  if (flags.yes !== true && !(await confirm(`\nImport ${limit} listings from ${name} and publish them?`))) {
     console.log('Nothing imported.');
     return;
   }
@@ -146,6 +152,7 @@ async function add() {
     sourceUrl: catalogUrl,
     limit,
     dealerName: name,
+    dealerEmail: email ?? undefined,
     token: operator.token,
     onProgress: (current) => process.stdout.write(`\r  ${current.status}…    `),
   });
@@ -155,6 +162,176 @@ async function add() {
   if (job.error) console.log(job.error);
 
   await setPermission('approved', new URL(catalogUrl).hostname.replace(/^www\./, ''));
+}
+
+async function findDealer(subject) {
+  const isUuid = /^[0-9a-f-]{36}$/i.test(subject);
+  const filter = isUuid ? `id=eq.${subject}` : `website=ilike.*${subject}*`;
+  const { body } = await request(`/rest/v1/dealers?${filter}&select=*`, { token: key });
+
+  if (!body?.length) {
+    console.error(`No dealer matched "${subject}".`);
+    process.exit(1);
+  }
+  if (body.length > 1) {
+    console.error(`"${subject}" matched ${body.length} dealers. Use an id.`);
+    for (const dealer of body) console.error(`  ${dealer.id}  ${dealer.name}`);
+    process.exit(1);
+  }
+  return body[0];
+}
+
+/**
+ * Deleting the dealer row cascades to listings and photo rows, but storage knows
+ * nothing about foreign keys. Without this the images stay, paid for and
+ * unreachable.
+ */
+async function deletePhotos(listingIds) {
+  let removed = 0;
+
+  for (const listingId of listingIds) {
+    const listed = await request('/storage/v1/object/list/listing-photos', {
+      token: key,
+      method: 'POST',
+      body: { prefix: `${listingId}/`, limit: 100 },
+    });
+    const paths = (listed.body ?? []).map((object) => `${listingId}/${object.name}`);
+    if (!paths.length) continue;
+
+    await request('/storage/v1/object/listing-photos', {
+      token: key,
+      method: 'DELETE',
+      body: { prefixes: paths },
+    });
+    removed += paths.length;
+  }
+
+  return removed;
+}
+
+async function remove() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- remove <id|host> [--yes]');
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(target);
+  const { body: listings } = await request(
+    `/rest/v1/listings?dealer_id=eq.${dealer.id}&select=id`,
+    { token: key }
+  );
+  const ids = (listings ?? []).map((listing) => listing.id);
+
+  console.log(`\n  ${dealer.name}`);
+  console.log(`  ${dealer.website ?? 'no website'}`);
+  console.log(`  ${ids.length} listing(s) and their photos will be deleted.\n`);
+
+  if (flags.yes !== true && !(await confirm('Delete permanently?'))) {
+    console.log('Nothing deleted.');
+    return;
+  }
+
+  const photos = await deletePhotos(ids);
+  const { ok, status, body } = await request(`/rest/v1/dealers?id=eq.${dealer.id}`, {
+    token: key,
+    method: 'DELETE',
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+  console.log(`Deleted ${dealer.name}: ${ids.length} listing(s), ${photos} photo(s).`);
+}
+
+async function set() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- set <id|host> [--email <address>] [--name "Shop"]');
+    console.error('With no flags, re-reads the name and contact address from their site.');
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(target);
+  const patch = {};
+
+  if (typeof flags.email === 'string') patch.contact_email = flags.email;
+  if (typeof flags.name === 'string') patch.name = flags.name;
+
+  if (!Object.keys(patch).length) {
+    if (!dealer.website) {
+      console.error(`${dealer.name} has no website to read. Pass --email or --name.`);
+      process.exit(1);
+    }
+    console.log(`Reading ${dealer.website}…`);
+    const found = await discover(dealer.website);
+    if (found.email) patch.contact_email = found.email;
+    if (found.name) patch.name = found.name;
+
+    if (!Object.keys(patch).length) {
+      console.log('Found nothing new.');
+      return;
+    }
+  }
+
+  const { ok, status, body } = await request(`/rest/v1/dealers?id=eq.${dealer.id}`, {
+    token: key,
+    method: 'PATCH',
+    body: patch,
+    prefer: 'return=representation',
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+  const updated = body[0];
+  console.log(`${updated.name} · ${updated.contact_email ?? 'no contact address'}`);
+}
+
+/**
+ * The dealer-facing numbers, read from the operator's seat because dealers have
+ * no account yet. Same function a dealer portal would call.
+ */
+async function stats() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- stats <id|host>');
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(target);
+  const operator = await signInOperator();
+
+  const { ok, body, status } = await request('/rest/v1/rpc/dealer_stats', {
+    token: operator.token,
+    method: 'POST',
+    body: { p_dealer_id: dealer.id },
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+
+  const total = body.reduce(
+    (sum, row) => ({
+      saves: sum.saves + row.saves,
+      passes: sum.passes + row.passes,
+      inquiries: sum.inquiries + row.inquiries,
+    }),
+    { saves: 0, passes: 0, inquiries: 0 }
+  );
+
+  console.log(`\n  ${dealer.name} · ${dealer.contact_email ?? 'no contact address'}`);
+  console.log(`  ${total.saves} saved · ${total.passes} passed · ${total.inquiries} inquired\n`);
+
+  for (const row of body) {
+    const name = [row.brand, row.model].filter(Boolean).join(' ');
+    console.log(
+      `  ${String(row.saves).padStart(3)} saved  ${String(row.inquiries).padStart(3)} asked   ` +
+        `${name} · ${formatPrice(row.price_cents, 'USD')}`
+    );
+  }
+  console.log('');
 }
 
 async function setPermission(permission, explicitTarget) {
@@ -198,6 +375,16 @@ switch (command) {
   case 'add':
     await add();
     break;
+  case 'remove':
+  case 'delete':
+    await remove();
+    break;
+  case 'set':
+    await set();
+    break;
+  case 'stats':
+    await stats();
+    break;
   case 'approve':
     await setPermission('approved');
     break;
@@ -205,6 +392,6 @@ switch (command) {
     await setPermission('revoked');
     break;
   default:
-    console.error(`Unknown command "${command}". Try: list, add, approve, revoke.`);
+    console.error(`Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke.`);
     process.exit(1);
 }

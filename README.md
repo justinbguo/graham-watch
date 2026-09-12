@@ -58,11 +58,18 @@ npm run dealers -- add goldfingersvintage.com   # the whole flow, from a domain
 npm run dealers                                 # list dealers and their permission
 npm run dealers -- approve <id|host>            # publish their listings
 npm run dealers -- revoke  <id|host>            # pull them back
+npm run dealers -- set     <id|host>            # re-read their name and address
+npm run dealers -- stats   <id|host>            # saves and inquiries per watch
+npm run dealers -- remove  <id|host>            # delete them, listings and photos
 ```
 
-`add` finds the dealer's catalog from their sitemap, reads their shop name, prints a
-few watches it extracted, and waits for you before writing anything. Then it imports
-and approves in one step. Flags: `--limit 10`, `--url <catalog>`, `--name "Shop"`.
+`add` finds the dealer's catalog from their sitemap, reads their shop name and contact
+address, prints a few watches it extracted, and waits for you before writing anything.
+Then it imports and approves in one step. Flags: `--limit 10`, `--url <catalog>`,
+`--name "Shop"`, `--email <address>`, `--yes`.
+
+The contact address is what makes an inquiry reach a dealer, so `list` warns about any
+dealer missing one.
 
 Use `npm run import -- <url> --limit 10` to re-run a dealer you have already added.
 Listings already imported are skipped, so it is safe to repeat.
@@ -112,4 +119,4 @@ supabase/functions  import-listings edge function
 | `npm run db:types` | Regenerate `src/lib/database.types.ts` from the live schema |
 | `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
 | `npm run import -- <url>` | Re-import a dealer you already added |
-| `npm run dealers` | List, approve, or revoke dealers |
+| `npm run dealers` | List, approve, revoke, remove or measure dealers |

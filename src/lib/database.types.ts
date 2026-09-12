@@ -400,6 +400,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dealer_stats: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          brand: string
+          inquiries: number
+          listing_id: string
+          model: string
+          passes: number
+          price_cents: number
+          saves: number
+        }[]
+      }
       get_deck: {
         Args: { p_limit?: number }
         Returns: {
