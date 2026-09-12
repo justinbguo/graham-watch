@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
 import {
+  GOOGLE_SIGN_IN_ENABLED,
   isAppleSignInAvailable,
   sendEmailCode,
   signInWithApple,
@@ -110,7 +111,9 @@ export default function SignIn() {
           {error ? <Message text={error} tone="error" /> : null}
         </View>
 
-        {stage === 'email' ? (
+        {/* An "or" rule with nothing under it reads as a broken screen, so the
+            whole block waits until at least one provider can actually run. */}
+        {stage === 'email' && (appleAvailable || GOOGLE_SIGN_IN_ENABLED) ? (
           <View style={styles.form}>
             <View style={styles.divider}>
               <View style={styles.rule} />
@@ -128,11 +131,13 @@ export default function SignIn() {
               />
             ) : null}
 
-            <Button
-              label="Continue with Google"
-              variant="secondary"
-              onPress={() => run(signInWithGoogle)}
-            />
+            {GOOGLE_SIGN_IN_ENABLED ? (
+              <Button
+                label="Continue with Google"
+                variant="secondary"
+                onPress={() => run(signInWithGoogle)}
+              />
+            ) : null}
           </View>
         ) : null}
       </KeyboardAvoidingView>

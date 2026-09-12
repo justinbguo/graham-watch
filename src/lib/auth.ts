@@ -71,12 +71,25 @@ export async function signInWithApple() {
   }
 }
 
+/**
+ * Google needs a client ID and secret that only exist once someone creates them
+ * in Google Cloud. Until then Supabase answers every attempt with
+ * "provider is not enabled", so the button stays hidden rather than lying.
+ * Flip this on in the same change that enables [auth.external.google].
+ */
+export const GOOGLE_SIGN_IN_ENABLED = false;
+
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
   });
-  if (error) throw error;
+  if (error) {
+    if (/not enabled/i.test(error.message)) {
+      throw new Error('Google sign-in is not set up yet. Use an email code instead.');
+    }
+    throw error;
+  }
   if (!data.url) throw new Error('Supabase did not return an OAuth URL.');
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
