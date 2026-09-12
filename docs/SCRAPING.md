@@ -4,7 +4,31 @@ The importer is two steps: fetch the page as clean text, then have an LLM pull
 typed listings out of it. The fetch step is pluggable — set `SCRAPE_PROVIDER`.
 Code lives in `supabase/functions/import-listings/scrape.ts`.
 
+Before either step it tries a platform adapter, which is always better when it
+applies. Only Squarespace exists so far.
+
+## Platform adapters
+
+`squarespace.ts` — adding `?format=json` to any Squarespace URL returns the page's
+own data: title, prose, price, and the full image gallery. No markup parsing, no
+guessing which text belongs to which watch.
+
+It reads in two passes. The collection URL gives the list, then each product URL is
+fetched for the detail, because a collection entry is only what the shop chose to
+show in a grid — usually a truncated teaser and a partial gallery. The product page
+wins on conflict; collection values are the floor. A product URL is already the
+detail page, so it skips the second pass.
+
+The shop's own price and currency override anything the model infers, because the
+model only ever sees prose. A `0.00` price means "enquire", not free, and is stored
+as null.
+
+This costs one HTTP request per listing. Imports are capped at 40, and requests run
+four at a time, so a dealer sees ordinary traffic.
+
 ## Fetch step
+
+For everything that is not a known platform.
 
 The provider is chosen automatically: `firecrawl` if `FIRECRAWL_API_KEY` is set,
 otherwise `jina` if `JINA_API_KEY` is set, otherwise `fetch`. Set `SCRAPE_PROVIDER`

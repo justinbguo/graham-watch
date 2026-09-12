@@ -1,3 +1,4 @@
+import { mapPool } from './pool.ts';
 import { htmlToText } from './scrape.ts';
 
 /**
@@ -17,6 +18,10 @@ export type SourceItem = {
 // never needs more than this, and we pay for every byte we copy into storage.
 const PHOTO_WIDTH = '1500w';
 const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
+
+// Product pages are fetched one per listing. Four at a time is brisk for us and
+// unremarkable traffic for the dealer.
+const HYDRATE_CONCURRENCY = 4;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
@@ -63,6 +68,53 @@ function mapItem(item: Json, base: URL): SourceItem | null {
   };
 }
 
+async function fetchJson(url: URL): Promise<Json | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A collection entry is whatever the shop chose to show in a grid. The full
+ * description and the rest of the gallery usually live on the product page, so
+ * prefer that and keep the collection values as a floor. Some shops, Goldfinger
+ * among them, send everything up front and this changes nothing.
+ */
+function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
+  if (!product) return collection;
+
+  return {
+    title: product.title || collection.title,
+    text: product.text.length >= collection.text.length ? product.text : collection.text,
+    // The collection's own link is the canonical one we dedupe on.
+    sourceUrl: collection.sourceUrl,
+    photoUrls:
+      product.photoUrls.length >= collection.photoUrls.length
+        ? product.photoUrls
+        : collection.photoUrls,
+    priceCents: product.priceCents ?? collection.priceCents,
+    currency: product.currency ?? collection.currency,
+  };
+}
+
+async function hydrate(items: SourceItem[]): Promise<SourceItem[]> {
+  return mapPool(items, HYDRATE_CONCURRENCY, async (item) => {
+    const url = new URL(item.sourceUrl);
+    url.searchParams.set('format', 'json');
+
+    const body = await fetchJson(url);
+    const product = body?.item ? mapItem(body.item, url) : null;
+    return merge(item, product);
+  });
+}
+
 /**
  * Squarespace answers any collection or product URL with JSON when asked, which
  * hands us titles, prose, prices and full image galleries as data. Scraping the
@@ -79,32 +131,20 @@ export async function fetchSquarespaceItems(
   const base = new URL(sourceUrl);
   const items: SourceItem[] = [];
   let offset: number | null = null;
+  let isCollection = false;
 
   while (items.length < limit) {
     const page = new URL(base.toString());
     page.searchParams.set('format', 'json');
     if (offset !== null) page.searchParams.set('offset', String(offset));
 
-    const response = await fetch(page, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) return items.length ? items : null;
-
-    let body: Json;
-    try {
-      body = await response.json();
-    } catch {
-      return items.length ? items : null;
-    }
+    const body = await fetchJson(page);
+    if (!body) return items.length ? items : null;
 
     // A product URL answers with `item`, a collection with `items`.
-    const batch = Array.isArray(body?.items)
-      ? body.items
-      : body?.item
-        ? [body.item]
-        : null;
+    const batch = Array.isArray(body.items) ? body.items : body.item ? [body.item] : null;
     if (!batch) return items.length ? items : null;
+    isCollection ||= Array.isArray(body.items);
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
@@ -112,10 +152,11 @@ export async function fetchSquarespaceItems(
       if (items.length >= limit) break;
     }
 
-    const next = body?.pagination?.nextPageOffset;
-    if (!body?.pagination?.nextPage || typeof next !== 'number' || next === offset) break;
+    const next = body.pagination?.nextPageOffset;
+    if (!body.pagination?.nextPage || typeof next !== 'number' || next === offset) break;
     offset = next;
   }
 
-  return items;
+  // A product URL was already the detail page; there is nothing deeper to read.
+  return isCollection ? hydrate(items) : items;
 }

@@ -5,6 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { extractFields, extractListings, type ExtractedFields } from './extract.ts';
 import { copyPhotos } from './photos.ts';
+import { mapPool } from './pool.ts';
 import { resolveProvider, scrape } from './scrape.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
 
@@ -78,27 +79,6 @@ async function resolveDealer(
 
   if (error || !data) throw new Error(error?.message ?? 'Could not create a dealer.');
   return data.id;
-}
-
-async function mapPool<T, R>(
-  items: T[],
-  concurrency: number,
-  run: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (cursor < items.length) {
-        const index = cursor;
-        cursor += 1;
-        results[index] = await run(items[index]);
-      }
-    })
-  );
-
-  return results;
 }
 
 type PreparedListing = {
