@@ -264,6 +264,16 @@ dealer. Who is selling it is half of what a vintage watch costs you, and down in
 row it was a caption trailing a number. An outline rather than a fill, because the details
 bar directly above is already a solid strip and two filled blocks stacked read as one.
 
+## What Saved adds up to
+
+The Saved header carries the total of everything in the list. A list of five-figure watches
+is a number the user is already holding in their head, badly.
+
+Watches priced on request are left out of the sum and counted under it — "2 on request" —
+because a total quietly short by two reads as the whole answer. Mixed currencies show no
+total at all rather than adding pounds to dollars. An empty list shows nothing: "$0" beside
+the word Saved reads as a price.
+
 The description is not on the card. Two lines of prose is a paragraph cut in half — long
 enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
 screen or not at all.

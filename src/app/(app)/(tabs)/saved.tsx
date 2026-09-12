@@ -5,6 +5,7 @@ import { ListingRow } from '@/components/ListingRow';
 import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { useUnsave } from '@/data/swipes';
+import { totalPrice } from '@/lib/format';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -33,8 +34,19 @@ export default function Saved() {
     );
   }
 
+  const { total, onRequest } = totalPrice(cards);
+
+  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
+  // like a price rather than an absence.
+  const action = cards.length ? (
+    <View style={styles.total}>
+      <Text style={styles.totalValue}>{total ?? `${cards.length} saved`}</Text>
+      {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
+    </View>
+  ) : null;
+
   return (
-    <Screen title="Saved">
+    <Screen title="Saved" action={action}>
       <FlatList
         data={cards}
         keyExtractor={(item) => item.id}
@@ -66,6 +78,17 @@ export default function Saved() {
 }
 
 const savedStyles = (theme: Theme) => ({
+  total: {
+    alignItems: 'flex-end' as const,
+  },
+  totalValue: {
+    ...type.price,
+    color: theme.color.text,
+  },
+  totalNote: {
+    ...type.caption,
+    color: theme.color.textFaint,
+  },
   list: {
     paddingHorizontal: inset.screen,
     flexGrow: 1,
