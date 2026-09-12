@@ -10,9 +10,9 @@ const MIN_TILE_WIDTH = 280;
 const GAP = space.lg;
 
 /**
- * The scanning half of the deck: many watches at once instead of one. Acting on
- * a watch stays a swipe, so a tap opens it in card view rather than saving it
- * outright. On web the keyboard can triage without leaving the grid.
+ * The scanning half of the deck: many watches at once instead of one. Judging a
+ * watch stays a swipe, so a tap reads rather than decides — it opens the detail
+ * screen. On web the keyboard can triage without leaving the grid.
  */
 export function DeckGrid({
   cards,
@@ -116,7 +116,7 @@ function Tile({
         </View>
       )}
 
-      <ListingSummary card={card} />
+      <ListingSummary card={card} variant="tile" />
     </Pressable>
   );
 }

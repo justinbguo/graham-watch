@@ -223,10 +223,16 @@ Only the top card takes taps; a card underneath is not being read.
 ## Deck views
 
 Two ways to read the same queue, chosen from the toggle beside the title. Cards are for
-deciding, one watch at a time. The grid is for scanning, and a tap there opens that watch
-in card view rather than saving it — there is one way to save, and it is a swipe.
+deciding, one watch at a time. The grid is for scanning, and a tap there opens the detail
+screen — reading, not deciding. There is one way to save and it is a swipe.
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
+
+A tile is half a phone wide, so it takes the type scale down a step: `titleSmall` for the
+watch name, `priceSmall` for the price. Nothing in a tile is clamped to one line. A name cut
+to "Oyster-Perpetual…" and a price squeezed beside a dealer are both answers to a question
+nobody asked, and a grid exists to be compared down a column — ragged tile heights cost less
+than missing words. On a card, where a line has room, one line is still the rule.
 
 ## Onboarding asks twice, and no more
 

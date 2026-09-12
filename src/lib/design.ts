@@ -100,6 +100,13 @@ export const type = {
     lineHeight: 28,
     letterSpacing: tracking.title,
   },
+  /** A watch name in a grid tile, where a 22pt serif wraps after two words. */
+  titleSmall: {
+    fontFamily: font.display.semibold,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: tracking.title,
+  },
   body: {
     fontFamily: font.text.regular,
     fontSize: 16,
@@ -128,6 +135,13 @@ export const type = {
     fontFamily: font.text.semibold,
     fontSize: 18,
     lineHeight: 24,
+    letterSpacing: tracking.label,
+  },
+  /** Same job in a grid tile. Still the heaviest thing in the block. */
+  priceSmall: {
+    fontFamily: font.text.semibold,
+    fontSize: 15,
+    lineHeight: 20,
     letterSpacing: tracking.label,
   },
   control: {

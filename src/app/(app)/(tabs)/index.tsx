@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { DeckGrid } from '@/components/DeckGrid';
@@ -33,7 +33,6 @@ export default function Deck() {
   const count = activeCount(filters);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
-  const [focusId, setFocusId] = useState<string | null>(null);
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
 
   // One step back, and only for a pass. A save is recoverable from the Saved
@@ -49,14 +48,6 @@ export default function Deck() {
         setLastPass(null);
       }
     : undefined;
-
-  // Opening a watch from the grid puts it on top of the pile. Once it is swiped
-  // away it leaves `cards` and the natural order resumes on its own.
-  const ordered = useMemo(() => {
-    const index = focusId ? cards.findIndex((card) => card.id === focusId) : -1;
-    if (index <= 0) return cards;
-    return [cards[index], ...cards.slice(0, index), ...cards.slice(index + 1)];
-  }, [cards, focusId]);
 
   const actions = (
     <View style={styles.actions}>
@@ -125,8 +116,8 @@ export default function Deck() {
           cards={cards}
           onSwipe={judge}
           onOpen={(card) => {
-            setFocusId(card.id);
-            setView('cards');
+            primeListing(card);
+            router.push(`/listing/${card.id}`);
           }}
         />
       </Screen>
@@ -134,7 +125,7 @@ export default function Deck() {
   }
 
   // Render a few cards deep so the next one shows under the top card.
-  const visible = ordered.slice(0, 3).reverse();
+  const visible = cards.slice(0, 3).reverse();
 
   return (
     <Screen title="Buy" action={actions}>
