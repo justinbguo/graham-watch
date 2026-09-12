@@ -1,9 +1,10 @@
 // Imported per weight, not from the package root: the root re-exports every
 // cut and Metro then bundles unused TTFs.
-import { EBGaramond_400Regular } from '@expo-google-fonts/eb-garamond/400Regular';
-import { EBGaramond_500Medium } from '@expo-google-fonts/eb-garamond/500Medium';
 import { EBGaramond_600SemiBold } from '@expo-google-fonts/eb-garamond/600SemiBold';
 import { EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond/700Bold';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -16,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { FilterProvider } from '@/features/filters/provider';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
@@ -24,10 +26,11 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    EBGaramond_400Regular,
-    EBGaramond_500Medium,
     EBGaramond_600SemiBold,
     EBGaramond_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
   });
 
   // A failed font load must not block the app — fall through to system faces.
@@ -38,8 +41,10 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <SplashScreenController />
-            <Chrome />
+            <FilterProvider>
+              <SplashScreenController />
+              <Chrome />
+            </FilterProvider>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>

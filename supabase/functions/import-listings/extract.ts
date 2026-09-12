@@ -1,10 +1,23 @@
+import {
+  CASE_MATERIALS,
+  COMPLICATIONS,
+  DIAL_COLORS,
+  STYLES,
+  WINDINGS,
+} from './taxonomy.ts';
+
 export type ExtractedFields = {
   brand: string;
   model: string | null;
   reference: string | null;
   year: number | null;
-  movement: string | null;
+  caliber: string | null;
+  winding: (typeof WINDINGS)[number] | null;
   case_size_mm: number | null;
+  case_material: (typeof CASE_MATERIALS)[number] | null;
+  dial_color: (typeof DIAL_COLORS)[number] | null;
+  style: (typeof STYLES)[number] | null;
+  complications: (typeof COMPLICATIONS)[number][];
   condition: string | null;
   has_box: boolean | null;
   has_papers: boolean | null;
@@ -20,13 +33,29 @@ export type ExtractedListing = ExtractedFields & {
 
 const nullable = (type: string) => ({ type: [type, 'null'] });
 
+// Listing null in the enum is what makes "not stated" expressible. Without it
+// the model must pick a wrong value rather than admit the page is silent.
+const nullableEnum = (values: readonly string[]) => ({
+  type: ['string', 'null'],
+  enum: [...values, null],
+});
+
 const FIELDS = {
   brand: { type: 'string' },
   model: nullable('string'),
   reference: nullable('string'),
   year: nullable('integer'),
-  movement: nullable('string'),
+  caliber: { ...nullable('string'), description: 'Movement caliber, e.g. "Venus 150"' },
+  winding: nullableEnum(WINDINGS),
   case_size_mm: nullable('number'),
+  case_material: nullableEnum(CASE_MATERIALS),
+  dial_color: nullableEnum(DIAL_COLORS),
+  style: nullableEnum(STYLES),
+  complications: {
+    type: 'array',
+    items: { type: 'string', enum: COMPLICATIONS },
+    description: 'Every complication the watch has. Empty when it is time-only.',
+  },
   condition: nullable('string'),
   has_box: nullable('boolean'),
   has_papers: nullable('boolean'),
@@ -63,7 +92,15 @@ model and reference.
 
 For year: if a specific year is stated, return exactly that year — "1975 Rolex Datejust"
 is 1975, not 1970. Only when a decade alone is given ("1960's", "mid sixties") return the
-first year of that decade. Circa dates are specific years: "c. 1948" is 1948.`;
+first year of that decade. Circa dates are specific years: "c. 1948" is 1948.
+
+caliber is the movement's name ("Venus 150", "Cal. 3135"); winding is how it is wound.
+A watch described only as "manual" has a winding and no caliber. two_tone is for cases
+combining steel and gold. style is the single best fit; complications lists everything
+the watch actually does, and is empty for a time-only watch. A date window is the 'date'
+complication. An everyday steel watch on a bracelet, like a Datejust or an Explorer, is
+'sports'. Choose 'other' only when the page describes something the list cannot express —
+prefer null when the page simply does not say.`;
 
 const PAGE_PROMPT = `You extract vintage watch listings from scraped web pages.
 Return one entry per watch actually for sale on the page. Ignore navigation, blog

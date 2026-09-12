@@ -45,13 +45,18 @@ Rules:
 
 ## Typography
 
-One family: **EB Garamond**. It is an old-style book serif, so the wordmark, the
-watch name, and the price all come from the same cut. Never introduce a second
-family. Never use a system font next to it; the mismatch is more visible than
-any weight you would gain.
+Two families, and that is the whole system.
 
-Garamond's default tracking is wide, so every style pulls in a little with
-negative `letterSpacing` from `tracking` in `src/lib/design.ts`.
+**EB Garamond** (display) is an old-style serif. It carries the wordmark, screen
+titles, and watch model names — the words a person came to read. **Inter** (text)
+is a grotesque: even, slightly geometric, with lining figures that prices and
+reference numbers need. Garamond for the watch, Inter for the paperwork.
+
+Never introduce a third family. Never use a system font next to these; the
+mismatch is more visible than any weight you would gain.
+
+Garamond's default tracking is wide, so display styles pull in with negative
+`letterSpacing`. Inter is already tight; body tracking is a nudge, not a clamp.
 
 | Style | Use |
 | --- | --- |
@@ -62,7 +67,7 @@ negative `letterSpacing` from `tracking` in `src/lib/design.ts`.
 | `label` | Buttons |
 | `control` | Compact actions: row chips, tile buttons |
 | `caption` | Specs, helper text, hints |
-| `price` | Prices |
+| `price` | Prices, in Inter so digits align |
 | `tab` | Tab bar labels |
 | `eyebrow` | Run-in above a title — the brand, a section name |
 
@@ -151,3 +156,24 @@ Things we have not decided yet. Move them up into rules once we do.
 - Photo treatment: do listing images get a consistent crop and background?
 - An empty-state illustration, or stay typographic.
 - Haptics on swipe commit.
+
+## Filters
+
+Ranges are presets, not sliders. Dragging two handles to "36 to 39mm" is slow on a
+phone and the precision buys nothing — nobody wants a 37.5mm floor. Presets also keep
+filter state small enough to be a cache key.
+
+Only offer a filter something can match. Options come from `listing_facets`, so a brand
+appears once a visible listing is that brand. A filter that can only return nothing is a
+dead end the user has to reverse out of.
+
+One filter set for the whole app. Narrowing in Search and finding the Deck unchanged
+would read as the filter not having applied.
+
+## Photo carousel
+
+Tap the right of a photo for the next, the left to go back. Paging never wraps: landing
+back on the first photo reads as a glitch, not as an end.
+
+Progress is segments across the top, not dots — they show how much is left at a glance.
+Only the top card takes taps; a card underneath is not being read.

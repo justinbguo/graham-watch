@@ -1,5 +1,5 @@
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, motion, radius, space, stack, type, type Theme } from '@/lib/theme';
@@ -33,6 +34,10 @@ export function SwipeCard({
 
   const pan = Gesture.Pan()
     .enabled(isTop)
+    // Without a threshold the pan claims the touch immediately and the photo
+    // taps underneath never fire.
+    .activeOffsetX([-12, 12])
+    .activeOffsetY([-12, 12])
     .onChange((event) => {
       translateX.value += event.changeX;
       translateY.value += event.changeY;
@@ -71,18 +76,10 @@ export function SwipeCard({
     opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], 'clamp'),
   }));
 
-  const photo = card.photos[0]?.url;
-
   return (
     <GestureDetector gesture={pan}>
       <Animated.View style={[styles.card, cardStyle]}>
-        {photo ? (
-          <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
-        ) : (
-          <View style={[styles.photo, styles.photoEmpty]}>
-            <Text style={styles.photoEmptyLabel}>No photograph</Text>
-          </View>
-        )}
+        <PhotoCarousel photos={card.photos} active={isTop} />
 
         <Animated.View style={[styles.stamp, styles.saveStamp, saveStampStyle]}>
           <Text style={[styles.stampLabel, styles.saveLabel]}>Save</Text>
@@ -124,18 +121,6 @@ const cardStyles = (theme: Theme) => ({
     borderWidth: 1,
     borderColor: theme.color.border,
     overflow: 'hidden' as const,
-  },
-  photo: {
-    flex: 1,
-    backgroundColor: theme.color.surfaceSunken,
-  },
-  photoEmpty: {
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  photoEmptyLabel: {
-    ...type.caption,
-    color: theme.color.textFaint,
   },
   info: {
     padding: inset.card,

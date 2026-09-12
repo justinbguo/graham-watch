@@ -226,65 +226,83 @@ export type Database = {
       listings: {
         Row: {
           brand: string
+          brand_key: string | null
+          caliber: string | null
+          case_material: Database["public"]["Enums"]["case_material"] | null
           case_size_mm: number | null
+          complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
           created_at: string
           currency: string
           dealer_id: string
           description: string | null
+          dial_color: Database["public"]["Enums"]["dial_color"] | null
           has_box: boolean | null
           has_papers: boolean | null
           id: string
           import_job_id: string | null
           imported_by: string
           model: string | null
-          movement: string | null
           price_cents: number | null
           reference: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
+          style: Database["public"]["Enums"]["watch_style"] | null
+          winding: Database["public"]["Enums"]["winding"] | null
           year: number | null
         }
         Insert: {
           brand: string
+          brand_key?: string | null
+          caliber?: string | null
+          case_material?: Database["public"]["Enums"]["case_material"] | null
           case_size_mm?: number | null
+          complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
           created_at?: string
           currency?: string
           dealer_id: string
           description?: string | null
+          dial_color?: Database["public"]["Enums"]["dial_color"] | null
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
           import_job_id?: string | null
           imported_by: string
           model?: string | null
-          movement?: string | null
           price_cents?: number | null
           reference?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
+          style?: Database["public"]["Enums"]["watch_style"] | null
+          winding?: Database["public"]["Enums"]["winding"] | null
           year?: number | null
         }
         Update: {
           brand?: string
+          brand_key?: string | null
+          caliber?: string | null
+          case_material?: Database["public"]["Enums"]["case_material"] | null
           case_size_mm?: number | null
+          complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
           created_at?: string
           currency?: string
           dealer_id?: string
           description?: string | null
+          dial_color?: Database["public"]["Enums"]["dial_color"] | null
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
           import_job_id?: string | null
           imported_by?: string
           model?: string | null
-          movement?: string | null
           price_cents?: number | null
           reference?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
+          style?: Database["public"]["Enums"]["watch_style"] | null
+          winding?: Database["public"]["Enums"]["winding"] | null
           year?: number | null
         }
         Relationships: [
@@ -386,23 +404,91 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: {
           brand: string
+          brand_key: string | null
+          caliber: string | null
+          case_material: Database["public"]["Enums"]["case_material"] | null
           case_size_mm: number | null
+          complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
           created_at: string
           currency: string
           dealer_id: string
           description: string | null
+          dial_color: Database["public"]["Enums"]["dial_color"] | null
           has_box: boolean | null
           has_papers: boolean | null
           id: string
           import_job_id: string | null
           imported_by: string
           model: string | null
-          movement: string | null
           price_cents: number | null
           reference: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
+          style: Database["public"]["Enums"]["watch_style"] | null
+          winding: Database["public"]["Enums"]["winding"] | null
+          year: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "listings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      listing_facets: {
+        Args: never
+        Returns: {
+          count: number
+          kind: string
+          label: string
+          value: string
+        }[]
+      }
+      search_listings: {
+        Args: {
+          p_brands?: string[]
+          p_complications?: Database["public"]["Enums"]["complication"][]
+          p_exclude_swiped?: boolean
+          p_limit?: number
+          p_materials?: Database["public"]["Enums"]["case_material"][]
+          p_offset?: number
+          p_price_max?: number
+          p_price_min?: number
+          p_query?: string
+          p_size_max?: number
+          p_size_min?: number
+          p_sort?: string
+          p_styles?: Database["public"]["Enums"]["watch_style"][]
+          p_windings?: Database["public"]["Enums"]["winding"][]
+          p_year_max?: number
+          p_year_min?: number
+        }
+        Returns: {
+          brand: string
+          brand_key: string | null
+          caliber: string | null
+          case_material: Database["public"]["Enums"]["case_material"] | null
+          case_size_mm: number | null
+          complications: Database["public"]["Enums"]["complication"][]
+          condition: string | null
+          created_at: string
+          currency: string
+          dealer_id: string
+          description: string | null
+          dial_color: Database["public"]["Enums"]["dial_color"] | null
+          has_box: boolean | null
+          has_papers: boolean | null
+          id: string
+          import_job_id: string | null
+          imported_by: string
+          model: string | null
+          price_cents: number | null
+          reference: string | null
+          source_url: string | null
+          status: Database["public"]["Enums"]["listing_status"]
+          style: Database["public"]["Enums"]["watch_style"] | null
+          winding: Database["public"]["Enums"]["winding"] | null
           year: number | null
         }[]
         SetofOptions: {
@@ -414,11 +500,64 @@ export type Database = {
       }
     }
     Enums: {
+      case_material:
+        | "steel"
+        | "yellow_gold"
+        | "rose_gold"
+        | "white_gold"
+        | "platinum"
+        | "two_tone"
+        | "titanium"
+        | "bronze"
+        | "silver"
+        | "other"
+      complication:
+        | "chronograph"
+        | "date"
+        | "day_date"
+        | "triple_calendar"
+        | "annual_calendar"
+        | "perpetual_calendar"
+        | "moonphase"
+        | "gmt"
+        | "world_time"
+        | "alarm"
+        | "power_reserve"
+        | "tourbillon"
+        | "minute_repeater"
+        | "jump_hour"
+        | "skeleton"
       dealer_permission: "pending" | "approved" | "revoked"
+      dial_color:
+        | "black"
+        | "white"
+        | "silver"
+        | "champagne"
+        | "gilt"
+        | "blue"
+        | "green"
+        | "grey"
+        | "salmon"
+        | "brown"
+        | "cream"
+        | "other"
       import_status: "queued" | "running" | "succeeded" | "failed"
       inquiry_status: "pending" | "sent" | "failed"
       listing_status: "active" | "hidden"
       swipe_direction: "left" | "right"
+      watch_style:
+        | "dress"
+        | "diver"
+        | "chronograph"
+        | "pilot"
+        | "field"
+        | "racing"
+        | "gmt"
+        | "jewellery"
+        | "pocket"
+        | "other"
+        | "sports"
+      winding: "manual" | "automatic" | "quartz"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -549,11 +688,68 @@ export const Constants = {
   },
   public: {
     Enums: {
+      case_material: [
+        "steel",
+        "yellow_gold",
+        "rose_gold",
+        "white_gold",
+        "platinum",
+        "two_tone",
+        "titanium",
+        "bronze",
+        "silver",
+        "other",
+      ],
+      complication: [
+        "chronograph",
+        "date",
+        "day_date",
+        "triple_calendar",
+        "annual_calendar",
+        "perpetual_calendar",
+        "moonphase",
+        "gmt",
+        "world_time",
+        "alarm",
+        "power_reserve",
+        "tourbillon",
+        "minute_repeater",
+        "jump_hour",
+        "skeleton",
+      ],
       dealer_permission: ["pending", "approved", "revoked"],
+      dial_color: [
+        "black",
+        "white",
+        "silver",
+        "champagne",
+        "gilt",
+        "blue",
+        "green",
+        "grey",
+        "salmon",
+        "brown",
+        "cream",
+        "other",
+      ],
       import_status: ["queued", "running", "succeeded", "failed"],
       inquiry_status: ["pending", "sent", "failed"],
       listing_status: ["active", "hidden"],
       swipe_direction: ["left", "right"],
+      watch_style: [
+        "dress",
+        "diver",
+        "chronograph",
+        "pilot",
+        "field",
+        "racing",
+        "gmt",
+        "jewellery",
+        "pocket",
+        "other",
+        "sports",
+      ],
+      winding: ["manual", "automatic", "quartz"],
     },
   },
 } as const

@@ -97,7 +97,8 @@ async function hydrate(items: SourceItem[]): Promise<SourceItem[]> {
  */
 export async function fetchSquarespaceItems(
   sourceUrl: string,
-  limit: number
+  limit: number,
+  minPhotos = 0
 ): Promise<SourceItem[] | null> {
   const base = new URL(sourceUrl);
   const items: SourceItem[] = [];
@@ -119,7 +120,9 @@ export async function fetchSquarespaceItems(
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
-      if (mapped) items.push(mapped);
+      // Discard thin listings before hydration, not after: each one that
+      // survives costs a product page fetch.
+      if (mapped && mapped.photoUrls.length >= minPhotos) items.push(mapped);
       if (items.length >= limit) break;
     }
 

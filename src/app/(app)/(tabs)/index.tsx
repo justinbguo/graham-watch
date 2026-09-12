@@ -1,10 +1,13 @@
-import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
 
 import { DeckGrid } from '@/components/DeckGrid';
 import { SwipeCard } from '@/components/SwipeCard';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
+import { useFilters } from '@/features/filters/provider';
+import { activeCount } from '@/features/filters/types';
 import { useIsWide } from '@/lib/layout';
 import { inset, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -16,6 +19,9 @@ export default function Deck() {
   const swipe = useRecordSwipe(userId);
   const isWide = useIsWide();
   const styles = useThemedStyles(deckStyles);
+  const router = useRouter();
+  const { filters, clear } = useFilters();
+  const count = activeCount(filters);
 
   if (isPending) {
     return (
@@ -40,9 +46,19 @@ export default function Deck() {
     return (
       <Screen title="Deck">
         <Centered>
-          <Heading>Nothing left to swipe</Heading>
-          <Message text="Check back once more dealers are approved." />
-          <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
+          <Heading>{count ? 'Nothing matches' : 'Nothing left to swipe'}</Heading>
+          <Message
+            text={
+              count
+                ? 'Your filters are narrower than the deck.'
+                : 'Check back once more dealers are approved.'
+            }
+          />
+          {count ? (
+            <Button label="Clear filters" variant="secondary" onPress={clear} />
+          ) : (
+            <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
+          )}
         </Centered>
       </Screen>
     );
@@ -74,7 +90,16 @@ export default function Deck() {
           />
         ))}
       </View>
-      <Text style={styles.hint}>Swipe right to save · left to pass</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push('/search')}
+        style={styles.hintRow}>
+        <Text style={styles.hint}>
+          {count
+            ? `Filtered to ${cards.length} · tap to change`
+            : 'Swipe right to save · left to pass'}
+        </Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -85,10 +110,12 @@ const deckStyles = (theme: Theme) => ({
     marginHorizontal: inset.screen,
     marginBottom: inset.screen,
   },
+  hintRow: {
+    paddingBottom: inset.screen,
+  },
   hint: {
     ...type.caption,
     color: theme.color.textFaint,
     textAlign: 'center' as const,
-    paddingBottom: inset.screen,
   },
 });

@@ -1,4 +1,5 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, Text, View } from 'react-native';
 
 import { formatPrice } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
@@ -9,20 +10,22 @@ export function ListingRow({
   card,
   actionLabel,
   onAction,
+  onPress,
   onLongPress,
 }: {
   card: DeckCard;
   actionLabel?: string;
   onAction?: () => void;
+  onPress?: () => void;
   onLongPress?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
   const photo = card.photos[0]?.url;
 
   return (
-    <Pressable onLongPress={onLongPress} delayLongPress={400} style={styles.row}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={400} style={styles.row}>
       {photo ? (
-        <Image source={{ uri: photo }} style={styles.thumb} />
+        <Image source={{ uri: photo }} style={styles.thumb} contentFit="cover" />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]} />
       )}

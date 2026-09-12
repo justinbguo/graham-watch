@@ -55,92 +55,99 @@ export const themes: Record<ColorScheme, Theme> = {
 };
 
 /**
- * One family. EB Garamond is an old-style serif — display, body, and figures
- * all come from it. Import weights from `@expo-google-fonts/eb-garamond/<weight>`
- * in the root layout, never from the package root (that bundles every cut).
+ * Two families, and that is the whole system. EB Garamond is the old-style
+ * serif for the wordmark and watch names. Inter is the grotesque for everything
+ * you read in quantity — body, buttons, prices, tabs. Import each weight from
+ * `@expo-google-fonts/<family>/<weight>` in the root layout, never from the
+ * package root (that bundles every cut).
  */
 export const font = {
-  regular: 'EBGaramond_400Regular',
-  medium: 'EBGaramond_500Medium',
-  semibold: 'EBGaramond_600SemiBold',
-  bold: 'EBGaramond_700Bold',
+  display: {
+    semibold: 'EBGaramond_600SemiBold',
+    bold: 'EBGaramond_700Bold',
+  },
+  text: {
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    semibold: 'Inter_600SemiBold',
+  },
 } as const;
 
-/** letterSpacing. Garamond runs wide, so every style pulls in a little. */
+/** letterSpacing. Garamond runs wide; Inter is already tight. */
 export const tracking = {
   display: -1.1,
   title: -0.6,
-  body: -0.35,
-  label: -0.25,
+  body: -0.2,
+  label: -0.1,
 } as const;
 
 export const type = {
   wordmark: {
-    fontFamily: font.bold,
+    fontFamily: font.display.bold,
     fontSize: 44,
     lineHeight: 48,
     letterSpacing: tracking.display,
   },
   display: {
-    fontFamily: font.bold,
+    fontFamily: font.display.bold,
     fontSize: 32,
     lineHeight: 38,
     letterSpacing: tracking.display,
   },
   title: {
-    fontFamily: font.semibold,
+    fontFamily: font.display.semibold,
     fontSize: 22,
     lineHeight: 28,
     letterSpacing: tracking.title,
   },
   body: {
-    fontFamily: font.regular,
-    fontSize: 17,
-    lineHeight: 26,
+    fontFamily: font.text.regular,
+    fontSize: 16,
+    lineHeight: 24,
     letterSpacing: tracking.body,
   },
   bodyStrong: {
-    fontFamily: font.medium,
-    fontSize: 17,
-    lineHeight: 26,
+    fontFamily: font.text.medium,
+    fontSize: 16,
+    lineHeight: 24,
     letterSpacing: tracking.body,
   },
   label: {
-    fontFamily: font.medium,
-    fontSize: 15,
+    fontFamily: font.text.medium,
+    fontSize: 14,
     lineHeight: 20,
     letterSpacing: tracking.label,
   },
   caption: {
-    fontFamily: font.regular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontFamily: font.text.regular,
+    fontSize: 13,
+    lineHeight: 18,
     letterSpacing: tracking.body,
   },
   price: {
-    fontFamily: font.semibold,
+    fontFamily: font.text.semibold,
     fontSize: 18,
     lineHeight: 24,
-    letterSpacing: tracking.title,
+    letterSpacing: tracking.label,
   },
   control: {
-    fontFamily: font.medium,
-    fontSize: 14,
+    fontFamily: font.text.medium,
+    fontSize: 13,
     lineHeight: 18,
     letterSpacing: tracking.label,
   },
   tab: {
-    fontFamily: font.medium,
-    fontSize: 12,
+    fontFamily: font.text.medium,
+    fontSize: 11,
     lineHeight: 14,
     letterSpacing: tracking.label,
   },
   // A run-in above a title. Sentence case, so weight and colour do the
   // separating that capitals used to do.
   eyebrow: {
-    fontFamily: font.semibold,
-    fontSize: 14,
-    lineHeight: 18,
+    fontFamily: font.text.semibold,
+    fontSize: 13,
+    lineHeight: 16,
     letterSpacing: tracking.label,
   },
 } satisfies Record<string, TextStyle>;
@@ -194,6 +201,8 @@ export const HIT_TARGET = 44;
 export const size = {
   thumb: 72,
   tabIcon: 24,
+  /** Photo progress segments: present but never competing with the photograph. */
+  progress: 3,
   appleButton: HIT_TARGET + space.sm,
   controlMin: HIT_TARGET + space.sm,
 } as const;

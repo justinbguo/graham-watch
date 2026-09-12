@@ -10,9 +10,14 @@ import { resolveProvider, scrape } from './scrape.ts';
 import { fetchShopifyItems } from './shopify.ts';
 import type { SourceItem } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
+import { canonicalBrand } from './taxonomy.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
 const MAX_PHOTOS_PER_LISTING = 6;
+
+// A card people tap through needs more than one angle. Below three photos a
+// listing reads as an afterthought, so it does not enter the deck at all.
+const MIN_PHOTOS_PER_LISTING = 3;
 
 // Each item is one OpenAI round trip. Four at a time keeps a ten-watch import
 // under ten seconds without tripping rate limits on a new account.
@@ -105,7 +110,10 @@ type PreparedListing = {
  * ask the model only to type the prose. Otherwise we scrape the page and ask the
  * model to find the watches too, which is the same job with worse inputs.
  */
-const ADAPTERS: Record<string, (url: string, limit: number) => Promise<SourceItem[] | null>> = {
+const ADAPTERS: Record<
+  string,
+  (url: string, limit: number, minPhotos: number) => Promise<SourceItem[] | null>
+> = {
   shopify: fetchShopifyItems,
   squarespace: fetchSquarespaceItems,
 };
@@ -118,7 +126,7 @@ async function prepare(
   let adapter = '';
 
   for (const [name, run] of Object.entries(ADAPTERS)) {
-    items = await run(sourceUrl, limit);
+    items = await run(sourceUrl, limit, MIN_PHOTOS_PER_LISTING);
     if (items?.length) {
       adapter = name;
       break;
@@ -162,11 +170,14 @@ async function prepare(
 
   return {
     provider,
-    listings: extracted.slice(0, limit).map((item) => ({
-      fields: item,
-      sourceUrl: item.source_url ?? sourceUrl,
-      photoUrls: item.photo_urls.filter((url) => url.startsWith('http')),
-    })),
+    listings: extracted
+      .map((item) => ({
+        fields: item,
+        sourceUrl: item.source_url ?? sourceUrl,
+        photoUrls: item.photo_urls.filter((url) => url.startsWith('http')),
+      }))
+      .filter((item) => item.photoUrls.length >= MIN_PHOTOS_PER_LISTING)
+      .slice(0, limit),
   };
 }
 
@@ -209,12 +220,17 @@ async function runImport(
           imported_by: userId,
           import_job_id: jobId,
           source_url: item.sourceUrl,
-          brand: item.fields.brand,
+          ...canonicalBrand(item.fields.brand),
           model: item.fields.model,
           reference: item.fields.reference,
           year: item.fields.year,
-          movement: item.fields.movement,
+          caliber: item.fields.caliber,
+          winding: item.fields.winding,
           case_size_mm: item.fields.case_size_mm,
+          case_material: item.fields.case_material,
+          dial_color: item.fields.dial_color,
+          style: item.fields.style,
+          complications: item.fields.complications ?? [],
           condition: item.fields.condition,
           has_box: item.fields.has_box,
           has_papers: item.fields.has_papers,

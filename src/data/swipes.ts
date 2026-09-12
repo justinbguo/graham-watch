@@ -43,7 +43,9 @@ export function useRecordSwipe(actorId: string | null) {
       return recordSwipe(actorId, listingId, direction);
     },
     onMutate: ({ listingId }) => {
-      queryClient.setQueryData<DeckCard[]>(keys.deck, (deck) =>
+      // Every cached deck, not just the current filter's: the card is judged and
+      // must not reappear by changing a filter and changing it back.
+      queryClient.setQueriesData<DeckCard[]>({ queryKey: ['deck'] }, (deck) =>
         (deck ?? []).filter((card) => card.id !== listingId)
       );
     },

@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useFilters } from '@/features/filters/provider';
+import { toRpcArgs, type Filters } from '@/features/filters/types';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
@@ -55,10 +57,15 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
   }));
 }
 
-async function fetchDeck(limit: number): Promise<DeckCard[]> {
-  if (isDemo) return demo.deck().slice(0, limit);
+async function fetchDeck(limit: number, filters: Filters): Promise<DeckCard[]> {
+  if (isDemo) return demo.deck(filters).slice(0, limit);
 
-  const { data, error } = await supabase.rpc('get_deck', { p_limit: limit });
+  // The deck is search with the cards you have already judged removed.
+  const { data, error } = await supabase.rpc('search_listings', {
+    p_limit: limit,
+    p_exclude_swiped: true,
+    ...toRpcArgs(filters),
+  });
   if (error) throw error;
   return hydrate(data ?? []);
 }
@@ -105,9 +112,11 @@ async function fetchListing(listingId: string): Promise<DeckCard | null> {
 }
 
 export function useDeck(limit = 20) {
+  const { filters } = useFilters();
+
   return useQuery({
-    queryKey: keys.deck,
-    queryFn: () => fetchDeck(limit),
+    queryKey: keys.deck(filters),
+    queryFn: () => fetchDeck(limit, filters),
     // The deck is consumed by swiping, not by refetching. Re-running it mid-pile
     // would shuffle cards out from under the user's thumb.
     staleTime: Infinity,

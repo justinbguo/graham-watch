@@ -25,6 +25,11 @@ export type ListingStatus = Enums['listing_status'];
 export type ImportStatus = Enums['import_status'];
 export type InquiryStatus = Enums['inquiry_status'];
 export type SwipeDirection = Enums['swipe_direction'];
+export type Winding = Enums['winding'];
+export type CaseMaterial = Enums['case_material'];
+export type DialColor = Enums['dial_color'];
+export type WatchStyle = Enums['watch_style'];
+export type Complication = Enums['complication'];
 
 /** A listing plus the photos and dealer a card needs to render. */
 export type DeckCard = Listing & {

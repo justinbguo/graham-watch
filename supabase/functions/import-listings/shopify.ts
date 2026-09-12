@@ -82,7 +82,8 @@ async function shopCurrency(origin: string): Promise<string | null> {
  */
 export async function fetchShopifyItems(
   sourceUrl: string,
-  limit: number
+  limit: number,
+  minPhotos = 0
 ): Promise<SourceItem[] | null> {
   const base = new URL(sourceUrl);
   const endpoint = productsEndpoint(base);
@@ -103,7 +104,7 @@ export async function fetchShopifyItems(
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     for (const product of products) {
       const mapped = mapProduct(product, base.origin, currency);
-      if (mapped) items.push(mapped);
+      if (mapped && mapped.photoUrls.length >= minPhotos) items.push(mapped);
       if (items.length >= limit) return items;
     }
 

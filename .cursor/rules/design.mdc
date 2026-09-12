@@ -16,7 +16,7 @@ nobody follows.
   gap in a component. Everything comes from `src/lib/design.ts`.
 - `StyleSheet.create` at module scope with colours in it. Colours change when the
   scheme flips, so styles come from `useThemedStyles(factory)`.
-- A second font family, or a system font beside EB Garamond.
+- A third font family, or a system font beside EB Garamond and Inter.
 - `textTransform: 'uppercase'`, or a string literal written in caps. Copy we
   write is sentence case; only proper nouns take a capital. Dealer data
   (brand, model, reference) is printed as imported and never re-cased.
