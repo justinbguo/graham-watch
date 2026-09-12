@@ -65,7 +65,8 @@ async function resolveDealer(
   userId: string,
   sourceUrl: string,
   dealerId?: string,
-  name?: string
+  name?: string,
+  email?: string
 ): Promise<string> {
   if (dealerId) return dealerId;
 
@@ -74,15 +75,20 @@ async function resolveDealer(
 
   const { data: existing } = await supabase
     .from('dealers')
-    .select('id, name')
+    .select('id, name, contact_email')
     .eq('website', website)
     .maybeSingle();
 
   if (existing) {
     // Dealers imported before we could read the shop's real name are stuck with
-    // their hostname on every card. Re-running the import repairs that.
-    if (name && existing.name === host) {
-      await supabase.from('dealers').update({ name }).eq('id', existing.id);
+    // their hostname on every card. Re-running the import repairs that, and
+    // fills in an address we could not find the first time.
+    const repairs: Record<string, string> = {};
+    if (name && existing.name === host) repairs.name = name;
+    if (email && !existing.contact_email) repairs.contact_email = email;
+
+    if (Object.keys(repairs).length) {
+      await supabase.from('dealers').update(repairs).eq('id', existing.id);
     }
     return existing.id;
   }
@@ -91,7 +97,13 @@ async function resolveDealer(
     .from('dealers')
     // The hostname is a poor name to show on a card, but it is the only one we
     // have when the caller cannot read the shop's own.
-    .insert({ name: name || host, website, created_by: userId, permission: 'pending' })
+    .insert({
+      name: name || host,
+      website,
+      contact_email: email ?? null,
+      created_by: userId,
+      permission: 'pending',
+    })
     .select('id')
     .single();
 
@@ -283,6 +295,7 @@ export default {
     let limit: number;
     let dryRun: boolean;
     let dealerName: string | undefined;
+    let dealerEmail: string | undefined;
     let requestedDealerId: string | undefined;
     try {
       const body = await req.json();
@@ -295,6 +308,7 @@ export default {
       );
       dryRun = Boolean(body?.dryRun);
       dealerName = typeof body?.dealerName === 'string' ? body.dealerName.trim() : undefined;
+      dealerEmail = typeof body?.dealerEmail === 'string' ? body.dealerEmail.trim() : undefined;
       requestedDealerId = typeof body?.dealerId === 'string' ? body.dealerId : undefined;
     } catch (error) {
       return Response.json(
@@ -331,7 +345,8 @@ export default {
         userId,
         sourceUrl,
         requestedDealerId,
-        dealerName
+        dealerName,
+        dealerEmail
       );
     } catch (error) {
       return Response.json(

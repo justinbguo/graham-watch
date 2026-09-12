@@ -128,6 +128,56 @@ async function shopName(origin) {
   return null;
 }
 
+// Tracking pixels, image filenames and vendor addresses all look like emails.
+const EMAIL_NOISE =
+  /(sentry|wixpress|example|godaddy|squarespace|shopify|\.png|\.jpg|\.gif|\.webp|@2x|domain\.com|yourdomain|email\.com)/i;
+
+const CONTACT_PATHS = ['/contact', '/pages/contact', '/contact-us', '/pages/contact-us', '/about'];
+
+// Craft + Tailored publish their address on the terms page and nowhere else, so
+// guessing paths is not enough — ask the sitemap which pages exist.
+const CONTACT_LIKE = /contact|about|terms|policies|faq|imprint|inquiry|enquiry|legal/i;
+const MAX_CONTACT_PAGES = 8;
+
+function emailsIn(html) {
+  if (!html) return [];
+
+  const found = [
+    // A mailto is a stated intention to be written to; loose text is a guess.
+    ...[...html.matchAll(/mailto:([^"'?>\s]+@[^"'?>\s]+)/gi)].map((m) => m[1]),
+    ...[...html.matchAll(/"email"\s*:\s*"([^"]+@[^"]+)"/gi)].map((m) => m[1]),
+    ...[...html.matchAll(/[\w.+-]+@[\w-]+\.[\w.-]{2,}/g)].map((m) => m[0]),
+  ];
+
+  return found
+    .map((email) => decode(email).trim().toLowerCase().replace(/[.,;:]+$/, ''))
+    .filter((email) => email.includes('@') && !EMAIL_NOISE.test(email));
+}
+
+/** Prefers an address on the dealer's own domain over a gmail in their footer. */
+function bestEmail(emails, origin) {
+  if (!emails.length) return null;
+
+  const host = new URL(origin).hostname.replace(/^www\./, '');
+  const ranked = [...new Set(emails)].sort((a, b) => {
+    const onDomain = (email) => (email.endsWith(`@${host}`) ? 0 : 1);
+    const named = (email) => (/^(info|contact|sales|hello|enquir|inquir)/.test(email) ? 0 : 1);
+    return onDomain(a) - onDomain(b) || named(a) - named(b);
+  });
+
+  return ranked[0];
+}
+
+async function contactEmail(origin, urls) {
+  const fromSitemap = urls.filter((url) => CONTACT_LIKE.test(url)).slice(0, MAX_CONTACT_PAGES);
+  const candidates = [
+    ...new Set([origin, ...CONTACT_PATHS.map((path) => `${origin}${path}`), ...fromSitemap]),
+  ];
+
+  const pages = await Promise.all(candidates.map(get));
+  return bestEmail(pages.flatMap(emailsIn), origin);
+}
+
 async function platform(origin, catalogUrl) {
   const shopify = await getJson(`${origin}/products.json?limit=1`);
   if (Array.isArray(shopify?.products)) return 'shopify';
@@ -145,11 +195,16 @@ export async function discover(input) {
   const catalog = catalogPath(urls, origin);
   const catalogUrl = catalog ? `${origin}${catalog.path}` : origin;
 
-  const [name, detected] = await Promise.all([shopName(origin), platform(origin, catalogUrl)]);
+  const [name, detected, email] = await Promise.all([
+    shopName(origin),
+    platform(origin, catalogUrl),
+    contactEmail(origin, urls),
+  ]);
 
   return {
     origin,
     name: name ?? new URL(origin).hostname.replace(/^www\./, ''),
+    email,
     catalogUrl,
     productCount: catalog?.count ?? 0,
     platform: detected,

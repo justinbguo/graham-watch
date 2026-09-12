@@ -17,11 +17,18 @@ export async function preview({ sourceUrl, limit, token }) {
   return body;
 }
 
-export async function runImport({ sourceUrl, limit, dealerName, token, onProgress }) {
+export async function runImport({
+  sourceUrl,
+  limit,
+  dealerName,
+  dealerEmail,
+  token,
+  onProgress,
+}) {
   const started = await request('/functions/v1/import-listings', {
     token,
     method: 'POST',
-    body: { sourceUrl, limit, dealerName },
+    body: { sourceUrl, limit, dealerName, dealerEmail },
   });
 
   if (!started.ok) {
