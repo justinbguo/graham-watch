@@ -4,13 +4,16 @@ import { useEffect, useState, type PropsWithChildren } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 // React Query assumes a browser: it watches window focus and navigator.onLine.
-// Neither exists here, so foreground and connectivity have to be wired by hand.
-onlineManager.setEventListener((setOnline) => {
-  const subscription = Network.addNetworkStateListener((state) => {
-    setOnline(Boolean(state.isConnected));
+// On native neither exists, so connectivity has to be wired by hand. On web its
+// own defaults are correct, and expo-network has no listener to replace them.
+if (Platform.OS !== 'web') {
+  onlineManager.setEventListener((setOnline) => {
+    const subscription = Network.addNetworkStateListener((state) => {
+      setOnline(Boolean(state.isConnected));
+    });
+    return subscription.remove;
   });
-  return subscription.remove;
-});
+}
 
 function handleAppStateChange(status: AppStateStatus) {
   if (Platform.OS !== 'web') focusManager.setFocused(status === 'active');

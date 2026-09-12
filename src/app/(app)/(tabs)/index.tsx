@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { DeckGrid } from '@/components/DeckGrid';
 import { SwipeCard } from '@/components/SwipeCard';
 import { Button, Centered, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
+import { useIsWide } from '@/lib/layout';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
@@ -11,6 +13,7 @@ export default function Deck() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const swipe = useRecordSwipe(userId);
+  const isWide = useIsWide();
 
   if (isPending) {
     return (
@@ -39,6 +42,17 @@ export default function Deck() {
           <Message text="Import a dealer's site, or check back once more listings are approved." />
           <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
         </Centered>
+      </Screen>
+    );
+  }
+
+  if (isWide) {
+    return (
+      <Screen title="Deck">
+        <DeckGrid
+          cards={cards}
+          onSwipe={(card, direction) => swipe.mutate({ listingId: card.id, direction })}
+        />
       </Screen>
     );
   }
