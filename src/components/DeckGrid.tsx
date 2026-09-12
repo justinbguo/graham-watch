@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import { formatPrice, formatSpecs } from '@/lib/format';
+import { ListingSummary } from '@/components/ListingSummary';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { radius, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const MIN_TILE_WIDTH = 280;
@@ -116,25 +116,7 @@ function Tile({
         </View>
       )}
 
-      <View style={styles.info}>
-        <Text style={styles.brand} numberOfLines={1}>
-          {card.brand}
-        </Text>
-        <Text style={styles.model} numberOfLines={1}>
-          {card.model ?? 'Unknown model'}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {formatSpecs(card)}
-        </Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{formatPrice(card)}</Text>
-          {card.dealer ? (
-            <Text style={styles.dealer} numberOfLines={1}>
-              {card.dealer.name}
-            </Text>
-          ) : null}
-        </View>
-      </View>
+      <ListingSummary card={card} />
     </Pressable>
   );
 }
@@ -170,39 +152,5 @@ const gridStyles = (theme: Theme) => ({
   photoEmptyLabel: {
     ...type.caption,
     color: theme.color.textFaint,
-  },
-  info: {
-    padding: inset.card,
-    gap: stack.tight,
-  },
-  brand: {
-    ...type.eyebrow,
-    color: theme.color.textMuted,
-  },
-  model: {
-    ...type.title,
-    color: theme.color.text,
-    paddingTop: space.xs,
-  },
-  meta: {
-    ...type.caption,
-    color: theme.color.textMuted,
-  },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.sm,
-    paddingTop: space.sm,
-  },
-  price: {
-    ...type.price,
-    color: theme.color.text,
-  },
-  dealer: {
-    ...type.caption,
-    color: theme.color.brass,
-    flexShrink: 1,
-    textAlign: 'right' as const,
   },
 });

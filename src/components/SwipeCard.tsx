@@ -10,10 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { ListingSummary } from '@/components/ListingSummary';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
-import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, motion, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -105,42 +105,20 @@ export function SwipeCard({
 
         <Animated.View pointerEvents="none" style={[styles.edge, edgeStyle]} />
 
-        {/* The photo takes taps for paging, so the block under it is what opens
-            the watch in full. Two targets, two jobs, no ambiguity. */}
+        {/* A bar, not a footnote under the price: the photo takes taps for
+            paging, so this is the one place on the card that navigates, and it
+            should look like a control rather than another line of prose. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${card.brand} ${card.model ?? ''}, open full details`}
+          accessibilityLabel={`${card.brand} ${card.model ?? ''}, details and dealer`.trim()}
           disabled={!isTop}
           onPress={onOpen}
-          style={({ pressed }) => [styles.info, pressed && styles.infoPressed]}>
-          <Text style={styles.brand} numberOfLines={1}>
-            {card.brand}
-          </Text>
-          <Text style={styles.model} numberOfLines={1}>
-            {card.model ?? 'Unknown model'}
-          </Text>
-          <Text style={styles.meta} numberOfLines={1}>
-            {formatSpecs(card)}
-          </Text>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPrice(card)}</Text>
-            {card.dealer ? (
-              <Text style={styles.dealer} numberOfLines={1}>
-                {card.dealer.name}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.moreRow}>
-            <Text style={styles.more}>Details and dealer</Text>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={size.tabIcon}
-              color={textFaint}
-            />
-          </View>
+          style={({ pressed }) => [styles.detailsBar, pressed && styles.detailsBarPressed]}>
+          <Text style={styles.detailsLabel}>Details and dealer</Text>
+          <MaterialCommunityIcons name="chevron-right" size={size.tabIcon} color={textFaint} />
         </Pressable>
+
+        <ListingSummary card={card} />
       </Animated.View>
     </GestureDetector>
   );
@@ -155,54 +133,23 @@ const cardStyles = (theme: Theme) => ({
     borderColor: theme.color.border,
     overflow: 'hidden' as const,
   },
-  info: {
-    padding: inset.card,
-    gap: stack.tight,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
-  },
-  infoPressed: {
-    backgroundColor: theme.color.surfaceSunken,
-  },
-  brand: {
-    ...type.eyebrow,
-    color: theme.color.textMuted,
-  },
-  model: {
-    ...type.title,
-    color: theme.color.text,
-    paddingTop: space.xs,
-  },
-  meta: {
-    ...type.caption,
-    color: theme.color.textMuted,
-  },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.sm,
-    paddingTop: space.sm,
-  },
-  price: {
-    ...type.price,
-    color: theme.color.text,
-  },
-  dealer: {
-    ...type.caption,
-    color: theme.color.brass,
-    flexShrink: 1,
-    textAlign: 'right' as const,
-  },
-  moreRow: {
+  detailsBar: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    paddingTop: space.sm,
+    paddingHorizontal: inset.card,
+    paddingVertical: space.md,
+    backgroundColor: theme.color.surfaceSunken,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.color.border,
   },
-  more: {
-    ...type.caption,
-    color: theme.color.textFaint,
+  detailsBarPressed: {
+    backgroundColor: theme.color.border,
+  },
+  detailsLabel: {
+    ...type.control,
+    color: theme.color.textMuted,
   },
   // The drag reads at the edge, not across the photograph. Two pixels so the
   // tint survives against a busy image without colouring the watch itself.

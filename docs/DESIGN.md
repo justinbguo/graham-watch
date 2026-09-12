@@ -244,9 +244,14 @@ answer, and it has to be told apart from never having been asked.
 
 ## Two targets on a card
 
-The photograph pages through the dealer's other shots. The block beneath it opens the
-watch full screen. Both are taps, so they must not overlap: one photo, one panel, a line
-between them and a chevron on the half that navigates.
+The photograph pages through the dealer's other shots. A bar directly beneath it opens the
+watch full screen. Both are taps, so they must not overlap.
+
+The bar sits between the photograph and the watch's name rather than under the price,
+because it is a control and not a closing remark. Given its own strip — sunken, ruled top
+and bottom, a chevron at the right end — it reads as something to press, and the four lines
+below it stay what they are: a maker, a model, its specs, its price, in that order every
+time. Under the price it was a fifth line of prose competing with them.
 
 The description is not on the card. Two lines of prose is a paragraph cut in half — long
 enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
