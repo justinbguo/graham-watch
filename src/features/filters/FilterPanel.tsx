@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { Field } from '@/components/ui';
 import { useFacets } from '@/data/search';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -7,7 +8,15 @@ import { useThemedStyles } from '@/providers/theme';
 import { useFilters, type Surface } from './provider';
 import { humanize } from '@/lib/format';
 
-import { ERA_PRESETS, PRICE_PRESETS, SIZE_PRESETS, activeCount } from './types';
+import {
+  ERA_PRESETS,
+  PRICE_PRESETS,
+  SIZE_PRESETS,
+  activeCount,
+  centsFromInput,
+  dollarsForInput,
+  isPricePreset,
+} from './types';
 
 function Chip({
   label,
@@ -56,7 +65,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  */
 export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
-  const { filters, toggle, setOne, clear } = useFilters(surface);
+  const { filters, toggle, setOne, setPrice, clear } = useFilters(surface);
   const { data: facets = [] } = useFacets();
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
@@ -67,16 +76,43 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       style={styles.panel}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled">
-      <Group title="Price">
-        {PRICE_PRESETS.map((preset) => (
-          <Chip
-            key={preset.id}
-            label={preset.label}
-            selected={filters.price === preset.id}
-            onPress={() => setOne('price', preset.id)}
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>Price</Text>
+        <View style={styles.range}>
+          <Field
+            value={dollarsForInput(filters.priceMin)}
+            onChangeText={(text) => setPrice(centsFromInput(text), filters.priceMax)}
+            placeholder="$ min"
+            keyboardType="number-pad"
+            style={styles.rangeField}
           />
-        ))}
-      </Group>
+          <Text style={styles.rangeJoin}>to</Text>
+          <Field
+            value={dollarsForInput(filters.priceMax)}
+            onChangeText={(text) => setPrice(filters.priceMin, centsFromInput(text))}
+            placeholder="$ max"
+            keyboardType="number-pad"
+            style={styles.rangeField}
+          />
+        </View>
+        {/* Shortcuts that fill the boxes above rather than a second, competing
+            way to say the same thing. Tapping the live one empties them. */}
+        <View style={styles.chips}>
+          {PRICE_PRESETS.map((preset) => {
+            const live = isPricePreset(filters, preset);
+            return (
+              <Chip
+                key={preset.id}
+                label={preset.label}
+                selected={live}
+                onPress={() =>
+                  live ? setPrice(null, null) : setPrice(preset.min, preset.max)
+                }
+              />
+            );
+          })}
+        </View>
+      </View>
 
       <Group title="Era">
         {ERA_PRESETS.map((preset) => (
@@ -109,6 +145,20 @@ export function FilterPanel({ surface }: { surface: Surface }) {
               count={facet.count}
               selected={filters.brands.includes(facet.value)}
               onPress={() => toggle('brands', facet.value)}
+            />
+          ))}
+        </Group>
+      ) : null}
+
+      {of('dealer').length > 1 ? (
+        <Group title="Dealer">
+          {of('dealer').map((facet) => (
+            <Chip
+              key={facet.value}
+              label={facet.label}
+              count={facet.count}
+              selected={filters.dealers.includes(facet.value)}
+              onPress={() => toggle('dealers', facet.value)}
             />
           ))}
         </Group>
@@ -200,6 +250,19 @@ const panelStyles = (theme: Theme) => ({
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
     gap: space.sm,
+  },
+  range: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+    paddingBottom: space.sm,
+  },
+  rangeField: {
+    flex: 1,
+  },
+  rangeJoin: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
   clear: {
     alignSelf: 'flex-start' as const,

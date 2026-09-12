@@ -169,6 +169,23 @@ Things we have not decided yet. Move them up into rules once we do.
 - An empty-state illustration, or stay typographic.
 - Haptics on swipe commit.
 
+## Price is typed, everything else is a preset
+
+Size and era are ranges nobody holds a precise opinion about: "36 to 39mm" is as
+exact as anyone gets, so the chips are the whole control. A budget is different —
+people arrive with a number. So price is two boxes, and the chips above them are
+shortcuts that fill the boxes rather than a second way to say the same thing.
+Tapping the live chip empties them.
+
+One state, not two. The chip reads as selected when the numbers happen to match it,
+which means typing $5,000 to $15,000 by hand lights up the "$5k–15k" chip on its own.
+
+## Filter by dealer
+
+The catalogue is a handful of shops and people shop by the shop they trust, so dealer
+sits beside brand. The group is hidden when only one dealer has anything in the deck:
+a filter whose every option returns everything is furniture.
+
 ## Where filters live
 
 The deck and search filter separately. They are different jobs: the deck is a queue you

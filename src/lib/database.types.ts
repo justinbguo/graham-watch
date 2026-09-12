@@ -470,6 +470,7 @@ export type Database = {
         Args: {
           p_brands?: string[]
           p_complications?: Database["public"]["Enums"]["complication"][]
+          p_dealers?: string[]
           p_exclude_swiped?: boolean
           p_favorites_first?: boolean
           p_limit?: number

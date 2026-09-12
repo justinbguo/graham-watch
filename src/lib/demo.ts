@@ -196,6 +196,7 @@ function matches(card: DeckCard, filters: Filters): boolean {
 
   if (f.p_query && !text.includes(f.p_query.toLowerCase())) return false;
   if (f.p_brands && !f.p_brands.includes(card.brand_key ?? '')) return false;
+  if (f.p_dealers && !f.p_dealers.includes(card.dealer_id)) return false;
   if (f.p_styles && (!card.style || !f.p_styles.includes(card.style))) return false;
   if (f.p_materials && (!card.case_material || !f.p_materials.includes(card.case_material))) return false;
   if (f.p_windings && (!card.winding || !f.p_windings.includes(card.winding))) return false;

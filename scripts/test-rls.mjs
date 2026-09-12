@@ -169,6 +169,15 @@ let listingId;
 
   const deck = await api('/rest/v1/rpc/get_deck', { token: buyer.token, method: 'POST', body: { p_limit: 50 } });
   check('the deck excludes pending dealers', !deck.body?.some((row) => row.id === listingId));
+
+  // The dealer filter takes an id straight from the caller. Asking for a shop
+  // that is not approved must not become a way around the approval rule.
+  const byDealer = await api('/rest/v1/rpc/search_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 50, p_dealers: [dealerId] },
+  });
+  check('filtering by a pending dealer returns nothing', byDealer.body?.length === 0);
 }
 
 console.log('\nafter approval');

@@ -10,13 +10,15 @@ import { NO_FILTERS, type Filters } from './types';
  */
 export type Surface = 'deck' | 'search';
 
-type ListKey = 'brands' | 'styles' | 'materials' | 'windings' | 'complications';
-type SingleKey = 'query' | 'price' | 'size' | 'era';
+type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'complications';
+type SingleKey = 'query' | 'size' | 'era';
 
 export type FilterApi = {
   filters: Filters;
   toggle: <K extends ListKey>(key: K, value: Filters[K][number]) => void;
   setOne: <K extends SingleKey>(key: K, value: Filters[K]) => void;
+  /** Both ends at once, so a preset chip does not land as two renders. */
+  setPrice: (min: number | null, max: number | null) => void;
   clear: () => void;
 };
 
@@ -65,6 +67,8 @@ export function useFilters(surface: Surface): FilterApi {
           ...current,
           [key]: current[key] === next && key !== 'query' ? null : next,
         })),
+      setPrice: (min, max) =>
+        update(surface, (current) => ({ ...current, priceMin: min, priceMax: max })),
       clear: () => update(surface, () => NO_FILTERS),
     }),
     [bySurface, surface, update]
