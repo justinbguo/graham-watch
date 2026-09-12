@@ -59,14 +59,17 @@ export async function signInWithApple() {
   if (error) throw error;
 
   // Apple sends the name on first sign-in only, so capture it now or never.
-  const name = [credential.fullName?.givenName, credential.fullName?.familyName]
-    .filter(Boolean)
-    .join(' ');
-  if (name) {
-    await supabase.auth.updateUser({ data: { full_name: name } });
+  // Onboarding shows it back as a prefill the user can correct.
+  const given = credential.fullName?.givenName ?? null;
+  const family = credential.fullName?.familyName ?? null;
+  if (given || family) {
+    await supabase.auth.updateUser({ data: { given_name: given, family_name: family } });
     const { data } = await supabase.auth.getUser();
     if (data.user) {
-      await supabase.from('profiles').update({ display_name: name }).eq('id', data.user.id);
+      await supabase
+        .from('profiles')
+        .update({ first_name: given, last_name: family })
+        .eq('id', data.user.id);
     }
   }
 }

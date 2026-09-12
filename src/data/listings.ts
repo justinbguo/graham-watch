@@ -60,10 +60,12 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
 async function fetchDeck(limit: number, filters: Filters): Promise<DeckCard[]> {
   if (isDemo) return demo.deck(filters).slice(0, limit);
 
-  // The deck is search with the cards you have already judged removed.
+  // The deck is search with the cards you have already judged removed, and with
+  // the brands you chose at sign-up dealt first.
   const { data, error } = await supabase.rpc('search_listings', {
     p_limit: limit,
     p_exclude_swiped: true,
+    p_favorites_first: true,
     ...toRpcArgs(filters),
   });
   if (error) throw error;

@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { useOnboardingGate } from '@/data/profile';
 import { FilterProvider } from '@/features/filters/provider';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
@@ -54,7 +55,8 @@ export default function RootLayout() {
 
 function SplashScreenController() {
   const { isLoading } = useSession();
-  if (!isLoading) SplashScreen.hide();
+  const { ready } = useOnboardingGate();
+  if (!isLoading && ready) SplashScreen.hide();
   return null;
 }
 
@@ -89,13 +91,23 @@ function Chrome() {
   );
 }
 
+/**
+ * Three destinations, and the gate has to know which before it renders any of
+ * them. While the profile is still loading no guard passes, the stack renders
+ * nothing, and the splash screen stays up to cover it.
+ */
 function RootNavigator() {
   const { isSignedIn } = useSession();
+  const { ready, needsOnboarding } = useOnboardingGate();
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={isSignedIn}>
+      <Stack.Protected guard={isSignedIn && ready && !needsOnboarding}>
         <Stack.Screen name="(app)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
+        <Stack.Screen name="onboarding" />
       </Stack.Protected>
 
       <Stack.Protected guard={!isSignedIn}>

@@ -40,7 +40,12 @@ function price(cents: number | null, currency: string | null): string {
   }).format(cents / 100);
 }
 
-function compose(inquiry: Inquiry, dealerEmail: string, buyerEmail: string) {
+function compose(
+  inquiry: Inquiry,
+  dealerEmail: string,
+  buyerEmail: string,
+  buyerName: string | null
+) {
   const listing = inquiry.listings!;
   const watch = [listing.brand, listing.model].filter(Boolean).join(' ') || 'a watch';
   const details = [
@@ -55,14 +60,14 @@ function compose(inquiry: Inquiry, dealerEmail: string, buyerEmail: string) {
     replyTo: buyerEmail,
     subject: `Inquiry: ${watch}`,
     text: [
-      `A buyer on Graham is interested in your ${watch}.`,
+      `${buyerName ?? 'A buyer'} on Graham is interested in your ${watch}.`,
       '',
       details.join(' · '),
       listing.source_url,
       '',
       inquiry.message ? `They wrote:\n\n"${inquiry.message}"\n` : 'They did not leave a message.',
       '',
-      `Reply to this email to reach them directly at ${buyerEmail}.`,
+      `Reply to this email to reach ${buyerName ?? 'them'} directly at ${buyerEmail}.`,
       '',
       '— Graham',
     ].join('\n'),
@@ -126,13 +131,24 @@ Deno.serve(async (req) => {
     .eq('id', inquiry.dealer_id)
     .maybeSingle();
 
+  // The caller's own token cannot see this row through RLS after the service
+  // role takes over, and a name signs the mail better than an address alone.
+  const { data: buyer } = await service
+    .from('profiles')
+    .select('first_name, last_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const buyerName =
+    [buyer?.first_name, buyer?.last_name].filter(Boolean).join(' ').trim() || null;
+
   if (!dealer?.contact_email) {
     await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
     return json({ error: 'We have no address for this dealer yet.' }, 422);
   }
 
   try {
-    await send(compose(inquiry, dealer.contact_email, user.email!));
+    await send(compose(inquiry, dealer.contact_email, user.email!, buyerName));
   } catch (error) {
     await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
     console.error('send-inquiry failed', error);

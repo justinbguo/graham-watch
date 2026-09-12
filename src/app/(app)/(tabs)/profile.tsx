@@ -2,6 +2,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Message, Screen } from '@/components/ui';
 import { useSaved } from '@/data/listings';
+import { fullName, useProfile } from '@/data/profile';
+import { useFacets } from '@/data/search';
 import { signOut } from '@/lib/auth';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
@@ -16,17 +18,33 @@ const APPEARANCE: { value: ThemePreference; label: string }[] = [
 export default function Profile() {
   const { session, userId } = useSession();
   const { data: saved = [] } = useSaved(userId);
+  const { data: profile } = useProfile(userId);
+  const { data: facets = [] } = useFacets();
   const { preference, setPreference } = useThemeContext();
   const styles = useThemedStyles(profileStyles);
+
+  const name = fullName(profile);
+  // favorite_brands stores brand_key; the facets carry the name a human wrote.
+  const favorites = (profile?.favorite_brands ?? []).map(
+    (key) => facets.find((facet) => facet.kind === 'brand' && facet.value === key)?.label ?? key
+  );
 
   return (
     <Screen title="Profile">
       <View style={styles.body}>
         <View style={styles.identity}>
           <Eyebrow>Signed in as</Eyebrow>
-          <Text style={styles.email}>{session?.user.email ?? 'Signed in'}</Text>
+          <Text style={styles.email}>{name ?? session?.user.email ?? 'Signed in'}</Text>
+          {name ? <Message text={session?.user.email ?? ''} /> : null}
           <Message text={`${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`} />
         </View>
+
+        {favorites.length ? (
+          <View style={styles.section}>
+            <Eyebrow>Brands you follow</Eyebrow>
+            <Text style={styles.favorites}>{favorites.join(' · ')}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Eyebrow>Appearance</Eyebrow>
@@ -72,6 +90,10 @@ const profileStyles = (theme: Theme) => ({
   },
   section: {
     gap: stack.related,
+  },
+  favorites: {
+    ...type.body,
+    color: theme.color.textMuted,
   },
   segmented: {
     flexDirection: 'row' as const,

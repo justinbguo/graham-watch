@@ -69,6 +69,29 @@ console.log('\nprofiles');
 
   const { body: others } = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, { token: importer.token });
   check("a user cannot read another user's profile", Array.isArray(others) && others.length === 0);
+
+  check(
+    'a new profile has not been onboarded',
+    body[0]?.onboarded_at === null && body[0]?.favorite_brands.length === 0
+  );
+
+  const onboard = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { first_name: 'Ada', last_name: 'Byron', onboarded_at: new Date().toISOString() },
+  });
+  check('a user can finish their own onboarding', onboard.status < 300, `got ${onboard.status}`);
+
+  // PATCH on a row RLS hides is a no-op, not an error, so read back to be sure.
+  await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { first_name: 'Mallory' },
+  });
+  const { body: unchanged } = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
+    token: buyer.token,
+  });
+  check("a user cannot rename someone else's profile", unchanged[0]?.first_name === 'Ada');
 }
 
 console.log('\ndealers');
@@ -164,6 +187,19 @@ console.log('\nafter approval');
 
   const importerDeck = await api('/rest/v1/rpc/get_deck', { token: importer.token, method: 'POST', body: { p_limit: 50 } });
   check('the deck never shows you your own import', !importerDeck.body?.some((row) => row.id === listingId));
+
+  // Favourites rank the deck. If they ever start filtering it, this listing —
+  // whose brand the buyer did not pick — disappears and the check fails.
+  await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { favorite_brands: ['a-brand-nobody-stocks'] },
+  });
+  const ranked = await api('/rest/v1/rpc/get_deck', { token: buyer.token, method: 'POST', body: { p_limit: 50 } });
+  check(
+    'favourite brands rank the deck without filtering it',
+    ranked.body?.some((row) => row.id === listingId)
+  );
 
   const tamper = await api(`/rest/v1/listings?id=eq.${listingId}`, {
     token: buyer.token,

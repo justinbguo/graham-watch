@@ -211,6 +211,20 @@ in card view rather than saving it — there is one way to save, and it is a swi
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
+## Onboarding asks twice, and no more
+
+Two steps, both answerable in seconds. A name, because the dealer reads it at the top
+of the inquiry email and "a buyer on Graham" is a worse way to start a conversation
+about a five-figure watch. Then favourite brands, picked from what the catalogue
+actually holds, with the count beside each one.
+
+Brands rank the deck; they never filter it. A first-run answer is a guess, and hiding
+the catalogue behind a guess costs more than dealing it in a slightly worse order.
+Choosing nothing is allowed and the button says "Skip for now" when you have.
+
+The gate is `profiles.onboarded_at`, not an empty brand list: picking nothing is an
+answer, and it has to be told apart from never having been asked.
+
 ## Two targets on a card
 
 The photograph pages through the dealer's other shots. The block beneath it opens the

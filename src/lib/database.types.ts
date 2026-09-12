@@ -334,25 +334,34 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
-          display_name: string | null
+          favorite_brands: string[]
+          first_name: string | null
           handle: string | null
           id: string
+          last_name: string | null
+          onboarded_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
-          display_name?: string | null
+          favorite_brands?: string[]
+          first_name?: string | null
           handle?: string | null
           id: string
+          last_name?: string | null
+          onboarded_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
-          display_name?: string | null
+          favorite_brands?: string[]
+          first_name?: string | null
           handle?: string | null
           id?: string
+          last_name?: string | null
+          onboarded_at?: string | null
         }
         Relationships: []
       }
@@ -462,6 +471,7 @@ export type Database = {
           p_brands?: string[]
           p_complications?: Database["public"]["Enums"]["complication"][]
           p_exclude_swiped?: boolean
+          p_favorites_first?: boolean
           p_limit?: number
           p_materials?: Database["public"]["Enums"]["case_material"][]
           p_offset?: number

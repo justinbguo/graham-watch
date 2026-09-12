@@ -115,7 +115,8 @@ idea the listing is gone, so the CLI clears it.
 
 A buyer swipes right to save. Sending an inquiry is a separate, deliberate act, and
 it is the only thing that emails a dealer. The mail comes from Graham with the
-buyer's address as Reply-To, so the dealer's reply goes straight to them.
+buyer's address as Reply-To, so the dealer's reply goes straight to them. It opens
+with the buyer's name, which is why onboarding asks for one.
 
 Locally the mail lands in Mailpit (http://127.0.0.1:54324), same inbox as sign-in
 codes. In production set `RESEND_API_KEY` and the function uses Resend instead.

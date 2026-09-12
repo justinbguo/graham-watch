@@ -9,6 +9,7 @@ export const keys = {
   deck: (filters: unknown = null) => ['deck', filters] as const,
   search: (filters: unknown) => ['search', filters] as const,
   facets: ['facets'] as const,
+  profile: (userId: string) => ['profile', userId] as const,
   saved: (userId: string) => ['saved', userId] as const,
   passes: (userId: string) => ['passes', userId] as const,
   listing: (listingId: string) => ['listing', listingId] as const,

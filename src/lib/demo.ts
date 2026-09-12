@@ -4,6 +4,7 @@ import type {
   CaseMaterial,
   Complication,
   DeckCard,
+  Profile,
   SwipeDirection,
   WatchStyle,
   Winding,
@@ -19,6 +20,18 @@ import type {
 export const isDemo = process.env.EXPO_PUBLIC_DEMO === '1';
 
 export const DEMO_USER_ID = 'demo-user';
+
+const DEMO_PROFILE: Profile = {
+  id: DEMO_USER_ID,
+  first_name: 'Demo',
+  last_name: 'Collector',
+  favorite_brands: ['rolex'],
+  onboarded_at: '2026-01-01T00:00:00.000Z',
+  avatar_url: null,
+  bio: null,
+  handle: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+};
 
 const DEALER = { id: 'demo-dealer', name: 'Vintage Vault', website: 'https://vintagevault.test' };
 
@@ -213,6 +226,11 @@ export const demo = {
   unsave: (listingId: string) => {
     swiped.delete(listingId);
   },
+
+  // Demo mode is for looking around, so it starts past onboarding.
+  profile: () => DEMO_PROFILE,
+
+  completeOnboarding: () => undefined,
 
   passCount: () => [...swiped.values()].filter((direction) => direction === 'left').length,
 
