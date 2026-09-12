@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
 import { useImportJobs, useStartImport } from '@/data/imports';
-import type { ImportJob } from '@/lib/database.types';
+import type { ImportJob } from '@/lib/models';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 

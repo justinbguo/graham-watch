@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { DeckCard } from '@/lib/database.types';
+import type { DeckCard } from '@/lib/models';
 import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 

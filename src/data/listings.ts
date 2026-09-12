@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import type { DeckCard, Listing, ListingPhoto } from '@/lib/database.types';
+import type { DeckCard, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 

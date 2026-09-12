@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import type { DeckCard, SwipeDirection } from '@/lib/database.types';
+import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { formatPrice, formatSpecs } from '@/lib/format';
 import { theme } from '@/lib/theme';
 

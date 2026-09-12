@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import type { DeckCard, SwipeDirection } from '@/lib/database.types';
+import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { formatPrice, formatSpecs } from '@/lib/format';
 import { theme } from '@/lib/theme';
 

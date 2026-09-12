@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { DeckCard } from '@/lib/database.types';
+import type { DeckCard } from '@/lib/models';
 import { formatPrice } from '@/lib/format';
 import { theme } from '@/lib/theme';
 

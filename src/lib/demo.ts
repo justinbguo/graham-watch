@@ -1,4 +1,4 @@
-import type { DeckCard, ImportJob, SwipeDirection } from './database.types';
+import type { DeckCard, ImportJob, SwipeDirection } from './models';
 
 /**
  * Demo mode runs the whole app against in-memory fixtures, with no Supabase at

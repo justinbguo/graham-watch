@@ -1,4 +1,4 @@
-import type { DeckCard } from './database.types';
+import type { DeckCard } from './models';
 
 export function formatPrice(card: Pick<DeckCard, 'price_cents' | 'currency'>) {
   if (card.price_cents == null) return 'Price on request';
