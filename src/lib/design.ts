@@ -125,6 +125,13 @@ export const type = {
     lineHeight: 20,
     letterSpacing: tracking.label,
   },
+  /** A run-in that has to hold its own beside another: the card's maker and dealer. */
+  labelStrong: {
+    fontFamily: font.text.semibold,
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: tracking.label,
+  },
   caption: {
     fontFamily: font.text.regular,
     fontSize: 13,

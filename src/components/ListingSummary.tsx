@@ -2,17 +2,15 @@ import { Text, View } from 'react-native';
 
 import { formatPrice, formatSpecs } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
-import { inset, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * What a watch says about itself at a glance, on the card and in the grid tile.
- * Four lines in a fixed order — maker, model, specs, price — so the eye lands in
- * the same place on every watch and comparing two is a matter of looking twice.
- *
- * A tile column is half a phone wide. It keeps the order and drops a step in the
- * type scale, and nothing in it is clamped to one line: a name cut to "Oyster-
- * Perpetual…" or a price sitting on top of a dealer answer neither question.
+ * What a watch says about itself at a glance. Both variants keep one order —
+ * maker, model, specs, price — so the eye lands in the same place on every watch
+ * and comparing two is a matter of looking twice. They differ in where the
+ * dealer goes and how much room a line gets, which is why they are written out
+ * rather than assembled from conditionals.
  */
 export function ListingSummary({
   card,
@@ -21,29 +19,56 @@ export function ListingSummary({
   card: DeckCard;
   variant?: 'card' | 'tile';
 }) {
+  return variant === 'tile' ? <TileSummary card={card} /> : <CardSummary card={card} />;
+}
+
+/** Full card width: the dealer sits up beside the maker, in its own outline. */
+function CardSummary({ card }: { card: DeckCard }) {
   const styles = useThemedStyles(summaryStyles);
-  const tile = variant === 'tile';
-  const clamp = tile ? undefined : 1;
 
   return (
-    <View style={tile ? styles.summaryTile : styles.summary}>
-      <Text style={styles.brand} numberOfLines={clamp}>
-        {card.brand}
-      </Text>
-      <Text style={tile ? styles.modelTile : styles.model} numberOfLines={clamp}>
+    <View style={styles.summary}>
+      <View style={styles.makerRow}>
+        <Text style={styles.brand} numberOfLines={1}>
+          {card.brand}
+        </Text>
+        {card.dealer ? (
+          <View style={styles.dealerBadge}>
+            <Text style={styles.dealerName} numberOfLines={1}>
+              {card.dealer.name}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={styles.model} numberOfLines={1}>
         {card.model ?? 'Unknown model'}
       </Text>
-      <Text style={styles.meta} numberOfLines={clamp}>
+      <Text style={styles.meta} numberOfLines={1}>
         {formatSpecs(card)}
       </Text>
+      <Text style={styles.price}>{formatPrice(card)}</Text>
+    </View>
+  );
+}
 
-      <View style={tile ? styles.priceBlockTile : styles.priceRow}>
-        <Text style={tile ? styles.priceTile : styles.price}>{formatPrice(card)}</Text>
-        {card.dealer ? (
-          <Text style={tile ? styles.dealerTile : styles.dealer} numberOfLines={clamp}>
-            {card.dealer.name}
-          </Text>
-        ) : null}
+/**
+ * Half a phone wide. A step down the type scale, the dealer back under the
+ * price, and nothing clamped to one line: a name cut to "Oyster-Perpetual…" and
+ * a price squeezed beside a dealer both answer a question nobody asked.
+ */
+function TileSummary({ card }: { card: DeckCard }) {
+  const styles = useThemedStyles(summaryStyles);
+
+  return (
+    <View style={styles.summaryTile}>
+      <Text style={styles.brandTile}>{card.brand}</Text>
+      <Text style={styles.modelTile}>{card.model ?? 'Unknown model'}</Text>
+      <Text style={styles.meta}>{formatSpecs(card)}</Text>
+
+      <View style={styles.priceBlockTile}>
+        <Text style={styles.priceTile}>{formatPrice(card)}</Text>
+        {card.dealer ? <Text style={styles.dealerTile}>{card.dealer.name}</Text> : null}
       </View>
     </View>
   );
@@ -58,9 +83,33 @@ const summaryStyles = (theme: Theme) => ({
     padding: space.md,
     gap: space.xs,
   },
+  makerRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    gap: space.sm,
+  },
   brand: {
+    ...type.labelStrong,
+    color: theme.color.textMuted,
+  },
+  brandTile: {
     ...type.eyebrow,
     color: theme.color.textMuted,
+  },
+  // An outline rather than a fill: the details bar directly above is already a
+  // solid strip, and two filled blocks stacked read as one control.
+  dealerBadge: {
+    flexShrink: 1,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.borderStrong,
+  },
+  dealerName: {
+    ...type.labelStrong,
+    color: theme.color.brass,
   },
   model: {
     ...type.title,
@@ -75,15 +124,6 @@ const summaryStyles = (theme: Theme) => ({
     ...type.caption,
     color: theme.color.textMuted,
   },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.sm,
-    paddingTop: space.sm,
-  },
-  // Stacked, not side by side. Two wrapping texts sharing a row make ragged
-  // columns of one word each, and the price stops being findable.
   priceBlockTile: {
     gap: space.xs,
     paddingTop: space.sm,
@@ -91,16 +131,11 @@ const summaryStyles = (theme: Theme) => ({
   price: {
     ...type.price,
     color: theme.color.text,
+    paddingTop: space.sm,
   },
   priceTile: {
     ...type.priceSmall,
     color: theme.color.text,
-  },
-  dealer: {
-    ...type.caption,
-    color: theme.color.brass,
-    flexShrink: 1,
-    textAlign: 'right' as const,
   },
   dealerTile: {
     ...type.caption,

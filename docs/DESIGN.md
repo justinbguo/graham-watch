@@ -259,6 +259,11 @@ and bottom, a chevron at the right end — it reads as something to press, and t
 below it stay what they are: a maker, a model, its specs, its price, in that order every
 time. Under the price it was a fifth line of prose competing with them.
 
+The dealer's name sits up beside the maker, both semibold, with a pill outline around the
+dealer. Who is selling it is half of what a vintage watch costs you, and down in the price
+row it was a caption trailing a number. An outline rather than a fill, because the details
+bar directly above is already a solid strip and two filled blocks stacked read as one.
+
 The description is not on the card. Two lines of prose is a paragraph cut in half — long
 enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
 screen or not at all.
