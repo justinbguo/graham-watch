@@ -10,26 +10,12 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import type { DeckCard, SwipeDirection } from '@/lib/database.types';
+import { formatPrice, formatSpecs } from '@/lib/format';
 import { theme } from '@/lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const OFF_SCREEN = SCREEN_WIDTH * 1.5;
-
-function priceLabel(card: DeckCard) {
-  if (card.price_cents == null) return 'Price on request';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: card.currency,
-    maximumFractionDigits: 0,
-  }).format(card.price_cents / 100);
-}
-
-function subtitle(card: DeckCard) {
-  return [card.reference, card.year, card.case_size_mm ? `${card.case_size_mm}mm` : null]
-    .filter(Boolean)
-    .join(' · ');
-}
 
 export function SwipeCard({
   card,
@@ -111,9 +97,9 @@ export function SwipeCard({
             {card.model ?? 'Unknown model'}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
-            {subtitle(card)}
+            {formatSpecs(card)}
           </Text>
-          <Text style={styles.price}>{priceLabel(card)}</Text>
+          <Text style={styles.price}>{formatPrice(card)}</Text>
           {card.dealer ? (
             <Text style={styles.dealer} numberOfLines={1}>
               {card.dealer.name}

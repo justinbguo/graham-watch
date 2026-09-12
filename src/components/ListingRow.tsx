@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { DeckCard } from '@/lib/database.types';
+import { formatPrice } from '@/lib/format';
 import { theme } from '@/lib/theme';
 
 export function ListingRow({
@@ -15,14 +16,6 @@ export function ListingRow({
   onLongPress?: () => void;
 }) {
   const photo = card.photos[0]?.url;
-  const price =
-    card.price_cents == null
-      ? 'Price on request'
-      : new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: card.currency,
-          maximumFractionDigits: 0,
-        }).format(card.price_cents / 100);
 
   return (
     <Pressable onLongPress={onLongPress} delayLongPress={400} style={styles.row}>
@@ -39,7 +32,7 @@ export function ListingRow({
         <Text style={styles.model} numberOfLines={1}>
           {card.model ?? 'Unknown model'}
         </Text>
-        <Text style={styles.price}>{price}</Text>
+        <Text style={styles.price}>{formatPrice(card)}</Text>
         {card.dealer ? (
           <Text style={styles.dealer} numberOfLines={1}>
             {card.dealer.name}
