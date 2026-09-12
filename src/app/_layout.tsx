@@ -28,15 +28,15 @@ function SplashScreenController() {
 }
 
 function RootNavigator() {
-  const { session } = useSession();
+  const { isSignedIn } = useSession();
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!session}>
+      <Stack.Protected guard={isSignedIn}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={!session}>
+      <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
     </Stack>

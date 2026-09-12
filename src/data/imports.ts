@@ -2,11 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import type { ImportJob } from '@/lib/database.types';
+import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
 
 async function fetchImportJobs(userId: string): Promise<ImportJob[]> {
+  if (isDemo) return demo.importJobs();
+
   const { data, error } = await supabase
     .from('import_jobs')
     .select('*')
@@ -31,7 +34,7 @@ export function useImportJobs(userId: string | null) {
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || isDemo) return;
 
     const channel = supabase
       .channel(`import-jobs-${userId}`)
@@ -58,6 +61,8 @@ export function useStartImport(userId: string | null) {
 
   return useMutation({
     mutationFn: async ({ sourceUrl, dealerId }: { sourceUrl: string; dealerId?: string }) => {
+      if (isDemo) return demo.startImport(sourceUrl);
+
       const { data, error } = await supabase.functions.invoke<{ job: ImportJob }>(
         'import-listings',
         { body: { sourceUrl, dealerId } }

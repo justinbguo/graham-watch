@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { DeckCard, Listing, ListingPhoto } from '@/lib/database.types';
+import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
@@ -44,12 +45,16 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
 }
 
 async function fetchDeck(limit: number): Promise<DeckCard[]> {
+  if (isDemo) return demo.deck().slice(0, limit);
+
   const { data, error } = await supabase.rpc('get_deck', { p_limit: limit });
   if (error) throw error;
   return hydrate(data ?? []);
 }
 
 async function fetchSaved(actorId: string): Promise<DeckCard[]> {
+  if (isDemo) return demo.saved();
+
   const { data: saved, error: savedError } = await supabase
     .from('swipes')
     .select('listing_id')
@@ -74,6 +79,8 @@ async function fetchSaved(actorId: string): Promise<DeckCard[]> {
 }
 
 async function fetchImported(userId: string): Promise<DeckCard[]> {
+  if (isDemo) return demo.imported();
+
   const { data, error } = await supabase
     .from('listings')
     .select('*')
@@ -84,6 +91,8 @@ async function fetchImported(userId: string): Promise<DeckCard[]> {
 }
 
 async function fetchListing(listingId: string): Promise<DeckCard | null> {
+  if (isDemo) return demo.listing(listingId);
+
   const { data, error } = await supabase
     .from('listings')
     .select('*')

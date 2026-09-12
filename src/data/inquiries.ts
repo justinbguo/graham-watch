@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { DeckCard } from '@/lib/database.types';
+import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
@@ -11,6 +12,7 @@ export function useSendInquiry(buyerId: string | null) {
   return useMutation({
     mutationFn: async ({ card, message }: { card: DeckCard; message: string }) => {
       if (!buyerId) throw new Error('Not signed in.');
+      if (isDemo) return null;
 
       const { data, error } = await supabase
         .from('inquiries')

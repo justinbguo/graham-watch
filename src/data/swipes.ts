@@ -1,11 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { DeckCard, SwipeDirection } from '@/lib/database.types';
+import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
 
 async function recordSwipe(actorId: string, listingId: string, direction: SwipeDirection) {
+  if (isDemo) return demo.recordSwipe(listingId, direction);
+
   const { error } = await supabase
     .from('swipes')
     .upsert(
@@ -16,6 +19,8 @@ async function recordSwipe(actorId: string, listingId: string, direction: SwipeD
 }
 
 async function deleteSwipe(actorId: string, listingId: string) {
+  if (isDemo) return demo.unsave(listingId);
+
   const { error } = await supabase
     .from('swipes')
     .delete()

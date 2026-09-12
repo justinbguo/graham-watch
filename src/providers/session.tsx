@@ -3,12 +3,15 @@ import * as Linking from 'expo-linking';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
 
 import { createSessionFromUrl } from '@/lib/auth';
+import { DEMO_USER_ID, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 type SessionState = {
   session: Session | null;
   userId: string | null;
   isLoading: boolean;
+  /** Demo mode has a user but no Supabase session, so this is not `!!session`. */
+  isSignedIn: boolean;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -25,6 +28,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const url = Linking.useLinkingURL();
 
   useEffect(() => {
+    if (isDemo) {
+      setIsLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setIsLoading(false);
@@ -44,7 +52,13 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [url]);
 
   return (
-    <SessionContext.Provider value={{ session, userId: session?.user.id ?? null, isLoading }}>
+    <SessionContext.Provider
+      value={{
+        session,
+        userId: isDemo ? DEMO_USER_ID : (session?.user.id ?? null),
+        isLoading,
+        isSignedIn: isDemo || Boolean(session),
+      }}>
       {children}
     </SessionContext.Provider>
   );
