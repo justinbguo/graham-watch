@@ -1,4 +1,4 @@
-export type ExtractedListing = {
+export type ExtractedFields = {
   brand: string;
   model: string | null;
   reference: string | null;
@@ -11,68 +11,72 @@ export type ExtractedListing = {
   price_cents: number | null;
   currency: string | null;
   description: string | null;
+};
+
+export type ExtractedListing = ExtractedFields & {
   photo_urls: string[];
   source_url: string | null;
 };
 
 const nullable = (type: string) => ({ type: [type, 'null'] });
 
-const LISTING_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['listings'],
-  properties: {
-    listings: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: [
-          'brand',
-          'model',
-          'reference',
-          'year',
-          'movement',
-          'case_size_mm',
-          'condition',
-          'has_box',
-          'has_papers',
-          'price_cents',
-          'currency',
-          'description',
-          'photo_urls',
-          'source_url',
-        ],
-        properties: {
-          brand: { type: 'string' },
-          model: nullable('string'),
-          reference: nullable('string'),
-          year: nullable('integer'),
-          movement: nullable('string'),
-          case_size_mm: nullable('number'),
-          condition: nullable('string'),
-          has_box: nullable('boolean'),
-          has_papers: nullable('boolean'),
-          price_cents: { ...nullable('integer'), description: 'Price in minor units' },
-          currency: { ...nullable('string'), description: 'ISO 4217 code, e.g. USD' },
-          description: nullable('string'),
-          photo_urls: { type: 'array', items: { type: 'string' } },
-          source_url: nullable('string'),
-        },
-      },
-    },
-  },
+const FIELDS = {
+  brand: { type: 'string' },
+  model: nullable('string'),
+  reference: nullable('string'),
+  year: nullable('integer'),
+  movement: nullable('string'),
+  case_size_mm: nullable('number'),
+  condition: nullable('string'),
+  has_box: nullable('boolean'),
+  has_papers: nullable('boolean'),
+  price_cents: { ...nullable('integer'), description: 'Price in minor units' },
+  currency: { ...nullable('string'), description: 'ISO 4217 code, e.g. USD' },
+  description: nullable('string'),
 } as const;
 
-const SYSTEM_PROMPT = `You extract vintage watch listings from scraped web pages.
-Return one entry per watch actually for sale on the page. Ignore navigation, blog
-posts, and sold items. Never invent a value: if the page does not state something,
-return null. Prices are in minor units (cents). Resolve photo URLs to absolute URLs.`;
+// strict mode requires every property to be listed as required; nullable types
+// are how a field is made optional in practice.
+const objectSchema = (properties: Record<string, unknown>) => ({
+  type: 'object',
+  additionalProperties: false,
+  required: Object.keys(properties),
+  properties,
+});
 
-export async function extractListings(
-  markdown: string,
-  sourceUrl: string
-): Promise<ExtractedListing[]> {
+const PAGE_SCHEMA = objectSchema({
+  listings: {
+    type: 'array',
+    items: objectSchema({
+      ...FIELDS,
+      photo_urls: { type: 'array', items: { type: 'string' } },
+      source_url: nullable('string'),
+    }),
+  },
+});
+
+const ITEM_SCHEMA = objectSchema(FIELDS);
+
+const SHARED_RULES = `Never invent a value: if the text does not state something, return
+null. Prices are in minor units (cents). Vintage dealers date most watches to a decade;
+when only a decade is given, return its first year (\"1960's\" becomes 1960). Read titles
+closely, they usually carry brand, model and reference.`;
+
+const PAGE_PROMPT = `You extract vintage watch listings from scraped web pages.
+Return one entry per watch actually for sale on the page. Ignore navigation, blog
+posts, and sold items. ${SHARED_RULES} Resolve photo URLs to absolute URLs.`;
+
+const ITEM_PROMPT = `You parse a single vintage watch listing into typed fields. The
+title and description come from the dealer's own product page, so everything you need
+is in them. ${SHARED_RULES} Write description as one or two plain sentences drawn from
+the dealer's prose, without marketing superlatives.`;
+
+async function complete(
+  system: string,
+  user: string,
+  schema: unknown,
+  schemaName: string
+): Promise<unknown> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY is not set.');
 
@@ -85,12 +89,12 @@ export async function extractListings(
     body: JSON.stringify({
       model: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Source URL: ${sourceUrl}\n\n${markdown}` },
+        { role: 'system', content: system },
+        { role: 'user', content: user },
       ],
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'watch_listings', strict: true, schema: LISTING_SCHEMA },
+        json_schema: { name: schemaName, strict: true, schema },
       },
     }),
   });
@@ -102,7 +106,39 @@ export async function extractListings(
   const body = await response.json();
   const content = body?.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenAI returned no content.');
+  return JSON.parse(content);
+}
 
-  const parsed = JSON.parse(content) as { listings?: ExtractedListing[] };
+/** For pages where we do not know what the listings are. The model finds them. */
+export async function extractListings(
+  markdown: string,
+  sourceUrl: string
+): Promise<ExtractedListing[]> {
+  const parsed = (await complete(
+    PAGE_PROMPT,
+    `Source URL: ${sourceUrl}\n\n${markdown}`,
+    PAGE_SCHEMA,
+    'watch_listings'
+  )) as { listings?: ExtractedListing[] };
+
   return (parsed.listings ?? []).filter((listing) => Boolean(listing.brand));
+}
+
+/**
+ * For a listing we already know is one watch. Far more accurate than asking the
+ * model to find watches in a page, and the prompt is short enough to be cheap.
+ */
+export async function extractFields(
+  title: string,
+  text: string,
+  sourceUrl: string
+): Promise<ExtractedFields | null> {
+  const fields = (await complete(
+    ITEM_PROMPT,
+    `Source URL: ${sourceUrl}\nTitle: ${title}\n\n${text}`,
+    ITEM_SCHEMA,
+    'watch_listing'
+  )) as ExtractedFields;
+
+  return fields?.brand ? fields : null;
 }

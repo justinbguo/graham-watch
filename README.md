@@ -67,11 +67,12 @@ The importer needs an OpenAI key to turn a scraped page into typed listings:
 
 ```
 cp supabase/functions/.env.example supabase/functions/.env   # add OPENAI_API_KEY
-docker restart supabase_edge_runtime_graham-watch
+npm run db:stop && npm run db:start
 ```
 
-The edge function does not reload secrets on its own, so restart that container after
-editing the file. Scraping falls back to plain `fetch` with no key, which handles
+Secrets are read when the function's container is built, so editing the file is not
+enough and `docker restart` will not do it either — the container keeps the environment
+it was created with. Restart the stack. Scraping falls back to plain `fetch` with no key, which handles
 static HTML only; set `FIRECRAWL_API_KEY` or `JINA_API_KEY` for JavaScript-rendered
 shops. See [docs/SCRAPING.md](docs/SCRAPING.md).
 

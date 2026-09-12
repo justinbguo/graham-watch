@@ -2,6 +2,7 @@
  * Run a listing import from the terminal.
  *
  *   npm run import -- https://dealer.example.com/watches
+ *   npm run import -- https://dealer.example.com/watches --limit 10
  *
  * Importing is an operator job, not something a buyer does, so it lives here
  * rather than in the app. This calls the same `import-listings` edge function
@@ -10,20 +11,24 @@
 
 import { request, signInOperator } from './_supabase.mjs';
 
-const sourceUrl = process.argv[2];
+const args = process.argv.slice(2);
+const sourceUrl = args.find((arg) => arg.startsWith('http'));
 
-if (!sourceUrl || !sourceUrl.startsWith('http')) {
-  console.error('Usage: npm run import -- <url>');
+const limitFlag = args.indexOf('--limit');
+const limit = limitFlag === -1 ? undefined : Number(args[limitFlag + 1]);
+
+if (!sourceUrl || (limitFlag !== -1 && !Number.isInteger(limit))) {
+  console.error('Usage: npm run import -- <url> [--limit <n>]');
   process.exit(1);
 }
 
 const operator = await signInOperator();
-console.log(`Importing ${sourceUrl} as ${operator.email}`);
+console.log(`Importing ${sourceUrl} as ${operator.email}${limit ? `, up to ${limit}` : ''}`);
 
 const started = await request('/functions/v1/import-listings', {
   token: operator.token,
   method: 'POST',
-  body: { sourceUrl },
+  body: { sourceUrl, limit },
 });
 
 if (!started.ok) {
@@ -54,11 +59,13 @@ process.stdout.write('\r');
 if (job.status === 'failed') {
   console.error(`Import failed: ${job.error}`);
   if (/openai|api key/i.test(job.error ?? '')) {
-    console.error('Set OPENAI_API_KEY in supabase/functions/.env, then restart with `npm run db:start`.');
+    console.error('Set a real OPENAI_API_KEY in supabase/functions/.env, then restart the');
+    console.error('stack so the function picks it up:  npm run db:stop && npm run db:start');
   }
   process.exit(1);
 }
 
-console.log(`Done. ${job.listings_created} listing(s) created.`);
+console.log(`Done via ${job.provider}. ${job.listings_created} listing(s) created.`);
+if (job.error) console.log(job.error);
 console.log('They stay invisible to other users until you approve the dealer:');
 console.log('  npm run dealers');

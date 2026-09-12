@@ -3,12 +3,17 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-import { extractListings } from './extract.ts';
+import { extractFields, extractListings, type ExtractedFields } from './extract.ts';
 import { copyPhotos } from './photos.ts';
 import { resolveProvider, scrape } from './scrape.ts';
+import { fetchSquarespaceItems } from './squarespace.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
 const MAX_PHOTOS_PER_LISTING = 6;
+
+// Each item is one OpenAI round trip. Four at a time keeps a ten-watch import
+// under ten seconds without tripping rate limits on a new account.
+const EXTRACT_CONCURRENCY = 4;
 
 let adminClient: SupabaseClient | null = null;
 
@@ -75,43 +80,140 @@ async function resolveDealer(
   return data.id;
 }
 
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  run: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await run(items[index]);
+      }
+    })
+  );
+
+  return results;
+}
+
+type PreparedListing = {
+  fields: ExtractedFields;
+  sourceUrl: string;
+  photoUrls: string[];
+};
+
+/**
+ * Two ways in. If the site will hand us its own structured data we take it and
+ * ask the model only to type the prose. Otherwise we scrape the page and ask the
+ * model to find the watches too, which is the same job with worse inputs.
+ */
+async function prepare(
+  sourceUrl: string,
+  limit: number
+): Promise<{ provider: string; listings: PreparedListing[] }> {
+  const items = await fetchSquarespaceItems(sourceUrl, limit);
+
+  if (items?.length) {
+    const failures: unknown[] = [];
+
+    const prepared = await mapPool(items, EXTRACT_CONCURRENCY, async (item) => {
+      try {
+        const fields = await extractFields(item.title, item.text, item.sourceUrl);
+        if (!fields) return null;
+        return {
+          // The shop's own price and currency are facts. The model only ever saw
+          // prose, so it does not get to overrule them.
+          fields: {
+            ...fields,
+            price_cents: item.priceCents ?? fields.price_cents,
+            currency: item.currency ?? fields.currency,
+          },
+          sourceUrl: item.sourceUrl,
+          photoUrls: item.photoUrls,
+        };
+      } catch (error) {
+        failures.push(error);
+        return null;
+      }
+    });
+
+    const listings = prepared.filter((item): item is PreparedListing => item !== null);
+    // One flaky item should not sink the batch, but a misconfigured key fails
+    // every item identically and must be reported rather than read as "0 found".
+    if (!listings.length && failures.length) throw failures[0];
+
+    return { provider: 'squarespace', listings };
+  }
+
+  const { markdown, provider } = await scrape(sourceUrl);
+  const extracted = await extractListings(markdown, sourceUrl);
+
+  return {
+    provider,
+    listings: extracted.slice(0, limit).map((item) => ({
+      fields: item,
+      sourceUrl: item.source_url ?? sourceUrl,
+      photoUrls: item.photo_urls.filter((url) => url.startsWith('http')),
+    })),
+  };
+}
+
 async function runImport(
   supabase: SupabaseClient,
   jobId: string,
   userId: string,
   dealerId: string,
-  sourceUrl: string
+  sourceUrl: string,
+  limit: number
 ) {
   try {
     await supabase.from('import_jobs').update({ status: 'running' }).eq('id', jobId);
 
-    const { markdown } = await scrape(sourceUrl);
-    const extracted = (await extractListings(markdown, sourceUrl)).slice(
-      0,
-      MAX_LISTINGS_PER_IMPORT
-    );
+    const { provider, listings } = await prepare(sourceUrl, limit);
+    await supabase.from('import_jobs').update({ provider }).eq('id', jobId);
+
+    // Re-running an import is the normal way to pick up new stock, so the same
+    // product URL must not land in the deck twice.
+    const { data: seen } = await supabase
+      .from('listings')
+      .select('source_url')
+      .eq('dealer_id', dealerId);
+    const known = new Set((seen ?? []).map((row) => row.source_url));
 
     let created = 0;
-    for (const item of extracted) {
+    let skipped = 0;
+
+    for (const item of listings.slice(0, MAX_LISTINGS_PER_IMPORT)) {
+      if (known.has(item.sourceUrl)) {
+        skipped += 1;
+        continue;
+      }
+      known.add(item.sourceUrl);
+
       const { data: listing, error } = await supabase
         .from('listings')
         .insert({
           dealer_id: dealerId,
           imported_by: userId,
           import_job_id: jobId,
-          source_url: item.source_url ?? sourceUrl,
-          brand: item.brand,
-          model: item.model,
-          reference: item.reference,
-          year: item.year,
-          movement: item.movement,
-          case_size_mm: item.case_size_mm,
-          condition: item.condition,
-          has_box: item.has_box,
-          has_papers: item.has_papers,
-          price_cents: item.price_cents,
-          currency: item.currency ?? 'USD',
-          description: item.description,
+          source_url: item.sourceUrl,
+          brand: item.fields.brand,
+          model: item.fields.model,
+          reference: item.fields.reference,
+          year: item.fields.year,
+          movement: item.fields.movement,
+          case_size_mm: item.fields.case_size_mm,
+          condition: item.fields.condition,
+          has_box: item.fields.has_box,
+          has_papers: item.fields.has_papers,
+          price_cents: item.fields.price_cents,
+          currency: item.fields.currency ?? 'USD',
+          description: item.fields.description,
         })
         .select('id')
         .single();
@@ -119,12 +221,9 @@ async function runImport(
       if (error || !listing) continue;
       created += 1;
 
-      const sourceUrls = item.photo_urls
-        .filter((url) => url.startsWith('http'))
-        .slice(0, MAX_PHOTOS_PER_LISTING);
-
-      if (sourceUrls.length) {
-        const photos = await copyPhotos(storage(), listing.id, sourceUrls);
+      const photoUrls = item.photoUrls.slice(0, MAX_PHOTOS_PER_LISTING);
+      if (photoUrls.length) {
+        const photos = await copyPhotos(storage(), listing.id, photoUrls);
         await supabase
           .from('listing_photos')
           .insert(photos.map((photo) => ({ ...photo, listing_id: listing.id })));
@@ -136,6 +235,7 @@ async function runImport(
       .update({
         status: 'succeeded',
         listings_created: created,
+        error: skipped ? `Skipped ${skipped} already imported.` : null,
         finished_at: new Date().toISOString(),
       })
       .eq('id', jobId);
@@ -158,10 +258,16 @@ export default {
 
     let sourceUrl: string;
     let dealerId: string;
+    let limit: number;
     try {
       const body = await req.json();
       sourceUrl = assertPublicHttpUrl(String(body?.sourceUrl ?? ''));
       dealerId = await resolveDealer(ctx.supabase, userId, sourceUrl, body?.dealerId);
+      const requested = Number(body?.limit ?? MAX_LISTINGS_PER_IMPORT);
+      limit = Math.min(
+        Math.max(Number.isFinite(requested) ? Math.trunc(requested) : MAX_LISTINGS_PER_IMPORT, 1),
+        MAX_LISTINGS_PER_IMPORT
+      );
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : 'Bad request.' },
@@ -169,14 +275,13 @@ export default {
       );
     }
 
-    const provider = resolveProvider();
     const { data: job, error } = await ctx.supabase
       .from('import_jobs')
       .insert({
         user_id: userId,
         dealer_id: dealerId,
         source_url: sourceUrl,
-        provider,
+        provider: resolveProvider(),
         status: 'queued',
       })
       .select('*')
@@ -188,7 +293,7 @@ export default {
 
     // Scraping plus extraction takes far longer than a request should. Hand the
     // job back now; the client follows progress on import_jobs over Realtime.
-    EdgeRuntime.waitUntil(runImport(ctx.supabase, job.id, userId, dealerId, sourceUrl));
+    EdgeRuntime.waitUntil(runImport(ctx.supabase, job.id, userId, dealerId, sourceUrl, limit));
 
     return Response.json({ job });
   }),

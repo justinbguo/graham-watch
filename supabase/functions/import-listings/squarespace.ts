@@ -1,0 +1,121 @@
+import { htmlToText } from './scrape.ts';
+
+/**
+ * One watch as the dealer's own site describes it, before any model has guessed
+ * at it. Facts here are read from the site's data, not inferred.
+ */
+export type SourceItem = {
+  title: string;
+  text: string;
+  sourceUrl: string;
+  photoUrls: string[];
+  priceCents: number | null;
+  currency: string | null;
+};
+
+// Squarespace serves originals at 4000px and several megabytes. A phone deck
+// never needs more than this, and we pay for every byte we copy into storage.
+const PHOTO_WIDTH = '1500w';
+const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
+function toCents(money: Json): number | null {
+  const value = Number(money?.value);
+  // Squarespace writes 0.00 when a dealer hides the price behind an enquiry.
+  // That is absence, not free.
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value * 100);
+}
+
+function photoUrls(item: Json): string[] {
+  const gallery = Array.isArray(item?.items) ? item.items : [];
+  const urls = [item?.assetUrl, ...gallery.map((entry: Json) => entry?.assetUrl)].filter(
+    (url: unknown): url is string => typeof url === 'string' && url.startsWith('http')
+  );
+  return [...new Set(urls)].map((url) => `${url}?format=${PHOTO_WIDTH}`);
+}
+
+function mapItem(item: Json, base: URL): SourceItem | null {
+  const title = typeof item?.title === 'string' ? item.title.trim() : '';
+  if (!title) return null;
+
+  const photos = photoUrls(item);
+  if (!photos.length) return null;
+
+  let sourceUrl = base.toString();
+  try {
+    if (typeof item?.fullUrl === 'string') sourceUrl = new URL(item.fullUrl, base).toString();
+  } catch {
+    // Keep the collection URL; a bad product path is not worth losing the item.
+  }
+
+  const money = item?.structuredContent?.priceMoney;
+
+  return {
+    title,
+    text: htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl),
+    sourceUrl,
+    photoUrls: photos,
+    priceCents: toCents(money),
+    currency: typeof money?.currency === 'string' ? money.currency : null,
+  };
+}
+
+/**
+ * Squarespace answers any collection or product URL with JSON when asked, which
+ * hands us titles, prose, prices and full image galleries as data. Scraping the
+ * rendered page instead means parsing five megabytes of markup to recover facts
+ * the site was willing to state outright.
+ *
+ * Returns null when the URL is not a Squarespace collection, so the caller can
+ * fall back to the generic scrape-and-extract path.
+ */
+export async function fetchSquarespaceItems(
+  sourceUrl: string,
+  limit: number
+): Promise<SourceItem[] | null> {
+  const base = new URL(sourceUrl);
+  const items: SourceItem[] = [];
+  let offset: number | null = null;
+
+  while (items.length < limit) {
+    const page = new URL(base.toString());
+    page.searchParams.set('format', 'json');
+    if (offset !== null) page.searchParams.set('offset', String(offset));
+
+    const response = await fetch(page, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return items.length ? items : null;
+
+    let body: Json;
+    try {
+      body = await response.json();
+    } catch {
+      return items.length ? items : null;
+    }
+
+    // A product URL answers with `item`, a collection with `items`.
+    const batch = Array.isArray(body?.items)
+      ? body.items
+      : body?.item
+        ? [body.item]
+        : null;
+    if (!batch) return items.length ? items : null;
+
+    for (const raw of batch) {
+      const mapped = mapItem(raw, base);
+      if (mapped) items.push(mapped);
+      if (items.length >= limit) break;
+    }
+
+    const next = body?.pagination?.nextPageOffset;
+    if (!body?.pagination?.nextPage || typeof next !== 'number' || next === offset) break;
+    offset = next;
+  }
+
+  return items;
+}
