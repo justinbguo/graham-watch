@@ -195,6 +195,35 @@ console.log('\nswipes');
 
   const others = await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}`, { token: importer.token });
   check("a user cannot read another user's swipes", others.body?.length === 0);
+
+  // Starting over deletes rows, so the same isolation has to hold for delete.
+  const passedId = deck.body?.[0]?.id;
+  await api('/rest/v1/swipes', {
+    token: buyer.token,
+    method: 'POST',
+    body: { actor_id: buyer.id, listing_id: passedId, direction: 'left' },
+  });
+
+  await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}&direction=eq.left`, {
+    token: importer.token,
+    method: 'DELETE',
+  });
+  const survived = await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}&direction=eq.left`, {
+    token: buyer.token,
+  });
+  check("a user cannot delete another user's swipes", survived.body?.length === 1);
+
+  await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}&direction=eq.left`, {
+    token: buyer.token,
+    method: 'DELETE',
+  });
+  const mine = await api(`/rest/v1/swipes?actor_id=eq.${buyer.id}&select=direction`, {
+    token: buyer.token,
+  });
+  check(
+    'starting over clears the passes and keeps the saves',
+    mine.body?.length === 1 && mine.body[0].direction === 'right'
+  );
 }
 
 console.log('\ndealer contact and stats');

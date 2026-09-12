@@ -10,6 +10,7 @@ export const keys = {
   search: (filters: unknown) => ['search', filters] as const,
   facets: ['facets'] as const,
   saved: (userId: string) => ['saved', userId] as const,
+  passes: (userId: string) => ['passes', userId] as const,
   listing: (listingId: string) => ['listing', listingId] as const,
   inquiries: (userId: string) => ['inquiries', userId] as const,
 };

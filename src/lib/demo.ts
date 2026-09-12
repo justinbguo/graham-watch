@@ -214,5 +214,13 @@ export const demo = {
     swiped.delete(listingId);
   },
 
+  passCount: () => [...swiped.values()].filter((direction) => direction === 'left').length,
+
+  startOver: () => {
+    for (const [listingId, direction] of swiped) {
+      if (direction === 'left') swiped.delete(listingId);
+    }
+  },
+
   listing: (listingId: string) => CARDS.find((card) => card.id === listingId) ?? null,
 };

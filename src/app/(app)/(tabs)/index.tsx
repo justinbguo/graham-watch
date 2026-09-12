@@ -8,7 +8,7 @@ import { SwipeCard } from '@/components/SwipeCard';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck } from '@/data/listings';
-import { useRecordSwipe } from '@/data/swipes';
+import { usePassCount, useRecordSwipe, useStartOver } from '@/data/swipes';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useIsWide } from '@/lib/layout';
@@ -20,6 +20,8 @@ export default function Deck() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const swipe = useRecordSwipe(userId);
+  const { data: passes = 0 } = usePassCount(userId);
+  const startOver = useStartOver(userId);
   const isWide = useIsWide();
   const styles = useThemedStyles(deckStyles);
   const router = useRouter();
@@ -67,16 +69,27 @@ export default function Deck() {
     return (
       <Screen title="Deck" action={actions}>
         <Centered>
-          <Heading>{count ? 'Nothing matches' : 'Nothing left to swipe'}</Heading>
+          <Heading>
+            {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
+          </Heading>
           <Message
             text={
               count
                 ? 'Your filters are narrower than the deck.'
-                : 'Check back once more dealers are approved.'
+                : passes
+                  ? `Start over to see the ${passes} you passed on again. Saved watches stay saved.`
+                  : 'Check back once more dealers are approved.'
             }
           />
           {count ? (
             <Button label="Clear filters" variant="secondary" onPress={clear} />
+          ) : passes ? (
+            <Button
+              label="Start over"
+              variant="secondary"
+              loading={startOver.isPending}
+              onPress={() => startOver.mutate()}
+            />
           ) : (
             <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
           )}

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
@@ -29,6 +29,34 @@ async function deleteSwipe(actorId: string, listingId: string) {
   if (error) throw error;
 }
 
+async function countPasses(actorId: string): Promise<number> {
+  if (isDemo) return demo.passCount();
+
+  const { count, error } = await supabase
+    .from('swipes')
+    .select('id', { count: 'exact', head: true })
+    .eq('actor_id', actorId)
+    .eq('direction', 'left');
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Only the passes. A right swipe is a decision the user can still see in Saved,
+ * and deleting those rows would empty that list without saying so.
+ */
+async function deletePasses(actorId: string) {
+  if (isDemo) return demo.startOver();
+
+  const { error } = await supabase
+    .from('swipes')
+    .delete()
+    .eq('actor_id', actorId)
+    .eq('direction', 'left');
+  if (error) throw error;
+}
+
 /**
  * The card leaves the deck the instant the gesture ends, before the write is
  * acknowledged. A swipe that waits on the network feels broken, and the worst
@@ -50,9 +78,34 @@ export function useRecordSwipe(actorId: string | null) {
       );
     },
     onSuccess: (_result, { direction }) => {
-      if (direction === 'right' && actorId) {
-        queryClient.invalidateQueries({ queryKey: keys.saved(actorId) });
-      }
+      if (!actorId) return;
+      const affected = direction === 'right' ? keys.saved(actorId) : keys.passes(actorId);
+      queryClient.invalidateQueries({ queryKey: affected });
+    },
+  });
+}
+
+/** How many watches are waiting to come back, which is what makes the offer honest. */
+export function usePassCount(actorId: string | null) {
+  return useQuery({
+    queryKey: keys.passes(actorId ?? 'anonymous'),
+    queryFn: () => countPasses(actorId!),
+    enabled: Boolean(actorId),
+  });
+}
+
+export function useStartOver(actorId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => {
+      if (!actorId) throw new Error('Not signed in.');
+      return deletePasses(actorId);
+    },
+    onSuccess: () => {
+      // Every cached deck: the passes are gone for every filter, not just this one.
+      queryClient.invalidateQueries({ queryKey: ['deck'] });
+      if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
 }

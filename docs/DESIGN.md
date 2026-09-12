@@ -211,6 +211,15 @@ in card view rather than saving it — there is one way to save, and it is a swi
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
+## The end of the deck
+
+Running out is not an error, so the empty deck offers the only move left: start over, which
+puts back every watch you passed on. Saved watches stay out of it. A right swipe is a decision
+you can still see in Saved, and replaying it risks losing a save to a stray thumb.
+
+The count is in the copy — "the 20 you passed on" — so the button is a promise, not a guess.
+With nothing to put back the offer is a plain refresh instead.
+
 ## No labels on the deck
 
 A drag shows its direction in colour alone: green wash for save, red for pass, both faint
