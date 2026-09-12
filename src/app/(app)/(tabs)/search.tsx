@@ -1,11 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
+import { FilterButton } from '@/components/FilterButton';
 import { ListingRow } from '@/components/ListingRow';
-import { Message, Screen, Spinner } from '@/components/ui';
+import { Field, Message, Screen, Spinner } from '@/components/ui';
 import { useSearch } from '@/data/search';
-import { FilterPanel } from '@/features/filters/FilterPanel';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { inset, space, type, type Theme } from '@/lib/theme';
@@ -14,30 +13,30 @@ import { useThemedStyles } from '@/providers/theme';
 export default function Search() {
   const styles = useThemedStyles(searchStyles);
   const router = useRouter();
-  const { filters } = useFilters();
+  const { filters, setOne } = useFilters('search');
   const { data: results = [], isPending, error } = useSearch(filters);
-  const [showFilters, setShowFilters] = useState(true);
 
-  const count = activeCount(filters);
+  // The typed query is a filter like any other, but it is the one people reach
+  // for first, so it stays on the screen instead of behind the funnel.
+  const chipCount = activeCount(filters) - (filters.query.trim() ? 1 : 0);
 
   return (
-    <Screen title="Search">
-      <View style={styles.toggleRow}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setShowFilters((open) => !open)}
-          style={styles.toggle}>
-          <Text style={styles.toggleLabel}>
-            {showFilters ? 'Hide filters' : 'Show filters'}
-            {count ? ` · ${count}` : ''}
-          </Text>
-        </Pressable>
+    <Screen
+      title="Search"
+      action={
+        <FilterButton count={chipCount} onPress={() => router.push('/filters/search')} />
+      }>
+      <View style={styles.queryRow}>
+        <Field
+          placeholder="Search brand, model or reference"
+          value={filters.query}
+          onChangeText={(text) => setOne('query', text)}
+          returnKeyType="search"
+        />
         <Text style={styles.count}>
-          {isPending ? '' : `${results.length} watch${results.length === 1 ? '' : 'es'}`}
+          {isPending ? ' ' : `${results.length} watch${results.length === 1 ? '' : 'es'}`}
         </Text>
       </View>
-
-      {showFilters ? <FilterPanel /> : null}
 
       {error ? (
         <View style={styles.state}>
@@ -65,19 +64,10 @@ export default function Search() {
 }
 
 const searchStyles = (theme: Theme) => ({
-  toggleRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
+  queryRow: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.md,
-  },
-  toggle: {
-    paddingVertical: space.sm,
-  },
-  toggleLabel: {
-    ...type.control,
-    color: theme.color.brass,
+    gap: space.sm,
   },
   count: {
     ...type.caption,

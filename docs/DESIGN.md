@@ -119,11 +119,23 @@ things look bloated.
 
 - `HIT_TARGET` is 44. Anything smaller needs `hitSlop` to reach it.
 - Durations come from `motion`: `fast` (160ms) for a gesture resolving, `base`
-  (240ms) for a transition the user is waiting on.
+  (240ms) for a transition the user is waiting on, `settle` (220ms) for a
+  released gesture returning to rest.
 - Animation runs in Reanimated worklets on the UI thread. Never drive a frame
   from React state.
 - Every gesture needs a visible response before the network is involved. The
-  swipe stamps appear as the card moves, not after the row is written.
+  colour wash appears as the card moves, not after the row is written.
+
+The swipe deck is one axis. A card tracks the thumb left and right and never
+moves vertically or rotates free of that travel, because the only two answers
+are save and pass. Giving it a second axis invites a gesture that means nothing.
+
+Drag is elastic, not linear: to the commit point the card follows the thumb
+exactly, past it the card returns about a third of the travel. The tension is
+what tells you the swipe has caught before the colour does.
+
+Nothing bounces. A released card settles to rest with easing and stops. Spring
+overshoot on a declined swipe looks like the card rejected the drop.
 
 ## Components
 
@@ -156,6 +168,19 @@ Things we have not decided yet. Move them up into rules once we do.
 - Photo treatment: do listing images get a consistent crop and background?
 - An empty-state illustration, or stay typographic.
 - Haptics on swipe commit.
+
+## Where filters live
+
+The deck and search filter separately. They are different jobs: the deck is a queue you
+are working through, search is a question you are asking. Narrowing search should not
+throw away the pile you were halfway through swiping.
+
+Both reach their filters through the same funnel button in the header, carrying the
+number of choices made. The count is the point — without it, a user who filtered
+yesterday has no way to tell why the deck looks short.
+
+The panel holds no text box. Typing a brand name is a question, so it belongs on the
+search tab, where the field stays on screen.
 
 ## Filters
 

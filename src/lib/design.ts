@@ -192,7 +192,9 @@ export const radius = {
 export const motion = {
   fast: 160,
   base: 240,
-  spring: { damping: 18, stiffness: 180 },
+  // A released gesture returns to rest. No spring: overshoot on a card the user
+  // just declined to swipe reads as a bug, not as physics.
+  settle: 220,
 } as const;
 
 /** Minimum tappable area. Anything smaller needs hitSlop to reach it. */

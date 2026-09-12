@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { DeckGrid } from '@/components/DeckGrid';
+import { FilterButton } from '@/components/FilterButton';
 import { SwipeCard } from '@/components/SwipeCard';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
@@ -11,7 +12,7 @@ import { useRecordSwipe } from '@/data/swipes';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useIsWide } from '@/lib/layout';
-import { inset, type, type Theme } from '@/lib/theme';
+import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -22,7 +23,7 @@ export default function Deck() {
   const isWide = useIsWide();
   const styles = useThemedStyles(deckStyles);
   const router = useRouter();
-  const { filters, clear } = useFilters();
+  const { filters, clear } = useFilters('deck');
   const count = activeCount(filters);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
@@ -36,7 +37,12 @@ export default function Deck() {
     return [cards[index], ...cards.slice(0, index), ...cards.slice(index + 1)];
   }, [cards, focusId]);
 
-  const toggle = <ViewToggle value={view} onChange={setView} />;
+  const actions = (
+    <View style={styles.actions}>
+      <FilterButton count={count} onPress={() => router.push('/filters/deck')} />
+      <ViewToggle value={view} onChange={setView} />
+    </View>
+  );
 
   if (isPending) {
     return (
@@ -48,7 +54,7 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Deck">
+      <Screen title="Deck" action={actions}>
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="secondary" onPress={() => refetch()} />
@@ -59,7 +65,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Deck">
+      <Screen title="Deck" action={actions}>
         <Centered>
           <Heading>{count ? 'Nothing matches' : 'Nothing left to swipe'}</Heading>
           <Message
@@ -81,7 +87,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Deck" action={toggle}>
+      <Screen title="Deck" action={actions}>
         <DeckGrid
           cards={cards}
           onSwipe={(card, direction) => swipe.mutate({ listingId: card.id, direction })}
@@ -98,7 +104,7 @@ export default function Deck() {
   const visible = ordered.slice(0, 3).reverse();
 
   return (
-    <Screen title="Deck" action={toggle}>
+    <Screen title="Deck" action={actions}>
       <View style={styles.stage}>
         {visible.map((card, index) => (
           <SwipeCard
@@ -109,30 +115,19 @@ export default function Deck() {
           />
         ))}
       </View>
-      {count ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/search')}
-          style={styles.hintRow}>
-          <Text style={styles.hint}>{`Filtered to ${cards.length} · tap to change`}</Text>
-        </Pressable>
-      ) : null}
     </Screen>
   );
 }
 
-const deckStyles = (theme: Theme) => ({
+const deckStyles = (_theme: Theme) => ({
+  actions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+  },
   stage: {
     flex: 1,
     marginHorizontal: inset.screen,
     marginBottom: inset.screen,
-  },
-  hintRow: {
-    paddingBottom: inset.screen,
-  },
-  hint: {
-    ...type.caption,
-    color: theme.color.textFaint,
-    textAlign: 'center' as const,
   },
 });

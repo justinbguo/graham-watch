@@ -1,11 +1,10 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useFacets } from '@/data/search';
-import { Field } from '@/components/ui';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { useFilters } from './provider';
+import { useFilters, type Surface } from './provider';
 import { ERA_PRESETS, PRICE_PRESETS, SIZE_PRESETS, activeCount, humanize } from './types';
 
 function Chip({
@@ -49,10 +48,13 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  * Every filter in one scrolling panel. Options come from `listing_facets`, so a
  * brand only appears once something in the deck is that brand — offering a
  * filter that can only return nothing is a dead end the user has to back out of.
+ *
+ * No text box here. Typing a brand name is a question, and questions belong on
+ * the search tab; this panel is for the shape of watch you want to see.
  */
-export function FilterPanel({ showQuery = true }: { showQuery?: boolean }) {
+export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
-  const { filters, toggle, setOne, clear } = useFilters();
+  const { filters, toggle, setOne, clear } = useFilters(surface);
   const { data: facets = [] } = useFacets();
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
@@ -63,15 +65,6 @@ export function FilterPanel({ showQuery = true }: { showQuery?: boolean }) {
       style={styles.panel}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled">
-      {showQuery ? (
-        <Field
-          placeholder="Search brand, model or reference"
-          value={filters.query}
-          onChangeText={(text) => setOne('query', text)}
-          returnKeyType="search"
-        />
-      ) : null}
-
       <Group title="Price">
         {PRICE_PRESETS.map((preset) => (
           <Chip

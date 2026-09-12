@@ -112,7 +112,7 @@ async function fetchListing(listingId: string): Promise<DeckCard | null> {
 }
 
 export function useDeck(limit = 20) {
-  const { filters } = useFilters();
+  const { filters } = useFilters('deck');
 
   return useQuery({
     queryKey: keys.deck(filters),

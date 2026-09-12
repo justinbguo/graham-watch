@@ -1,10 +1,10 @@
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  Easing,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -20,6 +20,18 @@ const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const OFF_SCREEN = SCREEN_WIDTH * 1.5;
 // Worklets only see module-scope values. Keep this faint: the photo stays the point.
 const WASH_OPACITY = 0.22;
+const FLING_VELOCITY = 800;
+// Past the commit point the card returns a third of the finger's travel, so the
+// drag builds tension instead of running away with the thumb.
+const DRAG_RESISTANCE = 0.34;
+
+/** Finger travel in, card travel out: one to one, then elastic past the commit point. */
+function resist(travel: number) {
+  'worklet';
+  const distance = Math.abs(travel);
+  if (distance <= SWIPE_THRESHOLD) return travel;
+  return Math.sign(travel) * (SWIPE_THRESHOLD + (distance - SWIPE_THRESHOLD) * DRAG_RESISTANCE);
+}
 
 export function SwipeCard({
   card,
@@ -31,51 +43,56 @@ export function SwipeCard({
   isTop: boolean;
 }) {
   const styles = useThemedStyles(cardStyles);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  // Raw finger travel, and the resisted distance the card actually moves.
+  const dragX = useSharedValue(0);
+  const cardX = useSharedValue(0);
 
   const pan = Gesture.Pan()
     .enabled(isTop)
-    // Without a threshold the pan claims the touch immediately and the photo
-    // taps underneath never fire.
+    // Activating on X alone keeps the card in its lane and leaves a vertical
+    // drag to the photo taps underneath.
     .activeOffsetX([-12, 12])
-    .activeOffsetY([-12, 12])
     .onChange((event) => {
-      translateX.value += event.changeX;
-      translateY.value += event.changeY;
+      dragX.value += event.changeX;
+      cardX.value = resist(dragX.value);
     })
     .onEnd((event) => {
-      const flungFarEnough = Math.abs(translateX.value) > SWIPE_THRESHOLD;
-      const flungFastEnough = Math.abs(event.velocityX) > 800;
+      const committed =
+        Math.abs(dragX.value) > SWIPE_THRESHOLD || Math.abs(event.velocityX) > FLING_VELOCITY;
 
-      if (flungFarEnough || flungFastEnough) {
-        const direction: SwipeDirection = translateX.value > 0 ? 'right' : 'left';
-        translateX.value = withTiming(
-          Math.sign(translateX.value || event.velocityX) * OFF_SCREEN,
-          { duration: motion.fast },
+      if (committed) {
+        const direction: SwipeDirection =
+          (dragX.value || event.velocityX) > 0 ? 'right' : 'left';
+        cardX.value = withTiming(
+          direction === 'right' ? OFF_SCREEN : -OFF_SCREEN,
+          { duration: motion.fast, easing: Easing.out(Easing.cubic) },
           () => scheduleOnRN(onSwipe, direction)
         );
         return;
       }
 
-      translateX.value = withSpring(0, motion.spring);
-      translateY.value = withSpring(0, motion.spring);
+      // Timing, not a spring: an overshoot past centre reads as the card
+      // rejecting the drop rather than settling from it.
+      dragX.value = 0;
+      cardX.value = withTiming(0, {
+        duration: motion.settle,
+        easing: Easing.out(Easing.cubic),
+      });
     });
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { rotate: `${interpolate(translateX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-10, 10])}deg` },
+      { translateX: cardX.value },
+      { rotate: `${interpolate(cardX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-10, 10])}deg` },
     ],
   }));
 
   const saveWashStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, WASH_OPACITY], 'clamp'),
+    opacity: interpolate(cardX.value, [0, SWIPE_THRESHOLD], [0, WASH_OPACITY], 'clamp'),
   }));
 
   const passWashStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [WASH_OPACITY, 0], 'clamp'),
+    opacity: interpolate(cardX.value, [-SWIPE_THRESHOLD, 0], [WASH_OPACITY, 0], 'clamp'),
   }));
 
   return (

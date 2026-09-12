@@ -1,36 +1,59 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 
 import { NO_FILTERS, type Filters } from './types';
 
-type FilterContext = {
+/**
+ * The deck and the search tab filter independently. They are different jobs:
+ * the deck is a queue you are working through, search is a question you are
+ * asking. Narrowing search to "chronographs under $15k" should not silently
+ * throw away the pile you were halfway through swiping.
+ */
+export type Surface = 'deck' | 'search';
+
+type ListKey = 'brands' | 'styles' | 'materials' | 'windings' | 'complications';
+type SingleKey = 'query' | 'price' | 'size' | 'era';
+
+export type FilterApi = {
   filters: Filters;
-  setFilters: (next: Filters) => void;
-  toggle: <K extends 'brands' | 'styles' | 'materials' | 'windings' | 'complications'>(
-    key: K,
-    value: Filters[K][number]
-  ) => void;
-  setOne: <K extends 'query' | 'price' | 'size' | 'era'>(key: K, value: Filters[K]) => void;
+  toggle: <K extends ListKey>(key: K, value: Filters[K][number]) => void;
+  setOne: <K extends SingleKey>(key: K, value: Filters[K]) => void;
   clear: () => void;
 };
 
-const Context = createContext<FilterContext | null>(null);
+type Store = {
+  bySurface: Record<Surface, Filters>;
+  update: (surface: Surface, next: (current: Filters) => Filters) => void;
+};
 
-/**
- * One set of filters for the whole app. The deck and the search tab read the
- * same state on purpose: narrowing to "chronographs under $15k" in search and
- * then finding the deck still showing everything would make the filter feel
- * like it had not been applied.
- */
+const Context = createContext<Store | null>(null);
+
 export function FilterProvider({ children }: PropsWithChildren) {
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [bySurface, setBySurface] = useState<Record<Surface, Filters>>({
+    deck: NO_FILTERS,
+    search: NO_FILTERS,
+  });
 
-  const value = useMemo<FilterContext>(
+  const update = useCallback<Store['update']>((surface, next) => {
+    setBySurface((current) => ({ ...current, [surface]: next(current[surface]) }));
+  }, []);
+
+  const value = useMemo<Store>(() => ({ bySurface, update }), [bySurface, update]);
+
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+export function useFilters(surface: Surface): FilterApi {
+  const store = useContext(Context);
+  if (!store) throw new Error('useFilters must be used inside FilterProvider.');
+
+  const { bySurface, update } = store;
+
+  return useMemo(
     () => ({
-      filters,
-      setFilters,
+      filters: bySurface[surface],
       toggle: (key, item) =>
-        setFilters((current) => {
-          const list = current[key] as typeof item[];
+        update(surface, (current) => {
+          const list = current[key] as (typeof item)[];
           return {
             ...current,
             [key]: list.includes(item) ? list.filter((v) => v !== item) : [...list, item],
@@ -38,20 +61,12 @@ export function FilterProvider({ children }: PropsWithChildren) {
         }),
       // Ranges are single-choice: tapping the active one turns it off.
       setOne: (key, next) =>
-        setFilters((current) => ({
+        update(surface, (current) => ({
           ...current,
           [key]: current[key] === next && key !== 'query' ? null : next,
         })),
-      clear: () => setFilters(NO_FILTERS),
+      clear: () => update(surface, () => NO_FILTERS),
     }),
-    [filters]
+    [bySurface, surface, update]
   );
-
-  return <Context.Provider value={value}>{children}</Context.Provider>;
-}
-
-export function useFilters(): FilterContext {
-  const context = useContext(Context);
-  if (!context) throw new Error('useFilters must be used inside FilterProvider.');
-  return context;
 }
