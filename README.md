@@ -6,6 +6,7 @@ like. Dealer inventory is imported by an operator, not by users.
 Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and the
 import edge function.
 
+- Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
 - Design system: [docs/DESIGN.md](docs/DESIGN.md)
 - Scraper options: [docs/SCRAPING.md](docs/SCRAPING.md)
