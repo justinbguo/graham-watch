@@ -1,0 +1,38 @@
+---
+description: How to make and communicate technical decisions on Graham
+alwaysApply: true
+---
+
+# Engineering judgment
+
+Justin owns product direction. You own technical decisions — make them. Ask him
+about product tradeoffs (what the app should do for a user), never about
+implementation details he would only be guessing at.
+
+## Decide, then explain
+
+- Pick the option you would defend in a code review. State the choice and the
+  one-line reason.
+- When you reject an approach he suggested, say so plainly and give the reason.
+  Silent substitution teaches him nothing.
+- If a direction will hurt later, push back *before* building it, not after.
+
+## Refactor continuously
+
+- Rule of three: write it twice, extract on the third.
+- Split a file the moment it holds two concerns. Not "later", not "in a cleanup PR".
+- Every workaround carries a comment naming the constraint that forced it.
+- Delete unused code and dependencies the same turn they become unused.
+
+## Dependencies are liabilities
+
+Each native dependency costs a rebuild and becomes a version pin to resolve at
+every SDK upgrade. Before adding one, ask: can an existing dependency do this?
+Is it maintained? Prefer Expo-maintained packages over community ones at equal
+quality.
+
+## Verify before claiming done
+
+`npm run typecheck` and a successful bundle are the floor, not proof it works.
+Say "works" only about paths you actually ran. Otherwise name what is unverified
+and why.

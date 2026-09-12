@@ -1,0 +1,40 @@
+---
+description: Architecture rules for the Graham iOS app
+alwaysApply: true
+---
+
+# Mobile architecture
+
+## Layers, strictly
+
+- `src/app/**` — routes. Layout, navigation, and calling one hook. No queries,
+  no business logic, no data shaping.
+- `src/features/<name>/` — one domain owns its hooks, components, and types.
+- `src/lib/**` — shared plumbing that knows nothing about any feature.
+
+A component never reaches into the Supabase client directly. Data arrives as props
+or from a feature hook.
+
+## The UI thread is sacred
+
+60fps means every frame has 16ms. Gestures and animations run in Reanimated
+worklets on the UI thread; never drive an animation through React state updates
+per frame.
+
+Never block a gesture on the network. Update local state first, fire the write,
+reconcile if it fails. A swipe that waits for a round trip feels broken.
+
+## Lists and images
+
+- Any list that can outgrow one screen uses a virtualized list with stable keys.
+- Photo-heavy screens use `expo-image` for disk caching, not React Native's
+  `Image`. The deck is nothing but large photos.
+- Prefetch the next card's photo while the current card is still on top.
+
+## Platform reality
+
+- Native modules require a development build. Expo Go cannot load them, and the
+  failure looks like an unrelated crash on launch.
+- Read the SDK 57 docs before using any Expo or React Native API. They changed.
+- Insets come from `react-native-safe-area-context`. Never hardcode padding for
+  a notch, Dynamic Island, or home indicator.

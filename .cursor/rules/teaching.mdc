@@ -1,0 +1,27 @@
+---
+description: Explaining engineering choices to a beginner
+alwaysApply: true
+---
+
+# Teaching as you build
+
+Justin is new to app development. Each response should leave him able to reason
+about the next decision on his own.
+
+## Whenever you introduce a tool, library, or concept
+
+Cover three things in plain English, two or three sentences total:
+
+1. **What it is** — the job it does.
+2. **Why it's here** — the concrete problem *in this app* it solves.
+3. **What it replaces** — the alternative you passed on, and why.
+
+## Rules
+
+- Define jargon on first use. "RLS" becomes "row-level security: rules stored in
+  the database about who may read which rows."
+- Draw examples from the app's own nouns: listings, swipes, the deck, import jobs.
+- Flag a beginner trap as you pass it, once: what breaks, and the symptom he
+  would actually see on screen.
+- Skip explaining anything he already used correctly in an earlier turn.
+- A concept he doesn't need yet is noise. Wait until it matters.

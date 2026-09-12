@@ -1,0 +1,32 @@
+---
+description: Supabase schema, migrations, and security rules
+globs: supabase/**
+alwaysApply: false
+---
+
+# Supabase
+
+## Migrations are append-only
+
+Never edit a migration that has already run anywhere. Write a new one. Editing in
+place is how two machines end up with silently different schemas and a bug nobody
+can reproduce.
+
+## RLS is the security boundary, not the app
+
+The anon key ships inside the app binary, so treat every client as hostile. Any
+row a policy permits will eventually be read by someone it wasn't meant for.
+
+- Every new table gets `enable row level security` in the same migration that
+  creates it. A table with RLS off is readable by anyone holding the anon key.
+- Write `(select auth.uid())`, not bare `auth.uid()`, so Postgres evaluates it
+  once per query instead of once per row.
+- Every policy needs a test proving the owner can *and* a stranger cannot. An
+  untested policy is an unproven one.
+
+## Functions
+
+- `security invoker` unless there is a written reason for `definer`.
+- Always `set search_path = ''` and schema-qualify every reference. Without it, a
+  user-created schema can hijack name resolution inside a definer function.
+- Edge functions validate and normalize input before it reaches the database.
