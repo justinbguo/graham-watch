@@ -2,6 +2,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
 
 SplashScreen.preventAutoHideAsync();
@@ -9,11 +10,13 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SessionProvider>
-        <SplashScreenController />
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </SessionProvider>
+      <QueryProvider>
+        <SessionProvider>
+          <SplashScreenController />
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </SessionProvider>
+      </QueryProvider>
     </GestureHandlerRootView>
   );
 }

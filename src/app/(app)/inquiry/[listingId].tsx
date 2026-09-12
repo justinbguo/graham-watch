@@ -1,50 +1,24 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Centered, Field, Message, Screen } from '@/components/ui';
-import type { DeckCard } from '@/lib/database.types';
-import { fetchListing, sendInquiry } from '@/lib/queries';
+import { Button, Centered, Field, Message, Screen, Spinner } from '@/components/ui';
+import { useSendInquiry } from '@/data/inquiries';
+import { useListing } from '@/data/listings';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
 export default function InquiryScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
   const { userId } = useSession();
-  const [card, setCard] = useState<DeckCard | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: card, isPending } = useListing(listingId);
   const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const sendInquiry = useSendInquiry(userId);
 
-  useEffect(() => {
-    fetchListing(listingId)
-      .then(setCard)
-      .catch(() => setError('Could not load this watch.'))
-      .finally(() => setLoading(false));
-  }, [listingId]);
-
-  const send = async () => {
-    if (!userId || !card) return;
-    setSending(true);
-    setError(null);
-    try {
-      await sendInquiry(userId, card, message);
-      setSent(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send your inquiry.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  if (loading) {
+  if (isPending) {
     return (
       <Screen title="Contact dealer">
-        <Centered>
-          <ActivityIndicator />
-        </Centered>
+        <Spinner />
       </Screen>
     );
   }
@@ -53,14 +27,14 @@ export default function InquiryScreen() {
     return (
       <Screen title="Contact dealer">
         <Centered>
-          <Message text={error ?? 'That watch is no longer available.'} tone="error" />
+          <Message text="That watch is no longer available." tone="error" />
           <Button label="Close" variant="secondary" onPress={() => router.back()} />
         </Centered>
       </Screen>
     );
   }
 
-  if (sent) {
+  if (sendInquiry.isSuccess) {
     return (
       <Screen title="Contact dealer">
         <Centered>
@@ -97,10 +71,14 @@ export default function InquiryScreen() {
 
         <Message text="Graham sends the dealer your email and a link to this listing. You deal with them directly — no payment happens here." />
 
-        {error ? <Message text={error} tone="error" /> : null}
+        {sendInquiry.error ? <Message text={sendInquiry.error.message} tone="error" /> : null}
 
         <View style={styles.actions}>
-          <Button label="Send inquiry" loading={sending} onPress={send} />
+          <Button
+            label="Send inquiry"
+            loading={sendInquiry.isPending}
+            onPress={() => sendInquiry.mutate({ card, message })}
+          />
           <Button label="Cancel" variant="secondary" onPress={() => router.back()} />
         </View>
       </KeyboardAvoidingView>

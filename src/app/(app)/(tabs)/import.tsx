@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
+import { useImportJobs, useStartImport } from '@/data/imports';
 import type { ImportJob } from '@/lib/database.types';
-import { fetchImportJobs, startImport } from '@/lib/queries';
-import { supabase } from '@/lib/supabase';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
@@ -18,49 +17,17 @@ const STATUS_LABEL: Record<ImportJob['status'], string> = {
 export default function Import() {
   const { userId } = useSession();
   const [url, setUrl] = useState('');
-  const [jobs, setJobs] = useState<ImportJob[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: jobs = [] } = useImportJobs(userId);
+  const startImport = useStartImport(userId);
 
-  useEffect(() => {
-    if (!userId) return;
-
-    fetchImportJobs(userId).then(setJobs).catch(() => undefined);
-
-    const channel = supabase
-      .channel('import-jobs')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'import_jobs', filter: `user_id=eq.${userId}` },
-        () => {
-          fetchImportJobs(userId).then(setJobs).catch(() => undefined);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const job = await startImport(url.trim());
-      setJobs((current) => [job, ...current]);
-      setUrl('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start the import.');
-    } finally {
-      setBusy(false);
-    }
+  const submit = () => {
+    startImport.mutate({ sourceUrl: url.trim() }, { onSuccess: () => setUrl('') });
   };
 
   return (
     <Screen title="Import">
       <View style={styles.form}>
-        <Message text="Paste the URL of a shop, collection, or single listing. Graham scrapes it and recreates the watches here." />
+        <Message text="Paste a dealer's shop, collection, or listing URL. Graham scrapes it and recreates the watches here." />
         <Field
           value={url}
           onChangeText={setUrl}
@@ -70,11 +37,12 @@ export default function Import() {
         />
         <Button
           label="Import listings"
-          loading={busy}
+          loading={startImport.isPending}
           disabled={!url.trim().startsWith('http')}
           onPress={submit}
         />
-        {error ? <Message text={error} tone="error" /> : null}
+        <Message text="Imported watches stay private until that dealer is approved." />
+        {startImport.error ? <Message text={startImport.error.message} tone="error" /> : null}
       </View>
 
       <FlatList
@@ -94,7 +62,9 @@ export default function Import() {
             </Text>
           </View>
         )}
-        ListHeaderComponent={jobs.length ? <Text style={styles.listHeader}>Recent imports</Text> : null}
+        ListHeaderComponent={
+          jobs.length ? <Text style={styles.listHeader}>Recent imports</Text> : null
+        }
       />
     </Screen>
   );

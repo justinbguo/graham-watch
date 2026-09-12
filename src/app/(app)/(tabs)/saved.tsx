@@ -1,49 +1,31 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
-import { Centered, Message, Screen } from '@/components/ui';
-import type { DeckCard } from '@/lib/database.types';
-import { fetchSaved, unsave } from '@/lib/queries';
+import { Centered, Message, Screen, Spinner } from '@/components/ui';
+import { useSaved } from '@/data/listings';
+import { useUnsave } from '@/data/swipes';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
 export default function Saved() {
   const { userId } = useSession();
-  const [cards, setCards] = useState<DeckCard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: cards = [], isPending, error } = useSaved(userId);
+  const unsave = useUnsave(userId);
 
-  const load = useCallback(async () => {
-    if (!userId) return;
-    setError(null);
-    try {
-      setCards(await fetchSaved(userId));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load saved watches.');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+  if (isPending) {
+    return (
+      <Screen title="Saved">
+        <Spinner />
+      </Screen>
+    );
+  }
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
-
-  const remove = async (listingId: string) => {
-    if (!userId) return;
-    setCards((current) => current.filter((c) => c.id !== listingId));
-    await unsave(userId, listingId).catch(() => undefined);
-  };
-
-  if (loading) {
+  if (error) {
     return (
       <Screen title="Saved">
         <Centered>
-          <ActivityIndicator />
+          <Message text={error.message} tone="error" />
         </Centered>
       </Screen>
     );
@@ -51,37 +33,31 @@ export default function Saved() {
 
   return (
     <Screen title="Saved">
-      {error ? (
-        <Centered>
-          <Message text={error} tone="error" />
-        </Centered>
-      ) : (
-        <FlatList
-          data={cards}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => (
-            <ListingRow
-              card={item}
-              actionLabel="Contact"
-              onAction={() => router.push(`/inquiry/${item.id}`)}
-              onLongPress={() => remove(item.id)}
-            />
-          )}
-          ListEmptyComponent={
-            <Centered>
-              <Text style={styles.emptyTitle}>Nothing saved yet</Text>
-              <Message text="Swipe right on the deck and it lands here." />
-            </Centered>
-          }
-          ListFooterComponent={
-            cards.length ? (
-              <Text style={styles.footerHint}>Long-press a watch to remove it.</Text>
-            ) : null
-          }
-        />
-      )}
+      <FlatList
+        data={cards}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => (
+          <ListingRow
+            card={item}
+            actionLabel="Contact"
+            onAction={() => router.push(`/inquiry/${item.id}`)}
+            onLongPress={() => unsave.mutate(item.id)}
+          />
+        )}
+        ListEmptyComponent={
+          <Centered>
+            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+            <Message text="Swipe right on the deck and it lands here." />
+          </Centered>
+        }
+        ListFooterComponent={
+          cards.length ? (
+            <Text style={styles.footerHint}>Long-press a watch to remove it.</Text>
+          ) : null
+        }
+      />
     </Screen>
   );
 }

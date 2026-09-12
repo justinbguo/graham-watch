@@ -1,51 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { SwipeCard } from '@/components/SwipeCard';
-import { Button, Centered, Message, Screen } from '@/components/ui';
-import type { DeckCard, SwipeDirection } from '@/lib/database.types';
-import { fetchDeck, recordSwipe } from '@/lib/queries';
+import { Button, Centered, Message, Screen, Spinner } from '@/components/ui';
+import { useDeck } from '@/data/listings';
+import { useRecordSwipe } from '@/data/swipes';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
 export default function Deck() {
   const { userId } = useSession();
-  const [cards, setCards] = useState<DeckCard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: cards = [], isPending, error, refetch } = useDeck();
+  const swipe = useRecordSwipe(userId);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setCards(await fetchDeck());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the deck.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const onSwipe = useCallback(
-    (card: DeckCard, direction: SwipeDirection) => {
-      setCards((current) => current.filter((c) => c.id !== card.id));
-      if (!userId) return;
-      // Optimistic: the card is already gone, so a failed write only costs a repeat.
-      recordSwipe(userId, card.id, direction).catch(() => undefined);
-    },
-    [userId]
-  );
-
-  if (loading) {
+  if (isPending) {
     return (
       <Screen title="Deck">
-        <Centered>
-          <ActivityIndicator />
-        </Centered>
+        <Spinner />
       </Screen>
     );
   }
@@ -54,8 +24,8 @@ export default function Deck() {
     return (
       <Screen title="Deck">
         <Centered>
-          <Message text={error} tone="error" />
-          <Button label="Try again" variant="secondary" onPress={load} />
+          <Message text={error.message} tone="error" />
+          <Button label="Try again" variant="secondary" onPress={() => refetch()} />
         </Centered>
       </Screen>
     );
@@ -66,14 +36,14 @@ export default function Deck() {
       <Screen title="Deck">
         <Centered>
           <Text style={styles.emptyTitle}>Nothing left to swipe</Text>
-          <Message text="Import listings from a site, or check back once more sellers do." />
-          <Button label="Refresh" variant="secondary" onPress={load} />
+          <Message text="Import a dealer's site, or check back once more listings are approved." />
+          <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
         </Centered>
       </Screen>
     );
   }
 
-  // Render a couple of cards deep so the next one is visible under the top card.
+  // Render a few cards deep so the next one shows under the top card.
   const visible = cards.slice(0, 3).reverse();
 
   return (
@@ -84,7 +54,7 @@ export default function Deck() {
             key={card.id}
             card={card}
             isTop={index === visible.length - 1}
-            onSwipe={(direction) => onSwipe(card, direction)}
+            onSwipe={(direction) => swipe.mutate({ listingId: card.id, direction })}
           />
         ))}
       </View>

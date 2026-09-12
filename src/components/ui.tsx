@@ -76,6 +76,14 @@ export function Centered({ children }: PropsWithChildren) {
   return <View style={styles.centered}>{children}</View>;
 }
 
+export function Spinner() {
+  return (
+    <Centered>
+      <ActivityIndicator />
+    </Centered>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,

@@ -1,25 +1,15 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
 import { Button, Message, Screen } from '@/components/ui';
-import type { DeckCard } from '@/lib/database.types';
+import { useImportedListings } from '@/data/listings';
 import { signOut } from '@/lib/auth';
-import { fetchImportedListings } from '@/lib/queries';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
 export default function Profile() {
   const { session, userId } = useSession();
-  const [listings, setListings] = useState<DeckCard[]>([]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!userId) return;
-      fetchImportedListings(userId).then(setListings).catch(() => undefined);
-    }, [userId])
-  );
+  const { data: listings = [] } = useImportedListings(userId);
 
   return (
     <Screen title="Profile">
