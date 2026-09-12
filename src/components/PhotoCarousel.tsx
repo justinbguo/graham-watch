@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DeckPhoto } from '@/lib/models';
 import { motion, radius, size, space, type, type Theme } from '@/lib/theme';
@@ -11,13 +12,32 @@ import { useThemedStyles } from '@/providers/theme';
  * grammar as every other card the user has met. Paging never wraps: reaching the
  * last photo and landing back on the first reads as a glitch.
  *
+ * `viewer` is the same paging on a black field with the whole photo in frame,
+ * for the full-screen route. On a card the photo is cropped to fill, because a
+ * letterboxed watch in a deck reads as a broken image.
+ *
  * expo-image rather than React Native's Image because these are large dealer
  * photographs and it caches them to disk; RN's Image only caches in memory, so
  * every return to a card would refetch.
  */
-export function PhotoCarousel({ photos, active }: { photos: DeckPhoto[]; active: boolean }) {
+export function PhotoCarousel({
+  photos,
+  active,
+  variant = 'card',
+  initialIndex = 0,
+  onExpand,
+}: {
+  photos: DeckPhoto[];
+  active: boolean;
+  variant?: 'card' | 'viewer';
+  initialIndex?: number;
+  onExpand?: (index: number) => void;
+}) {
   const styles = useThemedStyles(carouselStyles);
-  const [index, setIndex] = useState(0);
+  // A card sits inside a screen that already handled the notch; the viewer fills
+  // the display and has to keep the segments out from under it itself.
+  const insets = useSafeAreaInsets();
+  const [index, setIndex] = useState(initialIndex);
 
   const current = photos[Math.min(index, photos.length - 1)];
   const next = photos[index + 1];
@@ -38,45 +58,56 @@ export function PhotoCarousel({ photos, active }: { photos: DeckPhoto[]; active:
   const step = (by: number) =>
     setIndex((value) => Math.min(Math.max(value + by, 0), photos.length - 1));
 
+  const expand = onExpand ? () => onExpand(index) : undefined;
+  const paged = photos.length > 1;
+
   return (
-    <View style={styles.photo}>
+    <View style={[styles.photo, variant === 'viewer' && styles.viewer]}>
       <Image
         source={{ uri: current.url }}
         style={StyleSheet.absoluteFill}
-        contentFit="cover"
+        contentFit={variant === 'viewer' ? 'contain' : 'cover'}
         transition={motion.fast}
         recyclingKey={current.id}
       />
 
-      {photos.length > 1 ? (
-        <>
-          <View style={styles.segments} pointerEvents="none">
-            {photos.map((photo, position) => (
-              <View
-                key={photo.id}
-                style={[styles.segment, position === index && styles.segmentActive]}
-              />
-            ))}
-          </View>
+      {paged ? (
+        <View
+          style={[styles.segments, variant === 'viewer' && { top: insets.top + space.sm }]}
+          pointerEvents="none">
+          {photos.map((photo, position) => (
+            <View
+              key={photo.id}
+              style={[styles.segment, position === index && styles.segmentActive]}
+            />
+          ))}
+        </View>
+      ) : null}
 
-          {/* Only the top card takes taps; a card underneath is not being read. */}
-          {active ? (
-            <View style={styles.zones}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Previous photo"
-                style={styles.zone}
-                onPress={() => step(-1)}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Next photo"
-                style={styles.zone}
-                onPress={() => step(1)}
-              />
-            </View>
+      {/* Only the top card takes taps; a card underneath is not being read. The
+          zones exist even for a lone photo, because the long press does not
+          need a second one to be worth offering. */}
+      {active ? (
+        <View style={styles.zones}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={paged ? 'Previous photo' : 'Photo'}
+            accessibilityHint={expand ? 'Long press to see it full screen' : undefined}
+            style={styles.zone}
+            onPress={paged ? () => step(-1) : undefined}
+            onLongPress={expand}
+          />
+          {paged ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next photo"
+              accessibilityHint={expand ? 'Long press to see it full screen' : undefined}
+              style={styles.zone}
+              onPress={() => step(1)}
+              onLongPress={expand}
+            />
           ) : null}
-        </>
+        </View>
       ) : null}
     </View>
   );
@@ -87,6 +118,11 @@ const carouselStyles = (theme: Theme) => ({
     flex: 1,
     backgroundColor: theme.color.surfaceSunken,
     overflow: 'hidden' as const,
+  },
+  // Black in both themes. A photograph shown whole needs a field that does not
+  // compete with it, and a light one reads as an unfinished screen.
+  viewer: {
+    backgroundColor: '#000000',
   },
   empty: {
     alignItems: 'center' as const,

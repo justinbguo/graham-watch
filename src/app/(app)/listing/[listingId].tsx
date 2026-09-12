@@ -4,11 +4,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, Divider, Message, Screen, Spinner } from '@/components/ui';
-import { useListing } from '@/data/listings';
+import { useListing, useSaved } from '@/data/listings';
+import { useRecordSwipe, useUnsave } from '@/data/swipes';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
 import { formatPrice, formatSpecs, humanize } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
 import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 function yesNo(value: boolean | null) {
@@ -67,8 +69,14 @@ function CloseButton() {
 
 export default function ListingScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
+  const { userId } = useSession();
   const { data: card, isPending } = useListing(listingId);
+  const { data: saved = [] } = useSaved(userId);
+  const save = useRecordSwipe(userId);
+  const unsave = useUnsave(userId);
   const styles = useThemedStyles(detailStyles);
+
+  const isSaved = saved.some((entry) => entry.id === listingId);
 
   if (isPending) {
     return (
@@ -93,7 +101,11 @@ export default function ListingScreen() {
     <Screen title={card.brand} action={<CloseButton />}>
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.photo}>
-          <PhotoCarousel photos={card.photos} active />
+          <PhotoCarousel
+            photos={card.photos}
+            active
+            onExpand={(index) => router.push(`/photos/${card.id}?index=${index}`)}
+          />
         </View>
 
         <View style={styles.headline}>
@@ -114,10 +126,22 @@ export default function ListingScreen() {
 
         {card.dealer ? <DealerPanel dealer={card.dealer} /> : null}
 
-        <Button
-          label="Ask about this watch"
-          onPress={() => router.push(`/inquiry/${card.id}`)}
-        />
+        <View style={styles.actions}>
+          {/* A toggle, not a button that greys out once used. Saving from here
+              is the same right swipe, so undoing it has to be reachable too. */}
+          <Button
+            label={isSaved ? 'Saved' : 'Save watch'}
+            variant="secondary"
+            loading={save.isPending || unsave.isPending}
+            onPress={() =>
+              isSaved ? unsave.mutate(card.id) : save.mutate({ listingId: card.id, direction: 'right' })
+            }
+          />
+          <Button
+            label="Ask about this watch"
+            onPress={() => router.push(`/inquiry/${card.id}`)}
+          />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -172,6 +196,9 @@ const detailStyles = (theme: Theme) => ({
     color: theme.color.text,
     flexShrink: 1,
     textAlign: 'right' as const,
+  },
+  actions: {
+    gap: stack.related,
   },
   close: {
     padding: space.xs,

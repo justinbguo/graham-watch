@@ -7,7 +7,7 @@ import { FilterButton } from '@/components/FilterButton';
 import { SwipeCard } from '@/components/SwipeCard';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useDeck } from '@/data/listings';
+import { useDeck, usePrimeListing } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver } from '@/data/swipes';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
@@ -20,6 +20,7 @@ export default function Deck() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const swipe = useRecordSwipe(userId);
+  const primeListing = usePrimeListing();
   const { data: passes = 0 } = usePassCount(userId);
   const startOver = useStartOver(userId);
   const isWide = useIsWide();
@@ -125,7 +126,14 @@ export default function Deck() {
             card={card}
             isTop={index === visible.length - 1}
             onSwipe={(direction) => swipe.mutate({ listingId: card.id, direction })}
-            onOpen={() => router.push(`/listing/${card.id}`)}
+            onOpen={() => {
+              primeListing(card);
+              router.push(`/listing/${card.id}`);
+            }}
+            onExpandPhoto={(index) => {
+              primeListing(card);
+              router.push(`/photos/${card.id}?index=${index}`);
+            }}
           />
         ))}
       </View>

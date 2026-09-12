@@ -235,6 +235,15 @@ The description is not on the card. Two lines of prose is a paragraph cut in hal
 enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
 screen or not at all.
 
+A long press on the photo opens it alone, full screen and black, with the paging intact and
+nothing else on it. Long press because tap is already spoken for by paging, and because
+wanting a closer look is a deliberate act rather than a stray thumb.
+
+Saving is a swipe on the deck and a button on the detail screen, sitting above the inquiry
+button. Both write the same right swipe. The button reads "Saved" afterwards and undoes it
+when pressed again, because a control that greys out once used leaves the user stuck with
+a decision they made by accident.
+
 Full screen is the right weight for that screen. A sheet leaves the deck showing behind it
 and invites a swipe to dismiss, which is the gesture that means save.
 

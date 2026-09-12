@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { useFilters } from '@/features/filters/provider';
 import { toRpcArgs, type Filters } from '@/features/filters/types';
@@ -111,6 +112,20 @@ async function fetchListing(listingId: string): Promise<DeckCard | null> {
 
   const [card] = await hydrate([data]);
   return card ?? null;
+}
+
+/**
+ * The deck already holds the whole card. Handing it to the listing cache before
+ * navigating means the detail screen and the photo viewer open with their data
+ * already there, instead of flashing a spinner over something you were looking at.
+ */
+export function usePrimeListing() {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    (card: DeckCard) => queryClient.setQueryData(keys.listing(card.id), card),
+    [queryClient]
+  );
 }
 
 export function useDeck(limit = 20) {

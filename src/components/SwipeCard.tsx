@@ -36,11 +36,13 @@ export function SwipeCard({
   card,
   onSwipe,
   onOpen,
+  onExpandPhoto,
   isTop,
 }: {
   card: DeckCard;
   onSwipe: (direction: SwipeDirection) => void;
   onOpen: () => void;
+  onExpandPhoto: (index: number) => void;
   isTop: boolean;
 }) {
   const styles = useThemedStyles(cardStyles);
@@ -99,7 +101,7 @@ export function SwipeCard({
   return (
     <GestureDetector gesture={pan}>
       <Animated.View style={[styles.card, cardStyle]}>
-        <PhotoCarousel photos={card.photos} active={isTop} />
+        <PhotoCarousel photos={card.photos} active={isTop} onExpand={onExpandPhoto} />
 
         <Animated.View pointerEvents="none" style={[styles.edge, edgeStyle]} />
 
