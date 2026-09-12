@@ -17,6 +17,21 @@ export async function preview({ sourceUrl, limit, token }) {
   return body;
 }
 
+/**
+ * Re-reads a shop's stock and retires anything it no longer sells. No OpenAI and
+ * no writes beyond two timestamps, so it is safe to run on a schedule.
+ */
+export async function runSweep({ sourceUrl, token }) {
+  const { ok, body, status } = await request('/functions/v1/import-listings', {
+    token,
+    method: 'POST',
+    body: { sourceUrl, sweep: true },
+  });
+
+  if (!ok) throw new Error(body?.error ?? `Sweep failed (${status}).`);
+  return body;
+}
+
 export async function runImport({
   sourceUrl,
   limit,

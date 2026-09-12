@@ -210,6 +210,46 @@ console.log('\nafter approval');
     ranked.body?.some((row) => row.id === listingId)
   );
 
+  // A sold watch must leave every surface that offers something to buy, and stay
+  // readable everywhere that only reports what already happened.
+  await api(`/rest/v1/listings?id=eq.${listingId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { sold_at: new Date().toISOString() },
+  });
+
+  const soldDeck = await api('/rest/v1/rpc/get_deck', { token: buyer.token, method: 'POST', body: { p_limit: 50 } });
+  check('a sold listing leaves the deck', !soldDeck.body?.some((row) => row.id === listingId));
+
+  const soldSearch = await api('/rest/v1/rpc/search_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 50, p_query: 'Speedmaster' },
+  });
+  check('a sold listing leaves search', !soldSearch.body?.some((row) => row.id === listingId));
+
+  const soldFacets = await api('/rest/v1/rpc/listing_facets', { token: buyer.token, method: 'POST', body: {} });
+  check(
+    'a sold listing leaves the filter counts',
+    !soldFacets.body?.some((row) => row.kind === 'brand' && row.label === 'Omega')
+  );
+
+  // Saved reads listings directly. Hiding a sold watch there would delete it out
+  // of somebody's list with no explanation, so it has to stay legible.
+  const stillReadable = await api(`/rest/v1/listings?id=eq.${listingId}&select=id,sold_at`, {
+    token: buyer.token,
+  });
+  check(
+    'a watch you saved stays readable after it sells',
+    stillReadable.body?.length === 1 && stillReadable.body[0].sold_at !== null
+  );
+
+  await api(`/rest/v1/listings?id=eq.${listingId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { sold_at: null },
+  });
+
   const tamper = await api(`/rest/v1/listings?id=eq.${listingId}`, {
     token: buyer.token,
     method: 'PATCH',

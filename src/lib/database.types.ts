@@ -225,6 +225,7 @@ export type Database = {
       }
       listings: {
         Row: {
+          availability_checked_at: string | null
           brand: string
           brand_key: string | null
           caliber: string | null
@@ -245,6 +246,7 @@ export type Database = {
           model: string | null
           price_cents: number | null
           reference: string | null
+          sold_at: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -252,6 +254,7 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          availability_checked_at?: string | null
           brand: string
           brand_key?: string | null
           caliber?: string | null
@@ -272,6 +275,7 @@ export type Database = {
           model?: string | null
           price_cents?: number | null
           reference?: string | null
+          sold_at?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -279,6 +283,7 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          availability_checked_at?: string | null
           brand?: string
           brand_key?: string | null
           caliber?: string | null
@@ -299,6 +304,7 @@ export type Database = {
           model?: string | null
           price_cents?: number | null
           reference?: string | null
+          sold_at?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -424,6 +430,7 @@ export type Database = {
       get_deck: {
         Args: { p_limit?: number }
         Returns: {
+          availability_checked_at: string | null
           brand: string
           brand_key: string | null
           caliber: string | null
@@ -444,6 +451,7 @@ export type Database = {
           model: string | null
           price_cents: number | null
           reference: string | null
+          sold_at: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -488,6 +496,7 @@ export type Database = {
           p_year_min?: number
         }
         Returns: {
+          availability_checked_at: string | null
           brand: string
           brand_key: string | null
           caliber: string | null
@@ -508,6 +517,7 @@ export type Database = {
           model: string | null
           price_cents: number | null
           reference: string | null
+          sold_at: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null

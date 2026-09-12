@@ -114,6 +114,17 @@ export default function ListingScreen() {
           <Text style={styles.price}>{formatPrice(card)}</Text>
         </View>
 
+        {/* Only ever reached from Saved: the deck cannot serve a sold watch. It
+            says what the dealer would have said, before an email gets written. */}
+        {card.sold_at ? (
+          <View style={styles.sold}>
+            <Text style={styles.soldLabel}>Sold</Text>
+            <Text style={styles.soldNote}>
+              {card.dealer?.name ?? 'The dealer'} no longer has this watch.
+            </Text>
+          </View>
+        ) : null}
+
         {card.description ? <Text style={styles.description}>{card.description}</Text> : null}
 
         <Divider />
@@ -137,10 +148,14 @@ export default function ListingScreen() {
               isSaved ? unsave.mutate(card.id) : save.mutate({ listingId: card.id, direction: 'right' })
             }
           />
-          <Button
-            label="Ask about this watch"
-            onPress={() => router.push(`/inquiry/${card.id}`)}
-          />
+          {/* The whole point of tracking sold stock: no one writes to a dealer
+              about a watch that went months ago. */}
+          {card.sold_at ? null : (
+            <Button
+              label="Ask about this watch"
+              onPress={() => router.push(`/inquiry/${card.id}`)}
+            />
+          )}
         </View>
       </ScrollView>
     </Screen>
@@ -148,6 +163,22 @@ export default function ListingScreen() {
 }
 
 const detailStyles = (theme: Theme) => ({
+  sold: {
+    gap: space.xs,
+    padding: inset.card,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surfaceSunken,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  soldLabel: {
+    ...type.labelStrong,
+    color: theme.color.text,
+  },
+  soldNote: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
   body: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxl,

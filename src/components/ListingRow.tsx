@@ -37,7 +37,11 @@ export function ListingRow({
         <Text style={styles.model} numberOfLines={1}>
           {card.model ?? 'Unknown model'}
         </Text>
-        <Text style={styles.price}>{formatPrice(card)}</Text>
+        {/* Sold replaces the price rather than sitting beside it. A number next
+            to "Sold" reads as what it is going for, not what it went for. */}
+        <Text style={card.sold_at ? styles.sold : styles.price}>
+          {card.sold_at ? 'Sold' : formatPrice(card)}
+        </Text>
         {card.dealer ? (
           <Text style={styles.dealer} numberOfLines={1}>
             {card.dealer.name}
@@ -87,6 +91,10 @@ const rowStyles = (theme: Theme) => ({
   price: {
     ...type.caption,
     color: theme.color.text,
+  },
+  sold: {
+    ...type.caption,
+    color: theme.color.textFaint,
   },
   dealer: {
     ...type.caption,

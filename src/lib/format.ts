@@ -9,17 +9,21 @@ export function formatPrice(card: Pick<DeckCard, 'price_cents' | 'currency'>) {
   }).format(card.price_cents / 100);
 }
 
-type Priced = Pick<DeckCard, 'price_cents' | 'currency'>;
+type Priced = Pick<DeckCard, 'price_cents' | 'currency' | 'sold_at'>;
 
 /**
  * What a list of watches adds up to. Watches priced on request are left out and
  * counted separately, because a total quietly short by one reads as the whole
  * answer. Mixed currencies return no total rather than adding pounds to dollars.
+ *
+ * A sold watch is not part of the total either. Its row shows "Sold" where the
+ * price used to be, so counting it would leave a sum no visible price explains.
  */
 export function totalPrice(cards: Priced[]): { total: string | null; onRequest: number } {
-  const priced = cards.filter((card) => card.price_cents != null);
+  const forSale = cards.filter((card) => card.sold_at == null);
+  const priced = forSale.filter((card) => card.price_cents != null);
   const currencies = new Set(priced.map((card) => card.currency));
-  const onRequest = cards.length - priced.length;
+  const onRequest = forSale.length - priced.length;
 
   if (currencies.size !== 1) return { total: null, onRequest };
 

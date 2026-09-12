@@ -272,7 +272,34 @@ is a number the user is already holding in their head, badly.
 Watches priced on request are left out of the sum and counted under it — "2 on request" —
 because a total quietly short by two reads as the whole answer. Mixed currencies show no
 total at all rather than adding pounds to dollars. An empty list shows nothing: "$0" beside
-the word Saved reads as a price.
+the word Saved reads as a price. Sold watches are left out too, since their row shows "Sold"
+where the price was and a sum no visible price explains is worse than a smaller sum.
+
+## A sold watch never enters the deck
+
+**Rule: if the listing is sold, it does not go in the app.** A buyer who swipes on a sold
+watch spends attention on it, then an email, and learns it went months ago from the
+dealer's reply. That is the one failure that costs us the buyer and embarrasses the dealer
+at the same time.
+
+Shops say this in their own data and we read it rather than guess. Shopify marks every
+variant `available`; Squarespace drops `qtyInStock` to zero. Silence is not a sale: a feed
+that says nothing about stock is treated as for sale, because reading it the other way
+would empty an import from any shop we misread. Sold items are dropped before extraction,
+so a watch we cannot sell never costs an OpenAI call either.
+
+Importing only ever adds, so stock also has to be re-read. `npm run sweep` walks each
+approved dealer, compares what they still list against what we show, and stamps `sold_at`
+on anything that has gone. An import does the same sweep for the shop it just read. A
+listing missing from the feed is left alone — the read stops at a limit, so absence means
+we did not get that far, not that it sold.
+
+Sold is its own column, not a `status`. `status` is what we chose to publish; `sold_at` is
+what the market did, and it carries the date. Keeping them apart is also what lets a sold
+watch stay readable: `search_listings` drops it from the deck, search and the filter counts,
+while a watch already sitting in someone's Saved list stays there, marked "Sold", with the
+inquiry button gone. Deleting it instead would remove it from that list with no explanation
+and take the swipe history with it.
 
 The description is not on the card. Two lines of prose is a paragraph cut in half — long
 enough to crowd the price, short enough to tell you nothing. It reads in full on the detail

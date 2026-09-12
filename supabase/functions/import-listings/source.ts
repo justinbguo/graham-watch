@@ -10,9 +10,29 @@ export type SourceItem = {
   photoUrls: string[];
   priceCents: number | null;
   currency: string | null;
+  /**
+   * False only when the shop states the watch is gone. A feed that says nothing
+   * about stock is not announcing a sale, so silence has to read as available —
+   * the other way round empties an import from any shop we misread.
+   */
+  available: boolean;
 };
 
 export const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
+
+/**
+ * Identifies one product across the several URLs that reach it. An import
+ * started from `https://www.shop.com` stores `www` URLs; a sweep reads the
+ * dealer's saved website, which has `www` stripped. Comparing the raw strings
+ * made those the same watch twice, and made a sweep match nothing at all.
+ */
+export function productKey(raw: string): string {
+  try {
+    return new URL(raw).pathname.replace(/\/+$/, '').toLowerCase();
+  } catch {
+    return raw;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Json = any;

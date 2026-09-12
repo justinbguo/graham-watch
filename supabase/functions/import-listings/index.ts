@@ -8,11 +8,14 @@ import { copyPhotos } from './photos.ts';
 import { mapPool } from './pool.ts';
 import { resolveProvider, scrape } from './scrape.ts';
 import { fetchShopifyItems } from './shopify.ts';
-import type { SourceItem } from './source.ts';
+import { productKey, type SourceItem } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
 import { canonicalBrand } from './taxonomy.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
+
+// A sweep costs one feed read and no OpenAI, so it looks at the whole shop.
+const MAX_SWEEP_ITEMS = 250;
 const MAX_PHOTOS_PER_LISTING = 6;
 
 // A card people tap through needs more than one angle. Below three photos a
@@ -137,22 +140,80 @@ const ADAPTERS: Record<
   squarespace: fetchSquarespaceItems,
 };
 
+/** The first adapter that recognises the shop, with the shop's own stock state intact. */
+async function adapterItems(
+  sourceUrl: string,
+  limit: number
+): Promise<{ provider: string; items: SourceItem[] } | null> {
+  for (const [name, run] of Object.entries(ADAPTERS)) {
+    const items = await run(sourceUrl, limit, MIN_PHOTOS_PER_LISTING);
+    if (items?.length) return { provider: name, items };
+  }
+  return null;
+}
+
+/**
+ * Reconcile the deck against what the shop still has. An import only ever adds,
+ * so without this a watch that sold the week after we read it stays on offer
+ * forever — and the first a buyer hears of it is a dealer's reply.
+ *
+ * Only a listing the feed still carries and marks unavailable is retired. An
+ * item missing from the feed is not evidence of a sale: the adapter stops at
+ * `limit`, so absence usually just means we did not read that far.
+ */
+async function runSweep(
+  supabase: SupabaseClient,
+  dealerId: string,
+  sourceUrl: string,
+  limit: number
+): Promise<{ checked: number; sold: number }> {
+  const found = await adapterItems(sourceUrl, limit);
+  if (!found) throw new Error('That shop does not publish stock state we can read.');
+
+  const stock = new Map(found.items.map((item) => [productKey(item.sourceUrl), item.available]));
+
+  const { data: rows } = await supabase
+    .from('listings')
+    .select('id, source_url, sold_at')
+    .eq('dealer_id', dealerId);
+
+  const checked: string[] = [];
+  const sold: string[] = [];
+
+  for (const row of rows ?? []) {
+    if (!row.source_url) continue;
+    const available = stock.get(productKey(row.source_url));
+    // Absent from the feed is not evidence of a sale: the read stops at `limit`,
+    // so a watch we never reached would otherwise be retired for being deep in
+    // the catalog.
+    if (available === undefined) continue;
+    checked.push(row.id);
+    if (!available && !row.sold_at) sold.push(row.id);
+  }
+
+  const now = new Date().toISOString();
+  if (checked.length) {
+    await supabase.from('listings').update({ availability_checked_at: now }).in('id', checked);
+  }
+  if (sold.length) {
+    await supabase.from('listings').update({ sold_at: now }).in('id', sold);
+  }
+
+  return { checked: checked.length, sold: sold.length };
+}
+
 async function prepare(
   sourceUrl: string,
   limit: number
-): Promise<{ provider: string; listings: PreparedListing[] }> {
-  let items: SourceItem[] | null = null;
-  let adapter = '';
+): Promise<{ provider: string; listings: PreparedListing[]; sold: number }> {
+  const found = await adapterItems(sourceUrl, limit);
 
-  for (const [name, run] of Object.entries(ADAPTERS)) {
-    items = await run(sourceUrl, limit, MIN_PHOTOS_PER_LISTING);
-    if (items?.length) {
-      adapter = name;
-      break;
-    }
-  }
-
-  if (items?.length) {
+  if (found) {
+    const adapter = found.provider;
+    // A sold watch would cost an OpenAI call to type and then be thrown away.
+    // Drop it here, where the shop's own answer is still in hand.
+    const items = found.items.filter((item) => item.available);
+    const sold = found.items.length - items.length;
     const failures: unknown[] = [];
 
     const prepared = await mapPool(items, EXTRACT_CONCURRENCY, async (item) => {
@@ -181,7 +242,7 @@ async function prepare(
     // every item identically and must be reported rather than read as "0 found".
     if (!listings.length && failures.length) throw failures[0];
 
-    return { provider: adapter, listings };
+    return { provider: adapter, listings, sold };
   }
 
   const { markdown, provider } = await scrape(sourceUrl);
@@ -189,6 +250,9 @@ async function prepare(
 
   return {
     provider,
+    // The page path has no stock field to read; the extractor is told to ignore
+    // anything the page marks sold, which is a weaker guarantee than a feed.
+    sold: 0,
     listings: extracted
       .map((item) => ({
         fields: item,
@@ -211,8 +275,12 @@ async function runImport(
   try {
     await supabase.from('import_jobs').update({ status: 'running' }).eq('id', jobId);
 
-    const { provider, listings } = await prepare(sourceUrl, limit);
+    const { provider, listings, sold } = await prepare(sourceUrl, limit);
     await supabase.from('import_jobs').update({ provider }).eq('id', jobId);
+
+    // The same fetch that found new stock also says what is gone, so retire the
+    // sold ones now rather than waiting for a separate sweep.
+    const retired = await runSweep(supabase, dealerId, sourceUrl, limit).catch(() => null);
 
     // Re-running an import is the normal way to pick up new stock, so the same
     // product URL must not land in the deck twice.
@@ -220,17 +288,17 @@ async function runImport(
       .from('listings')
       .select('source_url')
       .eq('dealer_id', dealerId);
-    const known = new Set((seen ?? []).map((row) => row.source_url));
+    const known = new Set((seen ?? []).map((row) => productKey(row.source_url)));
 
     let created = 0;
     let skipped = 0;
 
     for (const item of listings.slice(0, MAX_LISTINGS_PER_IMPORT)) {
-      if (known.has(item.sourceUrl)) {
+      if (known.has(productKey(item.sourceUrl))) {
         skipped += 1;
         continue;
       }
-      known.add(item.sourceUrl);
+      known.add(productKey(item.sourceUrl));
 
       const { data: listing, error } = await supabase
         .from('listings')
@@ -277,7 +345,14 @@ async function runImport(
       .update({
         status: 'succeeded',
         listings_created: created,
-        error: skipped ? `Skipped ${skipped} already imported.` : null,
+        error:
+          [
+            skipped ? `Skipped ${skipped} already imported.` : null,
+            sold ? `Skipped ${sold} sold.` : null,
+            retired?.sold ? `Retired ${retired.sold} that have since sold.` : null,
+          ]
+            .filter(Boolean)
+            .join(' ') || null,
         finished_at: new Date().toISOString(),
       })
       .eq('id', jobId);
@@ -301,6 +376,7 @@ export default {
     let sourceUrl: string;
     let limit: number;
     let dryRun: boolean;
+    let sweep: boolean;
     let dealerName: string | undefined;
     let dealerEmail: string | undefined;
     let requestedDealerId: string | undefined;
@@ -314,6 +390,10 @@ export default {
         MAX_LISTINGS_PER_IMPORT
       );
       dryRun = Boolean(body?.dryRun);
+      sweep = Boolean(body?.sweep);
+      // A sweep reads stock and nothing else, so it can afford the whole shop
+      // where an import has to stop at what it can pay to extract.
+      if (sweep) limit = MAX_SWEEP_ITEMS;
       dealerName = typeof body?.dealerName === 'string' ? body.dealerName.trim() : undefined;
       dealerEmail = typeof body?.dealerEmail === 'string' ? body.dealerEmail.trim() : undefined;
       requestedDealerId = typeof body?.dealerId === 'string' ? body.dealerId : undefined;
@@ -360,6 +440,20 @@ export default {
         { error: error instanceof Error ? error.message : 'Bad request.' },
         { status: 400 }
       );
+    }
+
+    // A sweep touches no OpenAI and writes one column, so it answers in the
+    // request instead of queueing a job the operator would have to follow.
+    if (sweep) {
+      try {
+        const result = await runSweep(ctx.supabase, dealerId, sourceUrl, limit);
+        return Response.json(result);
+      } catch (error) {
+        return Response.json(
+          { error: error instanceof Error ? error.message : 'Sweep failed.' },
+          { status: 502 }
+        );
+      }
     }
 
     const { data: job, error } = await ctx.supabase

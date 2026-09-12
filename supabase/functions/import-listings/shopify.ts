@@ -50,7 +50,13 @@ function mapProduct(product: Json, origin: string, currency: string | null): Sou
   // never has to guess at.
   const vendor = typeof product?.vendor === 'string' ? product.vendor.trim() : '';
 
+  // Dealers keep sold watches published with every variant marked unavailable,
+  // which is the shop saying "gone" in the only place it says it.
+  const variants: Json[] = Array.isArray(product?.variants) ? product.variants : [];
+  const stated = variants.filter((variant: Json) => typeof variant?.available === 'boolean');
+
   return {
+    available: stated.length === 0 || stated.some((variant: Json) => variant.available === true),
     title: vendor && !title.toLowerCase().includes(vendor.toLowerCase()) ? `${vendor} ${title}` : title,
     text: htmlToText(String(product?.body_html ?? ''), origin),
     sourceUrl: new URL(`/products/${handle}`, origin).toString(),

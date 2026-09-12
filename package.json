@@ -53,6 +53,7 @@
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
     "test:rls": "node scripts/test-rls.mjs",
     "import": "node scripts/import.mjs",
+    "sweep": "node scripts/sweep.mjs",
     "dealers": "node scripts/dealers.mjs"
   },
   "private": true

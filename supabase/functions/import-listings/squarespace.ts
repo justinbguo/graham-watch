@@ -42,7 +42,18 @@ function mapItem(item: Json, base: URL): SourceItem | null {
 
   const money = item?.structuredContent?.priceMoney;
 
+  // One watch is one variant with one in stock. Sold drops it to zero, which is
+  // the only place a Squarespace shop admits the watch is gone.
+  const variants: Json[] = Array.isArray(item?.structuredContent?.variants)
+    ? item.structuredContent.variants
+    : [];
+
   return {
+    available:
+      variants.length === 0 ||
+      variants.some(
+        (variant: Json) => variant?.unlimited === true || Number(variant?.qtyInStock) > 0
+      ),
     title,
     text: htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl),
     sourceUrl,
@@ -72,6 +83,9 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
         : collection.photoUrls,
     priceCents: product.priceCents ?? collection.priceCents,
     currency: product.currency ?? collection.currency,
+    // Either page saying sold is enough. A grid tile can lag the product page,
+    // and neither of them ever claims a sold watch is back.
+    available: collection.available && product.available,
   };
 }
 
