@@ -1,5 +1,5 @@
--- The deck: active listings the caller neither owns nor has already swiped.
--- security invoker keeps RLS in force for the calling user.
+-- The deck: active listings from approved dealers that the caller neither
+-- imported nor has already swiped. security invoker keeps RLS in force.
 create function public.get_deck(p_limit integer default 20)
 returns setof public.listings
 language sql
@@ -9,8 +9,10 @@ set search_path = ''
 as $$
   select l.*
   from public.listings l
+  join public.dealers d on d.id = l.dealer_id
   where l.status = 'active'
-    and l.seller_id <> (select auth.uid())
+    and d.permission = 'approved'
+    and l.imported_by <> (select auth.uid())
     and not exists (
       select 1
       from public.swipes s

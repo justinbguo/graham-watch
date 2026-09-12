@@ -7,10 +7,12 @@ export function ListingRow({
   card,
   actionLabel,
   onAction,
+  onLongPress,
 }: {
   card: DeckCard;
   actionLabel?: string;
   onAction?: () => void;
+  onLongPress?: () => void;
 }) {
   const photo = card.photos[0]?.url;
   const price =
@@ -23,7 +25,7 @@ export function ListingRow({
         }).format(card.price_cents / 100);
 
   return (
-    <View style={styles.row}>
+    <Pressable onLongPress={onLongPress} delayLongPress={400} style={styles.row}>
       {photo ? (
         <Image source={{ uri: photo }} style={styles.thumb} />
       ) : (
@@ -38,6 +40,11 @@ export function ListingRow({
           {card.model ?? 'Unknown model'}
         </Text>
         <Text style={styles.price}>{price}</Text>
+        {card.dealer ? (
+          <Text style={styles.dealer} numberOfLines={1}>
+            {card.dealer.name}
+          </Text>
+        ) : null}
       </View>
 
       {actionLabel && onAction ? (
@@ -45,7 +52,7 @@ export function ListingRow({
           <Text style={styles.action}>{actionLabel}</Text>
         </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -85,8 +92,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.color.text,
   },
+  dealer: {
+    fontSize: 13,
+    color: theme.color.muted,
+  },
   action: {
     fontSize: 14,
-    color: theme.color.muted,
+    fontWeight: '600',
+    color: theme.color.text,
   },
 });

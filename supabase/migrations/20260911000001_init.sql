@@ -1,6 +1,8 @@
+create type public.dealer_permission as enum ('pending', 'approved', 'revoked');
 create type public.listing_status as enum ('active', 'hidden');
 create type public.import_status as enum ('queued', 'running', 'succeeded', 'failed');
 create type public.swipe_direction as enum ('left', 'right');
+create type public.inquiry_status as enum ('pending', 'sent', 'failed');
 
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -11,9 +13,23 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- A dealer is a shop, not an app user. Most are imported before they have any
+-- account, and claimed_by links one to a profile only if they later sign up.
+create table public.dealers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  website text unique,
+  contact_email text,
+  permission public.dealer_permission not null default 'pending',
+  claimed_by uuid references public.profiles (id) on delete set null,
+  created_by uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 create table public.import_jobs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
+  dealer_id uuid references public.dealers (id) on delete cascade,
   source_url text not null,
   provider text not null,
   status public.import_status not null default 'queued',
@@ -25,7 +41,8 @@ create table public.import_jobs (
 
 create table public.listings (
   id uuid primary key default gen_random_uuid(),
-  seller_id uuid not null references public.profiles (id) on delete cascade,
+  dealer_id uuid not null references public.dealers (id) on delete cascade,
+  imported_by uuid not null references public.profiles (id) on delete cascade,
   import_job_id uuid references public.import_jobs (id) on delete set null,
   source_url text,
   brand text not null,
@@ -61,11 +78,28 @@ create table public.swipes (
   unique (actor_id, listing_id)
 );
 
+-- A right swipe only saves. An inquiry is a separate, deliberate act, so one row
+-- here always means a buyer asked to be introduced to the dealer.
+create table public.inquiries (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid not null references public.listings (id) on delete cascade,
+  dealer_id uuid not null references public.dealers (id) on delete cascade,
+  buyer_id uuid not null references public.profiles (id) on delete cascade,
+  message text,
+  status public.inquiry_status not null default 'pending',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  unique (listing_id, buyer_id)
+);
+
 create index listings_deck_idx on public.listings (status, created_at desc);
-create index listings_seller_idx on public.listings (seller_id);
+create index listings_dealer_idx on public.listings (dealer_id);
+create index listings_importer_idx on public.listings (imported_by);
 create index listing_photos_listing_idx on public.listing_photos (listing_id);
 create index swipes_actor_idx on public.swipes (actor_id, created_at desc);
 create index import_jobs_user_idx on public.import_jobs (user_id, created_at desc);
+create index inquiries_dealer_idx on public.inquiries (dealer_id, created_at desc);
+create index inquiries_buyer_idx on public.inquiries (buyer_id, created_at desc);
 
 -- Give every new auth user a profile row so the app never has to create one.
 create function public.handle_new_user()

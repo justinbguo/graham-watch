@@ -114,6 +114,11 @@ export function SwipeCard({
             {subtitle(card)}
           </Text>
           <Text style={styles.price}>{priceLabel(card)}</Text>
+          {card.dealer ? (
+            <Text style={styles.dealer} numberOfLines={1}>
+              {card.dealer.name}
+            </Text>
+          ) : null}
         </View>
       </Animated.View>
     </GestureDetector>
@@ -164,6 +169,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.color.text,
     paddingTop: theme.space(0.5),
+  },
+  dealer: {
+    fontSize: 13,
+    color: theme.color.muted,
+    paddingTop: 2,
   },
   stamp: {
     position: 'absolute',

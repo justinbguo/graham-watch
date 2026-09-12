@@ -1,10 +1,12 @@
-// Mirrors supabase/migrations. Regenerate once the local stack runs:
+// Mirrors supabase/migrations. Regenerate once a database exists:
 //   npm run db:types
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+export type DealerPermission = 'pending' | 'approved' | 'revoked';
 export type ListingStatus = 'active' | 'hidden';
 export type ImportStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export type SwipeDirection = 'left' | 'right';
+export type InquiryStatus = 'pending' | 'sent' | 'failed';
 
 type ProfileRow = {
   id: string;
@@ -15,9 +17,21 @@ type ProfileRow = {
   created_at: string;
 };
 
+type DealerRow = {
+  id: string;
+  name: string;
+  website: string | null;
+  contact_email: string | null;
+  permission: DealerPermission;
+  claimed_by: string | null;
+  created_by: string;
+  created_at: string;
+};
+
 type ListingRow = {
   id: string;
-  seller_id: string;
+  dealer_id: string;
+  imported_by: string;
   import_job_id: string | null;
   source_url: string | null;
   brand: string;
@@ -54,6 +68,7 @@ type SwipeRow = {
 type ImportJobRow = {
   id: string;
   user_id: string;
+  dealer_id: string | null;
   source_url: string;
   provider: string;
   status: ImportStatus;
@@ -61,6 +76,17 @@ type ImportJobRow = {
   listings_created: number;
   created_at: string;
   finished_at: string | null;
+};
+
+type InquiryRow = {
+  id: string;
+  listing_id: string;
+  dealer_id: string;
+  buyer_id: string;
+  message: string | null;
+  status: InquiryStatus;
+  created_at: string;
+  sent_at: string | null;
 };
 
 export type Database = {
@@ -72,10 +98,22 @@ export type Database = {
         Update: Partial<ProfileRow>;
         Relationships: [];
       };
+      dealers: {
+        Row: DealerRow;
+        Insert: Partial<Omit<DealerRow, 'id' | 'name' | 'created_by'>> & {
+          name: string;
+          created_by: string;
+        };
+        Update: Partial<DealerRow>;
+        Relationships: [];
+      };
       listings: {
         Row: ListingRow;
-        Insert: Partial<Omit<ListingRow, 'id' | 'seller_id' | 'brand' | 'created_at'>> & {
-          seller_id: string;
+        Insert: Partial<
+          Omit<ListingRow, 'id' | 'dealer_id' | 'imported_by' | 'brand' | 'created_at'>
+        > & {
+          dealer_id: string;
+          imported_by: string;
           brand: string;
         };
         Update: Partial<ListingRow>;
@@ -106,6 +144,16 @@ export type Database = {
         Update: Partial<ImportJobRow>;
         Relationships: [];
       };
+      inquiries: {
+        Row: InquiryRow;
+        Insert: Partial<Omit<InquiryRow, 'id' | 'listing_id' | 'dealer_id' | 'buyer_id'>> & {
+          listing_id: string;
+          dealer_id: string;
+          buyer_id: string;
+        };
+        Update: Partial<InquiryRow>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -115,16 +163,25 @@ export type Database = {
       };
     };
     Enums: {
+      dealer_permission: DealerPermission;
       listing_status: ListingStatus;
       import_status: ImportStatus;
       swipe_direction: SwipeDirection;
+      inquiry_status: InquiryStatus;
     };
     CompositeTypes: Record<never, never>;
   };
 };
 
+export type Profile = ProfileRow;
+export type Dealer = DealerRow;
 export type Listing = ListingRow;
 export type ListingPhoto = ListingPhotoRow;
 export type ImportJob = ImportJobRow;
-export type Profile = ProfileRow;
-export type DeckCard = Listing & { photos: ListingPhoto[] };
+export type Inquiry = InquiryRow;
+
+/** A listing with everything a card needs to render in one object. */
+export type DeckCard = Listing & {
+  photos: ListingPhoto[];
+  dealer: Pick<Dealer, 'id' | 'name' | 'website'> | null;
+};

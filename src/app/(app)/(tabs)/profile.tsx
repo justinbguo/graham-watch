@@ -6,7 +6,7 @@ import { ListingRow } from '@/components/ListingRow';
 import { Button, Message, Screen } from '@/components/ui';
 import type { DeckCard } from '@/lib/database.types';
 import { signOut } from '@/lib/auth';
-import { fetchMyListings } from '@/lib/queries';
+import { fetchImportedListings } from '@/lib/queries';
 import { theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
@@ -17,7 +17,7 @@ export default function Profile() {
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-      fetchMyListings(userId).then(setListings).catch(() => undefined);
+      fetchImportedListings(userId).then(setListings).catch(() => undefined);
     }, [userId])
   );
 

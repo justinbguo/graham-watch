@@ -25,10 +25,42 @@ function assertPublicHttpUrl(raw: string) {
   return url.toString();
 }
 
+// Imported shops rarely have an account, so a dealer row is created from the
+// hostname. It starts 'pending' and stays invisible to other users until it is
+// approved out-of-band, which is what keeps un-permissioned inventory private.
+async function resolveDealer(
+  supabase: SupabaseClient,
+  userId: string,
+  sourceUrl: string,
+  dealerId?: string
+): Promise<string> {
+  if (dealerId) return dealerId;
+
+  const host = new URL(sourceUrl).hostname.replace(/^www\./, '');
+  const website = `https://${host}`;
+
+  const { data: existing } = await supabase
+    .from('dealers')
+    .select('id')
+    .eq('website', website)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  const { data, error } = await supabase
+    .from('dealers')
+    .insert({ name: host, website, created_by: userId, permission: 'pending' })
+    .select('id')
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? 'Could not create a dealer.');
+  return data.id;
+}
+
 async function runImport(
   supabase: SupabaseClient,
   jobId: string,
   userId: string,
+  dealerId: string,
   sourceUrl: string
 ) {
   try {
@@ -45,7 +77,8 @@ async function runImport(
       const { data: listing, error } = await supabase
         .from('listings')
         .insert({
-          seller_id: userId,
+          dealer_id: dealerId,
+          imported_by: userId,
           import_job_id: jobId,
           source_url: item.source_url ?? sourceUrl,
           brand: item.brand,
@@ -101,9 +134,11 @@ export default {
     if (!userId) return Response.json({ error: 'Not signed in.' }, { status: 401 });
 
     let sourceUrl: string;
+    let dealerId: string;
     try {
       const body = await req.json();
       sourceUrl = assertPublicHttpUrl(String(body?.sourceUrl ?? ''));
+      dealerId = await resolveDealer(ctx.supabase, userId, sourceUrl, body?.dealerId);
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : 'Bad request.' },
@@ -111,10 +146,16 @@ export default {
       );
     }
 
-    const provider = Deno.env.get('SCRAPE_PROVIDER') ?? 'fetch';
+    const provider = Deno.env.get('SCRAPE_PROVIDER') ?? 'jina';
     const { data: job, error } = await ctx.supabase
       .from('import_jobs')
-      .insert({ user_id: userId, source_url: sourceUrl, provider, status: 'queued' })
+      .insert({
+        user_id: userId,
+        dealer_id: dealerId,
+        source_url: sourceUrl,
+        provider,
+        status: 'queued',
+      })
       .select('*')
       .single();
 
@@ -124,7 +165,7 @@ export default {
 
     // Scraping plus extraction takes far longer than a request should. Hand the
     // job back now; the client follows progress on import_jobs over Realtime.
-    EdgeRuntime.waitUntil(runImport(ctx.supabase, job.id, userId, sourceUrl));
+    EdgeRuntime.waitUntil(runImport(ctx.supabase, job.id, userId, dealerId, sourceUrl));
 
     return Response.json({ job });
   }),

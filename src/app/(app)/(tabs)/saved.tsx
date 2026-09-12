@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -62,13 +62,23 @@ export default function Saved() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => (
-            <ListingRow card={item} actionLabel="Remove" onAction={() => remove(item.id)} />
+            <ListingRow
+              card={item}
+              actionLabel="Contact"
+              onAction={() => router.push(`/inquiry/${item.id}`)}
+              onLongPress={() => remove(item.id)}
+            />
           )}
           ListEmptyComponent={
             <Centered>
               <Text style={styles.emptyTitle}>Nothing saved yet</Text>
               <Message text="Swipe right on the deck and it lands here." />
             </Centered>
+          }
+          ListFooterComponent={
+            cards.length ? (
+              <Text style={styles.footerHint}>Long-press a watch to remove it.</Text>
+            ) : null
           }
         />
       )}
@@ -89,5 +99,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: theme.color.text,
+  },
+  footerHint: {
+    fontSize: 13,
+    color: theme.color.muted,
+    paddingVertical: theme.space(2),
+    textAlign: 'center',
   },
 });
