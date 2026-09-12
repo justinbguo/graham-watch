@@ -119,6 +119,7 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
       id: `demo-photo-${index}`,
       listing_id: `demo-${index}`,
       url: `https://picsum.photos/seed/${encodeURIComponent(fixture.reference)}/900/1200`,
+      source_url: null,
       position: 0,
     },
   ],

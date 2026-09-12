@@ -125,8 +125,8 @@ after the data path works end to end.
 ## 9. Known gaps before real users
 
 - Inquiries are recorded but nothing emails the dealer yet.
-- Photos are hot-linked from the dealer's site. They need copying into Supabase
-  Storage: sites block hotlinking and URLs rot.
+- Nothing re-copies a photo when the dealer changes it upstream. `listing_photos`
+  keeps `source_url` so a future job can diff, but that job does not exist.
 - Server state is hand-rolled per screen. It needs a query cache.
 - No dealer-facing view at all. Approval happens in the Supabase dashboard.
 

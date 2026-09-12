@@ -196,18 +196,21 @@ export type Database = {
           id: string
           listing_id: string
           position: number
+          source_url: string | null
           url: string
         }
         Insert: {
           id?: string
           listing_id: string
           position?: number
+          source_url?: string | null
           url: string
         }
         Update: {
           id?: string
           listing_id?: string
           position?: number
+          source_url?: string | null
           url?: string
         }
         Relationships: [

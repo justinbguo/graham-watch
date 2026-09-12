@@ -1,11 +1,30 @@
 import { withSupabase } from 'npm:@supabase/server@^1';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
+import { createClient } from 'npm:@supabase/supabase-js@^2';
+
 import { extractListings } from './extract.ts';
+import { copyPhotos } from './photos.ts';
 import { resolveProvider, scrape } from './scrape.ts';
 
 const MAX_LISTINGS_PER_IMPORT = 40;
 const MAX_PHOTOS_PER_LISTING = 6;
+
+let adminClient: SupabaseClient | null = null;
+
+/**
+ * Copying photos into storage is a server action. The request-scoped client runs
+ * as the signed-in user, who has no write access to the bucket by design, so
+ * uploads go through the service role instead.
+ */
+function storage(): SupabaseClient {
+  adminClient ??= createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false } }
+  );
+  return adminClient;
+}
 
 function assertPublicHttpUrl(raw: string) {
   let url: URL;
@@ -100,12 +119,16 @@ async function runImport(
       if (error || !listing) continue;
       created += 1;
 
-      const photos = item.photo_urls
+      const sourceUrls = item.photo_urls
         .filter((url) => url.startsWith('http'))
-        .slice(0, MAX_PHOTOS_PER_LISTING)
-        .map((url, position) => ({ listing_id: listing.id, url, position }));
+        .slice(0, MAX_PHOTOS_PER_LISTING);
 
-      if (photos.length) await supabase.from('listing_photos').insert(photos);
+      if (sourceUrls.length) {
+        const photos = await copyPhotos(storage(), listing.id, sourceUrls);
+        await supabase
+          .from('listing_photos')
+          .insert(photos.map((photo) => ({ ...photo, listing_id: listing.id })));
+      }
     }
 
     await supabase
