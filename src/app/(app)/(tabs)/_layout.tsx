@@ -43,7 +43,7 @@ export default function TabsLayout() {
           );
         },
       })}>
-      <Tabs.Screen name="index" options={{ title: 'Deck' }} />
+      <Tabs.Screen name="index" options={{ title: 'Buy' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
       <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
