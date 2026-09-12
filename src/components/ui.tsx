@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,11 +12,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-export function Screen({ title, children }: PropsWithChildren<{ title?: string }>) {
+export function Screen({
+  title,
+  action,
+  children,
+}: PropsWithChildren<{ title?: string; action?: ReactNode }>) {
   const styles = useThemedStyles(screenStyles);
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
+      {title || action ? (
+        <View style={styles.header}>
+          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {action}
+        </View>
+      ) : null}
       {children}
     </SafeAreaView>
   );
@@ -113,12 +122,18 @@ const screenStyles = (theme: Theme) => ({
     flex: 1,
     backgroundColor: theme.color.background,
   },
-  title: {
-    ...type.display,
-    color: theme.color.text,
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    gap: space.md,
     paddingHorizontal: inset.screen,
     paddingTop: space.md,
     paddingBottom: space.xl,
+  },
+  title: {
+    ...type.display,
+    color: theme.color.text,
   },
 });
 

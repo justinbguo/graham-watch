@@ -177,3 +177,18 @@ back on the first photo reads as a glitch, not as an end.
 
 Progress is segments across the top, not dots — they show how much is left at a glance.
 Only the top card takes taps; a card underneath is not being read.
+
+## Deck views
+
+Two ways to read the same queue, chosen from the toggle beside the title. Cards are for
+deciding, one watch at a time. The grid is for scanning, and a tap there opens that watch
+in card view rather than saving it — there is one way to save, and it is a swipe.
+
+Wide screens open on the grid, phones on cards. Either is reachable at any width.
+
+## No labels on the deck
+
+A drag shows its direction in colour alone: green wash for save, red for pass, both faint
+enough that the photograph stays the subject. The words "Save" and "Pass" are gone, and so
+is the instruction under the deck. A first swipe teaches the gesture faster than a caption,
+and the caption never stops taking up room.

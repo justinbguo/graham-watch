@@ -18,6 +18,8 @@ import { useThemedStyles } from '@/providers/theme';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const OFF_SCREEN = SCREEN_WIDTH * 1.5;
+// Worklets only see module-scope values. Keep this faint: the photo stays the point.
+const WASH_OPACITY = 0.22;
 
 export function SwipeCard({
   card,
@@ -68,12 +70,12 @@ export function SwipeCard({
     ],
   }));
 
-  const saveStampStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], 'clamp'),
+  const saveWashStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, WASH_OPACITY], 'clamp'),
   }));
 
-  const passStampStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], 'clamp'),
+  const passWashStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [WASH_OPACITY, 0], 'clamp'),
   }));
 
   return (
@@ -81,12 +83,14 @@ export function SwipeCard({
       <Animated.View style={[styles.card, cardStyle]}>
         <PhotoCarousel photos={card.photos} active={isTop} />
 
-        <Animated.View style={[styles.stamp, styles.saveStamp, saveStampStyle]}>
-          <Text style={[styles.stampLabel, styles.saveLabel]}>Save</Text>
-        </Animated.View>
-        <Animated.View style={[styles.stamp, styles.passStamp, passStampStyle]}>
-          <Text style={[styles.stampLabel, styles.passLabel]}>Pass</Text>
-        </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.wash, styles.saveWash, saveWashStyle]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.wash, styles.passWash, passWashStyle]}
+        />
 
         <View style={styles.info}>
           <Text style={styles.brand} numberOfLines={1}>
@@ -158,35 +162,15 @@ const cardStyles = (theme: Theme) => ({
     flexShrink: 1,
     textAlign: 'right' as const,
   },
-  // Stamps sit over the photo, so they carry their own surface rather than
-  // relying on whatever the image happens to be behind them.
-  stamp: {
-    position: 'absolute' as const,
-    top: space.xl,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.sm,
-    backgroundColor: theme.color.surface,
+  // Colour is the only cue that a drag has caught, so it has to reach the edges
+  // of the card. Kept faint: the photograph is the point, not the feedback.
+  wash: {
+    ...StyleSheet.absoluteFill,
   },
-  saveStamp: {
-    left: space.lg,
-    borderColor: theme.color.save,
-    transform: [{ rotate: '-8deg' }],
+  saveWash: {
+    backgroundColor: theme.color.save,
   },
-  passStamp: {
-    right: space.lg,
-    borderColor: theme.color.danger,
-    transform: [{ rotate: '8deg' }],
-  },
-  // Bigger than an eyebrow: this has to read at a glance while the card moves.
-  stampLabel: {
-    ...type.title,
-  },
-  saveLabel: {
-    color: theme.color.save,
-  },
-  passLabel: {
-    color: theme.color.danger,
+  passWash: {
+    backgroundColor: theme.color.danger,
   },
 });

@@ -10,16 +10,18 @@ const MIN_TILE_WIDTH = 280;
 const GAP = space.lg;
 
 /**
- * The desktop half of the deck. Swiping is a thumb gesture, so on a wide screen
- * the same listings are browsed as a grid and acted on with a click or the
- * keyboard. Both surfaces call the same `onSwipe`, so the data layer is shared.
+ * The scanning half of the deck: many watches at once instead of one. Acting on
+ * a watch stays a swipe, so a tap opens it in card view rather than saving it
+ * outright. On web the keyboard can triage without leaving the grid.
  */
 export function DeckGrid({
   cards,
   onSwipe,
+  onOpen,
 }: {
   cards: DeckCard[];
   onSwipe: (card: DeckCard, direction: SwipeDirection) => void;
+  onOpen: (card: DeckCard) => void;
 }) {
   const styles = useThemedStyles(gridStyles);
   const { width } = useWindowDimensions();
@@ -42,6 +44,10 @@ export function DeckGrid({
       };
 
       switch (event.key) {
+        case 'Enter': {
+          const card = cards[selectedIndex];
+          return card && onOpen(card);
+        }
         case 'ArrowRight':
           return move(1);
         case 'ArrowLeft':
@@ -59,51 +65,49 @@ export function DeckGrid({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [cards, columns, selectedIndex, onSwipe]);
+  }, [cards, columns, selectedIndex, onSwipe, onOpen]);
 
   return (
-    <>
-      <FlatList
-        // FlatList cannot change numColumns in place, so remount on resize.
-        key={columns}
-        data={cards}
-        keyExtractor={(card) => card.id}
-        numColumns={columns}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.content}
-        renderItem={({ item, index }) => (
-          <Tile
-            card={item}
-            isSelected={index === selectedIndex}
-            onSelect={() => setSelected(index)}
-            onSave={() => onSwipe(item, 'right')}
-            onPass={() => onSwipe(item, 'left')}
-          />
-        )}
-      />
-      <Text style={styles.hint}>Arrows to move · S to save · X to pass</Text>
-    </>
+    <FlatList
+      // FlatList cannot change numColumns in place, so remount on resize.
+      key={columns}
+      data={cards}
+      keyExtractor={(card) => card.id}
+      numColumns={columns}
+      columnWrapperStyle={styles.row}
+      contentContainerStyle={styles.content}
+      renderItem={({ item, index }) => (
+        <Tile
+          card={item}
+          isSelected={index === selectedIndex}
+          onOpen={() => {
+            setSelected(index);
+            onOpen(item);
+          }}
+        />
+      )}
+    />
   );
 }
 
 function Tile({
   card,
   isSelected,
-  onSelect,
-  onSave,
-  onPass,
+  onOpen,
 }: {
   card: DeckCard;
   isSelected: boolean;
-  onSelect: () => void;
-  onSave: () => void;
-  onPass: () => void;
+  onOpen: () => void;
 }) {
   const styles = useThemedStyles(gridStyles);
   const photo = card.photos[0]?.url;
 
   return (
-    <Pressable style={[styles.tile, isSelected && styles.tileSelected]} onPress={onSelect}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${card.brand} ${card.model ?? ''}`.trim()}
+      style={[styles.tile, isSelected && styles.tileSelected]}
+      onPress={onOpen}>
       {photo ? (
         <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
       ) : (
@@ -131,16 +135,6 @@ function Tile({
           ) : null}
         </View>
       </View>
-
-      <View style={styles.actions}>
-        <Pressable accessibilityRole="button" onPress={onPass} style={styles.action}>
-          <Text style={[styles.actionLabel, styles.passLabel]}>Pass</Text>
-        </Pressable>
-        <View style={styles.actionDivider} />
-        <Pressable accessibilityRole="button" onPress={onSave} style={styles.action}>
-          <Text style={[styles.actionLabel, styles.saveLabel]}>Save</Text>
-        </Pressable>
-      </View>
     </Pressable>
   );
 }
@@ -152,12 +146,6 @@ const gridStyles = (theme: Theme) => ({
   },
   row: {
     gap: GAP,
-  },
-  hint: {
-    ...type.caption,
-    color: theme.color.textFaint,
-    textAlign: 'center' as const,
-    paddingBottom: inset.screen,
   },
   tile: {
     flex: 1,
@@ -216,28 +204,5 @@ const gridStyles = (theme: Theme) => ({
     color: theme.color.brass,
     flexShrink: 1,
     textAlign: 'right' as const,
-  },
-  actions: {
-    flexDirection: 'row' as const,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
-  },
-  action: {
-    flex: 1,
-    paddingVertical: space.md,
-    alignItems: 'center' as const,
-  },
-  actionDivider: {
-    width: 1,
-    backgroundColor: theme.color.border,
-  },
-  actionLabel: {
-    ...type.control,
-  },
-  saveLabel: {
-    color: theme.color.save,
-  },
-  passLabel: {
-    color: theme.color.danger,
   },
 });
