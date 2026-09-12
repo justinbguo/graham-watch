@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
-import { Centered, Message, Screen, Spinner } from '@/components/ui';
+import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { useUnsave } from '@/data/swipes';
-import { theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
 export default function Saved() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error } = useSaved(userId);
   const unsave = useUnsave(userId);
+  const styles = useThemedStyles(savedStyles);
 
   if (isPending) {
     return (
@@ -48,7 +50,7 @@ export default function Saved() {
         )}
         ListEmptyComponent={
           <Centered>
-            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+            <Heading>Nothing saved yet</Heading>
             <Message text="Swipe right on the deck and it lands here." />
           </Centered>
         }
@@ -62,24 +64,19 @@ export default function Saved() {
   );
 }
 
-const styles = StyleSheet.create({
+const savedStyles = (theme: Theme) => ({
   list: {
-    paddingHorizontal: theme.space(2),
+    paddingHorizontal: space.lg,
     flexGrow: 1,
   },
   separator: {
     height: 1,
     backgroundColor: theme.color.border,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.color.text,
-  },
   footerHint: {
-    fontSize: 13,
-    color: theme.color.muted,
-    paddingVertical: theme.space(2),
-    textAlign: 'center',
+    ...type.caption,
+    color: theme.color.textFaint,
+    paddingVertical: space.xl,
+    textAlign: 'center' as const,
   },
 });

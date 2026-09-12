@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
-import { Button, Centered, Field, Message, Screen, Spinner } from '@/components/ui';
+import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
-import { theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
 export default function InquiryScreen() {
@@ -14,6 +15,7 @@ export default function InquiryScreen() {
   const { data: card, isPending } = useListing(listingId);
   const [message, setMessage] = useState('');
   const sendInquiry = useSendInquiry(userId);
+  const styles = useThemedStyles(inquiryStyles);
 
   if (isPending) {
     return (
@@ -38,7 +40,7 @@ export default function InquiryScreen() {
     return (
       <Screen title="Contact dealer">
         <Centered>
-          <Text style={styles.heading}>Inquiry sent</Text>
+          <Heading>Inquiry sent</Heading>
           <Message
             text={`${card.dealer?.name ?? 'The dealer'} will get your message with a link to this watch.`}
           />
@@ -54,7 +56,7 @@ export default function InquiryScreen() {
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.summary}>
-          <Text style={styles.brand}>{card.brand}</Text>
+          <Eyebrow>{card.brand}</Eyebrow>
           <Text style={styles.model}>{card.model ?? 'Unknown model'}</Text>
           <Message text={`Sold by ${card.dealer?.name ?? 'an unlisted dealer'}`} />
         </View>
@@ -79,44 +81,33 @@ export default function InquiryScreen() {
             loading={sendInquiry.isPending}
             onPress={() => sendInquiry.mutate({ card, message })}
           />
-          <Button label="Cancel" variant="secondary" onPress={() => router.back()} />
+          <Button label="Cancel" variant="ghost" onPress={() => router.back()} />
         </View>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const inquiryStyles = (theme: Theme) => ({
   body: {
     flex: 1,
-    padding: theme.space(2),
-    gap: theme.space(2),
+    paddingHorizontal: space.lg,
+    paddingBottom: space.lg,
+    gap: space.lg,
   },
   summary: {
-    gap: 2,
-  },
-  brand: {
-    fontSize: 13,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: theme.color.muted,
+    gap: space.xs,
   },
   model: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...type.title,
     color: theme.color.text,
   },
   messageField: {
-    minHeight: 120,
-    textAlignVertical: 'top',
+    minHeight: 128,
+    textAlignVertical: 'top' as const,
   },
   actions: {
-    marginTop: 'auto',
-    gap: theme.space(1),
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.color.text,
+    marginTop: 'auto' as const,
+    gap: space.sm,
   },
 });

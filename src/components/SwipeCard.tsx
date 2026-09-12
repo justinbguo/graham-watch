@@ -9,9 +9,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { formatPrice, formatSpecs } from '@/lib/format';
-import { theme } from '@/lib/theme';
+import type { DeckCard, SwipeDirection } from '@/lib/models';
+import { motion, radius, space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -26,6 +27,7 @@ export function SwipeCard({
   onSwipe: (direction: SwipeDirection) => void;
   isTop: boolean;
 }) {
+  const styles = useThemedStyles(cardStyles);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
@@ -43,21 +45,21 @@ export function SwipeCard({
         const direction: SwipeDirection = translateX.value > 0 ? 'right' : 'left';
         translateX.value = withTiming(
           Math.sign(translateX.value || event.velocityX) * OFF_SCREEN,
-          { duration: 180 },
+          { duration: motion.fast },
           () => scheduleOnRN(onSwipe, direction)
         );
         return;
       }
 
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
+      translateX.value = withSpring(0, motion.spring);
+      translateY.value = withSpring(0, motion.spring);
     });
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
       { translateY: translateY.value },
-      { rotate: `${interpolate(translateX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-12, 12])}deg` },
+      { rotate: `${interpolate(translateX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-10, 10])}deg` },
     ],
   }));
 
@@ -78,15 +80,15 @@ export function SwipeCard({
           <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={[styles.photo, styles.photoEmpty]}>
-            <Text style={styles.photoEmptyLabel}>No photo</Text>
+            <Text style={styles.photoEmptyLabel}>No photograph</Text>
           </View>
         )}
 
         <Animated.View style={[styles.stamp, styles.saveStamp, saveStampStyle]}>
-          <Text style={[styles.stampLabel, { color: theme.color.save }]}>SAVE</Text>
+          <Text style={[styles.stampLabel, styles.saveLabel]}>Save</Text>
         </Animated.View>
         <Animated.View style={[styles.stamp, styles.passStamp, passStampStyle]}>
-          <Text style={[styles.stampLabel, { color: theme.color.danger }]}>PASS</Text>
+          <Text style={[styles.stampLabel, styles.passLabel]}>Pass</Text>
         </Animated.View>
 
         <View style={styles.info}>
@@ -99,89 +101,107 @@ export function SwipeCard({
           <Text style={styles.meta} numberOfLines={1}>
             {formatSpecs(card)}
           </Text>
-          <Text style={styles.price}>{formatPrice(card)}</Text>
-          {card.dealer ? (
-            <Text style={styles.dealer} numberOfLines={1}>
-              {card.dealer.name}
-            </Text>
-          ) : null}
+
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(card)}</Text>
+            {card.dealer ? (
+              <Text style={styles.dealer} numberOfLines={1}>
+                {card.dealer.name}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </Animated.View>
     </GestureDetector>
   );
 }
 
-const styles = StyleSheet.create({
+const cardStyles = (theme: Theme) => ({
   card: {
     ...StyleSheet.absoluteFill,
     backgroundColor: theme.color.surface,
-    borderRadius: theme.radius * 1.5,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: theme.color.border,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   photo: {
     flex: 1,
-    backgroundColor: theme.color.bg,
+    backgroundColor: theme.color.surfaceSunken,
   },
   photoEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   photoEmptyLabel: {
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.textFaint,
   },
   info: {
-    padding: theme.space(2),
-    gap: 2,
+    padding: space.lg,
+    gap: space.xs / 2,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
   },
   brand: {
-    fontSize: 13,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: theme.color.muted,
+    ...type.eyebrow,
+    color: theme.color.textMuted,
   },
   model: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...type.title,
     color: theme.color.text,
+    paddingTop: space.xs,
   },
   meta: {
-    fontSize: 14,
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
+  priceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'baseline' as const,
+    justifyContent: 'space-between' as const,
+    gap: space.sm,
+    paddingTop: space.sm,
   },
   price: {
-    fontSize: 18,
-    fontWeight: '600',
+    ...type.price,
     color: theme.color.text,
-    paddingTop: theme.space(0.5),
   },
   dealer: {
-    fontSize: 13,
-    color: theme.color.muted,
-    paddingTop: 2,
+    ...type.caption,
+    color: theme.color.brass,
+    flexShrink: 1,
+    textAlign: 'right' as const,
   },
+  // Stamps sit over the photo, so they carry their own surface rather than
+  // relying on whatever the image happens to be behind them.
   stamp: {
-    position: 'absolute',
-    top: theme.space(3),
-    borderWidth: 3,
-    borderRadius: theme.radius / 2,
-    paddingHorizontal: theme.space(1.5),
-    paddingVertical: theme.space(0.5),
+    position: 'absolute' as const,
+    top: space.xl,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    backgroundColor: theme.color.surface,
   },
   saveStamp: {
-    left: theme.space(2),
+    left: space.lg,
     borderColor: theme.color.save,
-    transform: [{ rotate: '-14deg' }],
+    transform: [{ rotate: '-8deg' }],
   },
   passStamp: {
-    right: theme.space(2),
+    right: space.lg,
     borderColor: theme.color.danger,
-    transform: [{ rotate: '14deg' }],
+    transform: [{ rotate: '8deg' }],
   },
   stampLabel: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: 2,
+    ...type.eyebrow,
+    fontSize: 13,
+  },
+  saveLabel: {
+    color: theme.color.save,
+  },
+  passLabel: {
+    color: theme.color.danger,
   },
 });

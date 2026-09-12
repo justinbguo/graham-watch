@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react';
-import {
-  FlatList,
-  Image,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { FlatList, Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { formatPrice, formatSpecs } from '@/lib/format';
-import { theme } from '@/lib/theme';
+import type { DeckCard, SwipeDirection } from '@/lib/models';
+import { radius, space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 
-const MIN_TILE_WIDTH = 260;
-const GAP = theme.space(2);
+const MIN_TILE_WIDTH = 280;
+const GAP = space.lg;
 
 /**
  * The desktop half of the deck. Swiping is a thumb gesture, so on a wide screen
@@ -29,6 +21,7 @@ export function DeckGrid({
   cards: DeckCard[];
   onSwipe: (card: DeckCard, direction: SwipeDirection) => void;
 }) {
+  const styles = useThemedStyles(gridStyles);
   const { width } = useWindowDimensions();
   const columns = Math.max(2, Math.floor((width - GAP) / (MIN_TILE_WIDTH + GAP)));
 
@@ -88,7 +81,7 @@ export function DeckGrid({
           />
         )}
       />
-      <Text style={styles.hint}>Arrow keys to move · S to save · X to pass</Text>
+      <Text style={styles.hint}>Arrows to move · S to save · X to pass</Text>
     </>
   );
 }
@@ -106,6 +99,7 @@ function Tile({
   onSave: () => void;
   onPass: () => void;
 }) {
+  const styles = useThemedStyles(gridStyles);
   const photo = card.photos[0]?.url;
 
   return (
@@ -114,7 +108,7 @@ function Tile({
         <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
       ) : (
         <View style={[styles.photo, styles.photoEmpty]}>
-          <Text style={styles.photoEmptyLabel}>No photo</Text>
+          <Text style={styles.photoEmptyLabel}>No photograph</Text>
         </View>
       )}
 
@@ -128,27 +122,30 @@ function Tile({
         <Text style={styles.meta} numberOfLines={1}>
           {formatSpecs(card)}
         </Text>
-        <Text style={styles.price}>{formatPrice(card)}</Text>
-        {card.dealer ? (
-          <Text style={styles.dealer} numberOfLines={1}>
-            {card.dealer.name}
-          </Text>
-        ) : null}
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(card)}</Text>
+          {card.dealer ? (
+            <Text style={styles.dealer} numberOfLines={1}>
+              {card.dealer.name}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" onPress={onPass} style={styles.action}>
-          <Text style={[styles.actionLabel, { color: theme.color.danger }]}>Pass</Text>
+          <Text style={[styles.actionLabel, styles.passLabel]}>Pass</Text>
         </Pressable>
+        <View style={styles.actionDivider} />
         <Pressable accessibilityRole="button" onPress={onSave} style={styles.action}>
-          <Text style={[styles.actionLabel, { color: theme.color.save }]}>Save</Text>
+          <Text style={[styles.actionLabel, styles.saveLabel]}>Save</Text>
         </Pressable>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const gridStyles = (theme: Theme) => ({
   content: {
     padding: GAP,
     gap: GAP,
@@ -157,75 +154,94 @@ const styles = StyleSheet.create({
     gap: GAP,
   },
   hint: {
-    textAlign: 'center',
-    color: theme.color.muted,
-    fontSize: 13,
-    paddingBottom: theme.space(1.5),
+    ...type.caption,
+    color: theme.color.textFaint,
+    textAlign: 'center' as const,
+    paddingBottom: space.lg,
   },
   tile: {
     flex: 1,
     backgroundColor: theme.color.surface,
-    borderRadius: theme.radius,
-    borderWidth: 2,
+    borderRadius: radius.md,
+    borderWidth: 1,
     borderColor: theme.color.border,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   tileSelected: {
-    borderColor: theme.color.accent,
+    borderColor: theme.color.brass,
   },
   photo: {
-    width: '100%',
-    aspectRatio: 3 / 4,
-    backgroundColor: theme.color.bg,
+    width: '100%' as const,
+    aspectRatio: 4 / 5,
+    backgroundColor: theme.color.surfaceSunken,
   },
   photoEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   photoEmptyLabel: {
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.textFaint,
   },
   info: {
-    padding: theme.space(1.5),
-    gap: 2,
+    padding: space.lg,
+    gap: space.xs / 2,
   },
   brand: {
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: theme.color.muted,
+    ...type.eyebrow,
+    color: theme.color.textMuted,
   },
   model: {
+    ...type.title,
     fontSize: 18,
-    fontWeight: '700',
+    lineHeight: 24,
     color: theme.color.text,
+    paddingTop: space.xs,
   },
   meta: {
-    fontSize: 13,
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
+  priceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'baseline' as const,
+    justifyContent: 'space-between' as const,
+    gap: space.sm,
+    paddingTop: space.sm,
   },
   price: {
+    ...type.price,
     fontSize: 16,
-    fontWeight: '600',
     color: theme.color.text,
-    paddingTop: theme.space(0.5),
   },
   dealer: {
-    fontSize: 13,
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.brass,
+    flexShrink: 1,
+    textAlign: 'right' as const,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
   },
   action: {
     flex: 1,
-    paddingVertical: theme.space(1.25),
-    alignItems: 'center',
+    paddingVertical: space.md,
+    alignItems: 'center' as const,
+  },
+  actionDivider: {
+    width: 1,
+    backgroundColor: theme.color.border,
   },
   actionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...type.label,
+    fontSize: 13,
+  },
+  saveLabel: {
+    color: theme.color.save,
+  },
+  passLabel: {
+    color: theme.color.danger,
   },
 });

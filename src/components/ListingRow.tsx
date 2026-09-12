@@ -1,8 +1,9 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
-import type { DeckCard } from '@/lib/models';
 import { formatPrice } from '@/lib/format';
-import { theme } from '@/lib/theme';
+import type { DeckCard } from '@/lib/models';
+import { radius, space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 export function ListingRow({
   card,
@@ -15,6 +16,7 @@ export function ListingRow({
   onAction?: () => void;
   onLongPress?: () => void;
 }) {
+  const styles = useThemedStyles(rowStyles);
   const photo = card.photos[0]?.url;
 
   return (
@@ -41,26 +43,26 @@ export function ListingRow({
       </View>
 
       {actionLabel && onAction ? (
-        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={8}>
-          <Text style={styles.action}>{actionLabel}</Text>
+        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={12} style={styles.action}>
+          <Text style={styles.actionLabel}>{actionLabel}</Text>
         </Pressable>
       ) : null}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const rowStyles = (theme: Theme) => ({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space(1.5),
-    paddingVertical: theme.space(1.25),
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.lg,
+    paddingVertical: space.md,
   },
   thumb: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius / 1.5,
-    backgroundColor: theme.color.bg,
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: theme.color.surfaceSunken,
   },
   thumbEmpty: {
     borderWidth: 1,
@@ -71,27 +73,32 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   brand: {
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: theme.color.muted,
+    ...type.eyebrow,
+    color: theme.color.textMuted,
   },
   model: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...type.bodyStrong,
     color: theme.color.text,
+    paddingTop: space.xs / 2,
   },
   price: {
-    fontSize: 14,
+    ...type.caption,
     color: theme.color.text,
   },
   dealer: {
-    fontSize: 13,
-    color: theme.color.muted,
+    ...type.caption,
+    color: theme.color.brass,
   },
   action: {
-    fontSize: 14,
-    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: theme.color.borderStrong,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+  },
+  actionLabel: {
+    ...type.label,
+    fontSize: 13,
     color: theme.color.text,
   },
 });

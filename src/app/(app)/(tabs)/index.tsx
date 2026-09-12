@@ -1,12 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { DeckGrid } from '@/components/DeckGrid';
 import { SwipeCard } from '@/components/SwipeCard';
-import { Button, Centered, Message, Screen, Spinner } from '@/components/ui';
+import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
 import { useIsWide } from '@/lib/layout';
-import { theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
 export default function Deck() {
@@ -14,6 +15,7 @@ export default function Deck() {
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const swipe = useRecordSwipe(userId);
   const isWide = useIsWide();
+  const styles = useThemedStyles(deckStyles);
 
   if (isPending) {
     return (
@@ -38,8 +40,8 @@ export default function Deck() {
     return (
       <Screen title="Deck">
         <Centered>
-          <Text style={styles.emptyTitle}>Nothing left to swipe</Text>
-          <Message text="Import a dealer's site, or check back once more listings are approved." />
+          <Heading>Nothing left to swipe</Heading>
+          <Message text="Check back once more dealers are approved." />
           <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
         </Centered>
       </Screen>
@@ -77,20 +79,16 @@ export default function Deck() {
   );
 }
 
-const styles = StyleSheet.create({
+const deckStyles = (theme: Theme) => ({
   stage: {
     flex: 1,
-    margin: theme.space(2),
+    marginHorizontal: space.lg,
+    marginBottom: space.lg,
   },
   hint: {
-    textAlign: 'center',
-    color: theme.color.muted,
-    fontSize: 13,
-    paddingBottom: theme.space(1.5),
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.color.text,
+    ...type.caption,
+    color: theme.color.textFaint,
+    textAlign: 'center' as const,
+    paddingBottom: space.lg,
   },
 });

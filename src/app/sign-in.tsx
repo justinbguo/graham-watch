@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
 import {
@@ -10,7 +10,8 @@ import {
   signInWithGoogle,
   verifyEmailCode,
 } from '@/lib/auth';
-import { theme } from '@/lib/theme';
+import { radius, space, type, type Theme } from '@/lib/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 type Stage = 'email' | 'code';
 
@@ -20,6 +21,7 @@ export default function SignIn() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const styles = useThemedStyles(signInStyles);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -78,6 +80,7 @@ export default function SignIn() {
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
                 maxLength={6}
+                style={styles.codeField}
               />
               <Button
                 label="Sign in"
@@ -87,7 +90,7 @@ export default function SignIn() {
               />
               <Button
                 label="Use a different email"
-                variant="secondary"
+                variant="ghost"
                 onPress={() => {
                   setStage('email');
                   setCode('');
@@ -112,7 +115,7 @@ export default function SignIn() {
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                 buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                cornerRadius={theme.radius}
+                cornerRadius={radius.md}
                 style={styles.appleButton}
                 onPress={() => run(signInWithApple)}
               />
@@ -130,32 +133,36 @@ export default function SignIn() {
   );
 }
 
-const styles = StyleSheet.create({
+const signInStyles = (theme: Theme) => ({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: theme.space(3),
-    gap: theme.space(4),
+    justifyContent: 'center' as const,
+    paddingHorizontal: space.xl,
+    gap: space.xxl,
   },
   header: {
-    gap: theme.space(1),
+    gap: space.sm,
   },
   wordmark: {
-    fontSize: 40,
-    fontWeight: '700',
+    ...type.wordmark,
     color: theme.color.text,
   },
   tagline: {
-    fontSize: 16,
-    color: theme.color.muted,
+    ...type.body,
+    color: theme.color.textMuted,
   },
   form: {
-    gap: theme.space(1.5),
+    gap: space.md,
+  },
+  codeField: {
+    // A code is read back digit by digit, so give it room to breathe.
+    letterSpacing: 8,
+    textAlign: 'center' as const,
   },
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space(1.5),
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.md,
   },
   rule: {
     flex: 1,
@@ -163,8 +170,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.border,
   },
   dividerLabel: {
-    color: theme.color.muted,
-    fontSize: 13,
+    ...type.caption,
+    color: theme.color.textFaint,
   },
   appleButton: {
     height: 52,
