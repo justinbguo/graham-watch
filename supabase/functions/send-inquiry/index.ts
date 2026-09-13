@@ -147,8 +147,17 @@ Deno.serve(async (req) => {
     return json({ error: 'We have no address for this dealer yet.' }, 422);
   }
 
+  // The buyer's address is the entire point of the mail — it is the reply-to the
+  // dealer answers. Sign-in methods that carry no email (phone, and Apple when a
+  // user revokes the relay) would otherwise send "reach them at undefined" with
+  // a reply-to nobody can answer, and we would record it as sent.
+  if (!user.email) {
+    await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
+    return json({ error: 'Add an email to your profile before contacting a dealer.' }, 422);
+  }
+
   try {
-    await send(compose(inquiry, dealer.contact_email, user.email!, buyerName));
+    await send(compose(inquiry, dealer.contact_email, user.email, buyerName));
   } catch (error) {
     await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
     console.error('send-inquiry failed', error);
