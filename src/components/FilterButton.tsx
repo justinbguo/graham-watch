@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text } from 'react-native';
 
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -34,8 +34,9 @@ const buttonStyles = (theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.xs,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    paddingHorizontal: inset.chipX,
+    paddingVertical: inset.chipY,
+    minHeight: HIT_TARGET,
     borderRadius: radius.pill,
     backgroundColor: theme.color.surfaceSunken,
   },

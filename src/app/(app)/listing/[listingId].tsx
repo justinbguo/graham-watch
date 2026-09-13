@@ -1,17 +1,16 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
-import { Button, Centered, Divider, Message, Screen, Spinner } from '@/components/ui';
+import { Button, Centered, CloseButton, Divider, Message, Screen, Spinner } from '@/components/ui';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe, useUnsave } from '@/data/swipes';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
 import { formatPrice, formatSpecs, humanize } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
-import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
-import { useTheme, useThemedStyles } from '@/providers/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 function yesNo(value: boolean | null) {
   if (value == null) return null;
@@ -51,22 +50,6 @@ function Spec({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CloseButton() {
-  const styles = useThemedStyles(detailStyles);
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Close"
-      hitSlop={space.sm}
-      onPress={() => router.back()}
-      style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-      <MaterialCommunityIcons name="close" size={size.tabIcon} color={theme.color.text} />
-    </Pressable>
-  );
-}
-
 export default function ListingScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
   const { userId } = useSession();
@@ -80,7 +63,7 @@ export default function ListingScreen() {
 
   if (isPending) {
     return (
-      <Screen action={<CloseButton />}>
+      <Screen action={<CloseButton onPress={() => router.back()} />}>
         <Spinner />
       </Screen>
     );
@@ -88,7 +71,7 @@ export default function ListingScreen() {
 
   if (!card) {
     return (
-      <Screen action={<CloseButton />}>
+      <Screen action={<CloseButton onPress={() => router.back()} />}>
         <Centered>
           <Message text="That watch is no longer available." tone="error" />
           <Button label="Close" variant="secondary" onPress={() => router.back()} />
@@ -98,7 +81,7 @@ export default function ListingScreen() {
   }
 
   return (
-    <Screen title={card.brand} action={<CloseButton />}>
+    <Screen title={card.brand} action={<CloseButton onPress={() => router.back()} />}>
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.photo}>
           <PhotoCarousel
@@ -182,7 +165,7 @@ const detailStyles = (theme: Theme) => ({
   body: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxl,
-    gap: stack.related,
+    gap: stack.group,
   },
   photo: {
     aspectRatio: 1,
@@ -230,11 +213,5 @@ const detailStyles = (theme: Theme) => ({
   },
   actions: {
     gap: stack.related,
-  },
-  close: {
-    padding: space.xs,
-  },
-  pressed: {
-    opacity: 0.72,
   },
 });

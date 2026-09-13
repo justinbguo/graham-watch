@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, View } from 'react-native';
 
-import { radius, size, space, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export type DeckView = 'cards' | 'grid';
@@ -53,8 +53,10 @@ const toggleStyles = (theme: Theme) => ({
     padding: space.xs,
   },
   option: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    paddingHorizontal: inset.chipX,
+    paddingVertical: inset.chipY,
+    minHeight: HIT_TARGET,
+    justifyContent: 'center' as const,
     borderRadius: radius.pill,
   },
   optionActive: {

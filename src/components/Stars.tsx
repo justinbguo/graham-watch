@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { View } from 'react-native';
 
-import { space } from '@/lib/theme';
+import { size, space } from '@/lib/theme';
 import { useTheme } from '@/providers/theme';
 
 const POSITIONS = [0, 1, 2, 3, 4];
@@ -14,19 +14,19 @@ function glyph(rating: number, position: number) {
   return 'star-outline';
 }
 
-export function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+export function Stars({ rating }: { rating: number }) {
   const theme = useTheme();
 
   return (
     <View
       accessibilityRole="image"
       accessibilityLabel={`${rating} out of 5 stars`}
-      style={{ flexDirection: 'row', gap: space.xs / 2 }}>
+      style={{ flexDirection: 'row', gap: space.xs }}>
       {POSITIONS.map((position) => (
         <MaterialCommunityIcons
           key={position}
           name={glyph(rating, position)}
-          size={size}
+          size={size.star}
           color={theme.color.brass}
         />
       ))}

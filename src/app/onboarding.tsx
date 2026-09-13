@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Button, Eyebrow, Field, Message, Screen } from '@/components/ui';
 import { useCompleteOnboarding, useProfile } from '@/data/profile';
 import { useFacets } from '@/data/search';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -164,8 +164,9 @@ const onboardingStyles = (theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.md,
+    paddingHorizontal: inset.chipX,
+    paddingVertical: inset.chipY,
+    minHeight: HIT_TARGET,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: theme.color.border,

@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { Stars } from '@/components/Stars';
 import type { Dealer } from '@/lib/models';
-import { radius, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { placeholderReputation } from './reputation';
@@ -32,7 +32,7 @@ export function DealerPanel({ dealer }: { dealer: Pick<Dealer, 'id' | 'name' | '
       </View>
 
       <View style={styles.ratingRow}>
-        <Stars rating={reputation.rating} size={16} />
+        <Stars rating={reputation.rating} />
         <Text style={styles.rating}>
           {reputation.rating.toFixed(1)} · {reputation.reviews} reviews
         </Text>
@@ -59,7 +59,7 @@ const panelStyles = (theme: Theme) => ({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: theme.color.border,
-    padding: space.md,
+    padding: inset.card,
     gap: stack.related,
   },
   heading: {
@@ -82,7 +82,7 @@ const panelStyles = (theme: Theme) => ({
     borderColor: theme.color.borderStrong,
     borderRadius: radius.pill,
     paddingHorizontal: space.sm,
-    paddingVertical: 2,
+    paddingVertical: space.xs,
     overflow: 'hidden' as const,
   },
   ratingRow: {
@@ -100,7 +100,7 @@ const panelStyles = (theme: Theme) => ({
   },
   stat: {
     flex: 1,
-    gap: 2,
+    gap: stack.tight,
   },
   statValue: {
     ...type.bodyStrong,

@@ -168,7 +168,7 @@ const signInStyles = (theme: Theme) => ({
   },
   codeField: {
     // A code is read back digit by digit, so give it room to breathe.
-    letterSpacing: 8,
+    letterSpacing: space.sm,
     textAlign: 'center' as const,
   },
   divider: {

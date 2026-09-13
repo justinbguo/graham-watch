@@ -11,6 +11,7 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 const ICONS: Record<string, { active: IconName; idle: IconName }> = {
   index: { active: 'watch', idle: 'watch-variant' },
   search: { active: 'magnify', idle: 'magnify' },
+  source: { active: 'forum', idle: 'forum-outline' },
   saved: { active: 'bookmark', idle: 'bookmark-outline' },
   profile: { active: 'account', idle: 'account-outline' },
 };
@@ -45,6 +46,7 @@ export default function TabsLayout() {
       })}>
       <Tabs.Screen name="index" options={{ title: 'Buy' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
+      <Tabs.Screen name="source" options={{ title: 'Source' }} />
       <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>

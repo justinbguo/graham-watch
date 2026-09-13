@@ -15,6 +15,8 @@ export default function AppLayout() {
         <Stack.Screen name="photos/[listingId]" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="inquiry/[listingId]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="filters/[surface]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="sourcing/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="sourcing/[requestId]" />
       </Stack>
     </FilterProvider>
   );

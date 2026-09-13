@@ -98,17 +98,34 @@ uppercase text also loses the word shapes that make a line quick to skim.
 
 Spacing comes from `space` — `xs` 4, `sm` 8, `md` 16, `lg` 24, `xl` 32, `xxl` 48,
 `xxxl` 72. Nothing in between. If a layout needs 20px, the layout is wrong.
+The only off-scale values allowed are 1px hairlines, the 2px swipe-card edge,
+and `size.progress` (3) for photo segments.
 
 Named jobs sit on top of that scale so a screen does not guess:
 
-- `inset.screen` (24) is the page gutter. Cards use `inset.card` (also 24).
-- `inset.controlY` / `inset.controlX` pad buttons and fields. Do not use
-  `space.lg` inside a control — that token is for the page, not the chrome.
-- `stack.tight` groups a title with its caption. `stack.related` groups a field
-  with its button. `stack.section` separates unrelated blocks.
+- `inset.screen` (24) is the page gutter. Cards and nested panels use
+  `inset.card` (also 24). Sheets and full-screen modals use the same gutter —
+  a modal is still a page, not a control.
+- `inset.controlY` (8) / `inset.controlX` (16) pad buttons and text fields.
+  Never put the page gutter inside a field. A search box already sits in a 24px
+  margin; 24px more inside it leaves the cursor floating in empty chrome, and
+  two price fields side by side become unusable.
+- `inset.chipY` / `inset.chipX` pad pills (filter chips, brand picks, the
+  filter button). Same numbers as controls today, named so chips can tighten
+  later without shrinking a text field.
+- `stack.tight` groups a title with its caption. `stack.related` groups a
+  field with its button. `stack.group` (32) separates blocks inside a sheet or
+  listing. `stack.section` (48) is for a full page, not a modal.
+- A sheet's footer (Done, Send) lives outside the scroll. Do not add
+  `stack.section` or `space.xxxl` as scroll padding just to clear a sibling.
+
+Fields share `size.controlMin` (52) with buttons so a single-line input is a
+thumb target. Vertical padding is `sm` so Inter 16/24 plus padding does not
+exceed that height and then fight it. Multiline fields use
+`size.fieldMultiline` (120) and pin `textAlignVertical` to the top.
 
 The room around a watch is the product. Prefer the next larger step over
-squeezing copy in.
+squeezing copy in — on photographs and page sections, not inside inputs.
 
 Radius comes from `radius` — `sm` 8 for thumbnails and inner controls, `md` 14
 for buttons, fields, and tiles, `lg` 22 for the swipe card, `pill` for badges and
@@ -124,7 +141,7 @@ things look bloated.
 - Animation runs in Reanimated worklets on the UI thread. Never drive a frame
   from React state.
 - Every gesture needs a visible response before the network is involved. The
-  colour wash appears as the card moves, not after the row is written.
+  edge outline appears as the card moves, not after the row is written.
 
 The swipe deck is one axis. A card tracks the thumb left and right and never
 moves vertically or rotates free of that travel, because the only two answers
@@ -155,10 +172,86 @@ interface look assembled rather than designed.
 
 ## Platform
 
-The deck is a swipe stack below 900px and a browsable grid above it, because
-swiping is a thumb gesture and a mouse has no thumb. Both read the same data
-layer; only the presentation differs. Any future surface follows the same split:
-share the hooks, rewrite the layout.
+One codebase, one visual language. Web is not a separate design — it is the
+same design with room left over, and the rules below decide what we do with
+that room. The answer is almost never "stretch".
+
+### Nothing fills the window
+
+Every screen is a centred column with a ceiling, from `layout`:
+
+| Token | Width | Job |
+| --- | --- | --- |
+| `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
+| `layout.card` | 480 | The swipe stage. |
+| `layout.grid` | 1280 | The browse grid. |
+
+`Screen` applies the cap and centres itself, so a new screen is capped without
+doing anything. Pass `width` only to leave the default: the deck asks for
+`card` in swipe view and `grid` in grid view.
+
+A phone is narrower than all three, so these values change nothing on a phone.
+They exist for the case the app already supports and nobody looks at.
+
+Why each one:
+
+- Reading width is the 65-character line from the typography rules, made
+  literal. A full-window line of Inter at 16px runs past 200 characters, and
+  the eye cannot find the start of the next line.
+- A swipe card stays hand-sized. Stretched to a desktop window it is a
+  billboard, and the gesture that matches it is a shove rather than a flick.
+- The grid is the one surface that earns width, because it spends it on more
+  columns rather than on longer lines. It still stops, so tiles do not thin out
+  to a single row on an ultrawide monitor.
+
+### Size comes from measurement, not from the window
+
+Read a live size with `useWindowDimensions`, or measure the element with
+`onLayout`. Never `Dimensions.get('window')` at module scope: that is read once
+when the file is imported, and on web it is wrong the moment somebody resizes
+the browser. On a phone the bug hides, because a phone never resizes.
+
+Prefer the element to the window when the question is about the element. The
+swipe commit point is a quarter of the *card*, measured with `onLayout`, since
+the card is capped and no longer tracks the window. Distance to fly off screen
+is a window question, so that one reads `useWindowDimensions`.
+
+A grid that caps its width counts columns against the cap, not the window.
+
+### Browser chrome
+
+The scrollbar is the one piece of the interface the browser draws for us, and
+its default is a grey trough beside the photographs. It is styled down to a
+thin thumb in `borderStrong` on a transparent track, `size.scrollbar` (8) wide,
+lifting to `textFaint` on hover.
+
+Subtle, not gone. Hiding the bar outright costs the only cue for how much of a
+list is left, and `showsVerticalScrollIndicator={false}` is a blunt way to say
+it — per scroll view, and invisible from the design tokens. The rule lives in
+`applyScrollbarStyle`, which the theme provider repaints when the scheme flips
+because CSS in `document.head` is outside React's reach.
+
+### Pointer and keyboard
+
+- A swipe needs a thumb. Below `WIDE_BREAKPOINT` (900) the deck opens on cards;
+  above it, on the grid. Either view is reachable at any width — the breakpoint
+  picks the opening move, it does not lock a door.
+- Anything doable by swipe is doable without one. The grid takes arrow keys to
+  move, `s` to save, `x` to pass, and Enter to open.
+- Hover is a web-only hint and never the only signal. A control that only
+  reveals itself on hover is invisible on a touchscreen.
+- `HIT_TARGET` stays 44 on every platform. A mouse is precise, but the same
+  build runs on a tablet.
+
+### Shared hooks, separate layout
+
+Both deck views read the same data layer; only the presentation differs. Any
+future surface follows the same split: share the hooks, rewrite the layout.
+Branch on width, not on `Platform.OS` — a narrow browser window should behave
+like a phone, and a tablet is neither.
+
+`Platform.OS` is for capability, not for size: keyboard listeners, native
+modules, things that genuinely do not exist on the other platform.
 
 ## Open questions
 
@@ -168,6 +261,9 @@ Things we have not decided yet. Move them up into rules once we do.
 - Photo treatment: do listing images get a consistent crop and background?
 - An empty-state illustration, or stay typographic.
 - Haptics on swipe commit.
+- Desktop navigation. The tab bar still spans the bottom of a wide window,
+  where a sidebar is the usual answer. Capping the tab bar is not the fix —
+  a centred strip of tabs under 1200px of empty page looks stranded.
 
 ## Price is typed, everything else is a preset
 
@@ -196,8 +292,9 @@ Both reach their filters through the same funnel button in the header, carrying 
 number of choices made. The count is the point — without it, a user who filtered
 yesterday has no way to tell why the deck looks short.
 
-The panel holds no text box. Typing a brand name is a question, so it belongs on the
-search tab, where the field stays on screen.
+The panel holds no search box. Typing a brand name is a question, so it belongs on
+the search tab, where the field stays on screen. Price is the exception: two number
+fields with presets underneath, because a floor and a ceiling are amounts, not names.
 
 ## Filters
 
@@ -209,8 +306,9 @@ Only offer a filter something can match. Options come from `listing_facets`, so 
 appears once a visible listing is that brand. A filter that can only return nothing is a
 dead end the user has to reverse out of.
 
-One filter set for the whole app. Narrowing in Search and finding Buy unchanged
-would read as the filter not having applied.
+Buy and Search still filter separately. One shared set would make a search
+question wipe the queue you were halfway through, which is the thing the
+funnel on each tab exists to prevent.
 
 ## Photo carousel
 

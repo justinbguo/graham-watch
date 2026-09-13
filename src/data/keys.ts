@@ -14,4 +14,6 @@ export const keys = {
   passes: (userId: string) => ['passes', userId] as const,
   listing: (listingId: string) => ['listing', listingId] as const,
   inquiries: (userId: string) => ['inquiries', userId] as const,
+  sourcing: ['sourcing'] as const,
+  sourcingRequest: (id: string) => ['sourcing', id] as const,
 };

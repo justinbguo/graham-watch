@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { PropsWithChildren, ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -9,24 +10,43 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import {
+  HIT_TARGET,
+  inset,
+  layout,
+  radius,
+  size,
+  space,
+  stack,
+  type,
+  type LayoutWidth,
+  type Theme,
+} from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+/**
+ * Every screen is a centred column with a ceiling on its width. The header sits
+ * inside that column so a title lines up with the content under it rather than
+ * drifting off to a far corner of a desktop window.
+ */
 export function Screen({
   title,
   action,
+  width = 'reading',
   children,
-}: PropsWithChildren<{ title?: string; action?: ReactNode }>) {
+}: PropsWithChildren<{ title?: string; action?: ReactNode; width?: LayoutWidth }>) {
   const styles = useThemedStyles(screenStyles);
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      {title || action ? (
-        <View style={styles.header}>
-          {title ? <Text style={styles.title}>{title}</Text> : null}
-          {action}
-        </View>
-      ) : null}
-      {children}
+      <View style={[styles.column, { maxWidth: layout[width] }]}>
+        {title || action ? (
+          <View style={styles.header}>
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {action}
+          </View>
+        ) : null}
+        {children}
+      </View>
     </SafeAreaView>
   );
 }
@@ -117,10 +137,31 @@ export function Spinner() {
   );
 }
 
+export function CloseButton({ onPress }: { onPress: () => void }) {
+  const styles = useThemedStyles(closeStyles);
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Close"
+      hitSlop={space.sm}
+      onPress={onPress}
+      style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
+      <MaterialCommunityIcons name="close" size={size.tabIcon} color={theme.color.text} />
+    </Pressable>
+  );
+}
+
 const screenStyles = (theme: Theme) => ({
   screen: {
     flex: 1,
     backgroundColor: theme.color.background,
+  },
+  column: {
+    flex: 1,
+    width: '100%' as const,
+    alignSelf: 'center' as const,
   },
   header: {
     flexDirection: 'row' as const,
@@ -213,5 +254,17 @@ const messageStyles = (theme: Theme) => ({
     justifyContent: 'center' as const,
     padding: space.xxl,
     gap: stack.related,
+  },
+});
+
+const closeStyles = () => ({
+  close: {
+    minWidth: HIT_TARGET,
+    minHeight: HIT_TARGET,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'center' as const,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

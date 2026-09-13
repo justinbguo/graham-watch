@@ -104,8 +104,8 @@ const rowStyles = (theme: Theme) => ({
     borderWidth: 1,
     borderColor: theme.color.borderStrong,
     borderRadius: radius.pill,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.sm,
+    paddingHorizontal: inset.chipX,
+    paddingVertical: inset.chipY,
   },
   actionLabel: {
     ...type.control,

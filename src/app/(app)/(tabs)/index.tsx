@@ -111,7 +111,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Buy" action={actions}>
+      <Screen title="Buy" action={actions} width="grid">
         <DeckGrid
           cards={cards}
           onSwipe={judge}
@@ -128,7 +128,7 @@ export default function Deck() {
   const visible = cards.slice(0, 3).reverse();
 
   return (
-    <Screen title="Buy" action={actions}>
+    <Screen title="Buy" action={actions} width="card">
       <View style={styles.stage}>
         {visible.map((card, index) => (
           <SwipeCard

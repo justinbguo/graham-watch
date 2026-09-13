@@ -4,9 +4,11 @@
  */
 export {
   HIT_TARGET,
+  WIDE_BREAKPOINT,
   color as palette,
   font,
   inset,
+  layout,
   motion,
   radius,
   size,
@@ -16,6 +18,7 @@ export {
   tracking,
   type,
   type ColorScheme,
+  type LayoutWidth,
   type Theme,
   type ThemeColors,
 } from '@/lib/design';

@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -16,20 +16,20 @@ import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, motion, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
-const OFF_SCREEN = SCREEN_WIDTH * 1.5;
 const FLING_VELOCITY = 800;
 // Past the commit point the card returns a third of the finger's travel, so the
 // drag builds tension instead of running away with the thumb.
 const DRAG_RESISTANCE = 0.34;
+/** A quarter of the card's own width commits the swipe. */
+const COMMIT_FRACTION = 0.25;
+const ROTATION_DEGREES = 10;
 
 /** Finger travel in, card travel out: one to one, then elastic past the commit point. */
-function resist(travel: number) {
+function resist(travel: number, commit: number) {
   'worklet';
   const distance = Math.abs(travel);
-  if (distance <= SWIPE_THRESHOLD) return travel;
-  return Math.sign(travel) * (SWIPE_THRESHOLD + (distance - SWIPE_THRESHOLD) * DRAG_RESISTANCE);
+  if (commit <= 0 || distance <= commit) return travel;
+  return Math.sign(travel) * (commit + (distance - commit) * DRAG_RESISTANCE);
 }
 
 export function SwipeCard({
@@ -50,6 +50,14 @@ export function SwipeCard({
   // Raw finger travel, and the resisted distance the card actually moves.
   const dragX = useSharedValue(0);
   const cardX = useSharedValue(0);
+  // Measured rather than taken from `Dimensions`: the card is capped on a wide
+  // window, and a browser resize has to move the commit point with it. A
+  // module-scope snapshot is read once at import and then never updates.
+  const cardWidth = useSharedValue(0);
+  // The card leaves the window, not just its own column, so this one is a
+  // viewport question.
+  const { width: windowWidth } = useWindowDimensions();
+  const offScreen = windowWidth * 1.5;
 
   const pan = Gesture.Pan()
     .enabled(isTop)
@@ -58,17 +66,19 @@ export function SwipeCard({
     .activeOffsetX([-12, 12])
     .onChange((event) => {
       dragX.value += event.changeX;
-      cardX.value = resist(dragX.value);
+      cardX.value = resist(dragX.value, cardWidth.value * COMMIT_FRACTION);
     })
     .onEnd((event) => {
+      const commit = cardWidth.value * COMMIT_FRACTION;
       const committed =
-        Math.abs(dragX.value) > SWIPE_THRESHOLD || Math.abs(event.velocityX) > FLING_VELOCITY;
+        (commit > 0 && Math.abs(dragX.value) > commit) ||
+        Math.abs(event.velocityX) > FLING_VELOCITY;
 
       if (committed) {
         const direction: SwipeDirection =
           (dragX.value || event.velocityX) > 0 ? 'right' : 'left';
         cardX.value = withTiming(
-          direction === 'right' ? OFF_SCREEN : -OFF_SCREEN,
+          direction === 'right' ? offScreen : -offScreen,
           { duration: motion.fast, easing: Easing.out(Easing.cubic) },
           () => scheduleOnRN(onSwipe, direction)
         );
@@ -84,23 +94,37 @@ export function SwipeCard({
       });
     });
 
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: cardX.value },
-      { rotate: `${interpolate(cardX.value, [-SCREEN_WIDTH, SCREEN_WIDTH], [-10, 10])}deg` },
-    ],
-  }));
+  const cardStyle = useAnimatedStyle(() => {
+    const width = cardWidth.value;
+    return {
+      transform: [
+        { translateX: cardX.value },
+        {
+          rotate: width
+            ? `${interpolate(cardX.value, [-width, width], [-ROTATION_DEGREES, ROTATION_DEGREES])}deg`
+            : '0deg',
+        },
+      ],
+    };
+  });
 
   // One ring for both directions. It is invisible at centre, so the colour
   // swapping as the card crosses zero is never seen.
-  const edgeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(Math.abs(cardX.value), [0, SWIPE_THRESHOLD], [0, 1], 'clamp'),
-    borderColor: cardX.value > 0 ? save : danger,
-  }));
+  const edgeStyle = useAnimatedStyle(() => {
+    const commit = cardWidth.value * COMMIT_FRACTION;
+    return {
+      opacity: commit > 0 ? interpolate(Math.abs(cardX.value), [0, commit], [0, 1], 'clamp') : 0,
+      borderColor: cardX.value > 0 ? save : danger,
+    };
+  });
 
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={[styles.card, cardStyle]}>
+      <Animated.View
+        onLayout={(event) => {
+          cardWidth.value = event.nativeEvent.layout.width;
+        }}
+        style={[styles.card, cardStyle]}>
         <PhotoCarousel photos={card.photos} active={isTop} onExpand={onExpandPhoto} />
 
         <Animated.View pointerEvents="none" style={[styles.edge, edgeStyle]} />

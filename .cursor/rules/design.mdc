@@ -22,14 +22,28 @@ nobody follows.
   (brand, model, reference) is printed as imported and never re-cased.
 - An icon from outside `MaterialCommunityIcons`.
 - `save` or `danger` colour used for anything but saving and passing.
+- `Dimensions.get('window')` at module scope. It never updates on a browser
+  resize. Use `useWindowDimensions` for the viewport, `onLayout` for an element.
+- A screen, card, or text column with no maximum width. Widths come from
+  `layout`; `Screen` applies one by default.
+- `Platform.OS` used to ask how much room there is. That is a width question,
+  so branch on width. Reserve `Platform.OS` for capability.
+- `showsVerticalScrollIndicator={false}` to quiet a scrollbar. Web scrollbars
+  are already styled down in `applyScrollbarStyle`; hiding one per scroll view
+  removes the reader's only sense of how much is left.
 
 ## Always
 
 - Spread a style from `type` rather than setting size, family, or tracking by hand.
-- Use `space`, `inset`, `stack`, and `radius`. If the design needs a value that
-  is not in the scale, change the scale deliberately and write down why.
+- Use `space`, `inset`, `stack`, and `radius`. Page gutter (`inset.screen`)
+  never pads a field or chip. Sheets use `stack.group`, pages use
+  `stack.section`. If the design needs a value that is not in the scale, change
+  the scale deliberately and write down why.
 - Check both schemes. Dark mode is a warm charcoal, not an inversion.
-- Keep tappable areas at `HIT_TARGET` or give them `hitSlop`.
+- Keep tappable areas at `HIT_TARGET` or give them `hitSlop`, on every platform.
+- Check a narrow phone and a wide browser window. Resize the window: layout
+  that reads a stale size looks right until it moves.
+- Give every gesture a keyboard or pointer equivalent. A mouse has no thumb.
 
 ## When the rules do not cover it
 

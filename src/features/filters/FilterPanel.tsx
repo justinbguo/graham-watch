@@ -2,7 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Field } from '@/components/ui';
 import { useFacets } from '@/data/search';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { useFilters, type Surface } from './provider';
@@ -60,8 +60,8 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  * brand only appears once something in the deck is that brand — offering a
  * filter that can only return nothing is a dead end the user has to back out of.
  *
- * No text box here. Typing a brand name is a question, and questions belong on
- * the search tab; this panel is for the shape of watch you want to see.
+ * Price is two number fields with presets. There is no search box here —
+ * typing a brand name is a question, and questions belong on the search tab.
  */
 export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
@@ -235,8 +235,8 @@ const panelStyles = (theme: Theme) => ({
   },
   content: {
     paddingHorizontal: inset.screen,
-    paddingBottom: space.xxxl,
-    gap: stack.section,
+    paddingBottom: space.md,
+    gap: stack.group,
   },
   group: {
     gap: stack.tight,
@@ -279,8 +279,10 @@ const chipStyles = (theme: Theme) => ({
     borderWidth: 1,
     borderColor: theme.color.border,
     borderRadius: radius.pill,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.sm,
+    paddingHorizontal: inset.chipX,
+    paddingVertical: inset.chipY,
+    minHeight: HIT_TARGET,
+    justifyContent: 'center' as const,
     backgroundColor: theme.color.surface,
   },
   selected: {

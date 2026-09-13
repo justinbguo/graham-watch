@@ -3,7 +3,7 @@ import { FlatList, Image, Platform, Pressable, Text, View, useWindowDimensions }
 
 import { ListingSummary } from '@/components/ListingSummary';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { radius, space, type, type Theme } from '@/lib/theme';
+import { layout, radius, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const MIN_TILE_WIDTH = 280;
@@ -25,7 +25,11 @@ export function DeckGrid({
 }) {
   const styles = useThemedStyles(gridStyles);
   const { width } = useWindowDimensions();
-  const columns = Math.max(2, Math.floor((width - GAP) / (MIN_TILE_WIDTH + GAP)));
+  // The grid is capped by its Screen column, so count columns against that
+  // ceiling. Measuring the raw window would deal a tenth column into a
+  // container that only has room for six.
+  const available = Math.min(width, layout.grid);
+  const columns = Math.max(2, Math.floor((available - GAP) / (MIN_TILE_WIDTH + GAP)));
 
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));

@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
-import { inset, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -96,7 +96,7 @@ const inquiryStyles = (theme: Theme) => ({
     flex: 1,
     paddingHorizontal: inset.screen,
     paddingBottom: inset.screen,
-    gap: stack.related,
+    gap: stack.group,
   },
   summary: {
     gap: stack.tight,
@@ -113,8 +113,9 @@ const inquiryStyles = (theme: Theme) => ({
     paddingTop: space.sm,
   },
   messageField: {
-    minHeight: 128,
+    minHeight: size.fieldMultiline,
     textAlignVertical: 'top' as const,
+    paddingTop: inset.controlY,
   },
   actions: {
     marginTop: 'auto' as const,
