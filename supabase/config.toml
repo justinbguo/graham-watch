@@ -155,7 +155,17 @@ site_url = "graham://"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["graham://", "graham://*", "exp://127.0.0.1:8081"]
+# Expo Go hands back an `exp://<host>:<port>/--/...` redirect, and the port is
+# whichever one Metro picked that day. A URL missing from this list is rejected
+# by Auth with "requested path is invalid", which reads on screen as the OAuth
+# sheet closing with nothing happening. The wildcards cover the dev machine only;
+# a real build redirects to `graham://`.
+additional_redirect_urls = [
+  "graham://",
+  "graham://*",
+  "exp://127.0.0.1:*",
+  "exp://localhost:*",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -336,7 +346,10 @@ skip_nonce_check = false
 email_optional = false
 
 [auth.external.google]
-enabled = false
+# On here and gated on the client instead. Auth reads the credentials from the
+# environment, so an empty client id leaves the provider inert rather than
+# broken, and turning Google on becomes one variable rather than two places.
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
