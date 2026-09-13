@@ -155,7 +155,25 @@ site_url = "graham://"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["graham://", "graham://*", "exp://127.0.0.1:8081"]
+# Where Auth may send someone after a magic link or an OAuth callback. Anything
+# not matched here silently falls back to site_url, which on screen is the
+# browser sheet closing with no error and no session.
+#
+# Measured against this GoTrue, not assumed:
+#   - 127.0.0.1 is allowed on any port and path without being listed, so the
+#     simulator needs no entry. `localhost` is not — it needs the two below.
+#   - Matching is glob with `.` and `/` as separators, so `*` stops at a slash
+#     and every host:port entry needs a `/**` twin for the `/--/...` path Expo Go
+#     appends.
+#   - A LAN address is refused however it is written, exact or wildcard. Google
+#     sign-in from a physical device therefore cannot reach this local stack;
+#     use the simulator, or point the phone at a hosted project.
+additional_redirect_urls = [
+  "graham://",
+  "graham://**",
+  "exp://localhost:*",
+  "exp://localhost:*/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -336,7 +354,10 @@ skip_nonce_check = false
 email_optional = false
 
 [auth.external.google]
-enabled = false
+# On here and gated on the client instead. Auth reads the credentials from the
+# environment, so an empty client id leaves the provider inert rather than
+# broken, and turning Google on becomes one variable rather than two places.
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
