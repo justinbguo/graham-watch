@@ -113,7 +113,7 @@ the name is gone for good.
 
 ## Phone
 
-Not built, deliberately. Two things have to be decided first.
+Not built, and not planned. Two reasons, either of which is enough.
 
 **A phone number is not a reply-to.** A phone-only account can swipe, save, and
 then fail at the inquiry, which is the whole funnel. Shipping phone means also
@@ -125,11 +125,12 @@ matches and the provider verified it. A phone has no email to match on, so
 signing in with Google in March and a phone number in April produces two users,
 two Saved lists, and two swipe histories, with nothing on screen explaining it.
 
-If it ships anyway, use **Twilio Verify**, not plain Twilio SMS. Verify is built
-for one-time codes and is exempt from US A2P 10DLC brand and campaign
+Google and Apple already hand over a verified address, so neither reason applies
+to them. Phone would add a step and a bill to buy nothing.
+
+If it is ever revisited: use **Twilio Verify**, not plain Twilio SMS. Verify is
+built for one-time codes and is exempt from US A2P 10DLC brand and campaign
 registration, which otherwise costs $19.50–$61 up front, $1.50–$10 a month, and
 2–7 business days of carrier review that needs an EIN and a live privacy policy.
-
-Locally you do not need any of that. `[auth.sms.test_otp]` maps fixed numbers to
-fixed codes, so the whole flow can be built and tested with no provider and no
-spend.
+Locally none of that is needed — `[auth.sms.test_otp]` maps fixed numbers to
+fixed codes, so the flow can be built and tested with no provider and no spend.
