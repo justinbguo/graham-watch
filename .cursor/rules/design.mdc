@@ -1,6 +1,6 @@
 ---
 description: Design system rules for any UI work
-globs: src/app/**/*.tsx,src/components/**/*.tsx,src/lib/theme.ts,src/lib/design.ts,src/providers/theme.tsx
+globs: src/app/**/*.tsx,src/components/**/*.tsx,src/features/**/*.tsx,src/lib/theme.ts,src/lib/design.ts,src/providers/theme.tsx
 alwaysApply: false
 ---
 
@@ -20,16 +20,64 @@ nobody follows.
 - `textTransform: 'uppercase'`, or a string literal written in caps. Copy we
   write is sentence case; only proper nouns take a capital. Dealer data
   (brand, model, reference) is printed as imported and never re-cased.
-- An icon from outside `MaterialCommunityIcons`.
+- A glyph from outside `MaterialCommunityIcons`, or a hand-picked size for one.
+  Outline when idle, solid when active, `size.icon` or `size.iconSmall`.
+- An icon-only control without an `accessibilityLabel` naming what it does.
 - `save` or `danger` colour used for anything but saving and passing.
+- A capsule radius. Controls use `radius.sm`, fields and tiles use `md`, and the
+  swipe card uses `lg`. There is no `pill` token to reach for.
+- `contentFit="contain"` on a photo frame. A browsing frame — card, tile,
+  thumbnail, detail hero — fills with `cover`. Only the full-screen viewer keeps
+  the whole photograph.
+- An outline or badge around data. An outline is the shape of a control, so a
+  dealer's name on a card is type and colour, not a box.
+- A filled button except the final `Send inquiry` action. `Button` defaults to
+  outline; callers request `solid` explicitly.
+- `Dimensions.get('window')` at module scope. It never updates on a browser
+  resize. Use `useWindowDimensions` for the viewport, `onLayout` for an element.
+- A screen, card, or text column with no maximum width. Widths come from
+  `layout`; `Screen` applies one by default.
+- `Platform.OS` used to ask how much room there is. That is a width question,
+  so branch on width. Reserve `Platform.OS` for capability.
+- `showsVerticalScrollIndicator={false}` to quiet a scrollbar. Web scrollbars
+  are already styled down in `applyScrollbarStyle`; hiding one per scroll view
+  removes the reader's only sense of how much is left.
+- A hardcoded number for a notch, Dynamic Island, or home indicator. Insets
+  come from `react-native-safe-area-context`.
+- A guess at where a navigator put something. The save flight measures the
+  Saved bookmark with `measureInWindow` rather than dividing the window by the
+  tab count, and degrades to no animation until that measurement arrives.
+- A `tabBar*` styling option in the tabs layout. The bar is `TabBar`; the
+  layout declares routes, titles, icons, and `tabBarPosition`, nothing else.
+- A custom bar that changes where a tab goes. Emit `tabPress`, respect a
+  prevented default, then navigate — the navigator's own order.
 
 ## Always
 
 - Spread a style from `type` rather than setting size, family, or tracking by hand.
-- Use `space`, `inset`, `stack`, and `radius`. If the design needs a value that
-  is not in the scale, change the scale deliberately and write down why.
+- Use `space`, `inset`, `stack`, and `radius`. Page gutter (`inset.screen`)
+  never pads a field or compact option. Sheets use `stack.group`, pages use
+  `stack.section`. If the design needs a value that is not in the scale, change
+  the scale deliberately and write down why.
 - Check both schemes. Dark mode is a warm charcoal, not an inversion.
-- Keep tappable areas at `HIT_TARGET` or give them `hitSlop`.
+- Keep tappable areas at `HIT_TARGET` or give them `hitSlop`, on every platform.
+- Check a narrow phone and a wide browser window. Resize the window: layout
+  that reads a stale size looks right until it moves.
+- Pass `inTabs` to `Screen` from a screen inside `(tabs)`, and only from there.
+  A bottom tab bar owns the bottom inset; a wide left rail does not.
+- Pass `inSheet` to `Screen` from a route presented as `modal`, and only from
+  there. The sheet's card already starts below the status bar.
+- Pad safe-area insets from `useSafeAreaInsets`. `SafeAreaView` reads its own
+  position on screen and reports nothing for the top inside a `fullScreenModal`.
+- Give every gesture a keyboard or pointer equivalent. A mouse has no thumb.
+- Use `ChoiceRow` for selectable lists. Selection is a brass left rule and
+  quiet surface shift, never a filled pill cloud.
+- Render everything below a watch's price from `ListingDetails`. The deck card
+  and the listing route are two frames on one block, and the frame passes in its
+  own buttons.
+- Scroll inside a swipe card with React Native's `ScrollView`. Gesture
+  Handler's takes the whole touch on web and the card stops moving. Keep
+  `activeOffsetX` and `failOffsetY` on the pan so the two axes stay separate.
 
 ## When the rules do not cover it
 

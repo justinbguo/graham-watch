@@ -11,6 +11,7 @@ import { StyleSheet, useColorScheme } from 'react-native';
 
 import { secureStorage } from '@/lib/secureStorage';
 import { themes, type ColorScheme, type Theme } from '@/lib/theme';
+import { applyScrollbarStyle } from '@/lib/webScrollbars';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -46,6 +47,12 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   const scheme: ColorScheme =
     preference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : preference;
+
+  // The scrollbar is browser chrome, so it lives outside the React tree and has
+  // to be repainted by hand when the scheme flips.
+  useEffect(() => {
+    applyScrollbarStyle(themes[scheme]);
+  }, [scheme]);
 
   const value = useMemo(
     () => ({ theme: themes[scheme], preference, setPreference }),

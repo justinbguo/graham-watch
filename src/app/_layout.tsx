@@ -1,5 +1,6 @@
 // Imported per weight, not from the package root: the root re-exports every
 // cut and Metro then bundles unused TTFs.
+import { EBGaramond_400Regular } from '@expo-google-fonts/eb-garamond/400Regular';
 import { EBGaramond_600SemiBold } from '@expo-google-fonts/eb-garamond/600SemiBold';
 import { EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond/700Bold';
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
@@ -27,6 +28,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    EBGaramond_400Regular,
     EBGaramond_600SemiBold,
     EBGaramond_700Bold,
     Inter_400Regular,
