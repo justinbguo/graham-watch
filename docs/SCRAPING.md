@@ -1,10 +1,42 @@
 # Scraping options
 
-The importer is two steps: fetch the page as clean text, then have an LLM pull
-typed listings out of it. The fetch step is pluggable — set `SCRAPE_PROVIDER`.
-Code lives in `supabase/functions/import-listings/scrape.ts`.
+## The two halves
 
-Before either step it tries a platform adapter, which is always better when it
+A refresh is split by what it costs.
+
+**Read the catalogue** (`action: 'sync'`). Ask the shop what it sells and store
+one row per product in `source_items`, with a hash of the prose and a hash of
+everything else. Costs HTTP and nothing more, so it walks the whole shop —
+`MAX_CATALOG_ITEMS`, currently 500. Idempotent: run it twice and the second run
+writes nothing.
+
+**Publish** (`action: 'publish'`). Take a bounded slice of the queue, type each
+watch, and merge it into a listing. Costs one model call per watch whose prose
+changed. The response says how many are left and the caller calls again.
+
+That split is the whole design. Before it, one request had to read, type, and
+write everything, which capped an import at 40 watches and lost the lot if the
+invocation ran out of wall clock. Now the shop's size only decides how many
+times the caller loops, and a failed batch costs that batch.
+
+Three things follow from storing the catalogue:
+
+- **A refresh updates, it does not only insert.** A price cut on the shop's own
+  site reaches the deck. It used to be frozen at whatever it was on import day.
+- **The model runs only on reworded prose.** `text_hash` covers title and
+  description; `content_hash` also covers price, stock and photos. A price
+  change moves the second and not the first, so it is free.
+- **Hand corrections survive.** `listings.edited_fields` records every column a
+  human changed, written by a database trigger rather than by the app, and
+  `apply_source_item` skips those columns. A dealer fixes a reference number
+  once.
+
+## Fetching
+
+The fetch step is pluggable — set `SCRAPE_PROVIDER`. Code lives in
+`supabase/functions/import-listings/scrape.ts`.
+
+Before it, the reader tries a platform adapter, which is always better when it
 applies. Shopify and Squarespace exist so far; they covered three of the first four
 dealers we looked at.
 
@@ -32,18 +64,20 @@ plenty of shops leave the field blank. Currency lives in `/meta.json`, never in
 own data: title, prose, price, and the full image gallery. No markup parsing, no
 guessing which text belongs to which watch.
 
-It reads in two passes. The collection URL gives the list, then each product URL is
-fetched for the detail, because a collection entry is only what the shop chose to
-show in a grid — usually a truncated teaser and a partial gallery. The product page
-wins on conflict; collection values are the floor. A product URL is already the
-detail page, so it skips the second pass.
+It reads in two passes, and they happen at different times. The collection URL
+gives the list during the catalogue read. Each product URL is fetched later, in
+the publish batch, because a collection entry is only what the shop chose to show
+in a grid — usually a truncated teaser and a partial gallery. The product page wins
+on conflict; collection values are the floor.
+
+Hydrating during the catalogue read is what made a large Squarespace shop
+impossible: one HTTP request per watch, 300 watches, inside one invocation.
+Hydrating at publish time means only watches someone is actually adding cost a
+request, four at a time, which is ordinary traffic for the dealer.
 
 The shop's own price and currency override anything the model infers, because the
 model only ever sees prose. A `0.00` price means "enquire", not free, and is stored
 as null.
-
-This costs one HTTP request per listing. Imports are capped at 40, and requests run
-four at a time, so a dealer sees ordinary traffic.
 
 ## Finding the catalog
 
@@ -114,9 +148,26 @@ tying extraction quality to the scrape vendor.
 
 ## Pagination
 
-Not implemented. Today one URL means one page. A shop with 200 watches across 10
-pages imports only what's on the URL you paste. Crawling — Firecrawl `/v2/crawl` or
-Browserbase clicking through — is the next step if paging matters.
+Both adapters page their own feeds, to `MAX_CATALOG_ITEMS` (500). A read that
+hits the cap reports `complete: false`; running it again reads no further today,
+because paging restarts from the top — a shop with more than 500 products needs
+a cursor stored on the dealer, which is the next piece of work here.
+
+The generic scrape path still reads one page only. Crawling — Firecrawl
+`/v2/crawl` or Browserbase clicking through — is what that would need.
+
+## What a refresh costs
+
+Reading a catalogue is free: the adapters hit feeds the shop publishes anyway.
+Only extraction costs money, at roughly one `gpt-4o-mini` call per changed watch
+— on the order of a hundredth of a cent each at current prices, so a 300-watch
+first import lands around ten cents and a nightly re-read where five watches
+changed is a rounding error.
+
+The reason refreshing is still a button a dealer presses is not cost. It is that
+nobody has decided what should happen to a watch a schedule finds — publish it
+unseen, or hold it. Until that is decided, a schedule would either put
+un-reviewed extractions in front of buyers or quietly pile up a queue.
 
 ## Recommendation
 

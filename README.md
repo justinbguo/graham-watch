@@ -29,8 +29,9 @@ neither has credentials yet — see "Enabling Apple and Google" below.
 
 ## Sign-in during local development
 
-Email codes go to the local mail catcher at http://127.0.0.1:54324 rather than a real
-inbox. Enter any email, then read the 6-digit code there.
+Codes go to the local mail catcher at http://127.0.0.1:54324 rather than a real
+inbox. On the simulator or web the app reads that inbox and signs you in. On a
+physical phone, type the six digit code from Mailpit on the Mac.
 
 ## Enabling Apple and Google
 
@@ -97,7 +98,7 @@ Point the scripts at a hosted project by setting `SUPABASE_URL`,
 ## Layout
 
 ```
-src/app/            routes; (app)/(tabs) holds Deck, Saved, Profile
+src/app/            routes; (app)/(tabs) holds Buy, Search, Saved, Profile
 src/components/     SwipeCard, DeckGrid, ListingRow, shared UI primitives
 src/data/           one module per entity, TanStack Query hooks
 src/lib/            supabase client, auth, design tokens, generated types

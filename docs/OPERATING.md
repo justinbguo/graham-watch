@@ -85,11 +85,20 @@ No email ever leaves your machine. Supabase runs a fake mail server, so sign-in 
 land in Mailpit instead of a real inbox — checking Gmail will never show one.
 
 1. Type any address in the app. `a@b.c` works as well as your real one.
-2. Open http://127.0.0.1:54324 and read the 6-digit code from the newest message.
+2. On the iOS Simulator or web, wait: the app reads the code from Mailpit and
+   signs you in. Confirmation still happens; you just do not open the inbox.
+3. On a physical phone, open http://127.0.0.1:54324 on the Mac and type the
+   six digit code. The phone cannot reach Mailpit.
 
 The account is created on first use. Codes expire after an hour.
 
 ## Managing dealers
+
+Copy `scripts/.env.operator.example` to `scripts/.env.operator.local` and add the
+hosted project keys. Keep it under `scripts/` — Expo's bundler watches every
+`.env*` file in the project root and will try to parse this one as JavaScript.
+The ignored file gives operator scripts access without putting the service-role
+key in the client bundle.
 
 ```
 npm run dealers                          # who is in, and whether we can email them
@@ -118,11 +127,56 @@ it is the only thing that emails a dealer. The mail comes from Graham with the
 buyer's address as Reply-To, so the dealer's reply goes straight to them. It opens
 with the buyer's name, which is why onboarding asks for one.
 
+If the shop is unclaimed, a footer points them to sign in at `APP_ORIGIN/sign-in`
+with that same address. Claiming still happens in the app; the footer is how they
+find it, not proof they own the shop. Claimed shops get the lead only.
+
 Locally the mail lands in Mailpit (http://127.0.0.1:54324), same inbox as sign-in
 codes. In production set `RESEND_API_KEY` and the function uses Resend instead.
+`APP_ORIGIN` defaults to `https://graham.app`; set it to the deployed web origin
+so the footer link is real.
 
 A send that fails leaves the inquiry at `failed`. The buyer can try again — the
 second attempt reuses the same row rather than being told they already asked.
+
+## How a shop gets claimed
+
+A claim moves a dealer row's `claimed_by` to one account. That account can then
+read the shop's hidden listings, edit every field on them, see its inquiries, and
+refresh its catalogue. It does not change `permission` — whether a shop's watches
+reach the deck stays an operator decision, made with `npm run dealers -- approve`.
+
+Two ways in, and both prove a mailbox:
+
+1. **The address on the site.** Sign in with the address in `dealers.contact_email`
+   and the shop appears on Profile with a Claim button. The sign-in code already
+   proved that mailbox, so there is nothing more to check.
+2. **Any mailbox on the shop's domain.** Profile → Claim your shop. The dealer
+   types their website, gets a code at `whoever@their-domain.com`, and enters it.
+   This is the path for a shop that publishes `info@shop.com` but reads it from a
+   personal login, or publishes a Gmail address — the account doing the claiming
+   can be any address.
+
+Codes live 15 minutes, five wrong guesses burn one, three outstanding per shop per
+account, and a code is spendable only by the account that asked for it — so
+forwarding the email hands over nothing. `dealer_claim_codes` has RLS on and no
+policies: only the `claim-dealer` function writes it, and only
+`claim_dealer_with_code` spends it. Codes are stored as a salted SHA-256, never
+in the clear.
+
+The domain rule is the exact host with `www.` stripped, never a parent. Taking the
+registrable domain would read `goldfinger.squarespace.com` as `squarespace.com`
+and let anyone with an address there claim the shop. The cost is that a dealer at
+`shop.com` cannot use `me@mail.shop.com`; they use the published-address path.
+
+`enable_confirmations` must stay on. With it off GoTrue stamps `email_confirmed_at`
+the moment anyone posts to `/auth/v1/signup`, which made path 1 a takeover: sign up
+as the address a shop prints on its own contact page and the shop was yours.
+`dealer_accounts` and `claim_dealer` also check `email_confirmed_at` directly, so
+flipping the dashboard toggle cannot quietly reopen it.
+
+There is no way in the app to move a claim off an account. A dealer who loses the
+mailbox needs an operator to clear `claimed_by` by hand.
 
 ## What a dealer may know
 
@@ -134,6 +188,29 @@ the function refuses to run for anyone but the person who added the dealer.
 
 `npm run typecheck` and `npm run test:rls`. Both are fast. Neither proves the app
 works, but a failure in either means it does not.
+
+CI runs both on every push and pull request, plus two things that are easy to forget
+by hand:
+
+| Job | Checks |
+| --- | --- |
+| `app` | `npm run typecheck`, then a web bundle |
+| `edge functions` | `deno check` on all three functions |
+| `database` | every migration from empty, `npm run test:rls`, generated types |
+
+The bundle is there because `tsc` reads files and does not resolve the route tree. A
+screen deleted while a navigator still registers it type-checks and then fails on
+launch.
+
+The edge functions are not part of the Expo program, so `npm run typecheck` has never
+seen them. `deno check` is the only type check the import pipeline gets.
+
+The types job regenerates `database.types.ts` and fails if it differs from the
+committed file. A migration merged without `npm run db:types` means TypeScript is
+lying about your columns, and nothing else notices.
+
+The Supabase CLI is pinned in `.github/workflows/ci.yml`. Keep your local version
+matching, or the types job will disagree with you about formatting.
 
 ## Reading failures
 

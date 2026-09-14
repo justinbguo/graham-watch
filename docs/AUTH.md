@@ -17,9 +17,17 @@ its own — see "Phone" below.
 
 ## Email code
 
-`signInWithOtp` then `verifyOtp`. Six digits, no password, no link to click.
-Locally the mail lands in Mailpit at http://127.0.0.1:54324 rather than a real
-inbox, so you can sign in without an SMTP provider.
+`signInWithOtp` sends a one-use six digit code (and a fallback link). The app
+submits the code with `verifyOtp`. That is the confirmation: `email_confirmed_at`
+is set only after the code is spent, which is what stops a stranger signing up as
+a shop's published address and claiming it.
+
+Locally the mail lands in Mailpit at http://127.0.0.1:54324. When the app is
+pointed at that local stack (`127.0.0.1`, `localhost`, or Android's `10.0.2.2`),
+it reads the code from Mailpit and verifies it so the simulator never leaves the
+sign-in screen. A hosted project never does this — the gate is the Supabase URL
+host, not whether Metro is in development mode. A physical phone cannot reach
+Mailpit on the Mac; type the code from the Mailpit UI.
 
 ## Google
 
@@ -36,16 +44,22 @@ The code is written and inert. It turns on when the credentials exist.
 3. Credentials → Create credentials → OAuth client ID → **Web application**.
    Not "iOS". The flow goes through Supabase's callback, so Google is talking to
    a web server, not to the phone.
-4. Under Authorised redirect URIs add both:
+4. Under Authorised redirect URIs add:
 
    ```
-   http://127.0.0.1:54321/auth/v1/callback
-   https://<project-ref>.supabase.co/auth/v1/callback
+   http://localhost:54321/auth/v1/callback
    ```
 
-   The second one only matters once there is a hosted project.
+   Use `localhost`, not `127.0.0.1`. Google treats those as different strings,
+   and the Cloud Console often refuses to save a raw IP. The local stack is
+   already told to send this exact URI (`[auth.external.google].redirect_uri`).
+   A hosted project needs its own client, with
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
 
-### 2. Put them in `.env`
+### 2. Put them in the repo-root `.env`
+
+Not `supabase/functions/.env` — that file is for edge-function secrets.
+`supabase start` and Expo both read the `.env` next to `package.json`.
 
 ```
 SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=....apps.googleusercontent.com
@@ -87,7 +101,7 @@ following where it redirected, rather than read off the matching rules:
 | `exp://127.0.0.1:<any port>/...` | Yes | Loopback is allowed without being listed |
 | `exp://localhost:8083` | Yes | From the `exp://localhost:*` entry |
 | `exp://localhost:8083/--/x` | Yes | Needs the separate `/**` entry |
-| `exp://192.168.x.x:8083` | **No** | Refused however it is written |
+| `exp://192.168.x.x:8083` | **No** | Refused however it is written. Expo Go emits this unless `preferLocalhost` is set; Auth then falls back to `graham://` and Safari says the address is invalid. |
 | `graham://`, `graham://auth/cb` | Yes | The app's own scheme |
 
 Two consequences. The simulator needs no configuration, because Metro's port
