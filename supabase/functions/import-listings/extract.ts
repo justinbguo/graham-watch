@@ -1,3 +1,4 @@
+import { TIMEOUT } from '../_shared/timeouts.ts';
 import {
   CASE_MATERIALS,
   COMPLICATIONS,
@@ -111,6 +112,15 @@ title and description come from the dealer's own product page, so everything you
 is in them. ${SHARED_RULES} Write description as one or two plain sentences drawn from
 the dealer's prose, without marketing superlatives.`;
 
+/**
+ * The extractor failed, rather than the watch being unreadable.
+ *
+ * A missing key or a rate limit fails every watch identically. Recording that
+ * against the row would bury the whole catalogue behind an error that has
+ * nothing to do with any of it, so the caller retries these instead.
+ */
+export class ExtractorUnavailable extends Error {}
+
 async function complete(
   system: string,
   user: string,
@@ -118,7 +128,7 @@ async function complete(
   schemaName: string
 ): Promise<unknown> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not set.');
+  if (!apiKey) throw new ExtractorUnavailable('OPENAI_API_KEY is not set.');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -137,15 +147,18 @@ async function complete(
         json_schema: { name: schemaName, strict: true, schema },
       },
     }),
+    signal: AbortSignal.timeout(TIMEOUT.model),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI returned ${response.status}: ${await response.text()}`);
+    throw new ExtractorUnavailable(
+      `OpenAI returned ${response.status}: ${await response.text()}`
+    );
   }
 
   const body = await response.json();
   const content = body?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('OpenAI returned no content.');
+  if (!content) throw new ExtractorUnavailable('OpenAI returned no content.');
   return JSON.parse(content);
 }
 

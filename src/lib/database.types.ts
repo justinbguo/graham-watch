@@ -34,6 +34,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      dealer_claim_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          dealer_id: string
+          email: string
+          expires_at: string
+          id: string
+          requested_by: string
+          salt: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          dealer_id: string
+          email: string
+          expires_at: string
+          id?: string
+          requested_by: string
+          salt?: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          dealer_id?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          requested_by?: string
+          salt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_claim_codes_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_claim_codes_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dealers: {
         Row: {
           claimed_by: string | null
@@ -238,6 +292,7 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
@@ -267,6 +322,7 @@ export type Database = {
           dealer_id: string
           description?: string | null
           dial_color?: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields?: string[]
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
@@ -296,6 +352,7 @@ export type Database = {
           dealer_id?: string
           description?: string | null
           dial_color?: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields?: string[]
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
@@ -371,6 +428,84 @@ export type Database = {
         }
         Relationships: []
       }
+      source_items: {
+        Row: {
+          applied_hash: string | null
+          available: boolean
+          content_hash: string
+          dealer_id: string
+          error: string | null
+          external_id: string
+          extracted: Json | null
+          extracted_hash: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          listing_id: string | null
+          photos_hash: string | null
+          provider: string
+          publish: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }
+        Insert: {
+          applied_hash?: string | null
+          available?: boolean
+          content_hash: string
+          dealer_id: string
+          error?: string | null
+          external_id: string
+          extracted?: Json | null
+          extracted_hash?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          listing_id?: string | null
+          photos_hash?: string | null
+          provider: string
+          publish?: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }
+        Update: {
+          applied_hash?: string | null
+          available?: boolean
+          content_hash?: string
+          dealer_id?: string
+          error?: string | null
+          external_id?: string
+          extracted?: Json | null
+          extracted_hash?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          listing_id?: string | null
+          photos_hash?: string | null
+          provider?: string
+          publish?: boolean
+          raw?: Json
+          source_url?: string
+          text_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_items_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       swipes: {
         Row: {
           actor_id: string
@@ -415,6 +550,49 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adopt_existing_listings: {
+        Args: { p_dealer_id: string }
+        Returns: number
+      }
+      apply_source_item: { Args: { p_source_item_id: string }; Returns: string }
+      brand_key: { Args: { p_brand: string }; Returns: string }
+      can_claim_with_email: {
+        Args: { p_dealer_id: string; p_email: string }
+        Returns: boolean
+      }
+      claim_code_limits: {
+        Args: never
+        Returns: {
+          max_attempts: number
+          max_live: number
+          ttl: string
+        }[]
+      }
+      claim_dealer: { Args: { p_dealer_id: string }; Returns: string }
+      claim_dealer_with_code: {
+        Args: { p_code: string; p_dealer_id: string }
+        Returns: string
+      }
+      dealer_accounts: {
+        Args: never
+        Returns: {
+          claimed: boolean
+          id: string
+          name: string
+          permission: Database["public"]["Enums"]["dealer_permission"]
+          website: string
+        }[]
+      }
+      dealer_claim_host: { Args: { p_website: string }; Returns: string }
+      dealer_reputation: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          joined_at: string
+          last_refreshed_at: string
+          listings_live: number
+          watches_sold: number
+        }[]
+      }
       dealer_stats: {
         Args: { p_dealer_id: string }
         Returns: {
@@ -443,6 +621,7 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
@@ -465,6 +644,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      keep_edit: {
+        Args: {
+          p_column: string
+          p_current: unknown
+          p_edited: string[]
+          p_incoming: unknown
+        }
+        Returns: unknown
+      }
       listing_facets: {
         Args: never
         Returns: {
@@ -473,6 +661,57 @@ export type Database = {
           label: string
           value: string
         }[]
+      }
+      lookup_claimable_dealer: {
+        Args: { p_website: string }
+        Returns: {
+          claim_host: string
+          claimed: boolean
+          contact_hint: string
+          id: string
+          name: string
+          website: string
+        }[]
+      }
+      pending_source_item_count: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          failed: number
+          pending: number
+        }[]
+      }
+      pending_source_items: {
+        Args: { p_dealer_id: string; p_limit?: number }
+        Returns: {
+          applied_hash: string | null
+          available: boolean
+          content_hash: string
+          dealer_id: string
+          error: string | null
+          external_id: string
+          extracted: Json | null
+          extracted_hash: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          listing_id: string | null
+          photos_hash: string | null
+          provider: string
+          publish: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "source_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      replace_listing_photos: {
+        Args: { p_listing_id: string; p_photos: Json }
+        Returns: number
       }
       search_listings: {
         Args: {
@@ -509,6 +748,7 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
@@ -531,6 +771,21 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      store_dealer_claim_code: {
+        Args: {
+          p_code: string
+          p_dealer_id: string
+          p_email: string
+          p_requested_by: string
+        }
+        Returns: string
+      }
+      sync_source_availability: {
+        Args: { p_dealer_id: string; p_seen_ids: string[] }
+        Returns: number
+      }
+      synced_listing_columns: { Args: never; Returns: string[] }
+      url_path: { Args: { p_url: string }; Returns: string }
     }
     Enums: {
       case_material:

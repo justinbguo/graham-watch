@@ -1,3 +1,5 @@
+import { TIMEOUT } from '../_shared/timeouts.ts';
+
 // Scrape providers all reduce to the same thing: a URL in, clean text out.
 // See docs/SCRAPING.md for tradeoffs.
 export type ScrapeProvider = 'firecrawl' | 'jina' | 'fetch';
@@ -20,6 +22,7 @@ async function firecrawl(url: string): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),
+    signal: AbortSignal.timeout(TIMEOUT.render),
   });
 
   if (!response.ok) {
@@ -36,6 +39,7 @@ async function jina(url: string): Promise<string> {
   const apiKey = Deno.env.get('JINA_API_KEY');
   const response = await fetch(`https://r.jina.ai/${url}`, {
     headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    signal: AbortSignal.timeout(TIMEOUT.reader),
   });
 
   // r.jina.ai used to work anonymously and no longer does.
@@ -116,6 +120,7 @@ async function plainFetch(url: string): Promise<string> {
       'User-Agent': 'GrahamBot/0.1 (+https://graham.app)',
       Accept: 'text/html,application/xhtml+xml',
     },
+    signal: AbortSignal.timeout(TIMEOUT.source),
   });
   if (!response.ok) throw new Error(`Source returned ${response.status}.`);
   return htmlToText(await response.text(), url);

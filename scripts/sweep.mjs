@@ -1,15 +1,16 @@
 /**
- * Retire listings the dealer has since sold.
+ * Re-read every shop and reconcile the deck against what it still sells.
  *
  *   npm run sweep -- https://www.craftandtailored.com
- *   npm run sweep                                        (every approved dealer)
+ *   npm run sweep                                        (every dealer)
  *
- * An import only ever adds. Without this the deck keeps offering watches that
- * sold months ago, and the first a buyer hears of it is the dealer's reply.
- * Cheap enough to run daily: one feed read per shop, no extraction.
+ * This is a catalogue read and nothing else: no model call, so it costs HTTP
+ * and is cheap enough to run daily. It retires watches the shop has sold, picks
+ * up price changes on watches already in the deck, and records anything new
+ * without publishing it — a new watch still waits for someone to tick it.
  */
 
-import { runSweep } from './_import.mjs';
+import { syncCatalog } from './_import.mjs';
 import { request, signInOperator } from './_supabase.mjs';
 
 const operator = await signInOperator();
@@ -31,15 +32,23 @@ if (!urls.length) {
 }
 
 let retired = 0;
+let changed = 0;
 
 for (const url of urls) {
   try {
-    const result = await runSweep({ sourceUrl: url, token: operator.token });
-    retired += result.sold;
-    console.log(`${url}\n  checked ${result.checked}, retired ${result.sold}`);
+    const result = await syncCatalog({ sourceUrl: url, token: operator.token });
+    retired += result.retired;
+    changed += result.changed;
+    console.log(
+      `${url}\n  read ${result.found}, ${result.changed} changed, ${result.retired} retired${
+        result.complete ? '' : ', stopped at the read limit'
+      }`
+    );
   } catch (error) {
     console.log(`${url}\n  skipped: ${error.message}`);
   }
 }
 
-console.log(`\n${retired} listing(s) retired.`);
+console.log(`\n${retired} listing(s) retired, ${changed} changed on their shop's site.`);
+console.log('Changed watches update in the deck on the next publish:');
+console.log('  npm run import -- <shop url>');

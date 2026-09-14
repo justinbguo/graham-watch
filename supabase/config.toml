@@ -236,7 +236,12 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+#
+# On is load-bearing, not hygiene. With it off, GoTrue stamps email_confirmed_at
+# the instant anyone posts to /auth/v1/signup, so a stranger could sign up as
+# info@someshop.com — an address the shop prints on its own contact page — and
+# claim that shop. Measured against this stack before it was turned on.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -261,6 +266,15 @@ otp_expiry = 3600
 [auth.email.template.magic_link]
 subject = "Your Graham sign-in code"
 content_path = "./supabase/templates/magic_link.html"
+
+# With enable_confirmations on, a brand new address gets this template instead
+# of magic_link — signInWithOtp creates the user, and the first mail is a signup
+# confirmation. Leaving it stock sends a link-only email to exactly the people
+# who have never used the app, and the code screen waits for a code that never
+# arrives.
+[auth.email.template.confirmation]
+subject = "Your Graham sign-in code"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -360,7 +374,10 @@ email_optional = false
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
-redirect_uri = ""
+# Google's console accepts `localhost` and often refuses a raw `127.0.0.1` URI.
+# The default callback is the latter, so name the former or every sign-in dies
+# with redirect_uri_mismatch before a Google account is even chosen.
+redirect_uri = "http://localhost:54321/auth/v1/callback"
 url = ""
 skip_nonce_check = true
 

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
-import { send } from './mailer.ts';
+import { send } from '../_shared/mailer.ts';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -40,11 +40,17 @@ function price(cents: number | null, currency: string | null): string {
   }).format(cents / 100);
 }
 
+function signInUrl(): string {
+  const origin = (Deno.env.get('APP_ORIGIN') ?? 'https://graham.app').replace(/\/$/, '');
+  return `${origin}/sign-in`;
+}
+
 function compose(
   inquiry: Inquiry,
   dealerEmail: string,
   buyerEmail: string,
-  buyerName: string | null
+  buyerName: string | null,
+  claimed: boolean
 ) {
   const listing = inquiry.listings!;
   const watch = [listing.brand, listing.model].filter(Boolean).join(' ') || 'a watch';
@@ -53,6 +59,16 @@ function compose(
     listing.year ? `${listing.year}` : null,
     price(listing.price_cents, listing.currency),
   ].filter(Boolean);
+
+  // Discovery only. Ownership still requires signing in as this address and
+  // tapping Claim on Profile — a link in forwarded mail must not take the shop.
+  const claimFooter = claimed
+    ? []
+    : [
+        '',
+        'This watch is listed on Graham. Sign in with this address to claim the shop and update listings:',
+        signInUrl(),
+      ];
 
   return {
     to: dealerEmail,
@@ -68,6 +84,7 @@ function compose(
       inquiry.message ? `They wrote:\n\n"${inquiry.message}"\n` : 'They did not leave a message.',
       '',
       `Reply to this email to reach ${buyerName ?? 'them'} directly at ${buyerEmail}.`,
+      ...claimFooter,
       '',
       '— Graham',
     ].join('\n'),
@@ -127,7 +144,7 @@ Deno.serve(async (req) => {
 
   const { data: dealer } = await service
     .from('dealers')
-    .select('contact_email')
+    .select('contact_email, claimed_by')
     .eq('id', inquiry.dealer_id)
     .maybeSingle();
 
@@ -157,7 +174,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    await send(compose(inquiry, dealer.contact_email, user.email, buyerName));
+    await send(
+      compose(
+        inquiry,
+        dealer.contact_email,
+        user.email,
+        buyerName,
+        dealer.claimed_by != null
+      )
+    );
   } catch (error) {
     await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
     console.error('send-inquiry failed', error);

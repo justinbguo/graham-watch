@@ -1,14 +1,9 @@
-import { mapPool } from './pool.ts';
 import { htmlToText } from './scrape.ts';
-import { fetchJson, type Json, type SourceItem } from './source.ts';
+import { fetchJson, productKey, type Json, type SourceItem } from './source.ts';
 
 // Squarespace serves originals at 4000px and several megabytes. A phone deck
 // never needs more than this, and we pay for every byte we copy into storage.
 const PHOTO_WIDTH = '1500w';
-
-// Product pages are fetched one per listing. Four at a time is brisk for us and
-// unremarkable traffic for the dealer.
-const HYDRATE_CONCURRENCY = 4;
 
 function toCents(money: Json): number | null {
   const value = Number(money?.value);
@@ -49,6 +44,8 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     : [];
 
   return {
+    // Squarespace's own item id survives a slug rename; fullUrl does not.
+    externalId: item?.id ? `squarespace:${item.id}` : productKey(sourceUrl),
     available:
       variants.length === 0 ||
       variants.some(
@@ -73,6 +70,8 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
   if (!product) return collection;
 
   return {
+    // The collection's id is what the catalogue was stored under.
+    externalId: collection.externalId,
     title: product.title || collection.title,
     text: product.text.length >= collection.text.length ? product.text : collection.text,
     // The collection's own link is the canonical one we dedupe on.
@@ -89,15 +88,21 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
   };
 }
 
-async function hydrate(items: SourceItem[]): Promise<SourceItem[]> {
-  return mapPool(items, HYDRATE_CONCURRENCY, async (item) => {
-    const url = new URL(item.sourceUrl);
-    url.searchParams.set('format', 'json');
+/**
+ * Fills in what the grid tile left out, by reading the product page itself.
+ *
+ * This is one HTTP request per watch, so it runs when a watch is about to be
+ * published rather than when the catalogue is read. Hydrating a 300-watch shop
+ * up front is 300 requests inside one invocation, which is what used to make a
+ * large shop impossible to import at all.
+ */
+export async function hydrateSquarespaceItem(item: SourceItem): Promise<SourceItem> {
+  const url = new URL(item.sourceUrl);
+  url.searchParams.set('format', 'json');
 
-    const body = await fetchJson(url);
-    const product = body?.item ? mapItem(body.item, url) : null;
-    return merge(item, product);
-  });
+  const body = await fetchJson(url);
+  const product = body?.item ? mapItem(body.item, url) : null;
+  return merge(item, product);
 }
 
 /**
@@ -117,7 +122,6 @@ export async function fetchSquarespaceItems(
   const base = new URL(sourceUrl);
   const items: SourceItem[] = [];
   let offset: number | null = null;
-  let isCollection = false;
 
   while (items.length < limit) {
     const page = new URL(base.toString());
@@ -130,7 +134,6 @@ export async function fetchSquarespaceItems(
     // A product URL answers with `item`, a collection with `items`.
     const batch = Array.isArray(body.items) ? body.items : body.item ? [body.item] : null;
     if (!batch) return items.length ? items : null;
-    isCollection ||= Array.isArray(body.items);
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
@@ -145,6 +148,7 @@ export async function fetchSquarespaceItems(
     offset = next;
   }
 
-  // A product URL was already the detail page; there is nothing deeper to read.
-  return isCollection ? hydrate(items) : items;
+  // A collection entry is only what the shop chose to show in a grid. The rest
+  // arrives later, one watch at a time, from hydrateSquarespaceItem.
+  return items;
 }

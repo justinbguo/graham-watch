@@ -1,9 +1,17 @@
+import { TIMEOUT } from '../_shared/timeouts.ts';
+
 /**
  * One watch as the dealer's own site describes it, before any model has guessed
  * at it. Every platform adapter reduces to this, so the importer never needs to
  * know which shop software it is talking to.
  */
 export type SourceItem = {
+  /**
+   * The platform's own product id where it publishes one, falling back to the
+   * URL path. Keying on the path alone meant a dealer editing a product slug
+   * read as a brand new watch, while the old one stayed on offer forever.
+   */
+  externalId: string;
   title: string;
   text: string;
   sourceUrl: string;
@@ -41,7 +49,7 @@ export async function fetchJson(url: URL): Promise<Json | null> {
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(TIMEOUT.source),
     });
     if (!response.ok) return null;
     return await response.json();

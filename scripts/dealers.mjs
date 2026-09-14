@@ -16,7 +16,7 @@
 
 import { createInterface } from 'node:readline/promises';
 
-import { formatPrice, preview, runImport } from './_import.mjs';
+import { choose, formatPrice, preview, publishAll, syncCatalog } from './_import.mjs';
 import { config, request, serviceKey, signInOperator } from './_supabase.mjs';
 import { discover } from './discover.mjs';
 
@@ -148,18 +148,31 @@ async function add() {
     return;
   }
 
-  const job = await runImport({
+  const synced = await syncCatalog({
     sourceUrl: catalogUrl,
-    limit,
     dealerName: name,
     dealerEmail: email ?? undefined,
     token: operator.token,
-    onProgress: (current) => process.stdout.write(`\r  ${current.status}…    `),
+  });
+
+  console.log(
+    `\nRead ${synced.found} watches via ${synced.provider}: ${synced.added} new, ${synced.changed} changed, ${synced.retired} retired.`
+  );
+
+  const picked = await choose({ dealerId: synced.dealerId, limit, token: operator.token });
+  console.log(`Queued ${picked}. Typing them now…`);
+
+  const totals = await publishAll({
+    dealerId: synced.dealerId,
+    token: operator.token,
+    onProgress: (current) =>
+      process.stdout.write(`\r  ${current.published} published, ${current.pending} left…    `),
   });
 
   process.stdout.write('\r');
-  console.log(`Imported ${job.listings_created} listing(s) via ${job.provider}.`);
-  if (job.error) console.log(job.error);
+  console.log(
+    `Published ${totals.published} listing(s). ${totals.skipped} skipped, ${totals.failed} failed.`
+  );
 
   await setPermission('approved', new URL(catalogUrl).hostname.replace(/^www\./, ''));
 }

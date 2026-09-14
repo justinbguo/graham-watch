@@ -1,5 +1,7 @@
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
+import { TIMEOUT } from './timeouts.ts';
+
 export type Email = {
   to: string;
   replyTo: string;
@@ -30,6 +32,7 @@ async function sendViaResend(email: Email, from: string, apiKey: string): Promis
       subject: email.subject,
       text: email.text,
     }),
+    signal: AbortSignal.timeout(TIMEOUT.mail),
   });
 
   if (!response.ok) {

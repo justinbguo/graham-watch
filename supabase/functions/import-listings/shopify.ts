@@ -1,5 +1,5 @@
 import { htmlToText } from './scrape.ts';
-import { fetchJson, type Json, type SourceItem } from './source.ts';
+import { fetchJson, productKey, type Json, type SourceItem } from './source.ts';
 
 // Shopify caps products.json at 250 per page. Imports are capped well below one
 // page, so this loop almost never runs twice.
@@ -55,11 +55,15 @@ function mapProduct(product: Json, origin: string, currency: string | null): Sou
   const variants: Json[] = Array.isArray(product?.variants) ? product.variants : [];
   const stated = variants.filter((variant: Json) => typeof variant?.available === 'boolean');
 
+  const sourceUrl = new URL(`/products/${handle}`, origin).toString();
+
   return {
+    // Shopify's numeric product id survives a handle rename; the handle does not.
+    externalId: product?.id == null ? productKey(sourceUrl) : `shopify:${product.id}`,
     available: stated.length === 0 || stated.some((variant: Json) => variant.available === true),
     title: vendor && !title.toLowerCase().includes(vendor.toLowerCase()) ? `${vendor} ${title}` : title,
     text: htmlToText(String(product?.body_html ?? ''), origin),
-    sourceUrl: new URL(`/products/${handle}`, origin).toString(),
+    sourceUrl,
     photoUrls,
     priceCents: toCents(product?.variants?.[0]),
     currency,

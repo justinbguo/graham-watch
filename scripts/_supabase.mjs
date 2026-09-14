@@ -7,6 +7,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 let cached;
 
@@ -88,12 +89,23 @@ export function serviceKey() {
 /**
  * Imports are attributed to a real user, because the edge function runs as one
  * and `listings.imported_by` points at a profile. Locally we create that
- * operator on demand; against a hosted project you supply the credentials.
+ * operator on demand. Hosted projects derive a strong operator password from
+ * the service key unless an explicit password is supplied.
  */
 export async function signInOperator() {
-  const { url, anonKey, isLocal } = config();
+  const { url, anonKey, isLocal, serviceKey } = config();
   const email = process.env.GRAHAM_OPERATOR_EMAIL ?? 'operator@graham.local';
-  const password = process.env.GRAHAM_OPERATOR_PASSWORD ?? 'graham-operator';
+  const password =
+    process.env.GRAHAM_OPERATOR_PASSWORD ??
+    (isLocal
+      ? 'graham-operator'
+      : serviceKey
+        ? createHash('sha256').update(serviceKey).digest('hex')
+        : '');
+
+  if (!password) {
+    throw new Error('GRAHAM_OPERATOR_PASSWORD or SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
 
   const signIn = async () => {
     const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
@@ -106,12 +118,12 @@ export async function signInOperator() {
 
   let session = await signIn();
 
-  if (!session.access_token && isLocal && config().serviceKey) {
+  if (!session.access_token && serviceKey) {
     await fetch(`${url}/auth/v1/admin/users`, {
       method: 'POST',
       headers: {
-        apikey: config().serviceKey,
-        Authorization: `Bearer ${config().serviceKey}`,
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email, password, email_confirm: true }),

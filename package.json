@@ -14,6 +14,7 @@
     "expo-auth-session": "~57.0.12",
     "expo-constants": "~57.0.18",
     "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",
     "expo-linking": "~57.0.10",
     "expo-network": "~57.0.2",
@@ -52,9 +53,9 @@
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --clear",
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
     "test:rls": "node scripts/test-rls.mjs",
-    "import": "node scripts/import.mjs",
-    "sweep": "node scripts/sweep.mjs",
-    "dealers": "node scripts/dealers.mjs"
+    "import": "node --env-file=scripts/.env.operator.local scripts/import.mjs",
+    "sweep": "node --env-file=scripts/.env.operator.local scripts/sweep.mjs",
+    "dealers": "node --env-file=scripts/.env.operator.local scripts/dealers.mjs"
   },
   "private": true
 }
