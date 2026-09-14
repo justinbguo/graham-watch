@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push makes the first run's answer worthless, and both runs start a
+# Supabase stack. Cancel the one nobody is waiting on.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      # Typecheck reads files; it does not resolve the route tree or the asset
+      # graph. Deleting a screen that a navigator still registers, or importing
+      # a font that is not installed, both pass tsc and fail on launch. Only a
+      # bundle catches them.
+      - name: bundle
+        run: npx expo export --platform web --output-dir "$RUNNER_TEMP/web"
+
+  functions:
+    name: edge functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # The only type check these get. They are not part of the Expo program,
+      # so `npm run typecheck` never sees them, and the import pipeline is the
+      # largest piece of untyped-in-CI code we ship.
+      #
+      # --node-modules-dir=auto lets Deno resolve `npm:@supabase/server`.
+      # --no-lock because Deno finds the root package.json and would write a
+      # lockfile describing Expo rather than these three functions.
+      - name: typecheck
+        working-directory: supabase/functions
+        run: >-
+          deno check --no-lock --node-modules-dir=auto
+          import-listings/index.ts
+          send-inquiry/index.ts
+          claim-dealer/index.ts
+
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Pinned, not `latest`. The types check below diffs generated output
+      # against the committed file, so a CLI that formats differently turns a
+      # Supabase release into a red build on an unrelated change. Bump this
+      # deliberately, and run `npm run db:types` in the same commit.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - run: npm ci
+
+      # Applies every migration in order against an empty database, which is
+      # the only thing that proves a migration written today still works on a
+      # machine that has never seen it.
+      - name: start
+        run: supabase start
+
+      # RLS is the security boundary. The anon key ships inside the app binary,
+      # so any rule these tests do not cover is a rule nobody is enforcing.
+      - name: rls
+        run: npm run test:rls
+
+      - name: generated types match the schema
+        run: |
+          npm run db:types
+          if ! git diff --quiet src/lib/database.types.ts; then
+            echo "::error file=src/lib/database.types.ts::Stale. Run 'npm run db:types' and commit the result."
+            git --no-pager diff src/lib/database.types.ts
+            exit 1
+          fi
