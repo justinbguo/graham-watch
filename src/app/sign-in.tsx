@@ -1,49 +1,14 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
-import {
-  GOOGLE_SIGN_IN_ENABLED,
-  isAppleSignInAvailable,
-  sendEmailCode,
-  signInWithApple,
-  signInWithGoogle,
-  verifyEmailCode,
-} from '@/lib/auth';
+import { useSignIn } from '@/features/auth/email';
 import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-type Stage = 'email' | 'code';
-
 export default function SignIn() {
-  const [stage, setStage] = useState<Stage>('email');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [appleAvailable, setAppleAvailable] = useState(false);
+  const signIn = useSignIn();
   const styles = useThemedStyles(signInStyles);
-
-  useEffect(() => {
-    isAppleSignInAvailable()
-      .then(setAppleAvailable)
-      .catch(() => setAppleAvailable(false));
-  }, []);
-
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-    } catch (e) {
-      // A cancelled Apple sheet is a normal outcome, not an error worth showing.
-      if (e instanceof Error && 'code' in e && e.code === 'ERR_REQUEST_CANCELED') return;
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <Screen>
@@ -52,68 +17,55 @@ export default function SignIn() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <Text style={styles.wordmark}>Graham</Text>
-          <Text style={styles.tagline}>Vintage watches, one swipe at a time.</Text>
+          <View style={styles.wordmarkRule} />
+          <Text style={styles.tagline}>Find the watch. Meet the dealer.</Text>
         </View>
 
         <View style={styles.form}>
-          {stage === 'email' ? (
+          {signIn.stage === 'email' ? (
             <>
               <Field
-                value={email}
-                onChangeText={setEmail}
+                value={signIn.email}
+                onChangeText={signIn.setEmail}
                 placeholder="you@example.com"
                 keyboardType="email-address"
                 textContentType="emailAddress"
                 autoComplete="email"
               />
               <Button
-                label="Email me a code"
-                loading={busy}
-                disabled={!email.includes('@')}
-                onPress={() =>
-                  run(async () => {
-                    await sendEmailCode(email);
-                    setStage('code');
-                  })
-                }
+                label="Email me a sign-in code"
+                loading={signIn.busy}
+                disabled={!signIn.email.includes('@')}
+                onPress={signIn.sendCode}
               />
             </>
           ) : (
             <>
-              <Message text={`We sent a 6-digit code to ${email}.`} />
+              <Button label="Back to email" variant="ghost" onPress={signIn.backToEmail} />
+              <Message text={codeMessage(signIn)} />
               <Field
-                value={code}
-                onChangeText={setCode}
-                placeholder="123456"
+                accessibilityLabel="Sign-in code"
+                value={signIn.code}
+                onChangeText={signIn.setCode}
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
+                autoComplete="one-time-code"
                 maxLength={6}
-                style={styles.codeField}
+                placeholder="123456"
               />
               <Button
                 label="Sign in"
-                loading={busy}
-                disabled={code.length < 6}
-                onPress={() => run(() => verifyEmailCode(email, code))}
-              />
-              <Button
-                label="Use a different email"
-                variant="ghost"
-                onPress={() => {
-                  setStage('email');
-                  setCode('');
-                  setError(null);
-                }}
+                loading={signIn.busy}
+                disabled={signIn.code.trim().length !== 6}
+                onPress={signIn.submitCode}
               />
             </>
           )}
 
-          {error ? <Message text={error} tone="error" /> : null}
+          {signIn.error ? <Message text={signIn.error} tone="error" /> : null}
         </View>
 
-        {/* An "or" rule with nothing under it reads as a broken screen, so the
-            whole block waits until at least one provider can actually run. */}
-        {stage === 'email' && (appleAvailable || GOOGLE_SIGN_IN_ENABLED) ? (
+        {signIn.stage === 'email' && (signIn.appleAvailable || signIn.googleEnabled) ? (
           <View style={styles.form}>
             <View style={styles.divider}>
               <View style={styles.rule} />
@@ -121,21 +73,21 @@ export default function SignIn() {
               <View style={styles.rule} />
             </View>
 
-            {appleAvailable ? (
+            {signIn.appleAvailable ? (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                 buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
                 cornerRadius={radius.md}
                 style={styles.appleButton}
-                onPress={() => run(signInWithApple)}
+                onPress={signIn.signInWithApple}
               />
             ) : null}
 
-            {GOOGLE_SIGN_IN_ENABLED ? (
+            {signIn.googleEnabled ? (
               <Button
                 label="Continue with Google"
-                variant="secondary"
-                onPress={() => run(signInWithGoogle)}
+                variant="outline"
+                onPress={signIn.signInWithGoogle}
               />
             ) : null}
           </View>
@@ -143,6 +95,13 @@ export default function SignIn() {
       </KeyboardAvoidingView>
     </Screen>
   );
+}
+
+function codeMessage(signIn: ReturnType<typeof useSignIn>): string {
+  if (signIn.readingInbox) {
+    return `Reading the local inbox for ${signIn.email}.`;
+  }
+  return `Enter the six digit code we sent to ${signIn.email}.`;
 }
 
 const signInStyles = (theme: Theme) => ({
@@ -159,17 +118,17 @@ const signInStyles = (theme: Theme) => ({
     ...type.wordmark,
     color: theme.color.text,
   },
+  wordmarkRule: {
+    width: space.xxl,
+    height: 1,
+    backgroundColor: theme.color.brass,
+  },
   tagline: {
-    ...type.body,
+    ...type.editorial,
     color: theme.color.textMuted,
   },
   form: {
     gap: stack.related,
-  },
-  codeField: {
-    // A code is read back digit by digit, so give it room to breathe.
-    letterSpacing: 8,
-    textAlign: 'center' as const,
   },
   divider: {
     flexDirection: 'row' as const,

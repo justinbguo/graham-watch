@@ -6,7 +6,11 @@ import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const redirectTo = makeRedirectUri();
+// Expo Go's default is exp://<LAN-ip>:<port>. GoTrue refuses that host and
+// silently falls back to site_url (`graham://`), which Safari reports as an
+// invalid address. preferLocalhost rewrites the IP to localhost, which we
+// measured is on the allow-list. No effect on a real build (graham://).
+export const redirectTo = makeRedirectUri({ preferLocalhost: true });
 
 export async function createSessionFromUrl(url: string) {
   const { params, errorCode } = QueryParams.getQueryParams(url);
@@ -20,7 +24,7 @@ export async function createSessionFromUrl(url: string) {
   return data.session;
 }
 
-export async function sendEmailCode(email: string) {
+export async function sendEmailLink(email: string) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
     options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
@@ -28,13 +32,18 @@ export async function sendEmailCode(email: string) {
   if (error) throw error;
 }
 
+/**
+ * The mail templates print {{ .Token }}. A brand-new address gets the signup
+ * confirmation template; a returning one gets the magic-link template. The
+ * two OTP types are not interchangeable, so try signup first and fall through.
+ */
 export async function verifyEmailCode(email: string, token: string) {
-  const { error } = await supabase.auth.verifyOtp({
-    email: email.trim(),
-    token: token.trim(),
-    type: 'email',
-  });
-  if (error) throw error;
+  const trimmed = email.trim();
+  const otp = token.trim();
+  const signup = await supabase.auth.verifyOtp({ email: trimmed, token: otp, type: 'signup' });
+  if (!signup.error) return;
+  const magic = await supabase.auth.verifyOtp({ email: trimmed, token: otp, type: 'email' });
+  if (magic.error) throw magic.error;
 }
 
 // Ask the module, not the platform. Apple Sign In is missing in Expo Go and on
@@ -90,7 +99,7 @@ export async function signInWithGoogle() {
   });
   if (error) {
     if (/not enabled/i.test(error.message)) {
-      throw new Error('Google sign-in is not set up yet. Use an email code instead.');
+      throw new Error('Google sign-in is not set up yet. Use an email link instead.');
     }
     throw error;
   }
