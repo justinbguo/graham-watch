@@ -18,7 +18,7 @@ export default function Saved() {
 
   if (isPending) {
     return (
-      <Screen title="Saved">
+      <Screen title="Saved" inTabs>
         <Spinner />
       </Screen>
     );
@@ -26,7 +26,7 @@ export default function Saved() {
 
   if (error) {
     return (
-      <Screen title="Saved">
+      <Screen title="Saved" inTabs>
         <Centered>
           <Message text={error.message} tone="error" />
         </Centered>
@@ -46,7 +46,7 @@ export default function Saved() {
   ) : null;
 
   return (
-    <Screen title="Saved" action={action}>
+    <Screen title="Saved" action={action} inTabs>
       <FlatList
         data={cards}
         keyExtractor={(item) => item.id}

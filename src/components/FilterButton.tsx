@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text } from 'react-native';
 
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -21,8 +21,8 @@ export function FilterButton({ count, onPress }: { count: number; onPress: () =>
       style={({ pressed }) => [styles.button, isActive && styles.active, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name="filter-variant"
-        size={size.tabIcon}
-        color={isActive ? theme.color.onAccent : theme.color.text}
+        size={size.icon}
+        color={isActive ? theme.color.brass : theme.color.text}
       />
       {isActive ? <Text style={styles.count}>{count}</Text> : null}
     </Pressable>
@@ -33,20 +33,24 @@ const buttonStyles = (theme: Theme) => ({
   button: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     gap: space.xs,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
-    backgroundColor: theme.color.surfaceSunken,
+    paddingHorizontal: inset.compactX,
+    paddingVertical: inset.compactY,
+    minHeight: HIT_TARGET,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: 'transparent',
   },
   active: {
-    backgroundColor: theme.color.accent,
+    borderColor: theme.color.brass,
   },
   pressed: {
     opacity: 0.72,
   },
   count: {
     ...type.control,
-    color: theme.color.onAccent,
+    color: theme.color.brass,
   },
 });

@@ -4,12 +4,12 @@ import { View } from 'react-native';
 import { Button, Screen } from '@/components/ui';
 import { FilterPanel } from '@/features/filters/FilterPanel';
 import type { Surface } from '@/features/filters/provider';
-import { inset, stack, type Theme } from '@/lib/theme';
+import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const TITLES: Record<Surface, string> = {
-  deck: 'Filter the deck',
-  search: 'Narrow the search',
+  deck: 'Filter Buy',
+  search: 'Narrow search',
 };
 
 export default function FilterSheet() {
@@ -18,7 +18,7 @@ export default function FilterSheet() {
   const target: Surface = surface === 'search' ? 'search' : 'deck';
 
   return (
-    <Screen title={TITLES[target]}>
+    <Screen title={TITLES[target]} inSheet>
       <FilterPanel surface={target} />
       <View style={styles.footer}>
         <Button label="Done" onPress={() => router.back()} />
@@ -30,7 +30,7 @@ export default function FilterSheet() {
 const sheetStyles = (_theme: Theme) => ({
   footer: {
     paddingHorizontal: inset.screen,
+    paddingTop: space.md,
     paddingBottom: inset.screen,
-    gap: stack.related,
   },
 });

@@ -1,8 +1,8 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Field } from '@/components/ui';
+import { ChoiceRow, Field } from '@/components/ui';
 import { useFacets } from '@/data/search';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { useFilters, type Surface } from './provider';
@@ -18,39 +18,12 @@ import {
   isPricePreset,
 } from './types';
 
-function Chip({
-  label,
-  selected,
-  count,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  count?: number;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(chipStyles);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.chip, selected && styles.selected, pressed && styles.pressed]}>
-      <Text style={[styles.label, selected && styles.labelSelected]}>
-        {label}
-        {count ? ` ${count}` : ''}
-      </Text>
-    </Pressable>
-  );
-}
-
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   const styles = useThemedStyles(panelStyles);
   return (
     <View style={styles.group}>
       <Text style={styles.groupTitle}>{title}</Text>
-      <View style={styles.chips}>{children}</View>
+      <View style={styles.choices}>{children}</View>
     </View>
   );
 }
@@ -60,8 +33,8 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  * brand only appears once something in the deck is that brand — offering a
  * filter that can only return nothing is a dead end the user has to back out of.
  *
- * No text box here. Typing a brand name is a question, and questions belong on
- * the search tab; this panel is for the shape of watch you want to see.
+ * Price is two number fields with presets. There is no search box here —
+ * typing a brand name is a question, and questions belong on the search tab.
  */
 export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
@@ -97,11 +70,11 @@ export function FilterPanel({ surface }: { surface: Surface }) {
         </View>
         {/* Shortcuts that fill the boxes above rather than a second, competing
             way to say the same thing. Tapping the live one empties them. */}
-        <View style={styles.chips}>
+        <View style={styles.choices}>
           {PRICE_PRESETS.map((preset) => {
             const live = isPricePreset(filters, preset);
             return (
-              <Chip
+              <ChoiceRow
                 key={preset.id}
                 label={preset.label}
                 selected={live}
@@ -116,7 +89,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
 
       <Group title="Era">
         {ERA_PRESETS.map((preset) => (
-          <Chip
+          <ChoiceRow
             key={preset.id}
             label={preset.label}
             selected={filters.era === preset.id}
@@ -127,7 +100,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
 
       <Group title="Case size">
         {SIZE_PRESETS.map((preset) => (
-          <Chip
+          <ChoiceRow
             key={preset.id}
             label={preset.label}
             selected={filters.size === preset.id}
@@ -139,7 +112,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('brand').length ? (
         <Group title="Brand">
           {of('brand').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={facet.label}
               count={facet.count}
@@ -153,7 +126,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('dealer').length > 1 ? (
         <Group title="Dealer">
           {of('dealer').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={facet.label}
               count={facet.count}
@@ -167,7 +140,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('style').length ? (
         <Group title="Style">
           {of('style').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={humanize(facet.label)}
               count={facet.count}
@@ -181,7 +154,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('case_material').length ? (
         <Group title="Case">
           {of('case_material').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={humanize(facet.label)}
               count={facet.count}
@@ -195,7 +168,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('winding').length ? (
         <Group title="Winding">
           {of('winding').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={humanize(facet.label)}
               count={facet.count}
@@ -209,7 +182,7 @@ export function FilterPanel({ surface }: { surface: Surface }) {
       {of('complication').length ? (
         <Group title="Complications">
           {of('complication').map((facet) => (
-            <Chip
+            <ChoiceRow
               key={facet.value}
               label={humanize(facet.label)}
               count={facet.count}
@@ -235,8 +208,8 @@ const panelStyles = (theme: Theme) => ({
   },
   content: {
     paddingHorizontal: inset.screen,
-    paddingBottom: space.xxxl,
-    gap: stack.section,
+    paddingBottom: space.md,
+    gap: stack.group,
   },
   group: {
     gap: stack.tight,
@@ -246,10 +219,9 @@ const panelStyles = (theme: Theme) => ({
     color: theme.color.textMuted,
     paddingBottom: space.xs,
   },
-  chips: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: space.sm,
+  choices: {
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
   },
   range: {
     flexDirection: 'row' as const,
@@ -271,30 +243,5 @@ const panelStyles = (theme: Theme) => ({
   clearLabel: {
     ...type.control,
     color: theme.color.danger,
-  },
-});
-
-const chipStyles = (theme: Theme) => ({
-  chip: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.sm,
-    backgroundColor: theme.color.surface,
-  },
-  selected: {
-    backgroundColor: theme.color.accent,
-    borderColor: theme.color.accent,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  label: {
-    ...type.control,
-    color: theme.color.text,
-  },
-  labelSelected: {
-    color: theme.color.onAccent,
   },
 });

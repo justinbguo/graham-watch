@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DeckPhoto } from '@/lib/models';
-import { motion, radius, size, space, type, type Theme } from '@/lib/theme';
+import { motion, radius, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -12,9 +12,12 @@ import { useThemedStyles } from '@/providers/theme';
  * grammar as every other card the user has met. Paging never wraps: reaching the
  * last photo and landing back on the first reads as a glitch.
  *
- * `viewer` is the same paging on a black field with the whole photo in frame,
- * for the full-screen route. On a card the photo is cropped to fill, because a
- * letterboxed watch in a deck reads as a broken image.
+ * On a card the photograph fills its frame edge to edge. A watch centred in a
+ * band of matte reads as a broken image, and the crop costs less than the
+ * letterbox: dealers shoot the watch in the middle of the frame.
+ *
+ * `viewer` is the same paging on a black field with the whole photograph in
+ * frame, for the full-screen route. That is where nothing may be cropped.
  *
  * expo-image rather than React Native's Image because these are large dealer
  * photographs and it caches them to disk; RN's Image only caches in memory, so
@@ -35,7 +38,7 @@ export function PhotoCarousel({
 }) {
   const styles = useThemedStyles(carouselStyles);
   // A card sits inside a screen that already handled the notch; the viewer fills
-  // the display and has to keep the segments out from under it itself.
+  // the display and has to keep the counter clear of the home indicator itself.
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(initialIndex);
 
@@ -71,16 +74,16 @@ export function PhotoCarousel({
         recyclingKey={current.id}
       />
 
+      {/* A plate number, not a row of story bars: it says how many shots there
+          are rather than implying it, and it stays legible on a watch shot
+          against white, which half of them are. */}
       {paged ? (
         <View
-          style={[styles.segments, variant === 'viewer' && { top: insets.top + space.sm }]}
+          style={[styles.counter, variant === 'viewer' && { bottom: insets.bottom + space.lg }]}
           pointerEvents="none">
-          {photos.map((photo, position) => (
-            <View
-              key={photo.id}
-              style={[styles.segment, position === index && styles.segmentActive]}
-            />
-          ))}
+          <Text style={styles.counterLabel}>
+            {index + 1} / {photos.length}
+          </Text>
         </View>
       ) : null}
 
@@ -132,24 +135,19 @@ const carouselStyles = (theme: Theme) => ({
     ...type.caption,
     color: theme.color.textFaint,
   },
-  // Segments, not dots: they show how much of the set is left at a glance.
-  segments: {
+  counter: {
     position: 'absolute' as const,
-    top: space.md,
-    left: space.md,
     right: space.md,
-    flexDirection: 'row' as const,
-    gap: space.xs,
+    bottom: space.md,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs / 2,
+    borderRadius: radius.sm,
+    backgroundColor: theme.color.overlay,
     zIndex: 2,
   },
-  segment: {
-    flex: 1,
-    height: size.progress,
-    borderRadius: radius.pill,
-    backgroundColor: theme.color.overlay,
-  },
-  segmentActive: {
-    backgroundColor: theme.color.surface,
+  counterLabel: {
+    ...type.control,
+    color: theme.color.onOverlay,
   },
   zones: {
     ...StyleSheet.absoluteFill,

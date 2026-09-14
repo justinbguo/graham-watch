@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { DeckGrid } from '@/components/DeckGrid';
@@ -12,6 +12,7 @@ import { useDeck, usePrimeListing } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
+import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { useIsWide } from '@/lib/layout';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, space, type Theme } from '@/lib/theme';
@@ -35,9 +36,29 @@ export default function Deck() {
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
 
+  // Where the card is on screen, which is the stage it fills. Measured here
+  // rather than in the card: the card is mid-gesture and about to unmount, and
+  // this frame is the one thing on the deck that holds still.
+  const { launch } = useSaveFlight();
+  const stage = useRef<View>(null);
+  const stageRect = useRef<Rect | null>(null);
+
+  const measureStage = useCallback(() => {
+    stage.current?.measureInWindow((x, y, width, height) => {
+      stageRect.current = { x, y, width, height };
+    });
+  }, []);
+
   // One step back, and only for a pass. A save is recoverable from the Saved
   // tab, so a right swipe retires the offer instead of queueing behind it.
-  const judge = (card: DeckCard, direction: SwipeDirection) => {
+  const judge = (card: DeckCard, direction: SwipeDirection, releaseX = 0) => {
+    // Only from the cards view: the grid saves from a tile, and flying out of
+    // the stage the deck is not currently showing would come from nowhere.
+    if (direction === 'right' && view === 'cards' && stageRect.current) {
+      const from = stageRect.current;
+      launch({ from: { ...from, x: from.x + releaseX }, photo: card.photos[0]?.url });
+    }
+
     swipe.mutate({ listingId: card.id, direction });
     setLastPass(direction === 'left' ? card : null);
   };
@@ -59,7 +80,7 @@ export default function Deck() {
 
   if (isPending) {
     return (
-      <Screen title="Buy">
+      <Screen title="Buy" inTabs>
         <Spinner />
       </Screen>
     );
@@ -67,10 +88,10 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Buy" action={actions}>
+      <Screen title="Buy" action={actions} inTabs>
         <Centered>
           <Message text={error.message} tone="error" />
-          <Button label="Try again" variant="secondary" onPress={() => refetch()} />
+          <Button label="Try again" variant="outline" onPress={() => refetch()} />
         </Centered>
       </Screen>
     );
@@ -78,7 +99,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Buy" action={actions}>
+      <Screen title="Buy" action={actions} inTabs>
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -93,16 +114,16 @@ export default function Deck() {
             }
           />
           {count ? (
-            <Button label="Clear filters" variant="secondary" onPress={clear} />
+            <Button label="Clear filters" variant="outline" onPress={clear} />
           ) : passes ? (
             <Button
               label="Start over"
-              variant="secondary"
+              variant="outline"
               loading={startOver.isPending}
               onPress={() => startOver.mutate()}
             />
           ) : (
-            <Button label="Refresh" variant="secondary" onPress={() => refetch()} />
+            <Button label="Refresh" variant="outline" onPress={() => refetch()} />
           )}
         </Centered>
       </Screen>
@@ -111,7 +132,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Buy" action={actions}>
+      <Screen title="Buy" action={actions} width="grid" inTabs>
         <DeckGrid
           cards={cards}
           onSwipe={judge}
@@ -128,18 +149,15 @@ export default function Deck() {
   const visible = cards.slice(0, 3).reverse();
 
   return (
-    <Screen title="Buy" action={actions}>
-      <View style={styles.stage}>
+    <Screen title="Buy" action={actions} width="card" inTabs>
+      <View ref={stage} onLayout={measureStage} style={styles.stage}>
         {visible.map((card, index) => (
           <SwipeCard
             key={card.id}
             card={card}
             isTop={index === visible.length - 1}
-            onSwipe={(direction) => judge(card, direction)}
-            onOpen={() => {
-              primeListing(card);
-              router.push(`/listing/${card.id}`);
-            }}
+            onSwipe={(direction, releaseX) => judge(card, direction, releaseX)}
+            onAsk={() => router.push(`/inquiry/${card.id}`)}
             onExpandPhoto={(index) => {
               primeListing(card);
               router.push(`/photos/${card.id}?index=${index}`);

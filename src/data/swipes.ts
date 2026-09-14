@@ -78,10 +78,14 @@ export function useRecordSwipe(actorId: string | null) {
         (deck ?? []).filter((card) => card.id !== listingId)
       );
     },
-    onSuccess: (_result, { direction }) => {
+    onSuccess: () => {
       if (!actorId) return;
-      const affected = direction === 'right' ? keys.saved(actorId) : keys.passes(actorId);
-      queryClient.invalidateQueries({ queryKey: affected });
+      // Both lists, whichever way the thumb went. The write is an upsert, so
+      // saving a watch from the listing screen after passing on it in the deck
+      // moves the row rather than adding one, and the count it left behind is
+      // wrong until something refetches it.
+      queryClient.invalidateQueries({ queryKey: keys.saved(actorId) });
+      queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
 }
@@ -115,6 +119,15 @@ export function useUndoPass(actorId: string | null) {
     },
     onSuccess: () => {
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
+      // Every deck but this one. Whether the watch belongs in another filter's
+      // deck is a question only the server can answer, so those are marked
+      // stale. This deck is left alone: it was patched by hand above to put the
+      // card back on top, and a refetch would re-rank it somewhere the user is
+      // not looking.
+      queryClient.invalidateQueries({
+        queryKey: ['deck'],
+        predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(deckKey),
+      });
     },
   });
 }
@@ -169,6 +182,11 @@ export function useUnsave(actorId: string | null) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: savedKey });
+      // Unsaving deletes the swipe, so the watch is unjudged again and belongs
+      // back in the deck. Without this it stays missing from every cached deck
+      // until something else forces a refetch.
+      queryClient.invalidateQueries({ queryKey: ['deck'] });
+      if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
 }

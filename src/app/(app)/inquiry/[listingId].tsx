@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
-import { inset, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -19,7 +19,7 @@ export default function InquiryScreen() {
 
   if (isPending) {
     return (
-      <Screen title="Contact dealer">
+      <Screen title="Contact dealer" inSheet>
         <Spinner />
       </Screen>
     );
@@ -27,10 +27,10 @@ export default function InquiryScreen() {
 
   if (!card) {
     return (
-      <Screen title="Contact dealer">
+      <Screen title="Contact dealer" inSheet>
         <Centered>
           <Message text="That watch is no longer available." tone="error" />
-          <Button label="Close" variant="secondary" onPress={() => router.back()} />
+          <Button label="Close" variant="outline" onPress={() => router.back()} />
         </Centered>
       </Screen>
     );
@@ -38,7 +38,7 @@ export default function InquiryScreen() {
 
   if (sendInquiry.isSuccess) {
     return (
-      <Screen title="Contact dealer">
+      <Screen title="Contact dealer" inSheet>
         <Centered>
           <Heading>Inquiry sent</Heading>
           <Message
@@ -51,7 +51,7 @@ export default function InquiryScreen() {
   }
 
   return (
-    <Screen title="Contact dealer">
+    <Screen title="Contact dealer" inSheet>
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -81,6 +81,7 @@ export default function InquiryScreen() {
         <View style={styles.actions}>
           <Button
             label="Send inquiry"
+            variant="solid"
             loading={sendInquiry.isPending}
             onPress={() => sendInquiry.mutate({ card, message })}
           />
@@ -96,7 +97,7 @@ const inquiryStyles = (theme: Theme) => ({
     flex: 1,
     paddingHorizontal: inset.screen,
     paddingBottom: inset.screen,
-    gap: stack.related,
+    gap: stack.group,
   },
   summary: {
     gap: stack.tight,
@@ -113,8 +114,9 @@ const inquiryStyles = (theme: Theme) => ({
     paddingTop: space.sm,
   },
   messageField: {
-    minHeight: 128,
+    minHeight: size.fieldMultiline,
     textAlignVertical: 'top' as const,
+    paddingTop: inset.controlY,
   },
   actions: {
     marginTop: 'auto' as const,

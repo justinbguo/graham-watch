@@ -172,6 +172,7 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
   // Demo mode is a deck to look at, and the deck never holds a sold watch.
   sold_at: null,
   availability_checked_at: null,
+  edited_fields: [],
   created_at: new Date(Date.now() - index * 86_400_000).toISOString(),
   // Three, so the carousel has something to page through in demo mode.
   photos: [0, 1, 2].map((position) => {

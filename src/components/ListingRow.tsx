@@ -103,9 +103,9 @@ const rowStyles = (theme: Theme) => ({
   action: {
     borderWidth: 1,
     borderColor: theme.color.borderStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: inset.controlX,
-    paddingVertical: space.sm,
+    borderRadius: radius.sm,
+    paddingHorizontal: inset.compactX,
+    paddingVertical: inset.compactY,
   },
   actionLabel: {
     ...type.control,

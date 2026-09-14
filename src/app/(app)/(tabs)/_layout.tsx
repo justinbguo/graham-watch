@@ -1,43 +1,39 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 
-import { size, type } from '@/lib/theme';
-import { useTheme } from '@/providers/theme';
+import { TabBar } from '@/components/TabBar';
+import { SaveTargetIcon } from '@/features/saved/flight';
+import { useIsWide } from '@/lib/layout';
+import { size } from '@/lib/theme';
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
-// One icon family, outline when idle and solid when active. Mixing families is
-// the fastest way to make a tab bar look assembled rather than designed.
+// One family, outline when idle and solid when active. Mixing families is the
+// fastest way to make a tab bar look assembled rather than designed.
 const ICONS: Record<string, { active: IconName; idle: IconName }> = {
   index: { active: 'watch', idle: 'watch-variant' },
   search: { active: 'magnify', idle: 'magnify' },
-  saved: { active: 'bookmark', idle: 'bookmark-outline' },
   profile: { active: 'account', idle: 'account-outline' },
 };
 
 export default function TabsLayout() {
-  const theme = useTheme();
+  const isWide = useIsWide();
 
   return (
     <Tabs
+      // The bar draws itself. All this layout still owns is which tabs exist,
+      // what each is called, what it shows, and which edge it sits on.
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: theme.color.text,
-        tabBarInactiveTintColor: theme.color.textFaint,
-        tabBarStyle: {
-          backgroundColor: theme.color.surface,
-          borderTopColor: theme.color.border,
-        },
-        tabBarLabelStyle: {
-          ...type.tab,
-        },
+        tabBarPosition: isWide ? 'left' : 'bottom',
         tabBarIcon: ({ color, focused }) => {
           const icon = ICONS[route.name];
           if (!icon) return null;
           return (
             <MaterialCommunityIcons
               name={focused ? icon.active : icon.idle}
-              size={size.tabIcon}
+              size={size.icon}
               color={color}
             />
           );
@@ -45,7 +41,15 @@ export default function TabsLayout() {
       })}>
       <Tabs.Screen name="index" options={{ title: 'Buy' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
-      <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: 'Saved',
+          // The bookmark draws itself so it can report where a saved card
+          // should land, which is the glyph rather than the word under it.
+          tabBarIcon: ({ color, focused }) => <SaveTargetIcon color={color} focused={focused} />,
+        }}
+      />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );

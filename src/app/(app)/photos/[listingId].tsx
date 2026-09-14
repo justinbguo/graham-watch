@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Spinner } from '@/components/ui';
 import { useListing } from '@/data/listings';
-import { radius, size, space } from '@/lib/theme';
+import { HIT_TARGET, radius, size, space } from '@/lib/theme';
 
 /**
  * The photograph on its own. No price, no dealer, no name — you long-pressed
@@ -36,7 +36,7 @@ export default function PhotoViewer() {
         hitSlop={space.sm}
         onPress={() => router.back()}
         style={[styles.close, { top: insets.top + space.sm }]}>
-        <MaterialCommunityIcons name="close" size={size.tabIcon} color="#FFFFFF" />
+        <MaterialCommunityIcons name="close" size={size.icon} color="#FFFFFF" />
       </Pressable>
     </View>
   );
@@ -51,8 +51,11 @@ const styles = StyleSheet.create({
   close: {
     position: 'absolute',
     right: space.md,
-    padding: space.sm,
-    borderRadius: radius.pill,
+    minWidth: HIT_TARGET,
+    minHeight: HIT_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });

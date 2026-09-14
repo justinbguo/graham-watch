@@ -23,6 +23,7 @@ export default function Search() {
   return (
     <Screen
       title="Search"
+      inTabs
       action={
         <FilterButton count={chipCount} onPress={() => router.push('/filters/search')} />
       }>
