@@ -40,9 +40,13 @@ export function syncCatalog({ sourceUrl, dealerId, dealerName, dealerEmail, toke
  * ones the shop has not published here yet.
  */
 export async function choose({ dealerId, limit, token }) {
+  // Zero means "publish changed listings only". Testing truthiness below used
+  // to omit `limit=0`, selecting every unpublished watch in the catalogue.
+  if (limit === 0) return 0;
+
   const available = await request(
     `/rest/v1/source_items?dealer_id=eq.${dealerId}&listing_id=is.null&available=is.true&publish=is.false&select=id&order=first_seen_at${
-      limit ? `&limit=${limit}` : ''
+      limit !== undefined ? `&limit=${limit}` : ''
     }`,
     { token }
   );
