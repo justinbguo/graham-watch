@@ -13,9 +13,11 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ListingSummary } from '@/components/ListingSummary';
+import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button } from '@/components/ui';
 import { ListingDetails } from '@/features/listings/ListingDetails';
+import { formatName } from '@/lib/format';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, motion, radius, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -27,6 +29,8 @@ const DRAG_RESISTANCE = 0.34;
 /** A quarter of the card's own width commits the swipe. */
 const COMMIT_FRACTION = 0.25;
 const ROTATION_DEGREES = 10;
+/** How strong the commit wash gets. Past this the price stops reading. */
+const WASH = 0.28;
 /** How much of the card the photograph takes, and how tall it may ever get. */
 const PHOTO_FRACTION = 0.58;
 const PHOTO_MAX_RATIO = 1.25;
@@ -166,13 +170,16 @@ export function SwipeCard({
     };
   });
 
-  // One ring for both directions. It is invisible at centre, so the colour
-  // swapping as the card crosses zero is never seen.
-  const edgeStyle = useAnimatedStyle(() => {
+  // One wash for both directions, filling the card below the photograph:
+  // nothing in this app is drawn with an outline, and a tint over the picture
+  // would colour the watch itself — a green Submariner is a different watch.
+  // It is clear at centre, so the colour swapping as the card crosses zero is
+  // never seen.
+  const washStyle = useAnimatedStyle(() => {
     const commit = cardWidth.value * COMMIT_FRACTION;
     return {
-      opacity: commit > 0 ? interpolate(Math.abs(cardX.value), [0, commit], [0, 1], 'clamp') : 0,
-      borderColor: cardX.value > 0 ? save : danger,
+      opacity: commit > 0 ? interpolate(Math.abs(cardX.value), [0, commit], [0, WASH], 'clamp') : 0,
+      backgroundColor: cardX.value > 0 ? save : danger,
     };
   });
 
@@ -196,6 +203,7 @@ export function SwipeCard({
         <ScrollView scrollEnabled={isTop} contentContainerStyle={styles.content}>
           <View style={[styles.photo, photoHeight ? { height: photoHeight } : null]}>
             <PhotoCarousel photos={card.photos} active={isTop} onExpand={onExpandPhoto} />
+            <PhotoCaption name={formatName(card)} year={card.year} />
           </View>
 
           <View style={styles.summary}>
@@ -212,7 +220,10 @@ export function SwipeCard({
           </View>
         </ScrollView>
 
-        <Animated.View pointerEvents="none" style={[styles.edge, edgeStyle]} />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.wash, { top: photoHeight }, washStyle]}
+        />
       </Animated.View>
     </GestureDetector>
   );
@@ -223,8 +234,6 @@ const cardStyles = (theme: Theme) => ({
     ...StyleSheet.absoluteFill,
     backgroundColor: theme.color.surface,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: theme.color.border,
     overflow: 'hidden' as const,
   },
   content: {
@@ -245,9 +254,10 @@ const cardStyles = (theme: Theme) => ({
   },
   // The drag reads at the edge, not across the photograph. Two pixels so the
   // tint survives against a busy image without colouring the watch itself.
-  edge: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: radius.lg,
-    borderWidth: 2,
+  wash: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });

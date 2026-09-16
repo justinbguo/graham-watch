@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
 
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatTitle } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
 import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -27,15 +27,12 @@ export function ListingRow({
       {photo ? (
         <Image source={{ uri: photo }} style={styles.thumb} contentFit="cover" />
       ) : (
-        <View style={[styles.thumb, styles.thumbEmpty]} />
+        <View style={styles.thumb} />
       )}
 
       <View style={styles.body}>
-        <Text style={styles.brand} numberOfLines={1}>
-          {card.brand}
-        </Text>
-        <Text style={styles.model} numberOfLines={1}>
-          {card.model ?? 'Unknown model'}
+        <Text style={styles.title} numberOfLines={2}>
+          {formatTitle(card)}
         </Text>
         {/* Sold replaces the price rather than sitting beside it. A number next
             to "Sold" reads as what it is going for, not what it went for. */}
@@ -71,22 +68,13 @@ const rowStyles = (theme: Theme) => ({
     borderRadius: radius.sm,
     backgroundColor: theme.color.surfaceSunken,
   },
-  thumbEmpty: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
   body: {
     flex: 1,
     gap: stack.tight,
   },
-  brand: {
-    ...type.eyebrow,
-    color: theme.color.textMuted,
-  },
-  model: {
+  title: {
     ...type.bodyStrong,
     color: theme.color.text,
-    paddingTop: space.xs,
   },
   price: {
     ...type.caption,
@@ -101,8 +89,7 @@ const rowStyles = (theme: Theme) => ({
     color: theme.color.brass,
   },
   action: {
-    borderWidth: 1,
-    borderColor: theme.color.borderStrong,
+    backgroundColor: theme.color.fill,
     borderRadius: radius.sm,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,

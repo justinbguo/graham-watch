@@ -239,8 +239,6 @@ const signInStyles = (theme: Theme) => ({
     height: size.appleButton,
   },
   roleCard: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
     borderRadius: radius.md,
     padding: inset.card,
     minHeight: HIT_TARGET,

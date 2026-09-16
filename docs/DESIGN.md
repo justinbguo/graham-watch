@@ -22,17 +22,23 @@ literal hex in a component.
 | Token | Job |
 | --- | --- |
 | `background` | The page itself |
-| `surface` | Cards, tiles, the tab bar — anything sitting on the page |
-| `surfaceSunken` | Wells that recede: image placeholders, segmented controls |
-| `border` | Hairlines between content |
-| `borderStrong` | Outlines that must hold their own, like a secondary button |
+| `surface` | The fill of anything sitting on the page: cards, tiles, the tab bar |
+| `surfaceSunken` | A well inside a fill: image placeholders, a chosen row |
+| `fill` | Anything you press or type into: buttons, toggles, inputs |
+| `border` | Hairlines *between* content, and nothing else |
+| `scrollThumb` | The web scrollbar thumb, and only that |
 | `text` | Primary reading colour |
 | `textMuted` | Supporting copy, specs, eyebrows |
 | `textFaint` | Hints and placeholders you should be able to ignore |
 | `accent` / `onAccent` | The final solid action and its text |
 | `brass` | The one warm highlight: dealer names, selected states |
 | `save` / `danger` | The two irreversible directions, and nothing else |
-| `overlay` / `onOverlay` | A scrim on a photograph and the type on it |
+| `overlay` / `onOverlay` | A flat plate on a photograph and the type on it |
+
+`scrim` sits outside the table because it is not themed: it is the fade a caption sits on
+over a photograph, dark in both schemes. It is a CSS gradient string, drawn from
+`experimental_backgroundImage` on native and `backgroundImage` on web, which is the whole
+reason `PhotoCaption` exists rather than a style in the card.
 
 Rules:
 
@@ -44,24 +50,77 @@ Rules:
   vibrates and makes photographs look blown out.
 - Contrast floor is 4.5:1 for body text, 3:1 for large text and icons.
 
+## Nothing is drawn with an outline
+
+Not a card, not a tile, not a panel, not a notice, and not a button either.
+Everything that is a thing is a block of colour, and the step between tones is
+the only thing saying where it starts and stops.
+
+Three fills do all of it:
+
+- `surface` — a thing sitting on the page: a card, a tile, the tab bar.
+- `surfaceSunken` — a recess inside one of those: an empty photo slot, a chosen
+  row. Only ever inside a container, because in the dark scheme it is darker
+  than the page and would vanish on it.
+- `fill` — a control that carries words: a button, a segmented control, an
+  input. It is the one tone that has to read against the page *and* against a
+  card, which is why it sits a shade under `surface` on paper and a shade over
+  it in the dark.
+
+An icon-only control gets none of the three. It is the glyph and nothing else:
+undo, the filter funnel, the view toggle, a close, a row's edit and hide. A
+block behind a glyph is a second shape repeating what the glyph already said,
+and three of them in a header turn a title row into a toolbar. The touch target
+is `HIT_TARGET` (44) of empty space around it, which is invisible and enough.
+
+Two consequences worth knowing. The page went a shade lighter and `surface` a
+shade warmer when the outlines came off, because a borderless card needs a real
+step against the page — about 11% in luminance, so it holds up on a dim screen
+at an angle. And `textMuted` and `brass` went a shade darker in the light scheme
+to keep their 4.5:1 on the warmer fill.
+
+Nesting goes one deep. A container inside a container takes `surfaceSunken`,
+because two blocks of the same fill stack into one block: the sold notice inside
+a card, a matched shop inside a form.
+
+State is colour, never a ring. A chosen option fills with `brass` and flips its
+label to `background`; an active toggle turns its glyph `brass`, the same as the
+tab bar. Two fills a shade apart cannot carry a choice, so selection goes to the
+accent rather than to a fourth tone nobody can see.
+
+Hairlines survive where they separate content rather than enclose it — the rule
+above a price, the divider under a `ChoiceRow`, the tab bar's top edge, the brass
+mark on a chosen row's left. A single edge is punctuation. Four edges are a box.
+
+What this costs: a fill cannot float. Depth here comes from the colour step
+alone, so a modal over a card over a page is at most two steps of contrast, and
+anything needing a third needs rethinking instead of a shadow.
+
 ## Typography
 
-Two families, and that is the whole system.
+**SF Pro**, in three weights, and that is the whole system.
 
-**EB Garamond** (display) is an old-style serif. It carries the wordmark, screen
-titles, and watch model names — the words a person came to read. **Inter** (text)
-is a grotesque: even, slightly geometric, with lining figures that prices and
-reference numbers need. Garamond for the watch, Inter for the paperwork.
+It is the system face, so nothing is bundled and nothing is loaded. On iOS the
+way to ask for it is to name no family at all: `family` is `undefined` there,
+which also gets the optical cut Apple drew for the size — SF Pro Text below
+20pt, SF Pro Display above it, with the tighter spacing and shorter ascenders
+that go with each. Naming `"SF Pro"` as a family would lose that. On web the
+stack starts at `-apple-system`, which is SF Pro on Apple hardware and the
+platform's own UI face everywhere else. Apple does not license SF Pro to ship
+off its platforms, so an Android build gets Roboto and should.
 
-Never introduce a third family. Never use a system font next to these; the
-mismatch is more visible than any weight you would gain.
+Weight does the work a second family used to. `regular` (400) is for reading,
+`semibold` (600) leads a block, `bold` (700) announces a screen. There is no
+medium: four weights put two of them within a hair of each other, and the
+choice between them turns into a coin toss on every new screen.
 
-Garamond's default tracking is wide, so display styles pull in with negative
-`letterSpacing`. Inter is already tight; body tracking is a nudge, not a clamp.
+Only the sizes above the body scale take `letterSpacing`, and only a little —
+SF tracks itself tighter as it grows. Tracking small system text is how an
+interface starts to look like a slide deck.
 
 | Style | Use |
 | --- | --- |
-| `wordmark` | "Graham" on sign-in. Once per app. |
+| `wordmark` | "Graham" on sign-in. Once per app |
 | `display` | Screen titles |
 | `title` | Watch model, section headings, empty-state headlines |
 | `editorial` | Short atmospheric copy, never paperwork |
@@ -69,7 +128,7 @@ Garamond's default tracking is wide, so display styles pull in with negative
 | `label` | Buttons |
 | `control` | Compact actions: text toggles, tile buttons |
 | `caption` | Specs, helper text, hints |
-| `price` | Prices, in Inter so digits align |
+| `price` | Prices. SF Pro's lining figures align down a column |
 | `tab` | Tab bar labels |
 | `eyebrow` | Run-in above a title — the brand, a section name |
 
@@ -79,19 +138,21 @@ Rules:
   style from `type`.
 - Line length stays around 65 characters. Past that, split the paragraph.
 - One `display` per screen. Two headlines means neither is the headline.
-- `editorial` is EB Garamond Regular for one or two short lines. Prices, fields,
-  specs, filters, and paragraphs stay Inter.
+- `editorial` is the regular weight at 20pt, for one or two short lines under a
+  title. It is not a paragraph style.
+- Weight comes from `type` too. A one-off `fontWeight` in a component is a
+  fourth weight nobody agreed to.
 
 ## Capitalization
 
 Nothing is set in all caps. No `textTransform: 'uppercase'`, no shouting string
-literals. Garamond is a book face: capitals sit too wide and too loud in it, and
-uppercase text also loses the word shapes that make a line quick to skim.
+literals. Uppercase text loses the word shapes that make a line quick to skim,
+and a row of capitals in a UI face reads as shouting rather than as a heading.
 
 - Sentence case for everything we write — headings, buttons, labels, hints.
   "Email me a sign-in code", not "EMAIL ME A SIGN-IN CODE" or "Email Me A Sign-In Code".
 - Title case only for proper nouns and the words on our own chrome that are
-  already names: the "Graham" wordmark, tab names like "Buy" and "Saved".
+  already names: the "Graham" wordmark, tab names like "Search" and "Saved".
 - The `eyebrow` separates itself from the title under it by weight and colour,
   not by capitals.
 - Listing text is dealer data, printed as imported. An initialism like IWC or a
@@ -105,12 +166,17 @@ The provisional identity is a text lockup: `Graham`, one brass hairline, then
 heritage date, seal, or generated logo to imply history the product does not
 have. The restraint is the identity until commissioned assets replace it.
 
+The wordmark is set in the system face like everything else, which is honest
+about it being provisional: a lockup in a face every other app on the phone
+also uses is a placeholder, not a mark. A drawn wordmark is the one place a
+second face would ever be worth loading.
+
 ## Space and shape
 
 Spacing comes from `space` — `xs` 4, `sm` 8, `md` 16, `lg` 24, `xl` 32, `xxl` 48,
 `xxxl` 72. Nothing in between. If a layout needs 20px, the layout is wrong.
-The only off-scale values allowed are 1px hairlines, the 2px swipe-card edge,
-and `size.rule` (2), the left edge of a chosen row.
+The only off-scale values allowed are 1px hairlines and `size.rule` (2), the
+left edge of a chosen row.
 
 Named jobs sit on top of that scale so a screen does not guess:
 
@@ -130,7 +196,7 @@ Named jobs sit on top of that scale so a screen does not guess:
   `stack.section` or `space.xxxl` as scroll padding just to clear a sibling.
 
 Fields share `size.controlMin` (52) with buttons so a single-line input is a
-thumb target. Vertical padding is `sm` so Inter 16/24 plus padding does not
+thumb target. Vertical padding is `sm` so 16/24 text plus padding does not
 exceed that height and then fight it. Multiline fields use
 `size.fieldMultiline` (120) and pin `textAlignVertical` to the top.
 
@@ -152,7 +218,7 @@ a capsule makes the app read like generic consumer SaaS.
 - Animation runs in Reanimated worklets on the UI thread. Never drive a frame
   from React state.
 - Every gesture needs a visible response before the network is involved. The
-  edge outline appears as the card moves, not after the row is written.
+  commit wash appears as the card moves, not after the row is written.
 - Crossing the swipe commit point produces one selection tick. Committing
   produces one rigid impact. Never call haptics on every gesture frame.
 
@@ -181,8 +247,8 @@ or dictation, and the gesture must remain understandable without them.
 
 ### Button hierarchy
 
-The default button is transparent with a `borderStrong` hairline. `ghost`
-removes that hairline for a subordinate way back. `solid` is reserved for the
+The default button is a `fill` block with no outline. `ghost` drops the fill
+for a subordinate way back. `solid` is reserved for the
 last irreversible handoff: `Send inquiry`. Opening the inquiry, signing in,
 posting a request, saving edits, and moving through onboarding are important,
 but filling all of them with ink turns every screen into a contest for the
@@ -237,7 +303,7 @@ They exist for the case the app already supports and nobody looks at.
 Why each one:
 
 - Reading width is the 65-character line from the typography rules, made
-  literal. A full-window line of Inter at 16px runs past 200 characters, and
+  literal. A full-window line at 16px runs past 200 characters, and
   the eye cannot find the start of the next line.
 - A swipe card stays hand-sized. Stretched to a desktop window it is a
   billboard, and the gesture that matches it is a shove rather than a flick.
@@ -305,7 +371,7 @@ full-bleed black, and it positions its own close button with `useSafeAreaInsets`
 
 The scrollbar is the one piece of the interface the browser draws for us, and
 its default is a grey trough beside the photographs. It is styled down to a
-thin thumb in `borderStrong` on a transparent track, `size.scrollbar` (8) wide,
+thin thumb in `scrollThumb` on a transparent track, `size.scrollbar` (8) wide,
 lifting to `textFaint` on hover.
 
 Subtle, not gone. Hiding the bar outright costs the only cue for how much of a
@@ -392,7 +458,7 @@ Only offer a filter something can match. Options come from `listing_facets`, so 
 appears once a visible listing is that brand. A filter that can only return nothing is a
 dead end the user has to reverse out of.
 
-Buy and Search still filter separately. One shared set would make a search
+The deck and Search still filter separately. One shared set would make a search
 question wipe the queue you were halfway through, which is the thing the
 funnel on each tab exists to prevent.
 
@@ -411,7 +477,8 @@ square because they are wayfinding, not the product view. Photo-heavy surfaces
 use `expo-image` so the same dealer image is cached rather than fetched on every
 return.
 
-The photo set is counted, not barred: `1 / 3` on a scrim in the bottom corner.
+The photo set is counted, not barred: `1 / 3` on a plate in the top right corner, above the
+watch's name at the bottom.
 Segments across the top borrowed a social app's grammar, said how far along you
 were without saying how many there are, and went invisible on the white studio
 background half of these watches are shot against. Only the top card takes taps;
@@ -427,10 +494,17 @@ in. There is one way to save and it is a swipe.
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
 A tile is half a phone wide, so it takes the type scale down a step: `titleSmall` for the
-watch name, `priceSmall` for the price. Nothing in a tile is clamped to one line. A name cut
-to "Oyster-Perpetual…" and a price squeezed beside a dealer are both answers to a question
-nobody asked, and a grid exists to be compared down a column — ragged tile heights cost less
-than missing words. On a card, where a line has room, one line is still the rule.
+watch name, `priceSmall` for the price.
+
+Maker and model are one line in one size — `formatTitle`, "Omega Speedmaster Professional,
+1972" — and that line is two lines tall whether it needs the second or not. Tiles sit two to
+a row: a name that wraps where its neighbour does not leaves the prices under it stepping,
+and a row you cannot read across is worse than a name cut to "Omega Speedmaster …". The
+brand used to be an `eyebrow` over the model, which made every tile look like a section
+heading and gave a short name and a long one different heights.
+
+The search row is set the same way, at `bodyStrong`: one name, one voice, clamped to two
+lines.
 
 ## Onboarding asks twice, and no more
 
@@ -445,6 +519,19 @@ Choosing nothing is allowed and the button says "Skip for now" when you have.
 
 The gate is `profiles.onboarded_at`, not an empty brand list: picking nothing is an
 answer, and it has to be told apart from never having been asked.
+
+## Profile is who you are, then the shop
+
+The Profile tab opens on the person: a square `size.thumb` photo beside their
+name and how many watches they have saved. Settings keeps the email, theme, and
+sign-out. Putting the name behind a cog made the tab look empty for anyone who
+had not claimed a shop.
+
+The photo is optional. Tap the tile to pick one from the library. It uses
+`radius.sm` like every other thumbnail — not a circle. A circle is a capsule,
+and capsules are the thing this system does not do. An empty tile is a sunken
+well with the account glyph, the same empty language as a listing row with no
+photograph.
 
 ## The card is the whole listing
 
@@ -478,16 +565,39 @@ row, a search result, a grid tile. It shows the same block under a bigger
 headline, and adds the Save toggle a deck card does not need — there a right
 swipe is the save.
 
-The block is set like a catalogue entry: maker as an eyebrow, the watch in the
-serif, the specification line, then a hairline rule, then the price on the left
-and the dealer's name in brass on the same baseline to the right. The rule
-separates the description from the transaction, so the eye reads the watch and
-lands on what it costs as a conclusion.
+### The name is on the photograph
+
+"Rolex Datejust, 1968", in the semibold over the bottom of the photo, with the year in the
+regular weight after the comma — a dating app puts the name and the age on the face, and this
+deck is the same act performed on watches. The first thing a card says now sits on the
+thing the eye is already looking at.
+
+The year rides with the name everywhere, not in the specification line. It is the second
+thing anyone asks about a vintage watch, and "1601 · 1968 · 36mm" made a 1968 Datejust look
+like a 2015 one. `formatTitle` carries it on a tile, a row, and the listing headline;
+`formatSpecs` is the tile's one spec line — reference and case size.
+
+Under the photograph a card says the price and the dealer, and nothing else. The reference
+and the case size are rows in the table the card scrolls to, a few lines down; printing
+either one twice inside two inches reads as filler. The listing route drops them from its
+headline for the same reason.
+
+White type never sits straight on a photograph. It sits on `scrim`, a fade to a warm black
+that is the same in both schemes, because half these watches are shot on white and a
+photograph is not themed. A fade rather than a band: a hard edge across the frame crops
+the watch a second time. The type carries a soft shadow as well, for the top of the line
+where the fade is thinnest.
+
+Under the photograph the block is set like the plate under a catalogue picture: the
+specification line, a hairline rule, then the price on the left and the dealer's name in
+brass on the same baseline to the right. The name is not repeated there — twice in two
+inches reads as a template rather than a page. The rule separates the watch from the
+transaction, so the eye lands on what it costs as a conclusion.
 
 The dealer is on the price baseline at `labelStrong`, not in an outline beside
 the maker. Who is selling it is half of what a vintage watch costs you, so it
-gets equal weight to the price — but an outline is the shape of a control, and a
-dealer's name on a card is not something you press.
+gets equal weight to the price — but a box around a name makes it look like a
+control, and a dealer's name on a card is not something you press.
 
 ## What Saved adds up to
 
@@ -612,9 +722,11 @@ A drag shows its direction in colour alone: green for save, red for pass. The wo
 and "Pass" are gone, and so is the instruction under the deck. A first swipe teaches the
 gesture faster than a caption, and the caption never stops taking up room.
 
-The colour lands on the card's edge, as a 2px outline that fades in with the drag. A tint
-across the whole card colours the watch itself, which is the one thing on screen that has
-to stay true — a green Submariner is a different watch.
+The colour fills the card below the photograph and fades in with the drag, at 0.28 by the
+commit point. It stops at the photo on purpose: a tint over the picture colours the watch
+itself, which is the one thing on screen that has to stay true — a green Submariner is a
+different watch. It is a fill rather than an edge because nothing in this app is drawn with
+an outline.
 
 ## The tab bar is ours
 

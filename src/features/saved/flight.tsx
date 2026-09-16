@@ -239,8 +239,6 @@ const flightStyles = (theme: Theme) => ({
     position: 'absolute' as const,
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: theme.color.border,
     overflow: 'hidden' as const,
   },
 });

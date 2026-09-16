@@ -240,8 +240,6 @@ const previewStyles = (theme: Theme) => ({
     backgroundColor: theme.color.surfaceSunken,
   },
   thumbEmpty: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
   },
   copy: {
     flex: 1,

@@ -8,7 +8,7 @@ import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const TITLES: Record<Surface, string> = {
-  deck: 'Filter Buy',
+  deck: 'Filter the deck',
   search: 'Narrow search',
 };
 

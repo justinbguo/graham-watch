@@ -116,8 +116,6 @@ const cardStyles = (theme: Theme) => ({
   },
   card: {
     backgroundColor: theme.color.surface,
-    borderWidth: 1,
-    borderColor: theme.color.border,
     borderRadius: radius.md,
     padding: inset.card,
     gap: stack.related,

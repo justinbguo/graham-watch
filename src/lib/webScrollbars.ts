@@ -10,7 +10,7 @@ const STYLE_ID = 'graham-scrollbars';
  * column of chrome beside the photographs, and there is no style prop for it —
  * real CSS is the only lever.
  *
- * Thin, no track, and a thumb in `borderStrong` so it registers as an edge
+ * Thin, no track, and a thumb in `scrollThumb` so it registers as an edge
  * rather than a control. It stays `size.scrollbar` wide instead of shrinking to
  * a hairline, because a mouse has to be able to grab it and `hitSlop` is a
  * native-only idea.
@@ -21,7 +21,7 @@ export function applyScrollbarStyle(theme: Theme) {
   const css = `
     * {
       scrollbar-width: thin;
-      scrollbar-color: ${theme.color.borderStrong} transparent;
+      scrollbar-color: ${theme.color.scrollThumb} transparent;
     }
     ::-webkit-scrollbar {
       width: ${size.scrollbar}px;
@@ -32,7 +32,7 @@ export function applyScrollbarStyle(theme: Theme) {
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background-color: ${theme.color.borderStrong};
+      background-color: ${theme.color.scrollThumb};
       border-radius: ${radius.lg}px;
     }
     ::-webkit-scrollbar-thumb:hover {

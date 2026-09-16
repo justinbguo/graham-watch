@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable } from 'react-native';
 
-import { HIT_TARGET, inset, radius, size, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -34,13 +34,8 @@ const buttonStyles = (theme: Theme) => ({
   button: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    paddingHorizontal: inset.compactX,
-    paddingVertical: inset.compactY,
+    minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    backgroundColor: 'transparent',
   },
   pressed: {
     opacity: 0.72,

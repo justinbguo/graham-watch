@@ -6,7 +6,7 @@ import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/compo
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe, useUnsave } from '@/data/swipes';
 import { ListingDetails } from '@/features/listings/ListingDetails';
-import { formatPrice, formatSpecs } from '@/lib/format';
+import { formatPrice, formatTitle } from '@/lib/format';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
@@ -47,7 +47,7 @@ export default function ListingScreen() {
   }
 
   return (
-    <Screen title={card.brand} action={<CloseButton onPress={() => router.back()} />}>
+    <Screen action={<CloseButton onPress={() => router.back()} />}>
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.photo}>
           <PhotoCarousel
@@ -58,8 +58,7 @@ export default function ListingScreen() {
         </View>
 
         <View style={styles.headline}>
-          <Text style={styles.model}>{card.model ?? 'Unknown model'}</Text>
-          <Text style={styles.meta}>{formatSpecs(card)}</Text>
+          <Text style={styles.model}>{formatTitle(card)}</Text>
           <Text style={styles.price}>{formatPrice(card)}</Text>
         </View>
 
@@ -112,10 +111,6 @@ const detailStyles = (theme: Theme) => ({
   model: {
     ...type.display,
     color: theme.color.text,
-  },
-  meta: {
-    ...type.caption,
-    color: theme.color.textMuted,
   },
   price: {
     ...type.price,

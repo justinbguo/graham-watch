@@ -480,25 +480,22 @@ const editorStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   option: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
     borderRadius: radius.sm,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
     minHeight: HIT_TARGET,
     justifyContent: 'center' as const,
-    backgroundColor: theme.color.surface,
+    backgroundColor: theme.color.fill,
   },
   optionSelected: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.brass,
+    backgroundColor: theme.color.brass,
   },
   optionLabel: {
     ...type.control,
     color: theme.color.text,
   },
   optionLabelSelected: {
-    color: theme.color.brass,
+    color: theme.color.background,
   },
   pressed: {
     opacity: 0.72,

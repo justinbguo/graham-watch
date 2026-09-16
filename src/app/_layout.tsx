@@ -1,12 +1,3 @@
-// Imported per weight, not from the package root: the root re-exports every
-// cut and Metro then bundles unused TTFs.
-import { EBGaramond_400Regular } from '@expo-google-fonts/eb-garamond/400Regular';
-import { EBGaramond_600SemiBold } from '@expo-google-fonts/eb-garamond/600SemiBold';
-import { EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond/700Bold';
-import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
-import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
-import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
-import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
@@ -26,19 +17,9 @@ import { ThemeProvider, useTheme } from '@/providers/theme';
 
 SplashScreen.preventAutoHideAsync();
 
+// The type is the system face, so there is nothing to load and nothing to
+// wait for. The splash stays up for the session and profile alone.
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    EBGaramond_400Regular,
-    EBGaramond_600SemiBold,
-    EBGaramond_700Bold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-  });
-
-  // A failed font load must not block the app — fall through to system faces.
-  if (!fontsLoaded && !fontError) return null;
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>

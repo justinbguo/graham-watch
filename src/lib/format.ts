@@ -31,8 +31,34 @@ export function totalPrice(cards: Priced[]): { total: string | null; onRequest: 
   return { total: formatPrice({ price_cents: cents, currency: priced[0].currency }), onRequest };
 }
 
-export function formatSpecs(card: Pick<DeckCard, 'reference' | 'year' | 'case_size_mm'>) {
-  return [card.reference, card.year, card.case_size_mm ? `${card.case_size_mm}mm` : null]
+/** "Rolex Datejust". A watch whose model never came through is just its maker. */
+export function formatName(card: Pick<DeckCard, 'brand' | 'model'>) {
+  return [card.brand, card.model].filter(Boolean).join(' ');
+}
+
+/**
+ * "Omega Speedmaster Professional, 1972" — the whole name on one line, for a
+ * tile, a row, or the listing headline. Maker and model are one thing said in
+ * one voice; an eyebrow over a title made every brand look like a section
+ * heading, and the two type sizes made a short name and a long one different
+ * heights.
+ *
+ * The year is part of the name, not of the specification: it is the second
+ * thing anyone asks about a vintage watch, and "1601 · 1968 · 36mm" made a 1968
+ * Datejust look like a 2015 one.
+ */
+export function formatTitle(card: Pick<DeckCard, 'brand' | 'model' | 'year'>) {
+  const name = formatName(card) || 'Unknown watch';
+  return card.year ? `${name}, ${card.year}` : name;
+}
+
+/**
+ * A tile's one spec line. Nothing is printed under a tile, so the case size
+ * belongs here — unlike on a card or the listing route, where it is a row in
+ * the table a few lines down and saying it twice reads as filler.
+ */
+export function formatSpecs(card: Pick<DeckCard, 'reference' | 'case_size_mm'>) {
+  return [card.reference, card.case_size_mm ? `${card.case_size_mm}mm` : null]
     .filter(Boolean)
     .join(' · ');
 }

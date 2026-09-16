@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text } from 'react-native';
 
-import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -18,7 +18,7 @@ export function FilterButton({ count, onPress }: { count: number; onPress: () =>
       accessibilityRole="button"
       accessibilityLabel={count ? `Filters, ${count} active` : 'Filters'}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, isActive && styles.active, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name="filter-variant"
         size={size.icon}
@@ -35,16 +35,8 @@ const buttonStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: space.xs,
-    paddingHorizontal: inset.compactX,
-    paddingVertical: inset.compactY,
+    minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    backgroundColor: 'transparent',
-  },
-  active: {
-    borderColor: theme.color.brass,
   },
   pressed: {
     opacity: 0.72,

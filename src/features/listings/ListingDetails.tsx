@@ -103,8 +103,6 @@ const detailsStyles = (theme: Theme) => ({
     padding: inset.card,
     borderRadius: radius.md,
     backgroundColor: theme.color.surfaceSunken,
-    borderWidth: 1,
-    borderColor: theme.color.border,
   },
   soldLabel: {
     ...type.labelStrong,

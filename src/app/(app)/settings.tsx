@@ -2,8 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
-import { useSaved } from '@/data/listings';
-import { fullName, useProfile } from '@/data/profile';
+import { useProfile } from '@/data/profile';
 import { useFacets } from '@/data/search';
 import { signOut } from '@/lib/auth';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
@@ -18,13 +17,11 @@ const APPEARANCE: { value: ThemePreference; label: string }[] = [
 
 export default function SettingsScreen() {
   const { session, userId } = useSession();
-  const { data: saved = [] } = useSaved(userId);
   const { data: profile } = useProfile(userId);
   const { data: facets = [] } = useFacets();
   const { preference, setPreference } = useThemeContext();
   const styles = useThemedStyles(settingsStyles);
 
-  const name = fullName(profile);
   const favorites = (profile?.favorite_brands ?? []).map(
     (key) => facets.find((facet) => facet.kind === 'brand' && facet.value === key)?.label ?? key
   );
@@ -34,9 +31,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Eyebrow>Account</Eyebrow>
-          <Text style={styles.name}>{name ?? 'Collector'}</Text>
           <Message text={session?.user.email ?? 'No email available'} />
-          <Message text={`${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`} />
         </View>
 
         {favorites.length ? (
@@ -87,17 +82,13 @@ const settingsStyles = (theme: Theme) => ({
   section: {
     gap: stack.related,
   },
-  name: {
-    ...type.title,
-    color: theme.color.text,
-  },
   favorites: {
     ...type.body,
     color: theme.color.textMuted,
   },
   segmented: {
     flexDirection: 'row' as const,
-    backgroundColor: theme.color.surfaceSunken,
+    backgroundColor: theme.color.fill,
     borderRadius: radius.md,
     padding: space.xs,
     gap: space.xs,
@@ -110,8 +101,6 @@ const settingsStyles = (theme: Theme) => ({
   },
   segmentActive: {
     backgroundColor: theme.color.surface,
-    borderWidth: 1,
-    borderColor: theme.color.border,
   },
   segmentLabel: {
     ...type.label,

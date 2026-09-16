@@ -51,16 +51,20 @@ export default function Deck() {
 
   // One step back, and only for a pass. A save is recoverable from the Saved
   // tab, so a right swipe retires the offer instead of queueing behind it.
-  const judge = (card: DeckCard, direction: SwipeDirection, releaseX = 0) => {
-    // Only from the cards view: the grid saves from a tile, and flying out of
-    // the stage the deck is not currently showing would come from nowhere.
-    if (direction === 'right' && view === 'cards' && stageRect.current) {
-      const from = stageRect.current;
-      launch({ from: { ...from, x: from.x + releaseX }, photo: card.photos[0]?.url });
+  const judge = (card: DeckCard, direction: SwipeDirection, from?: Rect) => {
+    // A save flies from wherever it was judged, and only the view that judged
+    // it knows where that was: the card stage here, the tile in the grid.
+    if (direction === 'right' && from) {
+      launch({ from, photo: card.photos[0]?.url });
     }
 
     swipe.mutate({ listingId: card.id, direction });
     setLastPass(direction === 'left' ? card : null);
+  };
+
+  const judgeCard = (card: DeckCard, direction: SwipeDirection, releaseX: number) => {
+    const from = stageRect.current;
+    judge(card, direction, from ? { ...from, x: from.x + releaseX } : undefined);
   };
 
   const undo = lastPass
@@ -80,7 +84,7 @@ export default function Deck() {
 
   if (isPending) {
     return (
-      <Screen title="Buy" inTabs>
+      <Screen title="Graham" inTabs>
         <Spinner />
       </Screen>
     );
@@ -88,7 +92,7 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Buy" action={actions} inTabs>
+      <Screen title="Graham" action={actions} inTabs>
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
@@ -99,7 +103,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Buy" action={actions} inTabs>
+      <Screen title="Graham" action={actions} inTabs>
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -132,7 +136,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Buy" action={actions} width="grid" inTabs>
+      <Screen title="Graham" action={actions} width="grid" inTabs>
         <DeckGrid
           cards={cards}
           onSwipe={judge}
@@ -149,14 +153,14 @@ export default function Deck() {
   const visible = cards.slice(0, 3).reverse();
 
   return (
-    <Screen title="Buy" action={actions} width="card" inTabs>
+    <Screen title="Graham" action={actions} width="card" inTabs>
       <View ref={stage} onLayout={measureStage} style={styles.stage}>
         {visible.map((card, index) => (
           <SwipeCard
             key={card.id}
             card={card}
             isTop={index === visible.length - 1}
-            onSwipe={(direction, releaseX) => judge(card, direction, releaseX)}
+            onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
             onAsk={() => router.push(`/inquiry/${card.id}`)}
             onExpandPhoto={(index) => {
               primeListing(card);

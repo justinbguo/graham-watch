@@ -79,7 +79,11 @@ export function PhotoCarousel({
           against white, which half of them are. */}
       {paged ? (
         <View
-          style={[styles.counter, variant === 'viewer' && { bottom: insets.bottom + space.lg }]}
+          style={
+            variant === 'viewer'
+              ? [styles.counter, styles.counterViewer, { bottom: insets.bottom + space.lg }]
+              : [styles.counter, styles.counterCard]
+          }
           pointerEvents="none">
           <Text style={styles.counterLabel}>
             {index + 1} / {photos.length}
@@ -138,12 +142,19 @@ const carouselStyles = (theme: Theme) => ({
   counter: {
     position: 'absolute' as const,
     right: space.md,
-    bottom: space.md,
     paddingHorizontal: space.sm,
     paddingVertical: space.xs / 2,
     borderRadius: radius.sm,
     backgroundColor: theme.color.overlay,
     zIndex: 2,
+  },
+  // Top right on a card: the bottom of the photograph belongs to the caption,
+  // and a plate sitting on the fade beside the name reads as a second label.
+  counterCard: {
+    top: space.md,
+  },
+  counterViewer: {
+    bottom: space.md,
   },
   counterLabel: {
     ...type.control,

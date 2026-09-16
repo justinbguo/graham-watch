@@ -153,8 +153,6 @@ const rowStyles = (theme: Theme) => ({
     backgroundColor: theme.color.surfaceSunken,
   },
   thumbEmpty: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
   },
   names: {
     flex: 1,
@@ -188,8 +186,7 @@ const rowStyles = (theme: Theme) => ({
   action: {
     minHeight: HIT_TARGET,
     justifyContent: 'center' as const,
-    borderWidth: 1,
-    borderColor: theme.color.borderStrong,
+    backgroundColor: theme.color.fill,
     borderRadius: radius.sm,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
@@ -199,9 +196,6 @@ const rowStyles = (theme: Theme) => ({
     minHeight: HIT_TARGET,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderWidth: 1,
-    borderColor: theme.color.borderStrong,
-    borderRadius: radius.sm,
   },
   actionLabel: {
     ...type.control,

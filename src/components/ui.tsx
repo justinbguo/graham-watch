@@ -236,7 +236,7 @@ const screenStyles = (theme: Theme) => ({
     justifyContent: 'space-between' as const,
     gap: space.md,
     paddingHorizontal: inset.screen,
-    paddingBottom: space.xl,
+    paddingBottom: space.lg,
   },
   title: {
     ...type.display,
@@ -246,23 +246,19 @@ const screenStyles = (theme: Theme) => ({
 
 const buttonStyles = (theme: Theme) => ({
   base: {
-    backgroundColor: 'transparent',
+    backgroundColor: theme.color.fill,
     borderRadius: radius.md,
     paddingVertical: inset.controlY,
     paddingHorizontal: inset.controlX,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     minHeight: size.controlMin,
-    borderWidth: 1,
-    borderColor: theme.color.borderStrong,
   },
   solid: {
     backgroundColor: theme.color.accent,
-    borderColor: theme.color.accent,
   },
   ghost: {
     backgroundColor: 'transparent',
-    borderColor: 'transparent',
   },
   pressed: {
     opacity: 0.72,
@@ -282,9 +278,13 @@ const buttonStyles = (theme: Theme) => ({
 const fieldStyles = (theme: Theme) => ({
   field: {
     ...type.body,
-    backgroundColor: theme.color.surface,
-    borderWidth: 1,
-    borderColor: theme.color.border,
+    // A field takes the same fill as a button: both are things you act on, and
+    // the tone reads on a page and on a container alike.
+    backgroundColor: theme.color.fill,
+    // An <input> on web carries an intrinsic width of about 20 characters, and
+    // `min-width: auto` makes a flex row refuse to shrink past it. Two fields
+    // side by side then run off the screen edge.
+    minWidth: 0,
     borderRadius: radius.md,
     paddingHorizontal: inset.controlX,
     paddingVertical: inset.controlY,

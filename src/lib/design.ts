@@ -1,4 +1,4 @@
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 /**
  * Live design tokens. docs/DESIGN.md is the why; this file is the numbers the
@@ -6,19 +6,34 @@ import type { TextStyle } from 'react-native';
  * markdown is a value nobody follows.
  */
 
+/**
+ * Four warm tones carry the whole interface: the page, the fill of a thing on
+ * the page, the well inside that thing, and the fill of anything you can press.
+ * Nothing in this app is drawn with an outline — see docs/DESIGN.md — so these
+ * values do that work instead, and each step between them is a real one in both
+ * schemes rather than the hairline's difference it used to be.
+ *
+ * `fill` is the one tone that has to read against `background` and `surface`
+ * alike, since a button sits on a page as often as on a card. That is why it is
+ * a shade under `surface` on paper and a shade over it in the dark.
+ */
 export const color = {
   light: {
-    background: '#FAF8F4',
-    surface: '#FFFFFF',
-    surfaceSunken: '#F1EDE6',
-    border: '#E5DFD4',
-    borderStrong: '#CBC2B2',
+    background: '#FBF9F5',
+    surface: '#F3EDE3',
+    surfaceSunken: '#E8E0D2',
+    fill: '#E6DECF',
+    border: '#DFD7C8',
+    /** The web scrollbar thumb, which is the only mid tone left. */
+    scrollThumb: '#C3B9A6',
     text: '#17140F',
-    textMuted: '#7B7365',
-    textFaint: '#A79E8E',
+    // A step darker than the old muted, which was written against white and
+    // fell under the contrast floor once containers stopped being white.
+    textMuted: '#6E6656',
+    textFaint: '#9C9483',
     accent: '#17140F',
-    onAccent: '#FAF8F4',
-    brass: '#8A6A3B',
+    onAccent: '#FBF9F5',
+    brass: '#7E5F33',
     save: '#2E6B4F',
     danger: '#9A2B20',
     overlay: 'rgba(23, 20, 15, 0.45)',
@@ -27,10 +42,11 @@ export const color = {
   },
   dark: {
     background: '#121110',
-    surface: '#1A1817',
+    surface: '#1E1B18',
     surfaceSunken: '#0D0C0B',
-    border: '#2B2724',
-    borderStrong: '#443E38',
+    fill: '#302C27',
+    border: '#2E2A26',
+    scrollThumb: '#47413A',
     text: '#F3EFE8',
     textMuted: '#9A9186',
     textFaint: '#6F675C',
@@ -43,6 +59,15 @@ export const color = {
     onOverlay: '#FFFFFF',
   },
 } as const;
+
+/**
+ * The wash a caption sits on when it sits on a photograph. Not themed: half
+ * the watches in the deck are shot on white, so white type needs the same help
+ * in either scheme. It fades rather than stopping, because a hard band across
+ * a photograph crops the watch a second time.
+ */
+export const scrim =
+  'linear-gradient(to top, rgba(23, 20, 15, 0.88) 0%, rgba(23, 20, 15, 0.55) 40%, rgba(23, 20, 15, 0) 100%)';
 
 export type ColorScheme = 'light' | 'dark';
 export type ThemeColors = (typeof color)[ColorScheme];
@@ -58,129 +83,145 @@ export const themes: Record<ColorScheme, Theme> = {
 };
 
 /**
- * Two families, and that is the whole system. EB Garamond is the old-style
- * serif for the wordmark and watch names. Inter is the grotesque for everything
- * you read in quantity — body, buttons, prices, tabs. Import each weight from
- * `@expo-google-fonts/<family>/<weight>` in the root layout, never from the
- * package root (that bundles every cut).
+ * One family: SF Pro, in three weights. Nothing is bundled and nothing is
+ * loaded. On iOS, SF Pro *is* the system face, and the way to ask for it is to
+ * name no family at all — which also gets the optical cut Apple chose for the
+ * point size, Text below 20pt and Display above it. On web the stack resolves
+ * to SF Pro on Apple hardware and to the platform's own UI face elsewhere,
+ * because Apple does not license SF Pro to ship off its platforms.
  */
-export const font = {
-  display: {
-    regular: 'EBGaramond_400Regular',
-    semibold: 'EBGaramond_600SemiBold',
-    bold: 'EBGaramond_700Bold',
-  },
-  text: {
-    regular: 'Inter_400Regular',
-    medium: 'Inter_500Medium',
-    semibold: 'Inter_600SemiBold',
-  },
-} as const;
+export const family = Platform.select({
+  web: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif',
+  default: undefined,
+});
 
-/** letterSpacing. Garamond runs wide; Inter is already tight. */
+/**
+ * Weight carries the hierarchy that a second family used to: regular to read,
+ * semibold to lead, bold to announce. Three and no more — a scale with a
+ * medium in it has two weights that mean nearly the same thing, and the choice
+ * between them becomes a coin toss on every new screen.
+ *
+ * These are real weights of the system face, so they render as drawn. Numeric
+ * weights against a *bundled* family are the trap: Android ignores them and
+ * synthesises a fake bold instead.
+ */
+export const weight = {
+  regular: '400',
+  semibold: '600',
+  bold: '700',
+} as const satisfies Record<string, TextStyle['fontWeight']>;
+
+/**
+ * letterSpacing. SF Pro tracks itself tighter as it grows, so only the sizes
+ * above the body scale need help, and only a little. Tracking small system
+ * text is how an interface starts to look like a slide deck.
+ */
 export const tracking = {
-  display: -1.1,
-  title: -0.6,
-  body: -0.2,
-  label: -0.1,
+  display: -0.8,
+  title: -0.4,
 } as const;
 
 export const type = {
   wordmark: {
-    fontFamily: font.display.bold,
-    fontSize: 44,
-    lineHeight: 48,
+    fontFamily: family,
+    fontWeight: weight.bold,
+    fontSize: 40,
+    lineHeight: 46,
     letterSpacing: tracking.display,
   },
   display: {
-    fontFamily: font.display.bold,
-    fontSize: 32,
-    lineHeight: 38,
+    fontFamily: family,
+    fontWeight: weight.bold,
+    fontSize: 30,
+    lineHeight: 36,
     letterSpacing: tracking.display,
   },
   title: {
-    fontFamily: font.display.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 22,
     lineHeight: 28,
     letterSpacing: tracking.title,
   },
-  /** A watch name in a grid tile, where a 22pt serif wraps after two words. */
+  /** A watch name in a grid tile, where the full title wraps after two words. */
   titleSmall: {
-    fontFamily: font.display.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 17,
     lineHeight: 22,
     letterSpacing: tracking.title,
   },
-  /** Short editorial copy. Never fields, specs, prices, or long paragraphs. */
+  /** A lede: one sentence introducing a screen. Never fields, specs, or prices. */
   editorial: {
-    fontFamily: font.display.regular,
+    fontFamily: family,
+    fontWeight: weight.regular,
     fontSize: 20,
     lineHeight: 28,
     letterSpacing: tracking.title,
   },
   body: {
-    fontFamily: font.text.regular,
+    fontFamily: family,
+    fontWeight: weight.regular,
     fontSize: 16,
     lineHeight: 24,
-    letterSpacing: tracking.body,
   },
   bodyStrong: {
-    fontFamily: font.text.medium,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 16,
     lineHeight: 24,
-    letterSpacing: tracking.body,
   },
   label: {
-    fontFamily: font.text.medium,
+    fontFamily: family,
+    fontWeight: weight.regular,
     fontSize: 14,
     lineHeight: 20,
-    letterSpacing: tracking.label,
   },
-  /** A run-in that has to hold its own beside another: the card's maker and dealer. */
+  /** A run-in that has to hold its own beside another: the card's dealer. */
   labelStrong: {
-    fontFamily: font.text.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 14,
     lineHeight: 20,
-    letterSpacing: tracking.label,
   },
   caption: {
-    fontFamily: font.text.regular,
+    fontFamily: family,
+    fontWeight: weight.regular,
     fontSize: 13,
     lineHeight: 18,
-    letterSpacing: tracking.body,
   },
   price: {
-    fontFamily: font.text.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 18,
     lineHeight: 24,
-    letterSpacing: tracking.label,
   },
   /** Same job in a grid tile. Still the heaviest thing in the block. */
   priceSmall: {
-    fontFamily: font.text.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 15,
     lineHeight: 20,
-    letterSpacing: tracking.label,
   },
   control: {
-    fontFamily: font.text.medium,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 13,
     lineHeight: 18,
-    letterSpacing: tracking.label,
   },
   tab: {
-    fontFamily: font.text.medium,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 11,
     lineHeight: 14,
-    letterSpacing: tracking.label,
   },
   // A run-in above a title. Sentence case, so weight and colour do the
   // separating that capitals used to do.
   eyebrow: {
-    fontFamily: font.text.semibold,
+    fontFamily: family,
+    fontWeight: weight.semibold,
     fontSize: 13,
     lineHeight: 16,
-    letterSpacing: tracking.label,
   },
 } satisfies Record<string, TextStyle>;
 

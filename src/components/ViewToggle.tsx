@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, View } from 'react-native';
 
-import { HIT_TARGET, inset, radius, size, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export type DeckView = 'cards' | 'grid';
@@ -32,11 +32,11 @@ export function ViewToggle({
             accessibilityLabel={option.label}
             accessibilityState={{ selected: isActive }}
             onPress={() => onChange(option.value)}
-            style={[styles.option, isActive && styles.optionActive]}>
+            style={styles.option}>
             <MaterialCommunityIcons
               name={option.icon}
               size={size.icon}
-              color={isActive ? theme.color.text : theme.color.textFaint}
+              color={isActive ? theme.color.brass : theme.color.textFaint}
             />
           </Pressable>
         );
@@ -48,19 +48,11 @@ export function ViewToggle({
 const toggleStyles = (theme: Theme) => ({
   group: {
     flexDirection: 'row' as const,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    overflow: 'hidden' as const,
   },
   option: {
-    paddingHorizontal: inset.compactX,
-    paddingVertical: inset.compactY,
+    minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
+    alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderRadius: radius.sm,
-  },
-  optionActive: {
-    backgroundColor: theme.color.surfaceSunken,
   },
 });

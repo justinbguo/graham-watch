@@ -169,8 +169,6 @@ export function ClaimShopForm({
 const formStyles = (theme: Theme) => ({
   card: {
     backgroundColor: theme.color.surface,
-    borderWidth: 1,
-    borderColor: theme.color.border,
     borderRadius: radius.md,
     padding: inset.card,
     gap: stack.related,
@@ -195,8 +193,7 @@ const formStyles = (theme: Theme) => ({
     color: theme.color.textMuted,
   },
   match: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
+    backgroundColor: theme.color.surfaceSunken,
     borderRadius: radius.sm,
     padding: inset.card,
     gap: stack.tight,
