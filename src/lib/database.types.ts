@@ -757,6 +757,24 @@ export type Database = {
           website: string
         }[]
       }
+      my_dealer_application: {
+        Args: never
+        Returns: {
+          brands: string[]
+          claim_host: string
+          created_at: string
+          dealer_id: string
+          id: string
+          note: string
+          reviewed_at: string
+          shop_name: string
+          status: Database["public"]["Enums"]["application_status"]
+          verified_at: string
+          verified_email: string
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }[]
+      }
       pending_source_item_count: {
         Args: { p_dealer_id: string }
         Returns: {

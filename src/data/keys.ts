@@ -15,6 +15,7 @@ export const keys = {
   listing: (listingId: string) => ['listing', listingId] as const,
   inquiries: (userId: string) => ['inquiries', userId] as const,
   dealerAccounts: (userId: string) => ['dealer-accounts', userId] as const,
+  myApplication: (userId: string) => ['my-application', userId] as const,
   claimableDealer: (website: string) => ['claimable-dealer', website] as const,
   dealerInventory: (dealerId: string) => ['dealer-inventory', dealerId] as const,
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
