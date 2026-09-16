@@ -268,8 +268,19 @@ The types job regenerates `database.types.ts` and fails if it differs from the
 committed file. A migration merged without `npm run db:types` means TypeScript is
 lying about your columns, and nothing else notices.
 
-The Supabase CLI is pinned in `.github/workflows/ci.yml`. Keep your local version
-matching, or the types job will disagree with you about formatting.
+The Supabase CLI version is pinned exactly in `package.json`, and CI pins the same
+number in `.github/workflows/ci.yml`. Bump both together.
+
+The pin is not cosmetic. 2.100.1 and 2.117.0 generate `database.types.ts` with
+different punctuation in the generic helpers, so a file written by one version
+fails the diff under the other — a red build that has nothing to do with the
+schema.
+
+`npm run` puts `node_modules/.bin` at the front of `PATH`, so every `db:*` script
+uses the pinned binary no matter what `supabase` means in your shell. A bare
+`supabase db reset` in a terminal does not: that is whatever Homebrew installed.
+Check with `npm exec -- supabase --version` against `supabase --version`; if they
+disagree, run schema commands through `npm run`.
 
 None of the four proves the app works. There are no tests of the buyer or dealer
 flows above the database, so those are walked by hand.
