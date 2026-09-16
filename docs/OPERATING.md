@@ -73,6 +73,7 @@ What is missing on hosted today, and what it looks like if you test there:
 | --- | --- |
 | `dealer_applications` + `my_dealer_application` | Apply screen fails; PostgREST says the relation does not exist |
 | `answer_dealer_application` | `dealers -- accept` / `decline` fail with PGRST202 |
+| `operators` | The operator UI signs in and then says you are not an operator |
 | `avatar_storage` | Picking a profile photo fails: no such bucket |
 | `replace_listing_photos` | Photo refresh reports success and changes nothing |
 | `import_job_ledger` | The import rate limit can be reset by the account it bills |
@@ -221,6 +222,8 @@ npm run dealers -- revoke <id|host>      # pull them back
 npm run dealers -- applications          # shops asking to be listed
 npm run dealers -- accept <app-id>       # turn one into a shop they own
 npm run dealers -- decline <app-id>      # say no, with --note
+
+npm run dealers -- operator [email]      # let an account approve shops
 ```
 
 `accept` and `approve` are different gates. Accepting hands a shop to the dealer
@@ -232,6 +235,61 @@ unproved application cannot be accepted — the function refuses — so `○` is
 waiting on the applicant, not on you. `decline` requires `--note`, because the
 applicant reads it on their own profile and a decline with no reason is the dead
 end the application flow exists to remove.
+
+## The operator UI
+
+Reviewing applications in a terminal means reading a shop's website out of one
+window and typing a uuid into another. `operator/` is a small web app for the
+same two jobs: answer applications, and publish or pull back a shop.
+
+```
+cd operator
+cp .env.example .env.local     # fill in from `supabase status`
+npm install
+npm run dev                    # http://localhost:5173
+```
+
+Sign in with an email code, the same as the phone app. The address needs an
+account and an operator grant:
+
+```
+npm run dealers -- operator you@example.com
+```
+
+Locally that address is `operator@graham.local` and the code lands in Mailpit.
+Run `npm run dealers -- operator` with no argument to grant the configured
+account, which is what every other command in that script already signs in as.
+
+### Why an operator is a row
+
+Everything in `scripts/` authorises by holding `SUPABASE_SERVICE_ROLE_KEY`. That
+key bypasses row-level security on every table in the project — every buyer's
+saved list, delete rights on every listing — which is fine for a script on one
+laptop and unacceptable in a browser. So the UI holds the anon key and signs in
+normally, and the functions it calls check the caller against the `operators`
+table instead.
+
+The practical differences:
+
+- Access is revocable per person. Delete the row; no key rotation.
+- `dealer_applications.reviewed_by` now records who answered.
+- A grant can be given to a real address, so there is no shared password.
+
+`set_dealer_permission` is the only implementation of "publish a shop", used by
+both the UI and `dealers -- approve`. The same is true of accept and decline.
+
+### What is not in it
+
+`add <domain>` stays in the terminal. Discovery reads the dealer's own website,
+and a browser cannot: the dealer's server sends no CORS headers, so the request
+fails before it starts. Moving `discover` into an edge function would fix that
+and has not been done.
+
+The dealers table reads through `operator_dealers()` rather than the table,
+because `select` on `public.dealers` is granted column by column and
+`contact_email` is left out on purpose — see `20260912000007`. Granting that
+column back to `authenticated` to save a function would hand every dealer's
+mailbox to every buyer.
 
 ## Testing
 
@@ -392,6 +450,9 @@ Working-as-designed, so do not debug these:
 | Apple and Google buttons missing everywhere | Both are written and switched off until they have credentials. |
 | An application shows `○` and cannot be accepted | The applicant has not proved a mailbox yet. Waiting on them. |
 | A second application is refused | One live application per account, by unique index. Answered ones free it. |
+| The operator UI says "not an operator" | The account has no `operators` row. `npm run dealers -- operator <email>`. A `db:reset` drops it. |
+| Operator sign-in rejects a valid address | `shouldCreateUser` is false there on purpose, so an address with no account is refused rather than signed up as a new operator. |
+| The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
 | The deck is empty on a fresh `db:reset` | There are no watches until you import a shop. |
 
 Real bugs, by contrast, look like: a write that reports success and changes
