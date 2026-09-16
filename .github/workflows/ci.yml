@@ -74,8 +74,13 @@ jobs:
 
       # Pinned, not `latest`. The types check below diffs generated output
       # against the committed file, so a CLI that formats differently turns a
-      # Supabase release into a red build on an unrelated change. Bump this
-      # deliberately, and run `npm run db:types` in the same commit.
+      # Supabase release into a red build on an unrelated change. 2.100.1 and
+      # 2.117.0 really do differ here, in the parentheses around the generic
+      # helpers' constraints.
+      #
+      # Must equal devDependencies.supabase in package.json, which is what
+      # `npm run db:types` uses locally. Bump both together and regenerate in
+      # the same commit.
       - uses: supabase/setup-cli@v1
         with:
           version: 2.117.0
