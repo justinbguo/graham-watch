@@ -95,6 +95,13 @@ jobs:
           supabase/functions/claim-dealer/index.ts
           supabase/functions/verify-application/index.ts
 
+      # Pure functions over a shop's feed: the shapes are real payloads a
+      # dealer's site returned, which no other job here exercises.
+      - name: test
+        run: >-
+          deno test --no-lock --config supabase/functions/deno.ci.json
+          supabase/functions/
+
   database:
     name: database
     runs-on: ubuntu-latest
