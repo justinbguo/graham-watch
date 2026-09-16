@@ -19,10 +19,42 @@ Docker comes from Colima, not Docker Desktop. Install once with
 1. `npm install`
 2. `npm run db:start` — starts the local Supabase stack, prints the API URL and anon key.
 3. `cp .env.example .env` and paste those two values in.
-4. `npm run db:reset` — applies migrations and seeds demo watches.
+4. `npm run db:reset` — applies migrations. It seeds nothing; see "Filling the
+   local database" below.
 5. `npm run web` (browser) or `npm run ios` (simulator)
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
+
+## Choosing a backend
+
+`.env` holds one backend. To point at the local stack, put **both** lines in
+`.env.local`, which Expo loads at higher precedence and git ignores:
+
+```
+EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<the publishable key from `supabase status -o env`>
+```
+
+Delete the file to go back to the backend in `.env`.
+
+Keep the URL and the key together. Editing the URL alone is the trap: the local
+stack accepts a key from another project instead of rejecting it, so the app
+looks healthy and shows nothing. `npm run check:env` catches that pairing and
+runs automatically before `start`, `ios`, `android`, and `web`.
+
+## Filling the local database
+
+`supabase/seed.sql` is deliberately empty — invented references and placeholder
+photos beside real watches ruined every judgement about how the app looked. Put
+real inventory in instead:
+
+```
+npm run dealers -- add goldfingersvintage.com --limit 10 --yes
+```
+
+Run it with no operator env file and it targets whatever `supabase start` is
+running. Listings are invisible to anyone not signed in, so an empty deck on the
+sign-in screen is expected.
 
 Only email codes are enabled. Apple and Google are written but switched off, because
 neither has credentials yet — see "Enabling Apple and Google" below.
@@ -112,7 +144,8 @@ supabase/functions  import-listings edge function
 
 | Command | Does |
 | --- | --- |
-| `npm run web` / `ios` / `android` | Start the app |
+| `npm run web` / `ios` / `android` | Start the app in Expo Go (or the browser) |
+| `npm run start:dev` | Talk to a development build instead of Expo Go |
 | `npm run demo:web` / `demo` | Run against fixtures, no backend needed |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
