@@ -631,6 +631,14 @@ export type Database = {
         Returns: number
       }
       apply_source_item: { Args: { p_source_item_id: string }; Returns: string }
+      approve_dealer_application: {
+        Args: {
+          p_application_id: string
+          p_created_by: string
+          p_permission?: Database["public"]["Enums"]["dealer_permission"]
+        }
+        Returns: string
+      }
       brand_key: { Args: { p_brand: string }; Returns: string }
       can_claim_with_email: {
         Args: { p_dealer_id: string; p_email: string }
@@ -688,6 +696,10 @@ export type Database = {
           price_cents: number
           saves: number
         }[]
+      }
+      decline_dealer_application: {
+        Args: { p_application_id: string; p_note: string }
+        Returns: undefined
       }
       get_deck: {
         Args: { p_limit?: number }

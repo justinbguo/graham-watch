@@ -11,6 +11,20 @@
 
 import { config, serviceKey } from './_supabase.mjs';
 
+// These tests create users, approve shops, and delete what they made. Against
+// the hosted project that is a write to real data, and `config()` silently
+// prefers SUPABASE_URL from the environment — so one exported variable, or
+// `--env-file=scripts/.env.operator.local` copied from another script, is
+// enough to point them at production.
+if (!config().isLocal) {
+  console.error(
+    `\n  Refusing to run: ${config().url} is not the local stack.\n\n` +
+      '  These tests write and delete data. Run them against `npm run db:start`\n' +
+      '  and unset SUPABASE_URL.\n'
+  );
+  process.exit(1);
+}
+
 const URL = config().url;
 const ANON = config().anonKey;
 const SERVICE = serviceKey();
@@ -93,6 +107,39 @@ console.log('\nprofiles');
     token: buyer.token,
   });
   check("a user cannot rename someone else's profile", unchanged[0]?.first_name === 'Ada');
+}
+
+console.log('\navatars');
+{
+  // 1×1 jpeg. The bytes only have to be a legal image type the bucket accepts.
+  const jpeg = Uint8Array.from(
+    atob(
+      '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGf/9k='
+    ),
+    (c) => c.charCodeAt(0)
+  );
+
+  async function putAvatar(token, objectPath) {
+    return fetch(`${URL}/storage/v1/object/avatars/${objectPath}`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true',
+      },
+      body: jpeg,
+    });
+  }
+
+  const own = await putAvatar(buyer.token, `${buyer.id}/avatar.jpg`);
+  check('a user can upload their own avatar', own.ok, `got ${own.status}`);
+
+  const hijack = await putAvatar(importer.token, `${buyer.id}/avatar.jpg`);
+  check("a user cannot overwrite someone else's avatar", !hijack.ok, `got ${hijack.status}`);
+
+  const read = await fetch(`${URL}/storage/v1/object/public/avatars/${buyer.id}/avatar.jpg`);
+  check('an avatar is publicly readable by path', read.ok, `got ${read.status}`);
 }
 
 console.log('\ndealers');
@@ -1369,15 +1416,194 @@ let applicationId;
   });
 }
 
+console.log('\nanswering an application');
+let accepter;
+let decliner;
+let acceptedDealerId;
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  accepter = await createUser(`accepted-${stamp}@personal.test`);
+  decliner = await createUser(`declined-${stamp}@personal.test`);
+
+  // One application, proved, ready for an operator — the state `accept` needs.
+  const fileFor = async (user, host, shopName) => {
+    const filed = await api('/rest/v1/dealer_applications', {
+      token: user.token,
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        user_id: user.id,
+        shop_name: shopName,
+        website: `https://${host}`,
+        brands: ['Omega'],
+        volume: 'under_10',
+      },
+    });
+    return filed.body?.[0]?.id;
+  };
+
+  const prove = async (user, applicationId, host) => {
+    await api('/rest/v1/rpc/store_application_claim_code', {
+      token: SERVICE,
+      method: 'POST',
+      body: {
+        p_application_id: applicationId,
+        p_requested_by: user.id,
+        p_email: `owner@${host}`,
+        p_code: '313131',
+      },
+    });
+    return api('/rest/v1/rpc/verify_application_email', {
+      token: user.token,
+      method: 'POST',
+      body: { p_application_id: applicationId, p_code: '313131' },
+    });
+  };
+
+  const acceptHost = `accepted-${stamp}.test`;
+  const acceptId = await fileFor(accepter, acceptHost, 'Accepted Watches');
+
+  const answer = (token, applicationId, permission = 'approved') =>
+    api('/rest/v1/rpc/approve_dealer_application', {
+      token,
+      method: 'POST',
+      body: {
+        p_application_id: applicationId,
+        p_created_by: importer.id,
+        p_permission: permission,
+      },
+    });
+
+  const bySelf = await answer(accepter.token, acceptId);
+  check(
+    'an applicant cannot accept their own application',
+    bySelf.status >= 400,
+    `got ${bySelf.status}`
+  );
+
+  const unproved = await answer(SERVICE, acceptId);
+  check(
+    'an unproved application cannot be accepted',
+    unproved.status >= 400,
+    `got ${unproved.status} ${JSON.stringify(unproved.body)}`
+  );
+
+  await prove(accepter, acceptId, acceptHost);
+
+  const accepted = await answer(SERVICE, acceptId);
+  check(
+    'a proved application becomes a shop',
+    accepted.status === 200 && typeof accepted.body === 'string',
+    `got ${accepted.status} ${JSON.stringify(accepted.body)}`
+  );
+  acceptedDealerId = accepted.body;
+
+  const shop = await api(
+    `/rest/v1/dealers?id=eq.${acceptedDealerId}&select=name,claimed_by,contact_email,permission`,
+    { token: SERVICE }
+  );
+  check(
+    'the shop is claimed by the applicant',
+    shop.body?.[0]?.claimed_by === accepter.id,
+    JSON.stringify(shop.body)
+  );
+  check(
+    'the proved mailbox becomes the contact address',
+    shop.body?.[0]?.contact_email === `owner@${acceptHost}`,
+    JSON.stringify(shop.body)
+  );
+
+  // The dealer flow's whole point: the applicant now owns a shop they can
+  // manage, without ever proving the same mailbox a second time.
+  const owned = await api('/rest/v1/rpc/dealer_accounts', {
+    token: accepter.token,
+    method: 'POST',
+  });
+  check(
+    'the applicant can now manage their shop',
+    owned.body?.length === 1 && owned.body[0].claimed === true,
+    JSON.stringify(owned.body)
+  );
+
+  const twice = await answer(SERVICE, acceptId);
+  check('an answered application cannot be accepted twice', twice.status >= 400, `got ${twice.status}`);
+
+  // ------------------------------------------------------------------ decline
+  const declineHost = `declined-${stamp}.test`;
+  const declineId = await fileFor(decliner, declineHost, 'Declined Watches');
+  await prove(decliner, declineId, declineHost);
+
+  const noNote = await api('/rest/v1/rpc/decline_dealer_application', {
+    token: SERVICE,
+    method: 'POST',
+    body: { p_application_id: declineId, p_note: '   ' },
+  });
+  check('a decline needs a reason', noNote.status >= 400, `got ${noNote.status}`);
+
+  const bySelfDecline = await api('/rest/v1/rpc/decline_dealer_application', {
+    token: decliner.token,
+    method: 'POST',
+    body: { p_application_id: declineId, p_note: 'let me in' },
+  });
+  check(
+    'an applicant cannot answer their own application',
+    bySelfDecline.status >= 400,
+    `got ${bySelfDecline.status}`
+  );
+
+  const declined = await api('/rest/v1/rpc/decline_dealer_application', {
+    token: SERVICE,
+    method: 'POST',
+    body: { p_application_id: declineId, p_note: 'Not a dealer site.' },
+  });
+  check('an operator can decline', declined.status < 300, `got ${declined.status}`);
+
+  const read = await api('/rest/v1/rpc/my_dealer_application', {
+    token: decliner.token,
+    method: 'POST',
+  });
+  check(
+    'the applicant reads why they were declined',
+    read.body?.[0]?.status === 'declined' && read.body?.[0]?.note === 'Not a dealer site.',
+    JSON.stringify(read.body?.[0])
+  );
+
+  // A decline is final for that attempt but not for the account.
+  const again = await fileFor(decliner, `retry-${stamp}.test`, 'Second Try');
+  check('a declined applicant can apply again', Boolean(again));
+
+  for (const id of [acceptId, declineId, again]) {
+    await fetch(`${URL}/rest/v1/dealer_applications?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: admin,
+    });
+  }
+}
+
 // The tests approve a dealer to prove the deck respects permission, which put
 // fixtures in front of real users. Clean up rather than leave them there.
 async function cleanUp() {
   const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
 
-  for (const id of [dealerId, codeDealerId]) {
+  for (const id of [dealerId, codeDealerId, acceptedDealerId]) {
     if (id) await fetch(`${URL}/rest/v1/dealers?id=eq.${id}`, { method: 'DELETE', headers: admin });
   }
-  for (const user of [importer, buyer, dealerUser, claimer, rival, unconfirmed, applicant]) {
+  for (const user of [
+    importer,
+    buyer,
+    dealerUser,
+    claimer,
+    rival,
+    unconfirmed,
+    applicant,
+    accepter,
+    decliner,
+  ]) {
     if (user?.id) {
       await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
     }

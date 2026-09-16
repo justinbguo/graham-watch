@@ -9,9 +9,16 @@
  *   npm run dealers -- approve <id|host>  publish their listings
  *   npm run dealers -- revoke  <id|host>  pull them back
  *
+ *   npm run dealers -- applications       shops asking to be listed
+ *   npm run dealers -- accept  <app-id>   turn one into a shop they own
+ *   npm run dealers -- decline <app-id>   say no, with --note
+ *
  * Approval is deliberately impossible from the app: RLS blocks a user from
  * approving a dealer they created, so nobody can publish a shop's inventory by
  * importing it. That makes approving an operator action, and this is the tool.
+ *
+ * `accept` and `approve` are different gates. Accepting hands a shop to the
+ * dealer who applied for it; approving is what puts listings in the deck.
  */
 
 import { createInterface } from 'node:readline/promises';
@@ -378,6 +385,97 @@ async function setPermission(permission, explicitTarget) {
   }
 }
 
+const VOLUME_LABELS = {
+  under_10: 'under 10',
+  '10_to_50': '10–50',
+  '50_to_200': '50–200',
+  over_200: '200+',
+};
+
+/**
+ * Unverified applications are listed but marked, because an operator cannot act
+ * on one: approve_dealer_application refuses until the mailbox is proved.
+ */
+async function applications() {
+  const wanted = typeof flags.status === 'string' ? flags.status : 'pending';
+  const { body } = await request(
+    `/rest/v1/dealer_applications?status=eq.${wanted}&select=*&order=created_at.asc`,
+    { token: key }
+  );
+
+  if (!Array.isArray(body) || body.length === 0) {
+    console.log(`\nNo ${wanted} applications.\n`);
+    return;
+  }
+
+  console.log('');
+  for (const app of body) {
+    const mark = app.verified_at ? '●' : '○';
+    console.log(`  ${mark} ${app.shop_name}`);
+    console.log(`    ${app.website}  ·  ${VOLUME_LABELS[app.volume] ?? app.volume} at a time`);
+    console.log(`    ${app.brands?.length ? app.brands.join(' · ') : 'no brands given'}`);
+    console.log(
+      `    ${app.verified_email ?? '⚠ mailbox not proved yet — cannot be accepted'}`
+    );
+    console.log(`    ${app.id}`);
+  }
+  console.log('\n  ● mailbox proved   ○ waiting on the applicant\n');
+}
+
+async function accept() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- accept <app-id> [--hold]');
+    console.error('  --hold  create the shop but leave its listings unpublished');
+    process.exit(1);
+  }
+
+  const operator = await signInOperator();
+  const { ok, status, body } = await request('/rest/v1/rpc/approve_dealer_application', {
+    token: key,
+    method: 'POST',
+    body: {
+      p_application_id: target,
+      // created_by is not null and points at a profile. The operator really did
+      // create this row, so it says so.
+      p_created_by: operator.id,
+      p_permission: flags.hold === true ? 'pending' : 'approved',
+    },
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(body);
+  console.log(`\n  ${dealer.name} → ${dealer.permission}`);
+  console.log(`  ${dealer.website}`);
+  console.log(`  claimed · ${dealer.contact_email ?? 'no contact address'}`);
+  console.log(`  ${dealer.id}\n`);
+  console.log('They can import their inventory from the app now.\n');
+}
+
+async function decline() {
+  const note = typeof flags.note === 'string' ? flags.note : null;
+  if (!target || !note) {
+    console.error('Usage: npm run dealers -- decline <app-id> --note "why"');
+    console.error('The note is required. The applicant reads it on their profile.');
+    process.exit(1);
+  }
+
+  const { ok, status, body } = await request('/rest/v1/rpc/decline_dealer_application', {
+    token: key,
+    method: 'POST',
+    body: { p_application_id: target, p_note: note },
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+  console.log(`Declined. They will read: "${note}"`);
+}
+
 console.log(`${config().isLocal ? 'local' : config().url}`);
 
 switch (command) {
@@ -404,7 +502,18 @@ switch (command) {
   case 'revoke':
     await setPermission('revoked');
     break;
+  case 'applications':
+    await applications();
+    break;
+  case 'accept':
+    await accept();
+    break;
+  case 'decline':
+    await decline();
+    break;
   default:
-    console.error(`Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke.`);
+    console.error(
+      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke, applications, accept, decline.`
+    );
     process.exit(1);
 }
