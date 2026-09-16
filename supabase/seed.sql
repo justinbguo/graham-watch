@@ -4,9 +4,26 @@
 -- sat in the deck beside real watches, and every judgement about how the app
 -- looked was made against watches that do not exist.
 --
--- After `npm run db:reset`, repopulate with:
---   npm run dealers -- add goldfingersvintage.com --limit 10
---   npm run dealers -- add craftandtailored.com   --limit 10
+-- After `npm run db:reset`, repopulate with a real import. Point the operator
+-- scripts at local first — scripts/.env.operator.local holds hosted keys, so
+-- these commands write to production without it:
+--
+--   eval "$(supabase status -o env | sed -E 's/^API_URL=/export SUPABASE_URL=/;
+--     s/^ANON_KEY=/export SUPABASE_ANON_KEY=/;
+--     s/^SERVICE_ROLE_KEY=/export SUPABASE_SERVICE_ROLE_KEY=/' \
+--     | grep '^export SUPABASE_')"
+--
+--   npm run dealers -- add goldfingersvintage.com --limit 10 --yes
+--   npm run dealers -- add craftandtailored.com   --limit 10 --yes
+--
+-- A sync reads the shop's whole catalogue into source_items and --limit only
+-- chooses how many of those to publish, so raising the limit later republishes
+-- from rows already read rather than scraping again.
+--
+-- Expect most of the catalogue to be held back. Goldfinger's returns about 500
+-- pages, of which roughly 50 are available: a vintage dealer keeps sold pieces
+-- online as archive pages, and those land with available = false so they never
+-- reach a deck.
 --
 -- For a backend with no network or no OpenAI key, run the app in demo mode
 -- instead: `npm run demo`, which uses the fixtures in src/lib/demo.ts.
