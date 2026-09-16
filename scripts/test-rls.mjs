@@ -1151,6 +1151,224 @@ console.log('\nreplacing a gallery');
   check('replacing a shorter gallery leaves no tail behind', left.body?.length === 1);
 }
 
+console.log('\ndealer applications');
+let applicant;
+let applicationId;
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  applicant = await createUser(`applicant-${stamp}@personal.test`);
+  const applyHost = `applyshop-${stamp}.test`;
+
+  const file = (token, overrides = {}) =>
+    api('/rest/v1/dealer_applications', {
+      token,
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        user_id: applicant.id,
+        shop_name: 'Apply Shop',
+        website: `https://${applyHost}`,
+        brands: ['Heuer', 'Universal Genève'],
+        volume: '10_to_50',
+        ...overrides,
+      },
+    });
+
+  // ------------------------------------------------------- what may be filed
+  const asOther = await file(rival.token);
+  check('a user cannot apply as someone else', asOther.status >= 400, `got ${asOther.status}`);
+
+  const preVerified = await file(applicant.token, {
+    verified_email: `owner@${applyHost}`,
+    verified_at: new Date().toISOString(),
+  });
+  check(
+    'an applicant cannot file an already-verified application',
+    preVerified.status >= 400,
+    `got ${preVerified.status}`
+  );
+
+  const preApproved = await file(applicant.token, { status: 'approved' });
+  check(
+    'an applicant cannot file an already-approved application',
+    preApproved.status >= 400,
+    `got ${preApproved.status}`
+  );
+
+  // Pointing a fresh application at a shop that already exists would hand the
+  // applicant a claimed_by the moment an operator approved it.
+  const preLinked = await file(applicant.token, { dealer_id: dealerId });
+  check(
+    'an applicant cannot file an application against an existing shop',
+    preLinked.status >= 400,
+    `got ${preLinked.status}`
+  );
+
+  const filed = await file(applicant.token);
+  check('an applicant files their own application', filed.status === 201, `got ${filed.status}`);
+  applicationId = filed.body?.[0]?.id;
+  check('a filed application starts pending and unverified', 
+    filed.body?.[0]?.status === 'pending' && filed.body?.[0]?.verified_at === null);
+
+  const second = await file(applicant.token);
+  check(
+    'one live application per account',
+    second.status >= 400,
+    `got ${second.status}`
+  );
+
+  // ------------------------------------------------------------ who may read
+  const mine = await api(`/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    token: applicant.token,
+  });
+  check('an applicant reads their own application', mine.body?.length === 1);
+
+  const theirs = await api(`/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    token: rival.token,
+  });
+  check('a stranger cannot read an application', theirs.body?.length === 0);
+
+  // --------------------------------------------------- who may answer it
+  await api(`/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    token: applicant.token,
+    method: 'PATCH',
+    body: { status: 'approved' },
+  });
+  const unchanged = await api(
+    `/rest/v1/dealer_applications?id=eq.${applicationId}&select=status`,
+    { token: applicant.token }
+  );
+  check(
+    'an applicant cannot approve their own application',
+    unchanged.body?.[0]?.status === 'pending',
+    JSON.stringify(unchanged.body)
+  );
+
+  await api(`/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    token: applicant.token,
+    method: 'DELETE',
+  });
+  const survived = await api(`/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    token: applicant.token,
+  });
+  check('an applicant cannot delete their own application', survived.body?.length === 1);
+
+  // ------------------------------------------------------ proving the mailbox
+  const selfIssued = await api('/rest/v1/rpc/store_application_claim_code', {
+    token: applicant.token,
+    method: 'POST',
+    body: {
+      p_application_id: applicationId,
+      p_requested_by: applicant.id,
+      p_email: `owner@${applyHost}`,
+      p_code: '000000',
+    },
+  });
+  check(
+    'an applicant cannot issue themselves a code',
+    selfIssued.status >= 400,
+    `got ${selfIssued.status}`
+  );
+
+  const issue = (applicationTarget, userId, code) =>
+    api('/rest/v1/rpc/store_application_claim_code', {
+      token: SERVICE,
+      method: 'POST',
+      body: {
+        p_application_id: applicationTarget,
+        p_requested_by: userId,
+        p_email: `owner@${applyHost}`,
+        p_code: code,
+      },
+    });
+
+  const foreign = await api('/rest/v1/rpc/store_application_claim_code', {
+    token: SERVICE,
+    method: 'POST',
+    body: {
+      p_application_id: applicationId,
+      p_requested_by: applicant.id,
+      p_email: 'attacker@somewhere-else.test',
+      p_code: '111111',
+    },
+  });
+  check(
+    'a code cannot be sent off the applied domain',
+    foreign.status >= 400,
+    `got ${foreign.status}`
+  );
+
+  const notMine = await issue(applicationId, rival.id, '222222');
+  check(
+    'a code cannot be issued for an application you did not file',
+    notMine.status >= 400,
+    `got ${notMine.status}`
+  );
+
+  const issued = await issue(applicationId, applicant.id, '424242');
+  check('a mailbox on the applied domain gets a code', issued.status === 200, `got ${issued.status}`);
+
+  const spend = (token, code) =>
+    api('/rest/v1/rpc/verify_application_email', {
+      token,
+      method: 'POST',
+      body: { p_application_id: applicationId, p_code: code },
+    });
+
+  const byRival = await spend(rival.token, '424242');
+  check(
+    'another account cannot spend a code it did not request',
+    byRival.status >= 400,
+    `got ${byRival.status}`
+  );
+
+  const wrong = await spend(applicant.token, '999999');
+  check('a wrong code verifies nothing', wrong.body === null, `got ${wrong.status} ${wrong.body}`);
+
+  const right = await spend(applicant.token, '424242');
+  check(
+    'the right code stamps the proved mailbox',
+    right.body === `owner@${applyHost}`,
+    `got ${right.status} ${JSON.stringify(right.body)}`
+  );
+
+  const verified = await api(
+    `/rest/v1/dealer_applications?id=eq.${applicationId}&select=verified_email,verified_at,status`,
+    { token: applicant.token }
+  );
+  check(
+    'verification does not approve the application',
+    verified.body?.[0]?.verified_email === `owner@${applyHost}` &&
+      verified.body?.[0]?.verified_at !== null &&
+      verified.body?.[0]?.status === 'pending'
+  );
+
+  const replay = await spend(applicant.token, '424242');
+  check('the same code cannot be spent twice', replay.status >= 400, `got ${replay.status}`);
+
+  // Verifying grants nothing on its own. Until an operator creates the shop
+  // there is no dealers row to own, which is the whole point of the ordering.
+  const accounts = await api('/rest/v1/rpc/dealer_accounts', {
+    token: applicant.token,
+    method: 'POST',
+  });
+  check(
+    'a verified applicant owns no shop yet',
+    Array.isArray(accounts.body) && accounts.body.length === 0,
+    JSON.stringify(accounts.body)
+  );
+
+  await fetch(`${URL}/rest/v1/dealer_applications?id=eq.${applicationId}`, {
+    method: 'DELETE',
+    headers: admin,
+  });
+}
+
 // The tests approve a dealer to prove the deck respects permission, which put
 // fixtures in front of real users. Clean up rather than leave them there.
 async function cleanUp() {
@@ -1159,7 +1377,7 @@ async function cleanUp() {
   for (const id of [dealerId, codeDealerId]) {
     if (id) await fetch(`${URL}/rest/v1/dealers?id=eq.${id}`, { method: 'DELETE', headers: admin });
   }
-  for (const user of [importer, buyer, dealerUser, claimer, rival, unconfirmed]) {
+  for (const user of [importer, buyer, dealerUser, claimer, rival, unconfirmed, applicant]) {
     if (user?.id) {
       await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
     }

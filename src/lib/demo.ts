@@ -27,6 +27,8 @@ const DEMO_PROFILE: Profile = {
   last_name: 'Collector',
   favorite_brands: ['rolex'],
   onboarded_at: '2026-01-01T00:00:00.000Z',
+  // Demo mode is a deck to look at, and the dealer half needs a real shop row.
+  account_type: 'buyer',
   avatar_url: null,
   bio: null,
   handle: null,

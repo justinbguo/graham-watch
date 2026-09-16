@@ -34,13 +34,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      dealer_applications: {
+        Row: {
+          brands: string[]
+          created_at: string
+          dealer_id: string | null
+          id: string
+          note: string | null
+          reviewed_at: string | null
+          shop_name: string
+          status: Database["public"]["Enums"]["application_status"]
+          user_id: string
+          verified_at: string | null
+          verified_email: string | null
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }
+        Insert: {
+          brands?: string[]
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          shop_name: string
+          status?: Database["public"]["Enums"]["application_status"]
+          user_id: string
+          verified_at?: string | null
+          verified_email?: string | null
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }
+        Update: {
+          brands?: string[]
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          shop_name?: string
+          status?: Database["public"]["Enums"]["application_status"]
+          user_id?: string
+          verified_at?: string | null
+          verified_email?: string | null
+          volume?: Database["public"]["Enums"]["listing_volume"]
+          website?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_applications_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dealer_claim_codes: {
         Row: {
+          application_id: string | null
           attempts: number
           code_hash: string
           consumed_at: string | null
           created_at: string
-          dealer_id: string
+          dealer_id: string | null
           email: string
           expires_at: string
           id: string
@@ -48,11 +112,12 @@ export type Database = {
           salt: string
         }
         Insert: {
+          application_id?: string | null
           attempts?: number
           code_hash: string
           consumed_at?: string | null
           created_at?: string
-          dealer_id: string
+          dealer_id?: string | null
           email: string
           expires_at: string
           id?: string
@@ -60,11 +125,12 @@ export type Database = {
           salt?: string
         }
         Update: {
+          application_id?: string | null
           attempts?: number
           code_hash?: string
           consumed_at?: string | null
           created_at?: string
-          dealer_id?: string
+          dealer_id?: string | null
           email?: string
           expires_at?: string
           id?: string
@@ -72,6 +138,13 @@ export type Database = {
           salt?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "dealer_claim_codes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_applications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dealer_claim_codes_dealer_id_fkey"
             columns: ["dealer_id"]
@@ -394,6 +467,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"] | null
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -405,6 +479,7 @@ export type Database = {
           onboarded_at: string | null
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -416,6 +491,7 @@ export type Database = {
           onboarded_at?: string | null
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -559,6 +635,14 @@ export type Database = {
       can_claim_with_email: {
         Args: { p_dealer_id: string; p_email: string }
         Returns: boolean
+      }
+      can_verify_application: {
+        Args: { p_application_id: string; p_email: string }
+        Returns: boolean
+      }
+      claim_code_digest: {
+        Args: { p_code: string; p_salt: string }
+        Returns: string
       }
       claim_code_limits: {
         Args: never
@@ -771,6 +855,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      store_application_claim_code: {
+        Args: {
+          p_application_id: string
+          p_code: string
+          p_email: string
+          p_requested_by: string
+        }
+        Returns: string
+      }
       store_dealer_claim_code: {
         Args: {
           p_code: string
@@ -786,8 +879,14 @@ export type Database = {
       }
       synced_listing_columns: { Args: never; Returns: string[] }
       url_path: { Args: { p_url: string }; Returns: string }
+      verify_application_email: {
+        Args: { p_application_id: string; p_code: string }
+        Returns: string
+      }
     }
     Enums: {
+      account_type: "buyer" | "dealer"
+      application_status: "pending" | "approved" | "declined"
       case_material:
         | "steel"
         | "yellow_gold"
@@ -832,6 +931,7 @@ export type Database = {
       import_status: "queued" | "running" | "succeeded" | "failed"
       inquiry_status: "pending" | "sent" | "failed"
       listing_status: "active" | "hidden"
+      listing_volume: "under_10" | "10_to_50" | "50_to_200" | "over_200"
       swipe_direction: "left" | "right"
       watch_style:
         | "dress"
@@ -976,6 +1076,8 @@ export const Constants = {
   },
   public: {
     Enums: {
+      account_type: ["buyer", "dealer"],
+      application_status: ["pending", "approved", "declined"],
       case_material: [
         "steel",
         "yellow_gold",
@@ -1023,6 +1125,7 @@ export const Constants = {
       import_status: ["queued", "running", "succeeded", "failed"],
       inquiry_status: ["pending", "sent", "failed"],
       listing_status: ["active", "hidden"],
+      listing_volume: ["under_10", "10_to_50", "50_to_200", "over_200"],
       swipe_direction: ["left", "right"],
       watch_style: [
         "dress",
