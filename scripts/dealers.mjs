@@ -12,6 +12,7 @@
  *   npm run dealers -- applications       shops asking to be listed
  *   npm run dealers -- accept  <app-id>   turn one into a shop they own
  *   npm run dealers -- decline <app-id>   say no, with --note
+ *   npm run dealers -- operator [email]   let an account approve shops
  *
  * Approval is deliberately impossible from the app: RLS blocks a user from
  * approving a dealer they created, so nobody can publish a shop's inventory by
@@ -354,6 +355,10 @@ async function stats() {
   console.log('');
 }
 
+/**
+ * Goes through set_dealer_permission rather than patching the column, so this
+ * and the operator UI share one implementation of "make a shop live".
+ */
 async function setPermission(permission, explicitTarget) {
   const subject = explicitTarget ?? target;
   if (!subject) {
@@ -361,28 +366,57 @@ async function setPermission(permission, explicitTarget) {
     process.exit(1);
   }
 
-  const isUuid = /^[0-9a-f-]{36}$/i.test(subject);
-  const filter = isUuid ? `id=eq.${subject}` : `website=ilike.*${subject}*`;
-
-  const { body, ok, status } = await request(`/rest/v1/dealers?${filter}`, {
+  const dealer = await findDealer(subject);
+  const { body, ok, status } = await request('/rest/v1/rpc/set_dealer_permission', {
     token: key,
-    method: 'PATCH',
-    body: { permission },
-    prefer: 'return=representation',
+    method: 'POST',
+    body: { p_dealer_id: dealer.id, p_permission: permission },
   });
 
   if (!ok) {
     console.error(`Failed (${status}): ${body?.message ?? ''}`);
     process.exit(1);
   }
-  if (!body?.length) {
-    console.error(`No dealer matched "${subject}".`);
-    process.exit(1);
+  console.log(`${dealer.name} → ${body}`);
+}
+
+/**
+ * Grants operator access. The one action that still needs the service key,
+ * because it is what bootstraps every other operator identity.
+ */
+async function operator() {
+  const email = target ?? process.env.GRAHAM_OPERATOR_EMAIL ?? 'operator@graham.local';
+  let userId;
+
+  if (target) {
+    const { body } = await request('/auth/v1/admin/users?per_page=1000', { token: key });
+    const found = (body?.users ?? []).find(
+      (user) => user.email?.toLowerCase() === email.toLowerCase()
+    );
+    if (!found) {
+      console.error(`No account with the address ${email}. They have to sign in once first.`);
+      process.exit(1);
+    }
+    userId = found.id;
+  } else {
+    // Creates the configured operator account if it does not exist yet, which
+    // is what every other command in this file already relies on.
+    userId = (await signInOperator()).id;
   }
 
-  for (const dealer of body) {
-    console.log(`${dealer.name} → ${dealer.permission}`);
+  const { ok, status, body } = await request('/rest/v1/operators', {
+    token: key,
+    method: 'POST',
+    body: { user_id: userId, note: typeof flags.note === 'string' ? flags.note : email },
+    prefer: 'resolution=merge-duplicates,return=representation',
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
   }
+  console.log(`${email} can approve shops now.`);
+  console.log(`  ${userId}`);
 }
 
 const VOLUME_LABELS = {
@@ -435,10 +469,10 @@ async function accept() {
     method: 'POST',
     body: {
       p_application_id: target,
-      // created_by is not null and points at a profile. The operator really did
-      // create this row, so it says so.
-      p_created_by: operator.id,
       p_permission: flags.hold === true ? 'pending' : 'approved',
+      // A service-key call has no subject, so the new shop's created_by has to
+      // be named. The operator UI omits this and is attributed from its session.
+      p_created_by: operator.id,
     },
   });
 
@@ -463,10 +497,11 @@ async function decline() {
     process.exit(1);
   }
 
+  const operator = await signInOperator();
   const { ok, status, body } = await request('/rest/v1/rpc/decline_dealer_application', {
     token: key,
     method: 'POST',
-    body: { p_application_id: target, p_note: note },
+    body: { p_application_id: target, p_note: note, p_reviewed_by: operator.id },
   });
 
   if (!ok) {
@@ -511,9 +546,12 @@ switch (command) {
   case 'decline':
     await decline();
     break;
+  case 'operator':
+    await operator();
+    break;
   default:
     console.error(
-      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke, applications, accept, decline.`
+      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke, applications, accept, decline, operator.`
     );
     process.exit(1);
 }

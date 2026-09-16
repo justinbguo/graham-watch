@@ -828,6 +828,20 @@ export type Database = {
           website: string
         }[]
       }
+      operator_dealers: {
+        Args: never
+        Returns: {
+          claimed_by: string
+          contact_email: string
+          created_at: string
+          id: string
+          listings_live: number
+          listings_total: number
+          name: string
+          permission: Database["public"]["Enums"]["dealer_permission"]
+          website: string
+        }[]
+      }
       pending_source_item_count: {
         Args: { p_dealer_id: string }
         Returns: {

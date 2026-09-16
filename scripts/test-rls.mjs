@@ -1474,8 +1474,8 @@ let acceptedDealerId;
       method: 'POST',
       body: {
         p_application_id: applicationId,
-        p_created_by: importer.id,
         p_permission: permission,
+        p_created_by: importer.id,
       },
     });
 
@@ -1583,6 +1583,137 @@ let acceptedDealerId;
       headers: admin,
     });
   }
+}
+
+console.log('\noperators');
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  // The operator UI runs on a normal session, so every one of these is reachable
+  // from a browser by anyone signed in. The grant is the only thing stopping it.
+  const codes = await api('/rest/v1/operators', { token: buyer.token });
+  check('the operator list is unreachable over REST', codes.status >= 400, `got ${codes.status}`);
+
+  const claim = await api('/rest/v1/operators', {
+    token: buyer.token,
+    method: 'POST',
+    body: { user_id: buyer.id },
+  });
+  check('nobody can make themselves an operator', claim.status >= 400, `got ${claim.status}`);
+
+  const asksIfOperator = await api('/rest/v1/rpc/is_operator', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check('a signed-in user is not an operator', asksIfOperator.body === false);
+
+  const publish = (token, permission) =>
+    api('/rest/v1/rpc/set_dealer_permission', {
+      token,
+      method: 'POST',
+      body: { p_dealer_id: dealerId, p_permission: permission },
+    });
+
+  const byBuyer = await publish(buyer.token, 'approved');
+  check('a buyer cannot publish a shop', byBuyer.status >= 400, `got ${byBuyer.status}`);
+
+  // The dealer who claimed this shop is the sharpest case: they have every
+  // other power over it, and still cannot put their own stock in the deck.
+  const byDealer = await publish(dealerUser.token, 'approved');
+  check(
+    'the dealer who claimed the shop cannot publish it',
+    byDealer.status >= 400,
+    `got ${byDealer.status}`
+  );
+
+  const overviewBefore = await api('/rest/v1/rpc/operator_dealers', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'a non-operator cannot list shops with their addresses',
+    overviewBefore.status >= 400,
+    `got ${overviewBefore.status}`
+  );
+
+  await fetch(`${URL}/rest/v1/operators`, {
+    method: 'POST',
+    headers: admin,
+    body: JSON.stringify({ user_id: buyer.id, note: 'rls test' }),
+  });
+
+  const nowOperator = await api('/rest/v1/rpc/is_operator', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check('a granted account is an operator', nowOperator.body === true);
+
+  const byOperator = await publish(buyer.token, 'revoked');
+  check(
+    'an operator publishes and pulls back',
+    byOperator.body === 'revoked',
+    `got ${byOperator.status} ${JSON.stringify(byOperator.body)}`
+  );
+
+  // Reading every application is what the review screen is; without this the
+  // operator UI would show an empty list and look broken.
+  const everyApplication = await api('/rest/v1/dealer_applications?select=id', {
+    token: buyer.token,
+  });
+  check(
+    'an operator reads every application',
+    Array.isArray(everyApplication.body),
+    JSON.stringify(everyApplication.body)
+  );
+
+  // The dealers table stays column-restricted even for an operator, so the
+  // review screen reads through a function. If this ever became a plain table
+  // read, every buyer would get every shop's mailbox with it.
+  const bareRead = await api('/rest/v1/dealers?select=*', { token: buyer.token });
+  check(
+    'contact_email is unreadable through the table, operator or not',
+    bareRead.status >= 400,
+    `got ${bareRead.status}`
+  );
+
+  const overview = await api('/rest/v1/rpc/operator_dealers', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'operator_dealers returns the address the table will not',
+    Array.isArray(overview.body) &&
+      overview.body.some((row) => row.id === dealerId && 'contact_email' in row),
+    `${overview.status} ${JSON.stringify(overview.body)?.slice(0, 160)}`
+  );
+  check(
+    'it counts what is actually in the deck',
+    typeof overview.body?.[0]?.listings_live === 'number' &&
+      typeof overview.body?.[0]?.listings_total === 'number',
+    JSON.stringify(overview.body?.[0])
+  );
+
+  await fetch(`${URL}/rest/v1/operators?user_id=eq.${buyer.id}`, {
+    method: 'DELETE',
+    headers: admin,
+  });
+
+  const revoked = await publish(buyer.token, 'approved');
+  check(
+    'revoking the row revokes the power',
+    revoked.status >= 400,
+    `got ${revoked.status}`
+  );
+
+  await fetch(`${URL}/rest/v1/rpc/set_dealer_permission`, {
+    method: 'POST',
+    headers: admin,
+    body: JSON.stringify({ p_dealer_id: dealerId, p_permission: 'approved' }),
+  });
 }
 
 // The tests approve a dealer to prove the deck respects permission, which put
