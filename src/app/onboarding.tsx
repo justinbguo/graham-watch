@@ -1,141 +1,119 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-import { Button, ChoiceRow, Eyebrow, Field, Message, Screen } from '@/components/ui';
-import { useCompleteOnboarding, useProfile } from '@/data/profile';
-import { useFacets } from '@/data/search';
-import { inset, space, stack, type, type Theme } from '@/lib/theme';
-import { useSession } from '@/providers/session';
+import { Eyebrow, Message, Screen, Spinner } from '@/components/ui';
+import { forgetRole, takeRole, type AccountRole } from '@/features/auth/role';
+import { BuyerFlow } from '@/features/onboarding/BuyerFlow';
+import { DealerFlow } from '@/features/onboarding/DealerFlow';
+import { onboardingStyles } from '@/features/onboarding/styles';
+import { HIT_TARGET, inset, radius, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-type Step = 'name' | 'brands';
-
 export default function Onboarding() {
-  const { userId } = useSession();
-  const { data: profile } = useProfile(userId);
-  const { data: facets = [] } = useFacets();
-  const complete = useCompleteOnboarding(userId);
-  const styles = useThemedStyles(onboardingStyles);
+  const [role, setRole] = useState<AccountRole | null>(null);
+  const [resolving, setResolving] = useState(true);
 
-  const [step, setStep] = useState<Step>('name');
-  // Apple and Google give us a name on first sign-in. Prefilling it means most
-  // people confirm rather than type.
-  const [firstName, setFirstName] = useState(profile?.first_name ?? '');
-  const [lastName, setLastName] = useState(profile?.last_name ?? '');
-  const [brands, setBrands] = useState<string[]>([]);
+  // Picked on the sign-in screen and stashed, because the session that carries
+  // it can arrive through a deep link or a browser round trip that never comes
+  // back to that screen. A missing stash is a real case, not an error.
+  useEffect(() => {
+    let live = true;
+    void takeRole()
+      .then((stored) => {
+        if (live) setRole(stored);
+        // Cleared once read. Left behind, the next person to sign in on this
+        // device would silently inherit whichever door the last one picked.
+        return forgetRole();
+      })
+      .finally(() => {
+        if (live) setResolving(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
-  const brandFacets = facets.filter((facet) => facet.kind === 'brand');
-  const named = Boolean(firstName.trim() && lastName.trim());
-
-  const toggle = (value: string) =>
-    setBrands((current) =>
-      current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
-    );
-
-  const finish = () =>
-    complete.mutate({ firstName, lastName, favoriteBrands: brands });
-
-  if (step === 'name') {
+  if (resolving) {
     return (
       <Screen>
-        <KeyboardAvoidingView
-          style={styles.body}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.header}>
-            <Eyebrow>Step 1 of 2</Eyebrow>
-            <Text style={styles.heading}>What should we call you?</Text>
-            <Message text="Dealers see this name when you ask about a watch." />
-          </View>
-
-          <View style={styles.form}>
-            <Field
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="First name"
-              autoComplete="given-name"
-              textContentType="givenName"
-              autoCapitalize="words"
-            />
-            <Field
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Last name"
-              autoComplete="family-name"
-              textContentType="familyName"
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.actions}>
-            <Button label="Continue" disabled={!named} onPress={() => setStep('brands')} />
-          </View>
-        </KeyboardAvoidingView>
+        <Spinner />
       </Screen>
     );
   }
 
+  if (!role) return <RoleStep onChoose={setRole} />;
+  return role === 'dealer' ? <DealerFlow /> : <BuyerFlow />;
+}
+
+/** The fallback fork, for a session that arrived without the sign-in stash. */
+function RoleStep({ onChoose }: { onChoose: (role: AccountRole) => void }) {
+  const layout = useThemedStyles(onboardingStyles);
+
   return (
     <Screen>
-      <View style={styles.body}>
-        <View style={styles.header}>
-          <Eyebrow>Step 2 of 2</Eyebrow>
-          <Text style={styles.heading}>Which brands do you love?</Text>
-          <Message text="Watches from these come up first. Everything else still shows." />
+      <View style={layout.body}>
+        <View style={layout.header}>
+          <Eyebrow>First question</Eyebrow>
+          <Text style={layout.heading}>Are you buying or selling?</Text>
+          <Message text="You can change this later by writing to us." />
         </View>
 
-        <ScrollView contentContainerStyle={styles.brands}>
-          {brandFacets.map((facet) => (
-            <ChoiceRow
-              key={facet.value}
-              label={facet.label}
-              count={facet.count}
-              selected={brands.includes(facet.value)}
-              onPress={() => toggle(facet.value)}
-            />
-          ))}
-        </ScrollView>
-
-        {complete.error ? <Message text={complete.error.message} tone="error" /> : null}
-
-        <View style={styles.actions}>
-          {/* No minimum. Someone who wants to see everything in the order we
-              found it should not have to invent a preference to get past here. */}
-          <Button
-            label={brands.length ? 'Start swiping' : 'Skip for now'}
-            loading={complete.isPending}
-            onPress={finish}
+        <View style={layout.form}>
+          <Choice
+            title="I'm looking for a watch"
+            detail="Swipe a deck and write to the dealer when one is right."
+            onPress={() => onChoose('buyer')}
           />
-          <Button label="Back" variant="ghost" onPress={() => setStep('name')} />
+          <Choice
+            title="I sell watches"
+            detail="List your shop's stock and answer buyers directly."
+            onPress={() => onChoose('dealer')}
+          />
         </View>
       </View>
     </Screen>
   );
 }
 
-const onboardingStyles = (theme: Theme) => ({
-  body: {
-    flex: 1,
-    paddingHorizontal: inset.screen,
-    paddingBottom: inset.screen,
-    gap: stack.section,
-  },
-  header: {
+function Choice({
+  title,
+  detail,
+  onPress,
+}: {
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(roleStyles);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.detail}>{detail}</Text>
+    </Pressable>
+  );
+}
+
+const roleStyles = (theme: Theme) => ({
+  card: {
+    borderRadius: radius.md,
+    padding: inset.card,
+    minHeight: HIT_TARGET,
     gap: stack.tight,
+    backgroundColor: theme.color.surface,
   },
-  heading: {
-    ...type.display,
+  title: {
+    ...type.bodyStrong,
     color: theme.color.text,
   },
-  form: {
-    gap: stack.related,
+  detail: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
-  brands: {
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
-    paddingBottom: space.md,
-  },
-  actions: {
-    marginTop: 'auto' as const,
-    gap: stack.related,
+  pressed: {
+    opacity: 0.72,
   },
 });

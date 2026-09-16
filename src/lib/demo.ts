@@ -239,6 +239,10 @@ export const demo = {
 
   completeOnboarding: () => undefined,
 
+  setAvatar: (url: string) => {
+    DEMO_PROFILE.avatar_url = url;
+  },
+
   passCount: () => [...swiped.values()].filter((direction) => direction === 'left').length,
 
   startOver: () => {

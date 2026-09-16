@@ -34,7 +34,8 @@ In:
 3. Search — ask the catalogue a question, filtered separately from the deck.
 4. Saved — the list of right-swipes, with the total it adds up to.
 5. Inquiry — from a saved watch, deliberately contact the dealer.
-6. Profile — your account, and the shop you have claimed if you have one.
+6. Profile — your name, an optional picture, watches you have saved, and the
+   shop you have claimed if you have one.
 7. Dealer workspace — claim a shop, edit its listings, refresh its catalogue.
 
 Out, deliberately: payments and checkout, in-app messaging between users, ratings and

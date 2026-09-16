@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
+import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
 import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
 import {
   ClaimByCodeCard,
@@ -10,6 +11,7 @@ import {
   DealerShopCard,
 } from '@/features/dealers/DealerShopCard';
 import { useDealerWorkspace } from '@/features/dealers/workspace';
+import { ProfileHeader } from '@/features/profile/ProfileHeader';
 import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -20,6 +22,7 @@ export default function Profile() {
 
   const header = (
     <View style={styles.header}>
+      <ProfileHeader />
       {claimed ? (
         <View style={styles.section}>
           <Eyebrow>Your shop</Eyebrow>
@@ -44,12 +47,16 @@ export default function Profile() {
           <Eyebrow>Your shop</Eyebrow>
           <ClaimDealerCard dealer={shop.claimable} />
         </View>
-      ) : (
-        <View style={styles.emptyProfile}>
-          <Heading>Your profile</Heading>
-          <Message text="Your account and appearance are in Settings." />
-          <ClaimByCodeCard onStart={() => router.push('/claim-shop')} />
+      ) : shop.application ? (
+        <View style={styles.section}>
+          <Eyebrow>Your application</Eyebrow>
+          <ApplicationStatusCard
+            application={shop.application}
+            onFinishVerifying={() => router.push('/apply')}
+          />
         </View>
+      ) : (
+        <ClaimByCodeCard onStart={() => router.push('/apply')} />
       )}
     </View>
   );
@@ -129,10 +136,6 @@ const profileStyles = (theme: Theme) => ({
     backgroundColor: theme.color.border,
   },
   empty: {
-    paddingVertical: space.xxl,
-    gap: stack.related,
-  },
-  emptyProfile: {
     paddingVertical: space.xxl,
     gap: stack.related,
   },
