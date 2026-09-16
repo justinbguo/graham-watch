@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
+import { useMyApplication } from '@/data/applications';
 import {
   useDealerAccounts,
   useDealerInventory,
@@ -24,6 +25,11 @@ export function useDealerWorkspace() {
   const accounts = useDealerAccounts();
   const shop = accounts.data?.find((dealer) => dealer.claimed) ?? null;
   const claimable = accounts.data?.find((dealer) => !dealer.claimed) ?? null;
+
+  // Only asked for when there is no shop yet. A dealer whose application was
+  // approved has a claimed shop, and that outranks the application that got
+  // them there.
+  const application = useMyApplication();
 
   const inventory = useDealerInventory(shop?.id ?? null);
   const update = useUpdateDealerListing(shop?.id ?? null);
@@ -61,6 +67,7 @@ export function useDealerWorkspace() {
   return {
     shop,
     claimable,
+    application: shop || claimable ? null : (application.data ?? null),
     inventory: items,
     totals,
     isLoading: accounts.isLoading || inventory.isLoading,

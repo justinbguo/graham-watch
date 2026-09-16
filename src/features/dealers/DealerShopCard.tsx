@@ -12,7 +12,7 @@ import type { DealerAccount, DealerTotals } from './workspace';
 /**
  * The fast lane: this login is signed in as the very address the shop publishes,
  * and proved that mailbox to get here, so there is nothing further to check.
- * Every other dealer goes through /claim-shop and receives a code.
+ * Every other dealer goes through /apply and receives a code.
  */
 export function ClaimDealerCard({ dealer }: { dealer: DealerAccount }) {
   const styles = useThemedStyles(cardStyles);

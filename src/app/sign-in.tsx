@@ -1,14 +1,33 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 
 import { Button, Field, Message, Screen } from '@/components/ui';
 import { useSignIn } from '@/features/auth/email';
-import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { rememberRole, type AccountRole } from '@/features/auth/role';
+import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
+
+const TAGLINE: Record<AccountRole, string> = {
+  buyer: 'Find the watch. Meet the dealer.',
+  dealer: 'Put your window in front of people who collect.',
+};
 
 export default function SignIn() {
   const signIn = useSignIn();
   const styles = useThemedStyles(signInStyles);
+  const [role, setRole] = useState<AccountRole | null>(null);
+
+  /**
+   * Stashed before the session exists, because the account it belongs on does
+   * not exist yet. Onboarding picks it up; if the stash is gone it asks.
+   */
+  const choose = (next: AccountRole) => {
+    setRole(next);
+    void rememberRole(next);
+  };
+
+  if (!role) return <RoleChoice onChoose={choose} />;
 
   return (
     <Screen>
@@ -18,7 +37,7 @@ export default function SignIn() {
         <View style={styles.header}>
           <Text style={styles.wordmark}>Graham</Text>
           <View style={styles.wordmarkRule} />
-          <Text style={styles.tagline}>Find the watch. Meet the dealer.</Text>
+          <Text style={styles.tagline}>{TAGLINE[role]}</Text>
         </View>
 
         <View style={styles.form}>
@@ -63,6 +82,14 @@ export default function SignIn() {
           )}
 
           {signIn.error ? <Message text={signIn.error} tone="error" /> : null}
+
+          {signIn.stage === 'email' ? (
+            <Button
+              label={role === 'dealer' ? "I'm buying, not selling" : 'I sell watches'}
+              variant="ghost"
+              onPress={() => choose(role === 'dealer' ? 'buyer' : 'dealer')}
+            />
+          ) : null}
         </View>
 
         {signIn.stage === 'email' && (signIn.appleAvailable || signIn.googleEnabled) ? (
@@ -97,11 +124,75 @@ export default function SignIn() {
   );
 }
 
+/**
+ * The fork. One sign-in behind it, not two: Auth links identities by verified
+ * email and the shop claim turns on `email_confirmed_at`, so a second auth
+ * surface would be a second place for the redirect allow-list and the code flow
+ * to drift out of step.
+ *
+ * What the choice buys is the next screen, not a different account.
+ */
+function RoleChoice({ onChoose }: { onChoose: (role: AccountRole) => void }) {
+  const styles = useThemedStyles(signInStyles);
+
+  return (
+    <Screen>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.wordmark}>Graham</Text>
+          <View style={styles.wordmarkRule} />
+          <Text style={styles.tagline}>Vintage watches, and the people who sell them.</Text>
+        </View>
+
+        <View style={styles.form}>
+          <RoleCard
+            title="I'm looking for a watch"
+            detail="Swipe a deck of vintage watches and write to the dealer when one is right."
+            onPress={() => onChoose('buyer')}
+          />
+          <RoleCard
+            title="I sell watches"
+            detail="List your shop's stock and answer buyers directly. No fee and no commission."
+            onPress={() => onChoose('dealer')}
+          />
+        </View>
+      </View>
+    </Screen>
+  );
+}
+
+function RoleCard({
+  title,
+  detail,
+  onPress,
+}: {
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(signInStyles);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.roleCard, pressed && styles.pressed]}>
+      <Text style={styles.roleTitle}>{title}</Text>
+      <Text style={styles.roleDetail}>{detail}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The link is named as well as the code. `config.toml` templates only reach the
+ * local stack, so a hosted project whose dashboard templates are still stock
+ * sends a link and no code — and the deep link in `session.tsx` signs them in.
+ */
 function codeMessage(signIn: ReturnType<typeof useSignIn>): string {
   if (signIn.readingInbox) {
     return `Reading the local inbox for ${signIn.email}.`;
   }
-  return `Enter the six digit code we sent to ${signIn.email}.`;
+  return `Enter the six digit code we sent to ${signIn.email}, or open the link in that email.`;
 }
 
 const signInStyles = (theme: Theme) => ({
@@ -146,5 +237,25 @@ const signInStyles = (theme: Theme) => ({
   },
   appleButton: {
     height: size.appleButton,
+  },
+  roleCard: {
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderRadius: radius.md,
+    padding: inset.card,
+    minHeight: HIT_TARGET,
+    gap: stack.tight,
+    backgroundColor: theme.color.surface,
+  },
+  roleTitle: {
+    ...type.bodyStrong,
+    color: theme.color.text,
+  },
+  roleDetail: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

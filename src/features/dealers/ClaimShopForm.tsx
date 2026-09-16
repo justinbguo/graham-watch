@@ -9,9 +9,15 @@ import { useShopClaim } from './claim';
 export function ClaimShopForm({
   claim,
   onDone,
+  onApply,
 }: {
   claim: ReturnType<typeof useShopClaim>;
   onDone: () => void;
+  /**
+   * What to do when no shop here has that website. Without it the screen is a
+   * dead end that tells the dealer to ask us and gives them no way to ask.
+   */
+  onApply?: (website: string) => void;
 }) {
   const styles = useThemedStyles(formStyles);
 
@@ -143,7 +149,16 @@ export function ClaimShopForm({
       ) : claim.searching ? (
         <Message text="Looking…" />
       ) : claim.website.trim() ? (
-        <Message text="No shop here has that website yet. Check the spelling, or ask us to add it." />
+        <View style={styles.copy}>
+          <Message text="No shop here has that website yet. Check the spelling, or apply and we will read it by hand." />
+          {onApply ? (
+            <Button
+              label="Apply to list my shop"
+              variant="solid"
+              onPress={() => onApply(claim.website.trim())}
+            />
+          ) : null}
+        </View>
       ) : null}
 
       {claim.error ? <Message text={claim.error} tone="error" /> : null}
