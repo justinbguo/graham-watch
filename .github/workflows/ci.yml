@@ -49,17 +49,17 @@ jobs:
       # so `npm run typecheck` never sees them, and the import pipeline is the
       # largest piece of untyped-in-CI code we ship.
       #
-      # --node-modules-dir=auto lets Deno resolve `npm:@supabase/server`.
-      # --no-lock because Deno finds the root package.json and would write a
-      # lockfile describing Expo rather than these three functions.
+      # The config marks supabase/functions as the project root; see the note
+      # inside it for why the app's package.json must stay out of scope.
+      # --no-lock because a lockfile for four server files buys nothing: every
+      # specifier is already version-pinned in the import itself.
       - name: typecheck
-        working-directory: supabase/functions
         run: >-
-          deno check --no-lock --node-modules-dir=auto
-          import-listings/index.ts
-          send-inquiry/index.ts
-          claim-dealer/index.ts
-          verify-application/index.ts
+          deno check --no-lock --config supabase/functions/deno.ci.json
+          supabase/functions/import-listings/index.ts
+          supabase/functions/send-inquiry/index.ts
+          supabase/functions/claim-dealer/index.ts
+          supabase/functions/verify-application/index.ts
 
   database:
     name: database
