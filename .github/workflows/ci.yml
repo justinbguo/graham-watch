@@ -1,0 +1,42 @@
+name: CI
+
+# Only the app job. The edge function, database, and operator jobs are written
+# on feat/dealer-workspace and check files this branch does not carry yet, so
+# they arrive when that branch merges. This exists first because GitHub does
+# not register a workflow, or run one for a pull request, until the default
+# branch has it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push makes the first run's answer worthless. Cancel the one nobody
+# is waiting on.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      # Typecheck reads files; it does not resolve the route tree or the asset
+      # graph. Deleting a screen that a navigator still registers, or importing
+      # a font that is not installed, both pass tsc and fail on launch. Only a
+      # bundle catches them.
+      - name: bundle
+        run: npx expo export --platform web --output-dir "$RUNNER_TEMP/web"
