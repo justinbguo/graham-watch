@@ -35,6 +35,40 @@ jobs:
       - name: bundle
         run: npx expo export --platform web --output-dir "$RUNNER_TEMP/web"
 
+  operator:
+    name: operator ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: operator/package-lock.json
+
+      # Its own package.json. Vite and Expo both want to own React and the
+      # bundler, so they do not share a dependency tree. No root `npm ci` here:
+      # the schema types it imports are a committed file, not a dependency.
+      - run: npm ci
+        working-directory: operator
+
+      # Placeholders, but they have to be set. supabase.ts throws when the env
+      # is missing, so with no values Rollup proves the throw always runs,
+      # treats createClient as unreachable and tree-shakes every line of
+      # supabase-js out. The build stays green while bundling an app that can
+      # only crash — 228kB instead of 444kB.
+      - name: build
+        working-directory: operator
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+        run: npm run build
+
+      - name: lint
+        working-directory: operator
+        run: npx oxlint --deny-warnings
+
   functions:
     name: edge functions
     runs-on: ubuntu-latest
