@@ -13,6 +13,40 @@ function toCents(money: Json): number | null {
   return Math.round(value * 100);
 }
 
+/**
+ * The price Squarespace actually renders. Most shops repeat it at product
+ * level; Goldfinger leaves that at 0.00 and puts the real amount on its only
+ * variant, so stopping at the first field turns $19,950 into "Price on request".
+ */
+export function squarespacePrice(item: Json): {
+  priceCents: number | null;
+  currency: string | null;
+} {
+  const variants: Json[] = Array.isArray(item?.structuredContent?.variants)
+    ? item.structuredContent.variants
+    : [];
+  const available = variants.find(
+    (variant) => variant?.unlimited === true || Number(variant?.qtyInStock) > 0
+  );
+
+  const containers = [item?.structuredContent, available, ...variants, item];
+  for (const container of containers) {
+    const money =
+      container?.onSale === true && toCents(container?.salePriceMoney) !== null
+        ? container.salePriceMoney
+        : container?.priceMoney;
+    const priceCents = toCents(money);
+    if (priceCents !== null) {
+      return {
+        priceCents,
+        currency: typeof money?.currency === 'string' ? money.currency : null,
+      };
+    }
+  }
+
+  return { priceCents: null, currency: null };
+}
+
 function photoUrls(item: Json): string[] {
   const gallery = Array.isArray(item?.items) ? item.items : [];
   const urls = [item?.assetUrl, ...gallery.map((entry: Json) => entry?.assetUrl)].filter(
@@ -35,13 +69,12 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     // Keep the collection URL; a bad product path is not worth losing the item.
   }
 
-  const money = item?.structuredContent?.priceMoney;
-
   // One watch is one variant with one in stock. Sold drops it to zero, which is
   // the only place a Squarespace shop admits the watch is gone.
   const variants: Json[] = Array.isArray(item?.structuredContent?.variants)
     ? item.structuredContent.variants
     : [];
+  const price = squarespacePrice(item);
 
   return {
     // Squarespace's own item id survives a slug rename; fullUrl does not.
@@ -55,8 +88,8 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     text: htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl),
     sourceUrl,
     photoUrls: photos,
-    priceCents: toCents(money),
-    currency: typeof money?.currency === 'string' ? money.currency : null,
+    priceCents: price.priceCents,
+    currency: price.currency,
   };
 }
 
