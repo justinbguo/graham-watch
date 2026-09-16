@@ -59,6 +59,7 @@ jobs:
           import-listings/index.ts
           send-inquiry/index.ts
           claim-dealer/index.ts
+          verify-application/index.ts
 
   database:
     name: database
