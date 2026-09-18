@@ -173,6 +173,33 @@ Deno.serve(async (req) => {
     return json({ error: 'Add an email to your profile before contacting a dealer.' }, 422);
   }
 
+  // Claimed before the mail goes out, not after it comes back.
+  //
+  // Marking it afterwards read as the honest order — only report a send that
+  // happened — but the write was never checked, so a lost update left the row
+  // `pending` under a response that said `sent`. `recordIntent` hands a buyer
+  // any row that is not `sent` back to retry, and the guard above lets a
+  // `pending` row through, so the next tap mailed the dealer the same inquiry
+  // again. An email cannot be recalled; a status can be corrected.
+  //
+  // `neq` makes the claim the lock as well: two invocations for one inquiry
+  // cannot both win it, so neither can both send.
+  const claimed = await service
+    .from('inquiries')
+    .update({ status: 'sent', sent_at: new Date().toISOString() })
+    .eq('id', inquiry.id)
+    .neq('status', 'sent')
+    .select('id')
+    .maybeSingle();
+
+  if (claimed.error) {
+    console.error('send-inquiry could not claim the inquiry', inquiry.id, claimed.error.message);
+    return json({ error: 'Could not reach the dealer. Try again shortly.' }, 502);
+  }
+
+  // Another invocation claimed it between the read above and here.
+  if (!claimed.data) return json({ status: 'sent' });
+
   try {
     await send(
       compose(
@@ -184,15 +211,19 @@ Deno.serve(async (req) => {
       )
     );
   } catch (error) {
-    await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
+    // Hand the row back so the buyer can try again. If this write is the thing
+    // that is broken the row stays `sent` and the inquiry is stranded, which is
+    // the failure to prefer: it needs a person, not a second email.
+    const released = await service
+      .from('inquiries')
+      .update({ status: 'failed', sent_at: null })
+      .eq('id', inquiry.id);
+    if (released.error) {
+      console.error('send-inquiry stranded an inquiry', inquiry.id, released.error.message);
+    }
     console.error('send-inquiry failed', error);
     return json({ error: 'Could not reach the dealer. Try again shortly.' }, 502);
   }
-
-  await service
-    .from('inquiries')
-    .update({ status: 'sent', sent_at: new Date().toISOString() })
-    .eq('id', inquiry.id);
 
   return json({ status: 'sent' });
 });
