@@ -12,6 +12,20 @@ import { relative } from 'node:path';
 
 let cached;
 
+// The same test the operator UI makes (operator/src/supabase.ts). "Local" is a
+// property of the address, not of how the address was found: seed.sql documents
+// exporting SUPABASE_URL to aim these scripts at the local stack, and reading
+// that as production would label it wrong and gate it for nothing.
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
+
+function isLocalUrl(url) {
+  try {
+    return LOCAL_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function localStatus() {
   const output = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   return Object.fromEntries(
@@ -33,7 +47,7 @@ export function config() {
       url: process.env.SUPABASE_URL,
       anonKey: process.env.SUPABASE_ANON_KEY,
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      isLocal: false,
+      isLocal: isLocalUrl(process.env.SUPABASE_URL),
     };
     return cached;
   }
@@ -51,9 +65,29 @@ export function config() {
     url: status.API_URL,
     anonKey: status.ANON_KEY,
     serviceKey: status.SERVICE_ROLE_KEY,
-    isLocal: true,
+    isLocal: isLocalUrl(status.API_URL),
   };
   return cached;
+}
+
+/**
+ * A one-line answer to "which project is about to change?".
+ *
+ * `npm run dealers` loads scripts/.env.operator.local, which holds hosted keys,
+ * so every operator command writes to production unless it is overridden. The
+ * bare URL was not enough — a project ref reads as noise above a list of shops,
+ * and the word missing from it was the one that matters.
+ */
+export function describeTarget() {
+  const { url, isLocal } = config();
+  if (isLocal) return 'local';
+
+  try {
+    return `PRODUCTION · ${new URL(url).hostname}`;
+  } catch {
+    // This line only ever labels somebody else's output; never let it throw.
+    return `PRODUCTION · ${url}`;
+  }
 }
 
 export async function request(path, { token, method = 'GET', body, prefer } = {}) {
