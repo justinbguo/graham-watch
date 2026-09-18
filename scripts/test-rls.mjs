@@ -299,8 +299,10 @@ console.log('\nafter approval');
 
   // A sold watch must leave every surface that offers something to buy, and stay
   // readable everywhere that only reports what already happened.
+  // Marked by the account that claimed the shop. Importing it first is not a
+  // standing permission over someone else's stock.
   await api(`/rest/v1/listings?id=eq.${listingId}`, {
-    token: importer.token,
+    token: dealerUser.token,
     method: 'PATCH',
     body: { sold_at: new Date().toISOString() },
   });
@@ -332,7 +334,7 @@ console.log('\nafter approval');
   );
 
   await api(`/rest/v1/listings?id=eq.${listingId}`, {
-    token: importer.token,
+    token: dealerUser.token,
     method: 'PATCH',
     body: { sold_at: null },
   });
@@ -1176,21 +1178,31 @@ console.log('\nreplacing a gallery');
     { source_url: 'https://shop.test/2.jpg', storage_path: null, position: 1 },
   ];
 
-  const mine = await replace(importer.token, gallery);
-  check('the importer replaces their own gallery', mine.body === 2, `got ${JSON.stringify(mine.body)}`);
-
   const stranger = await replace(buyer.token, gallery);
   check('a stranger cannot replace a gallery', stranger.status >= 400, `got ${stranger.status}`);
+
+  // Importing a shop first is not a permission that outlives its claim. This
+  // account added the shop and is every listing's `imported_by`, and once
+  // dealerUser claimed it that stopped counting.
+  const stale = await replace(importer.token, gallery);
+  check(
+    'the earlier importer cannot rewrite a claimed shop’s gallery',
+    stale.status >= 400,
+    `got ${stale.status}`
+  );
 
   // The reason this is an RPC. dealerUser claimed this shop but did not import
   // it, so they are not the listing's importer — the photo write policy refused
   // them, and every refresh they ran silently left the gallery as it was.
-  const claimed = await replace(dealerUser.token, [gallery[0]]);
+  const claimed = await replace(dealerUser.token, gallery);
   check(
     'a dealer who claimed the shop replaces the gallery',
-    claimed.body === 1,
+    claimed.body === 2,
     `got ${JSON.stringify(claimed.body)}`
   );
+
+  const shorter = await replace(dealerUser.token, [gallery[0]]);
+  check('a shorter gallery replaces a longer one', shorter.body === 1, `got ${JSON.stringify(shorter.body)}`);
 
   const left = await api(`/rest/v1/listing_photos?listing_id=eq.${listingId}&select=position`, {
     token: buyer.token,
@@ -1752,13 +1764,13 @@ console.log('\nwhat anon can reach');
   }
 
   // The one that was live: a shop published by nobody at all.
-  const permission = await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
+  const stillPending = await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
     headers: admin,
   }).then((r) => r.json());
   check(
     'no anon call changed a permission',
-    permission?.[0]?.permission === 'approved',
-    `permission is ${permission?.[0]?.permission}`
+    stillPending?.[0]?.permission === 'approved',
+    `permission is ${stillPending?.[0]?.permission}`
   );
 
   const anonWrite = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
@@ -1780,6 +1792,134 @@ console.log('\nwhat anon can reach');
     probe.status >= 400,
     `got ${probe.status}`
   );
+}
+
+// Claiming a shop sets `claimed_by` and leaves `created_by` where it was, so
+// ownership spelled as `created_by = auth.uid()` never expires. The account that
+// imported a shop first kept write access after its real owner claimed it —
+// including over `contact_email`, the address send-inquiry mails buyers to.
+console.log('\nownership after a claim');
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  const readShop = async (columns) =>
+    (
+      await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=${columns}`, { headers: admin })
+    ).json();
+
+  const before = await readShop('name,contact_email');
+
+  // An update that no policy admits touches no rows and is not an error, so the
+  // column is the only honest assertion here.
+  await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { contact_email: 'attacker@example.com' },
+  });
+  const afterEmail = await readShop('contact_email');
+  check(
+    'the original importer cannot redirect inquiry mail',
+    afterEmail?.[0]?.contact_email === before?.[0]?.contact_email,
+    `contact_email became ${afterEmail?.[0]?.contact_email}`
+  );
+
+  await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { name: 'Importer Renamed This' },
+  });
+  const afterName = await readShop('name');
+  check(
+    'the original importer cannot rename a claimed shop',
+    afterName?.[0]?.name === before?.[0]?.name,
+    `name became ${afterName?.[0]?.name}`
+  );
+
+  // The other half of the rule: the account that claimed the shop owns it.
+  await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { name: 'Claimed And Renamed' },
+  });
+  const byOwner = await readShop('name');
+  check(
+    'the account that claimed the shop can rename it',
+    byOwner?.[0]?.name === 'Claimed And Renamed',
+    `name is ${byOwner?.[0]?.name}`
+  );
+
+  await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}`, {
+    method: 'PATCH',
+    headers: admin,
+    body: JSON.stringify({ name: before?.[0]?.name }),
+  });
+}
+
+// `imported_by` records who fetched a listing once. It was also accepted as
+// permission to update one, on either side of the write — so a listing could be
+// moved onto any approved shop and appear in the deck under that shop's name.
+console.log('\nmoving a listing between shops');
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  const strangerShop = await fetch(`${URL}/rest/v1/dealers`, {
+    method: 'POST',
+    headers: { ...admin, Prefer: 'return=representation' },
+    body: JSON.stringify({
+      name: `Stranger ${stamp}`,
+      website: `https://stranger-${stamp}.example.com`,
+      permission: 'approved',
+      created_by: buyer.id,
+      claimed_by: buyer.id,
+    }),
+  }).then((r) => r.json());
+  const strangerId = strangerShop?.[0]?.id;
+
+  const readDealerOf = async (id) =>
+    (
+      await fetch(`${URL}/rest/v1/listings?id=eq.${id}&select=dealer_id`, { headers: admin })
+    ).json();
+
+  await api(`/rest/v1/listings?id=eq.${listingId}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: { dealer_id: strangerId },
+  });
+  const moved = await readDealerOf(listingId);
+  check(
+    'a listing cannot be moved onto a shop the caller does not control',
+    moved?.[0]?.dealer_id === dealerId,
+    `dealer_id became ${moved?.[0]?.dealer_id}`
+  );
+
+  // The rule has to leave the ordinary edit working, which is the listing editor
+  // changing a price on stock the signed-in dealer actually owns.
+  const priced = await api(`/rest/v1/listings?id=eq.${listingId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { price_cents: 1234500 },
+  });
+  const afterPrice = await fetch(
+    `${URL}/rest/v1/listings?id=eq.${listingId}&select=price_cents`,
+    { headers: admin }
+  ).then((r) => r.json());
+  check(
+    'the shop owner can still edit their own listing',
+    afterPrice?.[0]?.price_cents === 1234500,
+    `${priced.status}, price is ${afterPrice?.[0]?.price_cents}`
+  );
+
+  if (strangerId) {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${strangerId}`, { method: 'DELETE', headers: admin });
+  }
 }
 
 // The tests approve a dealer to prove the deck respects permission, which put

@@ -701,6 +701,7 @@ export type Database = {
         Args: { p_code: string; p_dealer_id: string }
         Returns: string
       }
+      controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
       dealer_accounts: {
         Args: never
         Returns: {
