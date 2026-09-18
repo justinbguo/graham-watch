@@ -81,13 +81,18 @@ as null.
 
 ## Finding the catalog
 
-`scripts/discover.mjs` turns a bare domain into a catalog URL. Product pages vastly
+The `discover` action turns a bare domain into a catalog URL. Product pages vastly
 outnumber everything else in a sitemap, so the directory holding the most URLs is the
 catalog. Squarespace nests products as `/<collection>/p/<slug>`, so a trailing `/p`
 is dropped — the importable URL is the collection.
 
-It runs in the CLI, not the edge function: it needs no secrets, and the operator has
-to be able to see and override what it guessed with `--url`.
+It lives in the import function. It needs no secrets and used to run in the CLI, but
+the operator UI needs the same answer and a browser cannot read another origin's
+sitemap. The operator still overrides the guess with `--url`.
+
+Because it runs on a server, sitemap entries are filtered to the shop's own
+registrable domain before anything fetches them. A sitemap is a file the shop
+controls, and an unfiltered one could name the cluster's metadata address.
 
 Shop names come from Shopify's `/meta.json`, then `<title>`, then `og:site_name`.
 Title beats `og:site_name` because shops truncate it — Goldfinger's Vintage publishes

@@ -23,6 +23,16 @@ export function preview({ sourceUrl, limit, token }) {
 }
 
 /**
+ * Where a shop keeps its watches, given a domain.
+ *
+ * Runs in the import function rather than here, because the operator UI needs
+ * the same answer and a browser cannot read another origin's sitemap.
+ */
+export function discover({ domain, token }) {
+  return call({ action: 'discover', domain }, token, 'Could not read that site');
+}
+
+/**
  * Reads the shop's catalogue into source_items: what it sells, at what price,
  * and what it has since sold. No model call, so this is safe to run often.
  */

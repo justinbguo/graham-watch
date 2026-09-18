@@ -25,9 +25,8 @@
 
 import { createInterface } from 'node:readline/promises';
 
-import { choose, formatPrice, preview, publishAll, syncCatalog } from './_import.mjs';
+import { choose, discover, formatPrice, preview, publishAll, syncCatalog } from './_import.mjs';
 import { config, describeTarget, request, serviceKey, signInOperator } from './_supabase.mjs';
-import { discover } from './discover.mjs';
 
 function parseArgs(argv) {
   const positional = [];
@@ -137,8 +136,12 @@ async function add() {
     process.exit(1);
   }
 
+  // Signed in before discovery, not after: finding the catalogue is an import
+  // function call now, so it needs the same session the rest of the run uses.
+  const operator = await signInOperator();
+
   console.log(`\nLooking at ${target}…`);
-  const found = await discover(target);
+  const found = await discover({ domain: target, token: operator.token });
 
   const name = typeof flags.name === 'string' ? flags.name : found.name;
   const catalogUrl = typeof flags.url === 'string' ? flags.url : found.catalogUrl;
@@ -152,8 +155,6 @@ async function add() {
   if (found.platform === 'generic') {
     console.log('  unknown shop software: falls back to scraping, which is slower and less exact');
   }
-
-  const operator = await signInOperator();
 
   console.log(`\nReading ${SAMPLE_SIZE} of them…`);
   const sample = await preview({
@@ -307,7 +308,8 @@ async function set() {
       process.exit(1);
     }
     console.log(`Reading ${dealer.website}…`);
-    const found = await discover(dealer.website);
+    const operator = await signInOperator();
+    const found = await discover({ domain: dealer.website, token: operator.token });
     if (found.email) patch.contact_email = found.email;
     if (found.name) patch.name = found.name;
 
