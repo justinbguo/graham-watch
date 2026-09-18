@@ -103,20 +103,19 @@ async function confirmByName(name) {
   }
 }
 
+/**
+ * A preview is the shop's own words, not a typed watch.
+ *
+ * It reads the catalogue and stops, so there is no brand, model or year to
+ * print — those come from the model at publish time. Asking for them anyway
+ * printed a column of blank names and `????`, which is the opposite of what a
+ * preview is for.
+ */
 function printSample(listings) {
   for (const listing of listings) {
-    const name = [listing.brand, listing.model].filter(Boolean).join(' ');
-    const facts = [
-      listing.reference && `ref. ${listing.reference}`,
-      listing.case_size_mm && `${listing.case_size_mm}mm`,
-      listing.movement,
-    ].filter(Boolean);
-
-    console.log(`  ${String(listing.year ?? '????')}  ${name}`);
+    console.log(`  ${listing.title || listing.source_url}`);
     console.log(
-      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos${
-        facts.length ? ` · ${facts.join(' · ')}` : ''
-      }`
+      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos`
     );
   }
 }
