@@ -55,6 +55,7 @@
     "demo": "EXPO_PUBLIC_DEMO=1 expo start --go --clear",
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --go --clear",
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
+    "operator": "cd operator && { test -d node_modules || npm install; } && npm run dev",
     "test:rls": "node scripts/test-rls.mjs",
     "import": "node --env-file=scripts/.env.operator.local scripts/import.mjs",
     "sweep": "node --env-file=scripts/.env.operator.local scripts/sweep.mjs",
