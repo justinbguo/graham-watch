@@ -4,6 +4,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, adapterItems, readCatalog, syncCatalog } from './catalog.ts';
+import { discover, normalizeDomain } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, publishBatch } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
 import type { SourceItem } from './source.ts';
@@ -28,15 +29,22 @@ function admin(): SupabaseClient {
 /**
  * How many shops one account may introduce per hour.
  *
- * This meters the two actions that spend money on a URL nobody here owns yet:
- * a preview, and a sync that creates a dealer. Refreshing a shop you already
- * own is not counted, so a nightly sweep over every dealer and a dealer
- * reloading their own catalogue are both unaffected. An operator adding a shop
- * by hand spends two.
+ * This meters the actions that spend money on a URL nobody here owns yet: a
+ * discover, a preview, and a sync that creates a dealer. Refreshing a shop you
+ * already own is not counted, so a nightly sweep over every dealer and a dealer
+ * reloading their own catalogue are both unaffected. Adding a shop by hand
+ * spends two — one to find the catalogue, one to introduce it.
+ *
+ * Operators get a higher ceiling because seeding the deck is their job: a
+ * pasted list of forty shops is the intended use, and ten would refuse the
+ * eleventh line. It stays a ceiling rather than an exemption, because the thing
+ * it guards against is a loop nobody meant to start.
  */
 const NEW_SHOPS_PER_HOUR = 10;
+const OPERATOR_NEW_SHOPS_PER_HOUR = 200;
 
-async function assertBudget(userId: string) {
+async function assertBudget(userId: string, isOperator: boolean) {
+  const ceiling = isOperator ? OPERATOR_NEW_SHOPS_PER_HOUR : NEW_SHOPS_PER_HOUR;
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
   // Only the priced actions count. A preview belongs to no shop, so it is the
@@ -63,11 +71,31 @@ async function assertBudget(userId: string) {
     throw new Error('Could not check the import budget. Try again shortly.');
   }
 
-  if ((previews.count ?? 0) + (introduced.count ?? 0) >= NEW_SHOPS_PER_HOUR) {
+  if ((previews.count ?? 0) + (introduced.count ?? 0) >= ceiling) {
     throw new Error(
-      `That is ${NEW_SHOPS_PER_HOUR} new shops in an hour. Refreshing shops you already manage is not limited.`
+      `That is this hour's limit of ${ceiling} new shops. Shops already added are unaffected — refreshing and importing them is not limited.`
     );
   }
+}
+
+/**
+ * Whether the caller may act on shops that are not theirs.
+ *
+ * Read through the caller's own client, so this is the same answer RLS would
+ * give and not a second opinion. Cached for the request because two places ask.
+ */
+function operatorCheck(supabase: SupabaseClient): () => Promise<boolean> {
+  let answer: Promise<boolean> | undefined;
+
+  const ask = async (): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('is_operator');
+    return error ? false : data === true;
+  };
+
+  return () => {
+    if (!answer) answer = ask();
+    return answer;
+  };
 }
 
 /** Records a priced action against the account that asked for it. */
@@ -133,10 +161,18 @@ async function findDealer(
   supabase: SupabaseClient,
   userId: string,
   sourceUrl: string,
+  isOperator: () => Promise<boolean>,
   dealerId?: string,
   name?: string,
   email?: string
 ): Promise<string | null> {
+  // An operator manages every shop by definition — that is what the operator
+  // console is. Without this, re-reading a catalogue an operator did not
+  // personally introduce is refused, which is most of them once dealers start
+  // importing their own.
+  const mine = async (row: { claimed_by: string | null; created_by: string | null }) =>
+    row.claimed_by === userId || row.created_by === userId || (await isOperator());
+
   if (dealerId) {
     const { data: owned } = await supabase
       .from('dealers')
@@ -144,7 +180,7 @@ async function findDealer(
       .eq('id', dealerId)
       .maybeSingle();
 
-    if (!owned || (owned.claimed_by !== userId && owned.created_by !== userId)) {
+    if (!owned || !(await mine(owned))) {
       throw new Error('You do not manage that dealer.');
     }
     return owned.id;
@@ -167,7 +203,7 @@ async function findDealer(
   // signed in, so without this a stranger could name any shop's URL and make us
   // pay for the catalogue read. The writes would fail on RLS a moment later,
   // but the scrape credit and the model call were already spent.
-  if (existing.claimed_by !== userId && existing.created_by !== userId) {
+  if (!(await mine(existing))) {
     throw new Error('You do not manage that dealer.');
   }
 
@@ -214,6 +250,19 @@ async function createDealer(
     .select('id')
     .single();
 
+  // dealers.website is unique, so two requests racing on one domain — a
+  // double-clicked button, the same list pasted in two tabs — end with one row
+  // and one 23505 rather than a duplicate shop. The loser wants the winner's
+  // row, which is what it asked for in the first place.
+  if (error?.code === '23505') {
+    const { data: raced } = await supabase
+      .from('dealers')
+      .select('id')
+      .eq('website', website)
+      .maybeSingle();
+    if (raced) return raced.id;
+  }
+
   if (error || !data) throw new Error(error?.message ?? 'Could not create a dealer.');
   return data.id;
 }
@@ -240,8 +289,9 @@ function bad(message: string, status = 400) {
 }
 
 /**
- * Three actions, one function.
+ * Four actions, one function.
  *
+ * `discover` turns a domain into the URL its watches live at, writing nothing.
  * `sync` reads the shop's catalogue into source_items. It costs HTTP and
  * nothing else on a platform we have an adapter for, so it can walk the whole
  * shop. `publish` drains a bounded slice of the extraction queue and reports
@@ -262,6 +312,45 @@ export default {
     }
 
     const action = String(body.action ?? 'sync');
+    const isOperator = operatorCheck(ctx.supabase);
+
+    /**
+     * Given a domain, where the watches are.
+     *
+     * Metered like a preview: it writes nothing but reads a dozen pages off a
+     * site we do not own, which is not something to leave unbounded just
+     * because it is cheap.
+     */
+    if (action === 'discover') {
+      const domain = String(body.domain ?? '').trim();
+      if (!domain) return bad('discover needs a domain.');
+
+      // Two refusals, two codes. A bad domain is the caller's mistake and
+      // retrying will not help; a budget refusal is temporary and the UI says
+      // so. Reporting both as 429 had the operator waiting out an hour for a
+      // typo.
+      let origin: string;
+      try {
+        origin = normalizeDomain(domain);
+      } catch (error) {
+        return bad(error instanceof Error ? error.message : 'That is not a domain.');
+      }
+      try {
+        await assertBudget(userId, await isOperator());
+      } catch (error) {
+        return bad(error instanceof Error ? error.message : 'Out of budget.', 429);
+      }
+
+      try {
+        const found = await discover(origin);
+        await meter(userId, found.catalogUrl, null, 'succeeded');
+        return Response.json(found);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Could not read that site.';
+        await meter(userId, origin, null, 'failed', message);
+        return bad(message, 502);
+      }
+    }
 
     // Reads any URL on the open web and writes nothing, so a dealer row cannot
     // be the thing that authorises it. The budget is what stops an account
@@ -270,9 +359,13 @@ export default {
       let sourceUrl: string;
       try {
         sourceUrl = assertPublicHttpUrl(String(body.sourceUrl ?? ''));
-        await assertBudget(userId);
       } catch (error) {
-        return bad(error instanceof Error ? error.message : 'Bad request.', 429);
+        return bad(error instanceof Error ? error.message : 'That is not a URL.');
+      }
+      try {
+        await assertBudget(userId, await isOperator());
+      } catch (error) {
+        return bad(error instanceof Error ? error.message : 'Out of budget.', 429);
       }
 
       const limit = clamp(body.limit, MAX_CATALOG_ITEMS, MAX_CATALOG_ITEMS);
@@ -334,6 +427,7 @@ export default {
         ctx.supabase,
         userId,
         sourceUrl,
+        isOperator,
         typeof body.dealerId === 'string' ? body.dealerId : undefined,
         named,
         addressed
@@ -345,7 +439,7 @@ export default {
       if (found) {
         dealerId = found;
       } else {
-        await assertBudget(userId);
+        await assertBudget(userId, await isOperator());
         dealerId = await createDealer(ctx.supabase, userId, sourceUrl, named, addressed);
       }
     } catch (error) {
