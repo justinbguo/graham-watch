@@ -34,7 +34,17 @@ export function SignIn() {
         email: email.trim(),
         options: { shouldCreateUser: false },
       });
-      if (failed) throw failed;
+      if (failed) {
+        // "Signups not allowed for otp" is what the auth server says when the
+        // address has no account and shouldCreateUser is false. Accurate and
+        // useless: the reader's next move is a terminal command.
+        if (/signups? not allowed/i.test(failed.message)) {
+          throw new Error(
+            `No account for ${email.trim()} yet. Run: npm run dealers -- operator ${email.trim()}`
+          );
+        }
+        throw failed;
+      }
       setStage('code');
       setCode('');
     });
@@ -78,11 +88,12 @@ export function SignIn() {
             <button type="submit" disabled={busy || !email.includes('@')}>
               {busy ? 'Sending…' : 'Email me a code'}
             </button>
-            {/* shouldCreateUser is false, so an address with no account is
-                rejected rather than silently signed up as a new operator. */}
+            {/* shouldCreateUser is false, so typing an address here can never
+                make an account. The grant command is the only way in. */}
             <p className="muted small">
-              The address has to have an account already. Grant it with{' '}
-              <code>npm run dealers -- operator &lt;email&gt;</code>.
+              Not an operator yet? Run{' '}
+              <code>npm run dealers -- operator &lt;email&gt;</code>, which creates
+              the account if it needs to.
             </p>
           </>
         ) : (

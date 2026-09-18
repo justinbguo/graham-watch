@@ -393,11 +393,27 @@ async function operator() {
     const found = (body?.users ?? []).find(
       (user) => user.email?.toLowerCase() === email.toLowerCase()
     );
-    if (!found) {
-      console.error(`No account with the address ${email}. They have to sign in once first.`);
-      process.exit(1);
+
+    if (found) {
+      userId = found.id;
+    } else {
+      // Created here rather than refused. The operator UI turns signups off, so
+      // an address with no account cannot make one by signing in, and telling
+      // the operator to go and sign in first is a circle with no way out.
+      // Confirmed on the way in: an unconfirmed address cannot claim a shop.
+      const made = await request('/auth/v1/admin/users', {
+        token: key,
+        method: 'POST',
+        body: { email, email_confirm: true },
+      });
+
+      if (!made.ok) {
+        console.error(`Could not create an account for ${email} (${made.status}): ${made.body?.msg ?? made.body?.message ?? ''}`);
+        process.exit(1);
+      }
+      userId = made.body.id;
+      console.log(`Created an account for ${email}.`);
     }
-    userId = found.id;
   } else {
     // Creates the configured operator account if it does not exist yet, which
     // is what every other command in this file already relies on.

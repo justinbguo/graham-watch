@@ -137,15 +137,16 @@ cp operator/.env.example operator/.env.local   # both values from `supabase stat
 npm run operator                               # http://localhost:5173
 ```
 
-Sign in with an email code, the same as the app. The address needs an account
-already, plus a grant:
+Sign in with an email code, the same as the app. Grant the address first — the
+UI has signups off, so it cannot let anyone in who has not been granted:
 
 ```
 npm run dealers -- operator you@example.com
 ```
 
-Locally that address is `operator@graham.local` and the code lands in Mailpit.
-With no argument the command grants the account the scripts already use.
+That creates the account if it does not exist. With no argument it grants
+`operator@graham.local`, the account the other scripts already use. Either way
+the code lands in Mailpit, not a real inbox.
 
 An operator is a row in an `operators` table, not whoever holds
 `SUPABASE_SERVICE_ROLE_KEY` — that key bypasses row-level security on every

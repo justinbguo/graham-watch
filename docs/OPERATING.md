@@ -253,16 +253,21 @@ npm install
 npm run dev                    # http://localhost:5173
 ```
 
-Sign in with an email code, the same as the phone app. The address needs an
-account and an operator grant:
+Sign in with an email code, the same as the phone app. Grant the address first:
 
 ```
 npm run dealers -- operator you@example.com
 ```
 
-Locally that address is `operator@graham.local` and the code lands in Mailpit.
-Run `npm run dealers -- operator` with no argument to grant the configured
-account, which is what every other command in that script already signs in as.
+The command creates the account when the address has none. It has to: the UI
+sets `shouldCreateUser: false`, so nobody can sign themselves up there, and
+without this the only instruction to give a new operator would be "sign in
+first", which is the one thing they cannot do.
+
+Run it with no argument to grant `operator@graham.local`, which is what every
+other command in that script already signs in as. Codes land in Mailpit.
+
+A `db:reset` drops the account and the grant together. Run it again.
 
 ### Why an operator is a row
 
@@ -474,7 +479,7 @@ Working-as-designed, so do not debug these:
 | An application shows `○` and cannot be accepted | The applicant has not proved a mailbox yet. Waiting on them. |
 | A second application is refused | One live application per account, by unique index. Answered ones free it. |
 | The operator UI says "not an operator" | The account has no `operators` row. `npm run dealers -- operator <email>`. A `db:reset` drops it. |
-| Operator sign-in rejects a valid address | `shouldCreateUser` is false there on purpose, so an address with no account is refused rather than signed up as a new operator. |
+| Operator sign-in says "Signups not allowed for otp" | The address has no account. `npm run dealers -- operator <email>` makes one and grants it. Signups stay off in the UI so it is never the way in. |
 | The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
 | The deck is empty on a fresh `db:reset` | There are no watches until you import a shop. |
 
