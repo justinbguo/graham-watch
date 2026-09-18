@@ -7,6 +7,11 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
+// The fallback for the modal routes, which have no boundary of their own. A
+// screen-level boundary is preferred where one exists, so this runs only when
+// the failure is in this layout or in a route that did not claim it.
+export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function AppLayout() {
   return (
     <FilterProvider>

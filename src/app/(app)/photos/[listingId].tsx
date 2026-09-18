@@ -12,6 +12,8 @@ import { HIT_TARGET, radius, size, space } from '@/lib/theme';
  * The photograph on its own. No price, no dealer, no name — you long-pressed
  * because you wanted to look at the watch, and anything else here is in the way.
  */
+export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function PhotoViewer() {
   const { listingId, index } = useLocalSearchParams<{ listingId: string; index?: string }>();
   const { data: card } = useListing(listingId);

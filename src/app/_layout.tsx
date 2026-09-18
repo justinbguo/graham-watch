@@ -17,6 +17,10 @@ import { ThemeProvider, useTheme } from '@/providers/theme';
 
 SplashScreen.preventAutoHideAsync();
 
+// Catches what the per-screen boundaries cannot: a provider failing before any
+// screen exists. Without it that case is a white screen with no way out.
+export { RootErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 // The type is the system face, so there is nothing to load and nothing to
 // wait for. The splash stays up for the session and profile alone.
 export default function RootLayout() {

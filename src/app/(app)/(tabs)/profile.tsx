@@ -15,6 +15,8 @@ import { ProfileHeader } from '@/features/profile/ProfileHeader';
 import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function Profile() {
   const shop = useDealerWorkspace();
   const claimed = shop.shop;

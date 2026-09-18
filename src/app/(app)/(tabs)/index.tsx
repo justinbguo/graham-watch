@@ -19,6 +19,10 @@ import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
+// Claimed here rather than left to the layout so the tab bar stays mounted: a
+// deck that cannot draw should not also strand the user away from Saved.
+export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function Deck() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();

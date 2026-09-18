@@ -10,6 +10,8 @@ import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
+export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function Saved() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error } = useSaved(userId);

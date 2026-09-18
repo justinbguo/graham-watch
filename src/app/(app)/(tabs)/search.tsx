@@ -10,6 +10,8 @@ import { activeCount } from '@/features/filters/types';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function Search() {
   const styles = useThemedStyles(searchStyles);
   const router = useRouter();

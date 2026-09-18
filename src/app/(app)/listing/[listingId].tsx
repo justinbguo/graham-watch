@@ -16,6 +16,10 @@ import { useThemedStyles } from '@/providers/theme';
  * search result, or a grid tile. The deck reads the same content inside the
  * card itself, so everything below the price comes from `ListingDetails`.
  */
+// A full-screen modal over scraped fields. Its own boundary keeps the failure
+// inside the modal, where "Go back" still returns to the deck.
+export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
 export default function ListingScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
   const { userId } = useSession();
