@@ -137,16 +137,16 @@ cp operator/.env.example operator/.env.local   # both values from `supabase stat
 npm run operator                               # http://localhost:5173
 ```
 
-Sign in with an email code, the same as the app. Grant the address first — the
-UI has signups off, so it cannot let anyone in who has not been granted:
+Sign in with an email and password, both set from the terminal. There is no
+sign-up and no reset in the UI, so this is the only way in:
 
 ```
-npm run dealers -- operator you@example.com
+npm run dealers -- operator you@example.com --password "..."
 ```
 
-That creates the account if it does not exist. With no argument it grants
-`operator@graham.local`, the account the other scripts already use. Either way
-the code lands in Mailpit, not a real inbox.
+That creates the account if it does not exist, sets the password if it does, and
+grants operator either way. Twelve characters minimum. With no argument it
+grants `operator@graham.local`, whose local password is `graham-operator`.
 
 Watch which backend you grant on. `npm run dealers` reads
 `scripts/.env.operator.local` and points at hosted, while a copied

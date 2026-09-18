@@ -255,21 +255,33 @@ npm install
 npm run dev                    # http://localhost:5173
 ```
 
-Sign in with an email code, the same as the phone app. Grant the address first:
+Sign in with an email and password. Both are set from the terminal:
 
 ```
-npm run dealers -- operator you@example.com
+npm run dealers -- operator you@example.com --password "..."
 ```
 
-The command creates the account when the address has none. It has to: the UI
-sets `shouldCreateUser: false`, so nobody can sign themselves up there, and
-without this the only instruction to give a new operator would be "sign in
-first", which is the one thing they cannot do.
+That creates the account if the address has none, sets the password if it does,
+and grants operator either way. There is no sign-up and no password reset in the
+UI, so this command is the only way in — which is the point. Run it again to
+change the password.
+
+Minimum twelve characters, enforced by the script. Supabase's own floor is six,
+and this account decides which shops are live against an auth endpoint that is
+open to the internet.
+
+The phone app still uses one-time codes, because a buyer should never have a
+password to forget. An operator is one person with a terminal, and on hosted a
+code round trip goes through Supabase's built-in mailer, which allows only a few
+an hour. A password can be guessed where a code cannot; the length floor is the
+answer to that, not an afterthought.
 
 Run it with no argument to grant `operator@graham.local`, which is what every
-other command in that script already signs in as. Codes land in Mailpit.
+other command in that script already signs in as. Locally that account's
+password is `graham-operator`.
 
-A `db:reset` drops the account and the grant together. Run it again.
+A `db:reset` drops the account, the password and the grant together. Run it
+again.
 
 ### Which Graham the UI is talking to
 
@@ -501,7 +513,7 @@ Working-as-designed, so do not debug these:
 | A second application is refused | One live application per account, by unique index. Answered ones free it. |
 | The operator UI says "not an operator" | The account has no `operators` row *in the project the UI is pointed at*. A grant is per project, and `npm run dealers` grants on hosted while the UI usually reads local. Use `npm run dealers:local`. A `db:reset` drops it. |
 | `Could not find the table 'public.operators' in the schema cache` | You are pointed at a project that migration has not reached. The error names the project and the local command to use instead. |
-| Operator sign-in says "Signups not allowed for otp" | The address has no account. `npm run dealers -- operator <email>` makes one and grants it. Signups stay off in the UI so it is never the way in. |
+| Operator sign-in says "Invalid login credentials" | One message covers a wrong password, an unknown address, and an account with no password set. `npm run dealers -- operator <email> --password "..."` fixes all three. |
 | The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
 | The deck is empty on a fresh `db:reset` | There are no watches until you import a shop. |
 

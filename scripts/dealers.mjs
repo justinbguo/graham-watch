@@ -12,7 +12,8 @@
  *   npm run dealers -- applications       shops asking to be listed
  *   npm run dealers -- accept  <app-id>   turn one into a shop they own
  *   npm run dealers -- decline <app-id>   say no, with --note
- *   npm run dealers -- operator [email]   let an account approve shops
+ *   npm run dealers -- operator [email]   let an account approve shops,
+ *                                         with --password to set one
  *
  * Approval is deliberately impossible from the app: RLS blocks a user from
  * approving a dealer they created, so nobody can publish a shop's inventory by
@@ -25,7 +26,7 @@
 import { createInterface } from 'node:readline/promises';
 
 import { choose, formatPrice, preview, publishAll, syncCatalog } from './_import.mjs';
-import { config, request, serviceKey, signInOperator } from './_supabase.mjs';
+import { config, describeTarget, request, serviceKey, signInOperator } from './_supabase.mjs';
 import { discover } from './discover.mjs';
 
 function parseArgs(argv) {
@@ -78,6 +79,25 @@ async function confirm(question) {
   try {
     const answer = await rl.question(`${question} [y/N] `);
     return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Makes the operator type the shop's name before an irreversible change to a
+ * live project.
+ *
+ * `--yes` exists to repeat a local reset without ceremony, and it sits one
+ * character away from a command that deletes a real shop and every listing
+ * under it. So the flag is honoured on local and ignored on production, where
+ * the only thing that counts as consent is naming what is about to go.
+ */
+async function confirmByName(name) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question(`Type the shop's name to confirm on PRODUCTION — ${name}: `);
+    return answer.trim() === name;
   } finally {
     rl.close();
   }
@@ -247,7 +267,11 @@ async function remove() {
   console.log(`  ${dealer.website ?? 'no website'}`);
   console.log(`  ${ids.length} listing(s) and their photos will be deleted.\n`);
 
-  if (flags.yes !== true && !(await confirm('Delete permanently?'))) {
+  const agreed = config().isLocal
+    ? flags.yes === true || (await confirm('Delete permanently?'))
+    : await confirmByName(dealer.name);
+
+  if (!agreed) {
     console.log('Nothing deleted.');
     return;
   }
@@ -367,6 +391,17 @@ async function setPermission(permission, explicitTarget) {
   }
 
   const dealer = await findDealer(subject);
+
+  // Both directions are buyer-visible: approve puts stock in front of real
+  // people, revoke takes a working shop out of the deck. Neither asked before.
+  if (!config().isLocal) {
+    const verb = permission === 'approved' ? 'Publish' : 'Hide';
+    if (!(await confirm(`${verb} ${dealer.name} on PRODUCTION?`))) {
+      console.log('Nothing changed.');
+      return;
+    }
+  }
+
   const { body, ok, status } = await request('/rest/v1/rpc/set_dealer_permission', {
     token: key,
     method: 'POST',
@@ -386,7 +421,16 @@ async function setPermission(permission, explicitTarget) {
  */
 async function operator() {
   const email = target ?? process.env.GRAHAM_OPERATOR_EMAIL ?? 'operator@graham.local';
+  const password = typeof flags.password === 'string' ? flags.password : null;
   let userId;
+
+  // The UI signs in with a password, so this account can be reached by anyone
+  // who guesses one — the auth endpoint is public and an operator decides which
+  // shops are live. Twelve is the floor here; Supabase's own minimum is six.
+  if (password !== null && password.length < 12) {
+    console.error('That password is too short. Use at least 12 characters.');
+    process.exit(1);
+  }
 
   if (target) {
     const { body } = await request('/auth/v1/admin/users?per_page=1000', { token: key });
@@ -396,6 +440,19 @@ async function operator() {
 
     if (found) {
       userId = found.id;
+
+      if (password) {
+        const set = await request(`/auth/v1/admin/users/${userId}`, {
+          token: key,
+          method: 'PUT',
+          body: { password },
+        });
+        if (!set.ok) {
+          console.error(`Could not set the password (${set.status}): ${set.body?.msg ?? ''}`);
+          process.exit(1);
+        }
+        console.log(`Set a new password for ${email}.`);
+      }
     } else {
       // Created here rather than refused. The operator UI turns signups off, so
       // an address with no account cannot make one by signing in, and telling
@@ -404,7 +461,7 @@ async function operator() {
       const made = await request('/auth/v1/admin/users', {
         token: key,
         method: 'POST',
-        body: { email, email_confirm: true },
+        body: { email, email_confirm: true, ...(password ? { password } : {}) },
       });
 
       if (!made.ok) {
@@ -433,6 +490,11 @@ async function operator() {
   }
   console.log(`${email} can approve shops now.`);
   console.log(`  ${userId}`);
+
+  if (!password) {
+    console.log(`\nThe operator UI signs in with a password. Set one with:`);
+    console.log(`  npm run dealers -- operator ${email} --password "..."`);
+  }
 }
 
 const VOLUME_LABELS = {
@@ -527,7 +589,7 @@ async function decline() {
   console.log(`Declined. They will read: "${note}"`);
 }
 
-console.log(`${config().isLocal ? 'local' : config().url}`);
+console.log(describeTarget());
 
 switch (command) {
   case undefined:

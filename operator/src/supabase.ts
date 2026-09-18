@@ -38,9 +38,6 @@ export const VOLUME_LABELS: Record<Volume, string> = {
   over_200: '200+',
 };
 
-/** Mailpit is where the local stack dumps mail. Handy, not required. */
-export const MAILPIT = 'http://127.0.0.1:54324';
-
 function hostOf(value: string): string {
   try {
     return new URL(value).hostname;
