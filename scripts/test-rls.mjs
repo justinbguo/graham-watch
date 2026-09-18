@@ -299,6 +299,21 @@ console.log('\nafter approval');
 
   // A sold watch must leave every surface that offers something to buy, and stay
   // readable everywhere that only reports what already happened.
+  //
+  // The brand's count is read first rather than assumed to be one. Any real
+  // inventory in the database — the snapshot seed, or a shop imported by hand —
+  // stocks its own Omegas, so demanding the brand vanish outright only ever
+  // held on an empty database.
+  const brandCount = async () => {
+    const facets = await api('/rest/v1/rpc/listing_facets', {
+      token: buyer.token,
+      method: 'POST',
+      body: {},
+    });
+    return facets.body?.find((row) => row.kind === 'brand' && row.label === 'Omega')?.count ?? 0;
+  };
+  const omegasBefore = await brandCount();
+
   // Marked by the account that claimed the shop. Importing it first is not a
   // standing permission over someone else's stock.
   await api(`/rest/v1/listings?id=eq.${listingId}`, {
@@ -317,10 +332,11 @@ console.log('\nafter approval');
   });
   check('a sold listing leaves search', !soldSearch.body?.some((row) => row.id === listingId));
 
-  const soldFacets = await api('/rest/v1/rpc/listing_facets', { token: buyer.token, method: 'POST', body: {} });
+  const omegasAfter = await brandCount();
   check(
     'a sold listing leaves the filter counts',
-    !soldFacets.body?.some((row) => row.kind === 'brand' && row.label === 'Omega')
+    omegasAfter === omegasBefore - 1,
+    `Omega went from ${omegasBefore} to ${omegasAfter}`
   );
 
   // Saved reads listings directly. Hiding a sold watch there would delete it out
@@ -1702,11 +1718,35 @@ console.log('\noperators');
       overview.body.some((row) => row.id === dealerId && 'contact_email' in row),
     `${overview.status} ${JSON.stringify(overview.body)?.slice(0, 160)}`
   );
+  // The shop is revoked at this point, so the deck shows none of its watches.
+  // The count used to omit permission entirely and report them as live on the
+  // one screen used to decide whether to publish the shop.
+  const mine = overview.body?.find((row) => row.id === dealerId);
   check(
-    'it counts what is actually in the deck',
-    typeof overview.body?.[0]?.listings_live === 'number' &&
-      typeof overview.body?.[0]?.listings_total === 'number',
-    JSON.stringify(overview.body?.[0])
+    'a shop that is not approved has nothing in the deck',
+    mine?.listings_in_deck === 0,
+    JSON.stringify(mine)
+  );
+  check(
+    'and still reports what we hold for it',
+    mine?.listings_held > 0,
+    JSON.stringify(mine)
+  );
+
+  const sellable = await api(
+    `/rest/v1/listings?dealer_id=eq.${dealerId}&status=eq.active&sold_at=is.null&select=id`,
+    { token: SERVICE }
+  );
+  await publish(buyer.token, 'approved');
+  const afterPublish = await api('/rest/v1/rpc/operator_dealers', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  const published = afterPublish.body?.find((row) => row.id === dealerId);
+  check(
+    'approving puts exactly the sellable ones in the deck',
+    published?.listings_in_deck === sellable.body?.length,
+    `${published?.listings_in_deck} in deck vs ${sellable.body?.length} active and unsold`
   );
 
   await fetch(`${URL}/rest/v1/operators?user_id=eq.${buyer.id}`, {

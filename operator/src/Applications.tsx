@@ -2,23 +2,19 @@ import { useEffect, useState } from 'react';
 
 import { confirmWrite, supabase, VOLUME_LABELS, type Application } from './supabase';
 
-type Status = Application['status'];
-
-const TABS: { value: Status; label: string }[] = [
-  { value: 'pending', label: 'Waiting' },
-  { value: 'approved', label: 'Accepted' },
-  { value: 'declined', label: 'Declined' },
-];
-
+/**
+ * An inbox: shops waiting on an answer, and nothing else.
+ *
+ * Answered applications are deliberately absent. An accepted one becomes a shop
+ * and belongs on Dealers, where it can still be published or pulled back;
+ * keeping a copy here would mean two screens claiming to own the same thing.
+ * A declined one is not a record to keep either — the applicant reads the note
+ * on their profile and may reapply, which files a new row.
+ */
 export function Applications() {
-  const [status, setStatus] = useState<Status>('pending');
   const [rows, setRows] = useState<Application[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  // Reloading is a counter rather than a function call so the effect owns every
-  // fetch. Switching tabs quickly would otherwise let the slower answer land
-  // last and show the wrong list under the wrong heading.
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
 
@@ -28,7 +24,7 @@ export function Applications() {
       const { data, error: failed } = await supabase
         .from('dealer_applications')
         .select('*')
-        .eq('status', status)
+        .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
       if (!live) return;
@@ -38,37 +34,42 @@ export function Applications() {
     return () => {
       live = false;
     };
-  }, [status, tick]);
+  }, [tick]);
 
   async function answer(application: Application, verdict: 'accept' | 'decline') {
+    if (verdict === 'accept') {
+      // Accepting hands the shop to the account that applied, and publishes it.
+      // Both are hard to walk back once a dealer is editing listings.
+      if (
+        !confirmWrite(
+          `Give ${application.shop_name} to ${application.verified_email}, and publish it?`
+        )
+      ) {
+        return;
+      }
+    }
+
+    const note =
+      verdict === 'decline'
+        ? window.prompt(
+            `Why is ${application.shop_name} declined? They read this on their profile.`
+          )
+        : null;
+    if (verdict === 'decline' && note === null) return;
+
     setBusyId(application.id);
     setError(null);
     try {
-      if (verdict === 'accept') {
-        // Accepting hands the shop to the account that applied, and publishes
-        // it. Both are hard to walk back once a dealer is editing listings.
-        if (
-          !confirmWrite(
-            `Give ${application.shop_name} to ${application.verified_email}, and publish it?`
-          )
-        ) {
-          return;
-        }
-        const { error: failed } = await supabase.rpc('approve_dealer_application', {
-          p_application_id: application.id,
-        });
-        if (failed) throw failed;
-      } else {
-        const note = window.prompt(
-          `Why is ${application.shop_name} declined? They read this on their profile.`
-        );
-        if (note === null) return;
-        const { error: failed } = await supabase.rpc('decline_dealer_application', {
-          p_application_id: application.id,
-          p_note: note,
-        });
-        if (failed) throw failed;
-      }
+      const { error: failed } =
+        verdict === 'accept'
+          ? await supabase.rpc('approve_dealer_application', {
+              p_application_id: application.id,
+            })
+          : await supabase.rpc('decline_dealer_application', {
+              p_application_id: application.id,
+              p_note: note ?? '',
+            });
+      if (failed) throw failed;
       reload();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'That did not work.');
@@ -80,17 +81,11 @@ export function Applications() {
   return (
     <section>
       <header className="bar">
-        <nav className="tabs">
-          {TABS.map((tab) => (
-            <button
-              key={tab.value}
-              className={tab.value === status ? 'tab on' : 'tab'}
-              onClick={() => setStatus(tab.value)}>
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-        <button className="ghost" onClick={reload}>
+        <h1>
+          Waiting on you
+          {rows && rows.length > 0 ? <span className="badge">{rows.length}</span> : null}
+        </h1>
+        <button className="ghost push" onClick={reload}>
           Reload
         </button>
       </header>
@@ -100,7 +95,9 @@ export function Applications() {
       {rows === null ? (
         <p className="muted">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="muted">Nothing here.</p>
+        <p className="muted">
+          No shops are waiting. Accepted ones are on Dealers.
+        </p>
       ) : (
         <ul className="rows">
           {rows.map((application) => (
@@ -127,28 +124,25 @@ export function Applications() {
                   {' · applied '}
                   {new Date(application.created_at).toLocaleDateString()}
                 </p>
-                {application.note ? <p className="quote">{application.note}</p> : null}
               </div>
 
-              {status === 'pending' ? (
-                <div className="actions">
-                  {/* Accepting is refused by the database until the mailbox is
-                      proved, so the button says so rather than offering a click
-                      that returns an error. */}
-                  <button
-                    disabled={busyId === application.id || !application.verified_at}
-                    title={application.verified_at ? undefined : 'Waiting on the applicant'}
-                    onClick={() => void answer(application, 'accept')}>
-                    Accept
-                  </button>
-                  <button
-                    className="ghost"
-                    disabled={busyId === application.id}
-                    onClick={() => void answer(application, 'decline')}>
-                    Decline
-                  </button>
-                </div>
-              ) : null}
+              <div className="actions">
+                {/* Accepting is refused by the database until the mailbox is
+                    proved, so the button says so rather than offering a click
+                    that returns an error. */}
+                <button
+                  disabled={busyId === application.id || !application.verified_at}
+                  title={application.verified_at ? undefined : 'Waiting on the applicant'}
+                  onClick={() => void answer(application, 'accept')}>
+                  Accept
+                </button>
+                <button
+                  className="ghost"
+                  disabled={busyId === application.id}
+                  onClick={() => void answer(application, 'decline')}>
+                  Decline
+                </button>
+              </div>
             </li>
           ))}
         </ul>

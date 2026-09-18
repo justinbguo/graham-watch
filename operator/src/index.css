@@ -150,6 +150,23 @@ code {
   margin-bottom: 1rem;
 }
 
+.bar h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.push {
+  margin-left: auto;
+}
+
+.legend {
+  margin-top: 1rem;
+  max-width: 44rem;
+  line-height: 1.6;
+}
+
 /* ---------------------------------------------------------------- controls */
 
 button {

@@ -12,7 +12,7 @@ almost identical on screen, and three of them have different data.
 | Configuration | App talks to | Data you see | Started by |
 | --- | --- | --- | --- |
 | **Demo** | nothing | 8 watches hardcoded in `src/lib/demo.ts` | `npm run demo:web` |
-| **Local** | `127.0.0.1:54321` | whatever you imported; `db:reset` wipes it | `npm run web` / `ios`, with `.env.local` present |
+| **Local** | `127.0.0.1:54321` | a seeded shop and ten watches, plus whatever you import | `npm run web` / `ios`, with `.env.local` present |
 | **Hosted** | `hbxgxtbtefpyutyqafoi.supabase.co` | real dealers and real watches | same commands, with `.env.local` deleted |
 | **EAS build** | whatever `eas env` says | depends | `eas build` |
 
@@ -320,6 +320,23 @@ The practical differences:
 `set_dealer_permission` is the only implementation of "publish a shop", used by
 both the UI and `dealers -- approve`. The same is true of accept and decline.
 
+### The two numbers on Dealers
+
+**In the deck** is what a buyer can see right now, and it is the shop-level half
+of `search_listings`' own test: the watch is active, unsold, *and the shop is
+approved*. A shop that is pending or revoked reads zero however much it holds.
+
+**Imported** is every listing row we have for them.
+
+A gap between the two is sold or deactivated stock — or the whole shop not being
+approved, which is what `Publish` changes. The rest of what the deck filters is
+per-viewer, because a buyer never sees what they imported themselves or has
+already swiped, so it cannot be counted per shop.
+
+Applications lists only what is waiting. An accepted one is a shop and lives on
+Dealers; a declined one is not a record worth a tab, since the applicant reads
+the note on their profile and reapplying files a new row.
+
 ### What is not in it
 
 `add <domain>` stays in the terminal. Discovery reads the dealer's own website,
@@ -411,11 +428,17 @@ walked by hand.
 | An edge function | `deno check` and `deno test`, then `supabase functions serve <name>` |
 | A shop's feed parser | `deno test` — the fixtures are real payloads |
 | The operator UI | `npm run build` and `npx oxlint` inside `operator/` |
-| Which backend the app uses | `npm run check:env` |
+| Which backend the app uses | `npm run check:env`, which also prints it on every start |
 
 `npm run db:reset` is the undo button: drops everything, re-runs every migration
-in order, re-seeds. Nothing local is precious. Migrations are append-only once
-they have run — never edit one, add a new file.
+in order, and re-seeds the inventory snapshot so the deck works again. Nothing
+local is precious, which is the point — a reset costs half a minute and no
+network. Migrations are append-only once they have run: never edit one, add a
+new file.
+
+The snapshot in `supabase/seed.sql` is generated. Regenerate it with
+`npm run snapshot` when the shape of the data changes, and never edit it by
+hand.
 
 Two interfaces worth bookmarking:
 
@@ -424,27 +447,27 @@ Two interfaces worth bookmarking:
 
 ### Walking the buyer flow
 
-A fresh local database has no watches, so the deck is empty and correct. Get one
-shop in first — with the operator scripts pointed at local, or this imports into
-production:
-
-```
-npm run db:reset
-# then the export block from "The app and the operator scripts point at
-# different backends" above, then:
-npm run dealers -- add goldfingersvintage.com --limit 10 --yes
-```
-
-`add` discovers, previews, imports and approves in one pass, and takes about 15
-seconds on a Squarespace shop — the adapter reads their JSON feed directly
-rather than paying for a scrape and an extraction. Expect most of the catalogue
-to be held back as sold; see the note in `supabase/seed.sql`. Then:
+`npm run db:reset` leaves a shop and ten watches in the deck already — the
+snapshot in `supabase/seed.sql`. Nothing to import first:
 
 1. `npm run web`, sign in with any address.
 2. Onboarding asks for a name — the inquiry email opens with it, so it is not optional.
 3. Swipe the deck. Right saves, left passes.
 4. Saved tab → a watch → **Ask about this watch**.
 5. Read the mail in Mailpit. Check the Reply-To is your buyer address, not Graham's.
+
+To walk it against a shop of your own instead, add one to the local stack —
+`dealers:local` targets whatever `supabase start` is running, so it cannot
+import into production:
+
+```
+npm run dealers:local -- add goldfingersvintage.com --limit 10 --yes
+```
+
+`add` discovers, previews, imports and approves in one pass, and takes about 15
+seconds on a Squarespace shop — the adapter reads their JSON feed directly
+rather than paying for a scrape and an extraction. Expect most of the catalogue
+to be held back as sold.
 
 ### Walking the dealer claim flow
 
@@ -515,7 +538,7 @@ Working-as-designed, so do not debug these:
 | `Could not find the table 'public.operators' in the schema cache` | You are pointed at a project that migration has not reached. The error names the project and the local command to use instead. |
 | Operator sign-in says "Invalid login credentials" | One message covers a wrong password, an unknown address, and an account with no password set. `npm run dealers -- operator <email> --password "..."` fixes all three. |
 | The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
-| The deck is empty on a fresh `db:reset` | There are no watches until you import a shop. |
+| The deck is empty on a fresh `db:reset` | You are signed in as the account that owns the seeded shop. The deck hides listings you imported, so sign in as anybody else. |
 
 Real bugs, by contrast, look like: a write that reports success and changes
 nothing, an `import_jobs` row stuck at `running`, a photo gallery that is empty

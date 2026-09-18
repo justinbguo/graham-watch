@@ -836,8 +836,8 @@ export type Database = {
           contact_email: string
           created_at: string
           id: string
-          listings_live: number
-          listings_total: number
+          listings_held: number
+          listings_in_deck: number
           name: string
           permission: Database["public"]["Enums"]["dealer_permission"]
           website: string
