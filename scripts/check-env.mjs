@@ -71,7 +71,17 @@ try {
   fail([`EXPO_PUBLIC_SUPABASE_URL is not a URL: ${url}`]);
 }
 
-if (!LOCAL_HOSTS.has(host)) process.exit(0);
+// Which backend the app is about to talk to, before Metro's output buries it.
+// Nothing on screen distinguishes a local deck from a hosted one, and an empty
+// deck looks the same either way — so the answer belongs here, on every start.
+function announce(where) {
+  console.log(`  app → ${where}`);
+}
+
+if (!LOCAL_HOSTS.has(host)) {
+  announce(`hosted · ${host}`);
+  process.exit(0);
+}
 
 let status;
 try {
@@ -103,3 +113,5 @@ if (!localKeys.includes(key)) {
     'Fix: put both lines in .env.local, from `supabase status -o env`.',
   ]);
 }
+
+announce('local');
