@@ -19,8 +19,8 @@ Docker comes from Colima, not Docker Desktop. Install once with
 1. `npm install`
 2. `npm run db:start` — starts the local Supabase stack, prints the API URL and anon key.
 3. `cp .env.example .env` and paste those two values in.
-4. `npm run db:reset` — applies migrations. It seeds nothing; see "Filling the
-   local database" below.
+4. `npm run db:reset` — applies migrations and seeds a snapshot of real
+   inventory, so the deck has watches in it once you sign in.
 5. `npm run web` (browser) or `npm run ios` (simulator)
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
@@ -44,17 +44,30 @@ runs automatically before `start`, `ios`, `android`, and `web`.
 
 ## Filling the local database
 
-`supabase/seed.sql` is deliberately empty — invented references and placeholder
-photos beside real watches ruined every judgement about how the app looked. Put
-real inventory in instead:
+`npm run db:reset` seeds `supabase/seed.sql`, a snapshot of real inventory —
+real references, real prices, photographs served from the shop's own site. There
+are no invented fixtures, because placeholder photos beside real watches ruined
+every judgement about how the app looked. Nothing is scraped and no OpenAI call
+is made, so a reset is free and works offline.
+
+The seeded shop belongs to a seed account rather than to you, on purpose: the
+deck hides listings you imported yourself, so a seed owned by the account you
+sign in with would look like a seed that failed.
+
+Regenerate it from a live project when the shape of the data changes:
 
 ```
-npm run dealers -- add goldfingersvintage.com --limit 10 --yes
+npm run snapshot
 ```
 
-Run it with no operator env file and it targets whatever `supabase start` is
-running. Listings are invisible to anyone not signed in, so an empty deck on the
-sign-in screen is expected.
+To add a different shop to the local stack instead:
+
+```
+npm run dealers:local -- add goldfingersvintage.com --limit 10 --yes
+```
+
+Listings are invisible to anyone not signed in, so an empty deck on the sign-in
+screen is expected.
 
 Only email codes are enabled. Apple and Google are written but switched off, because
 neither has credentials yet — see "Enabling Apple and Google" below.
@@ -187,8 +200,10 @@ supabase/functions  import-listings edge function
 | `npm run demo:web` / `demo` | Run against fixtures, no backend needed |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
-| `npm run db:reset` | Re-apply migrations and seed |
+| `npm run db:reset` | Re-apply migrations and seed the inventory snapshot |
 | `npm run db:types` | Regenerate `src/lib/database.types.ts` from the live schema |
+| `npm run snapshot` | Rewrite `supabase/seed.sql` from a live project's inventory |
+| `npm run dealers:local` | Any `dealers` command, against the local stack |
 | `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
 | `npm run import -- <url>` | Re-import a dealer you already added |
 | `npm run dealers` | List, approve, revoke, remove or measure dealers |
