@@ -301,3 +301,12 @@ th {
   color: var(--brass);
   border-color: var(--brass);
 }
+
+/* Pointed at production. Loud on purpose: the screens are identical against
+   local, and the difference is whether a real buyer's deck empties. */
+.badge.live {
+  color: var(--text);
+  background: var(--bad);
+  border-color: var(--bad);
+  font-weight: 600;
+}

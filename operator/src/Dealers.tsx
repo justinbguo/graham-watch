@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { supabase, type OperatorDealer, type Permission } from './supabase';
+import { confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
 type Row = OperatorDealer;
 
@@ -37,6 +37,12 @@ export function Dealers() {
   }, [tick]);
 
   async function setPermission(dealer: Row, permission: Permission) {
+    const asked =
+      permission === 'approved'
+        ? `Put ${dealer.listings_live || dealer.listings_total} of ${dealer.name}'s watches into the deck?`
+        : `Pull ${dealer.name} out of the deck? Buyers stop seeing their watches.`;
+    if (!confirmWrite(asked)) return;
+
     setBusyId(dealer.id);
     setError(null);
     const { error: failed } = await supabase.rpc('set_dealer_permission', {

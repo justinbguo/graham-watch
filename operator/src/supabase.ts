@@ -41,10 +41,31 @@ export const VOLUME_LABELS: Record<Volume, string> = {
 /** Mailpit is where the local stack dumps mail. Handy, not required. */
 export const MAILPIT = 'http://127.0.0.1:54324';
 
-export function isLocal(): boolean {
+function hostOf(value: string): string {
   try {
-    return ['127.0.0.1', 'localhost'].includes(new URL(url).hostname);
+    return new URL(value).hostname;
   } catch {
-    return false;
+    return value;
   }
+}
+
+const host = hostOf(url);
+
+/**
+ * Which Graham this tab is pointed at.
+ *
+ * These screens are identical against local and production, and the difference
+ * is whether pulling a shop back empties a real buyer's deck. So the answer is
+ * on screen at all times, and anything that writes asks first when the answer
+ * is production.
+ */
+export const target = {
+  url,
+  host,
+  isLocal: ['127.0.0.1', 'localhost'].includes(host),
+} as const;
+
+export function confirmWrite(question: string): boolean {
+  if (target.isLocal) return true;
+  return window.confirm(`${question}\n\nThis is production: ${target.host}`);
 }

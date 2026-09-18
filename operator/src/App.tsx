@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Applications } from './Applications';
 import { Dealers } from './Dealers';
 import { SignIn } from './SignIn';
-import { supabase } from './supabase';
+import { supabase, target } from './supabase';
 
 type Screen = 'applications' | 'dealers';
 
@@ -72,6 +72,11 @@ export function App() {
         <div className="brand">
           Graham <span className="muted">Operator</span>
         </div>
+        <span
+          className={target.isLocal ? 'badge' : 'badge live'}
+          title={target.url}>
+          {target.isLocal ? 'local' : 'production'}
+        </span>
         <nav className="tabs">
           <button
             className={screen === 'applications' ? 'tab on' : 'tab'}

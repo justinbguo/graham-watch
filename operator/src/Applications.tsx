@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { supabase, VOLUME_LABELS, type Application } from './supabase';
+import { confirmWrite, supabase, VOLUME_LABELS, type Application } from './supabase';
 
 type Status = Application['status'];
 
@@ -45,6 +45,15 @@ export function Applications() {
     setError(null);
     try {
       if (verdict === 'accept') {
+        // Accepting hands the shop to the account that applied, and publishes
+        // it. Both are hard to walk back once a dealer is editing listings.
+        if (
+          !confirmWrite(
+            `Give ${application.shop_name} to ${application.verified_email}, and publish it?`
+          )
+        ) {
+          return;
+        }
         const { error: failed } = await supabase.rpc('approve_dealer_application', {
           p_application_id: application.id,
         });

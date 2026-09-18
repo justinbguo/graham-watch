@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { isLocal, MAILPIT, supabase } from './supabase';
+import { MAILPIT, supabase, target } from './supabase';
 
 type Stage = 'email' | 'code';
 
@@ -115,7 +115,7 @@ export function SignIn() {
             <button type="button" className="ghost" onClick={() => setStage('email')}>
               Back
             </button>
-            {isLocal() ? (
+            {target.isLocal ? (
               <p className="muted small">
                 Local stack:{' '}
                 <a href={MAILPIT} target="_blank" rel="noreferrer">
@@ -123,7 +123,16 @@ export function SignIn() {
                 </a>
                 .
               </p>
-            ) : null}
+            ) : (
+              // Not Mailpit: a hosted project sends auth codes through
+              // Supabase's own mailer, which is a different path from the
+              // RESEND_API_KEY the edge functions need.
+              <p className="muted small">
+                Sent to your real inbox. If nothing arrives, {target.host} is
+                probably on Supabase's built-in mailer, which allows only a few
+                an hour.
+              </p>
+            )}
           </>
         )}
 
