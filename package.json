@@ -60,7 +60,8 @@
     "import": "node --env-file=scripts/.env.operator.local scripts/import.mjs",
     "sweep": "node --env-file=scripts/.env.operator.local scripts/sweep.mjs",
     "dealers": "node --env-file=scripts/.env.operator.local scripts/dealers.mjs",
-    "dealers:local": "node scripts/dealers.mjs"
+    "dealers:local": "node scripts/dealers.mjs",
+    "snapshot": "node --env-file=scripts/.env.operator.local scripts/snapshot.mjs"
   },
   "private": true
 }
