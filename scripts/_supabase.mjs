@@ -8,6 +8,7 @@
 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { relative } from 'node:path';
 
 let cached;
 
@@ -75,7 +76,42 @@ export async function request(path, { token, method = 'GET', body, prefer } = {}
   } catch {
     parsed = text;
   }
+
+  if (response.status === 404 && SCHEMA_CACHE_MISS.has(parsed?.code)) {
+    parsed.message = `${parsed.message}\n${whichProject()}`;
+  }
+
   return { status: response.status, ok: response.ok, body: parsed };
+}
+
+/**
+ * PostgREST reports an absent table or function as a 404 against its schema
+ * cache, which reads like a broken script. It almost always means this project
+ * has not had a migration applied — and since `npm run dealers` loads
+ * scripts/.env.operator.local, the project being asked is usually hosted while
+ * the one holding the migration is local. Say which is which.
+ */
+const SCHEMA_CACHE_MISS = new Set(['PGRST202', 'PGRST205']);
+
+function whichProject() {
+  const { url, isLocal } = config();
+
+  if (isLocal) {
+    return `  ${url} has not had that migration applied. Run: npm run db:reset`;
+  }
+
+  const line = `  ${url} has not had that migration applied.`;
+
+  // `node -e` and the REPL have no entry script. This runs while reporting
+  // somebody else's error, so it must never be the thing that throws.
+  const entry = process.argv[1];
+  if (!entry) return line;
+
+  const within = relative(process.cwd(), entry);
+  const script = within.startsWith('..') ? entry : within;
+  const args = process.argv.slice(2).join(' ');
+
+  return [line, `  For the local stack instead: node ${script}${args ? ` ${args}` : ''}`].join('\n');
 }
 
 export function serviceKey() {

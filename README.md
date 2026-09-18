@@ -148,6 +148,11 @@ That creates the account if it does not exist. With no argument it grants
 `operator@graham.local`, the account the other scripts already use. Either way
 the code lands in Mailpit, not a real inbox.
 
+Watch which backend you grant on. `npm run dealers` reads
+`scripts/.env.operator.local` and points at hosted, while a copied
+`operator/.env.example` points the UI at local — and a grant only counts in the
+project it was made in. `npm run dealers:local` grants on the local stack.
+
 An operator is a row in an `operators` table, not whoever holds
 `SUPABASE_SERVICE_ROLE_KEY` — that key bypasses row-level security on every
 table and never belongs in a browser. So access is revocable per person, and

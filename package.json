@@ -59,7 +59,8 @@
     "test:rls": "node scripts/test-rls.mjs",
     "import": "node --env-file=scripts/.env.operator.local scripts/import.mjs",
     "sweep": "node --env-file=scripts/.env.operator.local scripts/sweep.mjs",
-    "dealers": "node --env-file=scripts/.env.operator.local scripts/dealers.mjs"
+    "dealers": "node --env-file=scripts/.env.operator.local scripts/dealers.mjs",
+    "dealers:local": "node scripts/dealers.mjs"
   },
   "private": true
 }

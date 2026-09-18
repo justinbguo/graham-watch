@@ -271,6 +271,25 @@ other command in that script already signs in as. Codes land in Mailpit.
 
 A `db:reset` drops the account and the grant together. Run it again.
 
+### Which Graham the UI is talking to
+
+`operator/.env.local` decides, and it is not the file the scripts read.
+`npm run dealers` loads `scripts/.env.operator.local` and points at **hosted**,
+while the UI points wherever its own env file says — and a copied
+`.env.example` says local. A grant is per project, so being an operator locally
+is not being an operator on hosted.
+
+That mismatch has one confusing symptom: the grant command reports that the
+address can approve shops, and the UI still says it is not an operator. Two
+different databases, both telling the truth.
+
+`npm run dealers:local` runs the same commands against the local stack.
+
+Aiming the UI at hosted means putting the hosted URL and anon key in
+`operator/.env.local`. Everything it does there is a write to production:
+accepting an application hands a real shop to a real dealer, and publishing puts
+real stock in real decks.
+
 ### Why an operator is a row
 
 Everything in `scripts/` authorises by holding `SUPABASE_SERVICE_ROLE_KEY`. That
@@ -480,7 +499,8 @@ Working-as-designed, so do not debug these:
 | Apple and Google buttons missing everywhere | Both are written and switched off until they have credentials. |
 | An application shows `○` and cannot be accepted | The applicant has not proved a mailbox yet. Waiting on them. |
 | A second application is refused | One live application per account, by unique index. Answered ones free it. |
-| The operator UI says "not an operator" | The account has no `operators` row. `npm run dealers -- operator <email>`. A `db:reset` drops it. |
+| The operator UI says "not an operator" | The account has no `operators` row *in the project the UI is pointed at*. A grant is per project, and `npm run dealers` grants on hosted while the UI usually reads local. Use `npm run dealers:local`. A `db:reset` drops it. |
+| `Could not find the table 'public.operators' in the schema cache` | You are pointed at a project that migration has not reached. The error names the project and the local command to use instead. |
 | Operator sign-in says "Signups not allowed for otp" | The address has no account. `npm run dealers -- operator <email>` makes one and grants it. Signups stay off in the UI so it is never the way in. |
 | The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
 | The deck is empty on a fresh `db:reset` | There are no watches until you import a shop. |
