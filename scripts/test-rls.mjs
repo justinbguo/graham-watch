@@ -1716,6 +1716,72 @@ console.log('\noperators');
   });
 }
 
+// Every function in this schema is executable by anon the moment it is created:
+// Supabase's default privileges say so. `revoke execute ... from public` does
+// not undo that, because PUBLIC is the implicit everyone-grant and not the anon
+// role. Tables ride out that mistake because RLS denies a role with no policy.
+// A `security definer` function has no such backstop — it runs as its owner and
+// skips RLS on purpose — so an ungranted function is an open one.
+console.log('\nwhat anon can reach');
+{
+  const admin = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+
+  // The publishable key with no session behind it, which is what anyone who
+  // unzips the app binary holds.
+  const asAnon = (fn, body) => api(`/rest/v1/rpc/${fn}`, { method: 'POST', body: body ?? {} });
+
+  for (const [fn, body] of [
+    ['operator_dealers', {}],
+    ['set_dealer_permission', { p_dealer_id: dealerId, p_permission: 'approved' }],
+    ['approve_dealer_application', { p_application_id: applicationId }],
+    ['decline_dealer_application', { p_application_id: applicationId, p_reason: 'no' }],
+    ['is_operator', {}],
+    ['require_operator', {}],
+    ['can_claim_with_email', { p_dealer_id: dealerId, p_email: 'sales@example.com' }],
+    ['store_dealer_claim_code', { p_dealer_id: dealerId, p_email: 'sales@example.com' }],
+    ['replace_listing_photos', { p_listing_id: listingId, p_photos: [] }],
+    ['apply_source_item', { p_source_item_id: listingId }],
+    ['lookup_claimable_dealer', { p_website: 'https://example.com' }],
+  ]) {
+    const attempt = await asAnon(fn, body);
+    check(`anon cannot execute ${fn}`, attempt.status >= 400, `got ${attempt.status}`);
+  }
+
+  // The one that was live: a shop published by nobody at all.
+  const permission = await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
+    headers: admin,
+  }).then((r) => r.json());
+  check(
+    'no anon call changed a permission',
+    permission?.[0]?.permission === 'approved',
+    `permission is ${permission?.[0]?.permission}`
+  );
+
+  const anonWrite = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+    method: 'PATCH',
+    body: { name: 'anon was here' },
+  });
+  check('anon cannot write dealers', anonWrite.status >= 400, `got ${anonWrite.status}`);
+
+  // Authenticated is not the fix either: this one answers whether a guessed
+  // address matches the column SELECT is revoked on, so any account could have
+  // harvested dealer addresses one guess at a time.
+  const probe = await api('/rest/v1/rpc/can_claim_with_email', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_email: 'sales@example.com' },
+  });
+  check(
+    'a signed-in buyer cannot probe contact addresses',
+    probe.status >= 400,
+    `got ${probe.status}`
+  );
+}
+
 // The tests approve a dealer to prove the deck respects permission, which put
 // fixtures in front of real users. Clean up rather than leave them there.
 async function cleanUp() {
