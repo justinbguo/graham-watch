@@ -57,9 +57,9 @@ because it creates and deletes users.
 
 ## Hosted is behind local
 
-Hosted is not a mirror of your machine and nothing keeps it in step. As of this
-branch it is **eight migrations and one function behind**, which makes most of
-the dealer work invisible there. Check before blaming the code:
+Hosted is not a mirror of your machine and nothing keeps it in step. The schema
+and the four functions are level as of this branch, so what is left is secrets.
+Check before blaming the code:
 
 ```
 npx supabase migration list      # local vs remote, side by side
@@ -67,30 +67,32 @@ npx supabase functions list      # what is actually deployed
 npx supabase secrets list        # names only, values are hashed
 ```
 
-What is missing on hosted today, and what it looks like if you test there:
+What is still missing on hosted, and what it looks like if you test there:
 
 | Not on hosted | Symptom if you try it there |
 | --- | --- |
-| `dealer_applications` + `my_dealer_application` | Apply screen fails; PostgREST says the relation does not exist |
-| `answer_dealer_application` | `dealers -- accept` / `decline` fail with PGRST202 |
-| `operators` | The operator UI signs in and then says you are not an operator |
-| `avatar_storage` | Picking a profile photo fails: no such bucket |
-| `replace_listing_photos` | Photo refresh reports success and changes nothing |
-| `import_job_ledger` | The import rate limit can be reset by the account it bills |
-| `inquiry_targets_its_listing` | An inquiry can name a dealer who never carried the watch |
-| `verify-application` function | The application code email never sends |
-| `RESEND_API_KEY` / `SMTP_HOST` | **No mail sends at all** — sign-in codes, claim codes, inquiries |
+| `RESEND_API_KEY` / `SMTP_HOST` | **No mail sends at all** — claim codes, application codes, inquiries |
 | `SCRAPE_PROVIDER` / `JINA_API_KEY` | Imports fall back to plain `fetch`, so JavaScript-rendered shops read as empty |
 
-That last pair of rows means hosted Graham cannot currently email anyone. Treat
-it as a deploy that has not happened, not a bug to hunt. Closing the gap is
-three commands, and they are writes to production — run them deliberately:
+That first row means hosted Graham still cannot email anyone. Treat it as a
+deploy that has not happened, not a bug to hunt:
 
 ```
-supabase db push
-supabase functions deploy verify-application
-supabase secrets set RESEND_API_KEY=... SCRAPE_PROVIDER=jina
+supabase secrets set RESEND_API_KEY=... SCRAPE_PROVIDER=jina JINA_API_KEY=...
 ```
+
+Migrations and functions go up the same way, and they are writes to production —
+run them deliberately, and take a dump first if the data matters:
+
+```
+npx supabase db dump --linked --data-only -f ~/graham-backups/data-$(date +%F).sql
+npx supabase db push
+npx supabase functions deploy send-inquiry
+```
+
+An operator on hosted is a row in `operators` there, and `npm run db:reset`
+cannot reach it. Grant one with `npm run dealers -- operator you@example.com`
+while the scripts point at hosted, which is their default.
 
 ## Three processes
 
