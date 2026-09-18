@@ -25,5 +25,8 @@
   },
   // The app's generated schema types live outside this project so both the
   // phone app and this one read the same `npm run db:types` output.
-  "include": ["src", "../src/lib/database.types.ts"]
+  "include": ["src", "../src/lib/database.types.ts"],
+  // Tests run under `node --test`, not in a browser. They are checked by
+  // tsconfig.node.json, which is the project that has Node's types.
+  "exclude": ["src/**/*.test.ts"]
 }

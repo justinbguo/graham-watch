@@ -69,6 +69,13 @@ jobs:
         working-directory: operator
         run: npx oxlint --deny-warnings
 
+      # No test runner dependency: Node 22 strips the types itself. The parser
+      # under test decides which shops a pasted list adds, and its failure mode
+      # is a line read as the wrong thing rather than a crash.
+      - name: test
+        working-directory: operator
+        run: npm test
+
   functions:
     name: edge functions
     runs-on: ubuntu-latest

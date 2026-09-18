@@ -829,9 +829,24 @@ export type Database = {
           website: string
         }[]
       }
+      operator_catalog_problems: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          error: string
+          id: string
+          last_seen_at: string
+          queued: boolean
+          source_url: string
+          title: string
+        }[]
+      }
       operator_dealers: {
         Args: never
         Returns: {
+          can_import: boolean
+          catalog_failed: number
+          catalog_queued: number
+          catalog_total: number
           claimed_by: string
           contact_email: string
           created_at: string
@@ -841,6 +856,26 @@ export type Database = {
           name: string
           permission: Database["public"]["Enums"]["dealer_permission"]
           website: string
+        }[]
+      }
+      operator_listings: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          brand: string
+          case_size_mm: number
+          condition: string
+          created_at: string
+          currency: string
+          id: string
+          model: string
+          photo_count: number
+          price_cents: number
+          reference: string
+          sold_at: string
+          source_url: string
+          status: Database["public"]["Enums"]["listing_status"]
+          thumb_path: string
+          year: number
         }[]
       }
       pending_source_item_count: {

@@ -1,12 +1,19 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 
+import { AddShops } from './AddShops';
 import { Applications } from './Applications';
 import { Dealers } from './Dealers';
 import { SignIn } from './SignIn';
 import { supabase, target } from './supabase';
 
-type Screen = 'applications' | 'dealers';
+const SCREENS = {
+  applications: 'Applications',
+  dealers: 'Dealers',
+  add: 'Add shops',
+} as const;
+
+type Screen = keyof typeof SCREENS;
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -78,16 +85,14 @@ export function App() {
           {target.isLocal ? 'local' : 'production'}
         </span>
         <nav className="tabs">
-          <button
-            className={screen === 'applications' ? 'tab on' : 'tab'}
-            onClick={() => setScreen('applications')}>
-            Applications
-          </button>
-          <button
-            className={screen === 'dealers' ? 'tab on' : 'tab'}
-            onClick={() => setScreen('dealers')}>
-            Dealers
-          </button>
+          {Object.entries(SCREENS).map(([key, label]) => (
+            <button
+              key={key}
+              className={screen === key ? 'tab on' : 'tab'}
+              onClick={() => setScreen(key as Screen)}>
+              {label}
+            </button>
+          ))}
         </nav>
         <div className="who">
           <span className="muted small">{session.user.email}</span>
@@ -98,7 +103,15 @@ export function App() {
       </header>
 
       <main className="body">
-        {screen === 'applications' ? <Applications /> : <Dealers />}
+        {screen === 'applications' ? (
+          <Applications />
+        ) : screen === 'dealers' ? (
+          <Dealers />
+        ) : (
+          // Lands on Dealers after a run, because the next two steps — importing
+          // watches and publishing the shop — both live there.
+          <AddShops onAdded={() => setScreen('dealers')} />
+        )}
       </main>
     </div>
   );

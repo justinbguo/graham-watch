@@ -1749,6 +1749,86 @@ console.log('\noperators');
     `${published?.listings_in_deck} in deck vs ${sellable.body?.length} active and unsold`
   );
 
+  // ---------------------------------------------------------------------
+  // The console's own reads
+  // ---------------------------------------------------------------------
+
+  const watches = await api('/rest/v1/rpc/operator_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'operator_listings returns one shop\u2019s watches',
+    Array.isArray(watches.body) && watches.body.some((row) => row.id === listingId),
+    `${watches.status} ${JSON.stringify(watches.body)?.slice(0, 120)}`
+  );
+
+  const problems = await api('/rest/v1/rpc/operator_catalog_problems', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'operator_catalog_problems answers for a shop with none',
+    Array.isArray(problems.body),
+    `${problems.status} ${JSON.stringify(problems.body)?.slice(0, 120)}`
+  );
+
+  // ---------------------------------------------------------------------
+  // Who may run the importer
+  // ---------------------------------------------------------------------
+
+  // Later sections assert what a claim takes away from the original importer,
+  // so this block puts the shop back exactly as it found it. Restoring `null`
+  // instead quietly unclaimed the shop and made those checks pass for the wrong
+  // reason.
+  const setClaim = async (userId) => {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}`, {
+      method: 'PATCH',
+      headers: admin,
+      body: JSON.stringify({ claimed_by: userId }),
+    });
+    const all = await api('/rest/v1/rpc/operator_dealers', {
+      token: buyer.token,
+      method: 'POST',
+    });
+    return all.body?.find((row) => row.id === dealerId);
+  };
+
+  const claimedBy = (
+    await api(`/rest/v1/dealers?id=eq.${dealerId}&select=claimed_by`, { token: SERVICE })
+  ).body?.[0]?.claimed_by;
+
+  // An unclaimed shop is the operator's to import even though somebody else
+  // added it. The terminal tools sign in as their own account, so without this
+  // every shop added from a laptop is unimportable in the browser.
+  check(
+    'an operator controls an unclaimed shop it did not add',
+    (await setClaim(null))?.can_import === true
+  );
+
+  // A claim is a dealer taking over their own inventory. 20260917000002 exists
+  // to stop an earlier importer writing over them, and operator status must not
+  // be a way back in.
+  check(
+    'an operator does not control a shop a dealer has claimed',
+    (await setClaim(dealerUser.id))?.can_import === false
+  );
+
+  // The flag has to agree with what the write would really do. A screen that
+  // offers the button and a policy that refuses it is worse than either.
+  const catalogue = await api(`/rest/v1/source_items?dealer_id=eq.${dealerId}&select=id`, {
+    token: buyer.token,
+  });
+  check(
+    'and cannot read that shop\u2019s catalogue',
+    Array.isArray(catalogue.body) && catalogue.body.length === 0,
+    `${catalogue.status} ${JSON.stringify(catalogue.body)?.slice(0, 120)}`
+  );
+
+  await setClaim(claimedBy);
+
   await fetch(`${URL}/rest/v1/operators?user_id=eq.${buyer.id}`, {
     method: 'DELETE',
     headers: admin,

@@ -21,9 +21,12 @@ Docker comes from Colima, not Docker Desktop. Install once with
 3. `cp .env.example .env` and paste those two values in.
 4. `npm run db:reset` — applies migrations and seeds a snapshot of real
    inventory, so the deck has watches in it once you sign in.
-5. `npm run web` (browser) or `npm run ios` (simulator)
+5. `npm run web` (browser) or `npm run ios` (simulator via Expo Go)
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
+
+Native modules such as Sign in with Apple do not load in Expo Go. For those, install
+a development build (below) and run `npm run start:dev`.
 
 ## Choosing a backend
 
@@ -90,8 +93,7 @@ and skipping one gives you `provider is not enabled` from the auth server.
 
 **Apple** — needs the paid Apple Developer Program and a Services ID, plus
 `[auth.external.apple] enabled = true`. It cannot run in Expo Go at all; the button
-hides itself there because the native view is missing, so testing it needs a
-development build.
+hides itself there because the native view is missing. Use a development build.
 
 If you ship on iOS offering Google, App Store review requires Sign in with Apple too.
 
@@ -171,9 +173,28 @@ An operator is a row in an `operators` table, not whoever holds
 table and never belongs in a browser. So access is revocable per person, and
 `npm run db:reset` drops the grant along with everything else.
 
-`add <domain>` stays in the terminal. Discovery fetches the dealer's own site and
-a browser cannot: their server sends no CORS headers, so the request never
-starts.
+### Seeding the deck
+
+Filling the app with watches is three steps, deliberately separate, because only
+the second costs money and only the third is visible to a buyer.
+
+1. **Add shops.** Paste domains one per line, or upload a CSV with a
+   `domain,name,email` header. Each site is read first and shown as a table you
+   can cut rows from; then each shop is created unpublished with its catalogue
+   read. Costs HTTP on Shopify and Squarespace.
+2. **Import** on a shop's row. Turns catalogue items into watches — a model call
+   and a photo download each, so you type the count.
+3. **Publish** the shop. This is what puts its watches in the deck.
+
+Nothing is lost if you close the tab mid-run. Domains are keyed on the shop's
+website, so pasting the same list again skips what is already there, and a shop's
+**Catalogue** column reports what is still queued for a stopped import.
+
+The arrow on a shop's row opens what has been imported, with photos, prices and
+the catalogue items that failed to read.
+
+Importing is refused on a shop a dealer has claimed — they manage their own
+inventory from the app. Those rows show Import disabled.
 
 More in [docs/OPERATING.md](docs/OPERATING.md).
 
@@ -191,12 +212,46 @@ supabase/migrations schema and RLS
 supabase/functions  import-listings edge function
 ```
 
+## Development build
+
+`expo-dev-client` is a library inside Graham's own binary. Expo Go is Expo's generic
+host. Installing the package is not enough: the Simulator still opens Expo Go until
+Graham.app is compiled and installed once.
+
+For the iOS Simulator (no Apple Developer account):
+
+```
+eas build:dev -p ios
+```
+
+That uses the `development-simulator` profile, installs Graham on the booted
+Simulator, and tries to start Metro. If port 8081 is already taken (`npm run demo`
+or `npm run ios`), stop that server and run:
+
+```
+npm run start:dev
+```
+
+Then press `i`. `npm run ios` still forces Expo Go on purpose.
+
+`app.json` sets `ITSAppUsesNonExemptEncryption` to false so EAS does not prompt for
+Apple's export-compliance question. Graham only uses HTTPS.
+
+A Simulator build cannot be copied onto a physical iPhone. A device build needs the
+paid Apple Developer Program and `eas build --platform ios --profile development`.
+Local `npx expo run:ios` also needs a signing certificate in Xcode, because Sign in
+with Apple adds an entitlement.
+
+Rebuild only after a native library, `app.json`, or an SDK bump. JS-only work does
+not. Store binaries are a different path: [docs/OPERATING.md](docs/OPERATING.md).
+
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `npm run web` / `ios` / `android` | Start the app in Expo Go (or the browser) |
-| `npm run start:dev` | Talk to a development build instead of Expo Go |
+| `eas build:dev -p ios` | Build/install the iOS Simulator development client |
+| `npm run start:dev` | Talk to a development build already on the Simulator or device |
 | `npm run demo:web` / `demo` | Run against fixtures, no backend needed |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
@@ -210,3 +265,4 @@ supabase/functions  import-listings edge function
 | `npm run dealers -- applications` | Shops asking to be listed; answer with `accept` or `decline` |
 | `npm run dealers -- operator <email>` | Let an account use the operator UI |
 | `npm run operator` | Start the operator UI on http://localhost:5173 |
+| `npm test --prefix operator` | Unit-test the pasted-list parser |

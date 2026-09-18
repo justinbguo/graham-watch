@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 // a column this UI reads cannot quietly stop existing.
 import type { Database } from '../../src/lib/database.types';
 
+export type { Database };
+
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 

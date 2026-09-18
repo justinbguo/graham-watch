@@ -320,7 +320,7 @@ The practical differences:
 `set_dealer_permission` is the only implementation of "publish a shop", used by
 both the UI and `dealers -- approve`. The same is true of accept and decline.
 
-### The two numbers on Dealers
+### The three numbers on Dealers
 
 **In the deck** is what a buyer can see right now, and it is the shop-level half
 of `search_listings`' own test: the watch is active, unsold, *and the shop is
@@ -328,21 +328,59 @@ approved*. A shop that is pending or revoked reads zero however much it holds.
 
 **Imported** is every listing row we have for them.
 
-A gap between the two is sold or deactivated stock — or the whole shop not being
-approved, which is what `Publish` changes. The rest of what the deck filters is
-per-viewer, because a buyer never sees what they imported themselves or has
-already swiped, so it cannot be counted per shop.
+**Catalogue** is what their site is offering — `source_items`, which a catalogue
+read fills and `Import` draws from. A shop can hold five hundred here and no
+listings at all; that is the normal state right after it is added.
+
+A gap between the first two is sold or deactivated stock — or the whole shop not
+being approved, which is what `Publish` changes. The rest of what the deck
+filters is per-viewer, because a buyer never sees what they imported themselves
+or has already swiped, so it cannot be counted per shop.
+
+Under Catalogue, `N queued` is an import that stopped part way. The rows stay
+marked, so importing again drains exactly those. `N failed` are catalogue items
+the model could not read; they are not retried on every batch, because one bad
+row at the head of the queue would stall everything behind it. Expand the shop to
+read why each failed.
 
 Applications lists only what is waiting. An accepted one is a shop and lives on
 Dealers; a declined one is not a record worth a tab, since the applicant reads
 the note on their profile and reapplying files a new row.
 
-### What is not in it
+### Adding shops in bulk
 
-`add <domain>` stays in the terminal. Discovery reads the dealer's own website,
-and a browser cannot: the dealer's server sends no CORS headers, so the request
-fails before it starts. Moving `discover` into an edge function would fix that
-and has not been done.
+Paste domains one per line, or upload a CSV. A first row naming its columns is
+read as a header — `domain`, `website`, `url` and `site` all name the domain
+column; `name`/`shop`/`dealer` and `email`/`contact` fill the rest. A first row
+that holds a domain is treated as data, because eating it would silently drop a
+shop. Quoted fields are honoured, so `"Watches, Ltd"` stays one field. Lines with
+no domain in them are reported with their line number rather than skipped.
+
+The run is two phases. Reading the sites writes nothing, so every shop is read
+first and listed with what discovery found — platform, product count, contact
+address — and rows can be unticked before anything is created. Then each shop is
+created at `pending` with its catalogue read, one at a time.
+
+Three things make an interrupted run safe to repeat:
+
+- `dealers.website` is unique and the importer keys on it, so the same list
+  pasted twice adds nothing twice. A race on one domain ends with one row.
+- Adding a shop never publishes it. New shops are `pending`, which the deck
+  excludes, so an unreviewed catalogue cannot reach a buyer.
+- A stopped import leaves its queue marked. `Import` drains what is left first.
+
+The hour's ceiling is 200 new shops for an operator and 10 for anyone else, and
+the refusal is a 429 that names the wait. Shops already added are unaffected:
+refreshing and importing them are not metered.
+
+### Who may run the importer
+
+`controls_dealer` is the one answer, and operator status is part of it only while
+a shop is unclaimed. A claim is a dealer taking over their own inventory, so a
+claimed shop shows `Import` disabled — see the ownership rules above for why
+widening that would undo them. `operator_dealers.can_import` is the same
+function the write itself consults, so the button cannot disagree with the
+policy.
 
 The dealers table reads through `operator_dealers()` rather than the table,
 because `select` on `public.dealers` is granted column by column and
