@@ -127,6 +127,37 @@ shops. See [docs/SCRAPING.md](docs/SCRAPING.md).
 Point the scripts at a hosted project by setting `SUPABASE_URL`,
 `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 
+## The operator UI
+
+Answering dealer applications and publishing shops runs in a web app, separate
+from the phone app and with its own dependencies:
+
+```
+cp operator/.env.example operator/.env.local   # both values from `supabase status`
+npm run operator                               # http://localhost:5173
+```
+
+Sign in with an email code, the same as the app. The address needs an account
+already, plus a grant:
+
+```
+npm run dealers -- operator you@example.com
+```
+
+Locally that address is `operator@graham.local` and the code lands in Mailpit.
+With no argument the command grants the account the scripts already use.
+
+An operator is a row in an `operators` table, not whoever holds
+`SUPABASE_SERVICE_ROLE_KEY` — that key bypasses row-level security on every
+table and never belongs in a browser. So access is revocable per person, and
+`npm run db:reset` drops the grant along with everything else.
+
+`add <domain>` stays in the terminal. Discovery fetches the dealer's own site and
+a browser cannot: their server sends no CORS headers, so the request never
+starts.
+
+More in [docs/OPERATING.md](docs/OPERATING.md).
+
 ## Layout
 
 ```
@@ -136,6 +167,7 @@ src/data/           one module per entity, TanStack Query hooks
 src/lib/            supabase client, auth, design tokens, generated types
 src/providers/      session, query cache, theme
 scripts/            operator tools and RLS tests
+operator/           operator web app; own package.json, Vite not Expo
 supabase/migrations schema and RLS
 supabase/functions  import-listings edge function
 ```
@@ -154,3 +186,6 @@ supabase/functions  import-listings edge function
 | `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
 | `npm run import -- <url>` | Re-import a dealer you already added |
 | `npm run dealers` | List, approve, revoke, remove or measure dealers |
+| `npm run dealers -- applications` | Shops asking to be listed; answer with `accept` or `decline` |
+| `npm run dealers -- operator <email>` | Let an account use the operator UI |
+| `npm run operator` | Start the operator UI on http://localhost:5173 |
