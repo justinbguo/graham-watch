@@ -125,25 +125,42 @@ async function publishOne(
   // Copying a gallery is the slowest thing in a batch, so it only reruns when
   // the shop's own gallery changed.
   if (photosHash !== row.photos_hash) {
-    const photos = await copyPhotos(storage, listingId, photoUrls);
+    try {
+      const photos = await copyPhotos(storage, listingId, photoUrls);
 
-    // One statement, because a delete that lands without its insert leaves a
-    // live listing with no photographs and the deck does not filter those out.
-    const written = await supabase.rpc('replace_listing_photos', {
-      p_listing_id: listingId,
-      p_photos: photos,
-    });
-    if (written.error) throw new Error(written.error.message);
+      // One statement, because a delete that lands without its insert leaves a
+      // live listing with no photographs and the deck does not filter those out.
+      const written = await supabase.rpc('replace_listing_photos', {
+        p_listing_id: listingId,
+        p_photos: photos,
+      });
+      if (written.error) throw new Error(written.error.message);
 
-    // A failed stamp costs one repeated copy on the next pass and nothing else,
-    // so it is reported rather than thrown — failing the row here would retire
-    // a watch that did publish.
-    const stamped = await supabase
-      .from('source_items')
-      .update({ photos_hash: photosHash })
-      .eq('id', row.id);
-    if (stamped.error) {
-      console.error('photos_hash stamp failed', row.id, stamped.error.message);
+      // A failed stamp costs one repeated copy on the next pass and nothing else,
+      // so it is reported rather than thrown — failing the row here would retire
+      // a watch that did publish.
+      const stamped = await supabase
+        .from('source_items')
+        .update({ photos_hash: photosHash })
+        .eq('id', row.id);
+      if (stamped.error) {
+        console.error('photos_hash stamp failed', row.id, stamped.error.message);
+      }
+    } catch (error) {
+      // `apply_source_item` already stamped `applied_hash`, and the queue only
+      // offers rows whose hashes disagree. So the row above is finished as far
+      // as the queue is concerned while its listing is live with the wrong
+      // gallery — or none, which the deck shows as a card with nothing on it.
+      // Unstamping puts the watch back in the queue, where clearing the error
+      // this failure is about to record will pick it up again.
+      const unstamped = await supabase
+        .from('source_items')
+        .update({ applied_hash: null })
+        .eq('id', row.id);
+      if (unstamped.error) {
+        console.error('could not requeue after a photo failure', row.id, unstamped.error.message);
+      }
+      throw error;
     }
   }
 
