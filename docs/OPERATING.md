@@ -58,7 +58,7 @@ because it creates and deletes users.
 ## Hosted is behind local
 
 Hosted is not a mirror of your machine and nothing keeps it in step. As of this
-branch it is **seven migrations and one function behind**, which makes most of
+branch it is **eight migrations and one function behind**, which makes most of
 the dealer work invisible there. Check before blaming the code:
 
 ```
@@ -207,8 +207,12 @@ photo management, and `import-inventory` to re-read their own site.
 
 ### The operator path
 
-Not in the app. `npm run dealers` with the service-role key, because RLS blocks
-approving a shop you created.
+Not in the phone app, and never reachable by a dealer: RLS blocks approving a
+shop you created, so publishing is somebody else's decision by construction.
+
+Two surfaces do it. This script, holding the service-role key, and the web UI
+below, holding the anon key and an `operators` row. Both end up in the same
+functions — see [Why an operator is a row](#why-an-operator-is-a-row).
 
 ```
 npm run dealers                          # who is in, and whether we can email them
@@ -293,23 +297,39 @@ mailbox to every buyer.
 
 ## Testing
 
-### The four automated checks
+### The automated checks
 
 | Command | Catches | Blind to |
 | --- | --- | --- |
 | `npm run typecheck` | Type errors in the app | Anything at runtime |
 | `npx expo export --platform web` | Broken route tree, missing assets, bad imports | Logic |
+| `npm run build` in `operator/` | Type errors and a broken bundle in the operator UI | Logic |
+| `npx oxlint --deny-warnings` in `operator/` | Lint in the operator UI | The Expo app, which has no linter |
 | `deno check --config supabase/functions/deno.ci.json …` | Type errors in the four edge functions | Logic, and whether they are deployed |
+| `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace feed parser, against payloads a real shop returned | Every other part of the pipeline |
 | `npm run test:rls` | Every security policy, over HTTP, from a buyer's side of the wire | Anything above the database |
 
-Run the first and last before every commit; both are seconds. CI runs all four
-on every push and pull request:
+Run `npm run typecheck` and `npm run test:rls` before every commit; both are
+seconds. CI runs all of them on every push and pull request:
 
 | Job | Checks |
 | --- | --- |
 | `app` | `npm run typecheck`, then a web bundle |
-| `edge functions` | `deno check` on all four functions |
+| `operator ui` | `npm run build` and `oxlint --deny-warnings`, in `operator/` |
+| `edge functions` | `deno check` on all four, then `deno test` over the directory |
 | `database` | every migration from empty, `npm run test:rls`, generated types |
+
+The operator job installs from `operator/package-lock.json` and never runs the
+root `npm ci`. Vite and Expo both want to own React and the bundler, so the two
+do not share a dependency tree; the schema types the UI imports are a committed
+file rather than a dependency.
+
+It also passes placeholder `VITE_` values, which is load-bearing in a way worth
+knowing before you copy the job. `operator/src/supabase.ts` throws when the env
+is missing, so with nothing set Rollup proves the throw always runs, treats
+`createClient` as unreachable, and tree-shakes supabase-js out entirely. The
+build stays green while bundling an app that can only crash — 228kB instead of
+444kB.
 
 The bundle is there because `tsc` reads files and does not resolve the route tree.
 A screen deleted while a navigator still registers it type-checks and then fails
@@ -340,8 +360,9 @@ uses the pinned binary no matter what `supabase` means in your shell. A bare
 Check with `npm exec -- supabase --version` against `supabase --version`; if they
 disagree, run schema commands through `npm run`.
 
-None of the four proves the app works. There are no tests of the buyer or dealer
-flows above the database, so those are walked by hand.
+None of them proves the app works. The one test above the database covers a feed
+parser; there is nothing exercising the buyer or dealer flows, so those are
+walked by hand.
 
 ### What to run after what you changed
 
@@ -349,7 +370,9 @@ flows above the database, so those are walked by hand.
 | --- | --- |
 | The schema | `npm run db:types`, then `npm run test:rls` |
 | A security policy | `npm run test:rls` |
-| An edge function | `deno check`, then `supabase functions serve <name>` |
+| An edge function | `deno check` and `deno test`, then `supabase functions serve <name>` |
+| A shop's feed parser | `deno test` — the fixtures are real payloads |
+| The operator UI | `npm run build` and `npx oxlint` inside `operator/` |
 | Which backend the app uses | `npm run check:env` |
 
 `npm run db:reset` is the undo button: drops everything, re-runs every migration
@@ -639,8 +662,9 @@ them on takes.
 Apple additionally cannot run in Expo Go — it needs native code Expo Go cannot load,
 which means a development build.
 
-There are no automated tests above the database. `test:rls` covers every policy,
-and the flows in [Testing](#testing) are walked by hand.
+The only automated test above the database is the Squarespace feed parser.
+`test:rls` covers every policy, the operator UI is type-checked and linted, and
+the flows in [Testing](#testing) are walked by hand. The Expo app has no linter.
 
 Demo mode reimplements the buyer surfaces in JavaScript rather than running the
 real queries, so it can drift from the backend without anything failing. It is for
