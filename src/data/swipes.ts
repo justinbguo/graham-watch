@@ -60,8 +60,12 @@ async function deletePasses(actorId: string) {
 
 /**
  * The card leaves the deck the instant the gesture ends, before the write is
- * acknowledged. A swipe that waits on the network feels broken, and the worst
- * case for a failed write is the card reappearing on the next fetch.
+ * acknowledged. A swipe that waits on the network feels broken.
+ *
+ * The removal has to be undone by hand when the write fails. `useDeck` sets
+ * `staleTime: Infinity` and does not refetch on focus, so there is no later
+ * fetch to fall back on: without the restore below, a save that failed took the
+ * watch out of the pile for the rest of the session and saved nothing.
  */
 export function useRecordSwipe(actorId: string | null) {
   const queryClient = useQueryClient();
@@ -74,9 +78,20 @@ export function useRecordSwipe(actorId: string | null) {
     onMutate: ({ listingId }) => {
       // Every cached deck, not just the current filter's: the card is judged and
       // must not reappear by changing a filter and changing it back.
+      const previous = queryClient.getQueriesData<DeckCard[]>({ queryKey: ['deck'] });
+
       queryClient.setQueriesData<DeckCard[]>({ queryKey: ['deck'] }, (deck) =>
         (deck ?? []).filter((card) => card.id !== listingId)
       );
+
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      // Back in the order they were in, rather than on top like an undo: the
+      // user did not ask for this card again, the write simply did not land.
+      for (const [key, deck] of context?.previous ?? []) {
+        queryClient.setQueryData(key, deck);
+      }
     },
     onSuccess: () => {
       if (!actorId) return;
