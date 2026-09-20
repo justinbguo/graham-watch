@@ -148,8 +148,10 @@ with a module count means the code compiled and any problem is at runtime.
 ## Known limits
 
 Only email codes are enabled. Apple and Google are written but switched off until
-they have credentials, so neither button appears. See the README for what turning
-them on takes.
+they have credentials, so neither button appears. See [AUTH.md](AUTH.md).
 
 Apple additionally cannot run in Expo Go — it needs native code Expo Go cannot load,
-which means a development build.
+which means a development or EAS build.
+
+The Source tab stores posts in memory on the device. Closing the app clears them;
+there is no `source_*` table yet.
