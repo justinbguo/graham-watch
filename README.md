@@ -9,6 +9,7 @@ import edge function.
 - Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
 - Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
+- Auth: [docs/AUTH.md](docs/AUTH.md)
 - Design system: [docs/DESIGN.md](docs/DESIGN.md)
 - Scraper options: [docs/SCRAPING.md](docs/SCRAPING.md)
 
@@ -29,7 +30,8 @@ To install on a real phone without leaving Metro running, use an EAS `preview`
 build (demo fixtures baked in). See [docs/PHONE.md](docs/PHONE.md).
 
 Only email codes are enabled. Apple and Google are written but switched off, because
-neither has credentials yet — see "Enabling Apple and Google" below.
+neither has credentials yet — see [docs/AUTH.md](docs/AUTH.md) and the short version
+below.
 
 ## Sign-in during local development
 
@@ -38,18 +40,18 @@ inbox. Enter any email, then read the 6-digit code there.
 
 ## Enabling Apple and Google
 
-Both are implemented and both are off. Turning either on takes three matching changes,
-and skipping one gives you `provider is not enabled` from the auth server.
+Both are implemented and both stay off until credentials exist. Skipping a step gives
+you `provider is not enabled` from the auth server.
 
-**Google** — create an OAuth client in Google Cloud, then set
-`[auth.external.google] enabled = true` in `supabase/config.toml`, export
-`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `..._SECRET`, and flip
-`GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
+**Google** — create a Web OAuth client in Google Cloud (see AUTH.md), put
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `..._SECRET` in `.env`, then set
+`EXPO_PUBLIC_GOOGLE_SIGN_IN=1`. `[auth.external.google]` is already `enabled = true`
+in `config.toml`; the env flag is what shows the button. Restart Supabase and Expo
+after editing `.env`.
 
 **Apple** — needs the paid Apple Developer Program and a Services ID, plus
-`[auth.external.apple] enabled = true`. It cannot run in Expo Go at all; the button
-hides itself there because the native view is missing, so testing it needs a
-development build.
+`[auth.external.apple] enabled = true`. It cannot run in Expo Go; the button hides
+itself there. Testing needs a development or EAS build.
 
 If you ship on iOS offering Google, App Store review requires Sign in with Apple too.
 
@@ -76,7 +78,8 @@ The contact address is what makes an inquiry reach a dealer, so `list` warns abo
 dealer missing one.
 
 Use `npm run import -- <url> --limit 10` to re-run a dealer you have already added.
-Listings already imported are skipped, so it is safe to repeat.
+Listings already imported are skipped, so it is safe to repeat. `npm run sweep`
+re-checks approved dealers and marks watches sold when the shop feed says so.
 
 Imported listings stay invisible to everyone but the importer until the dealer is
 approved, and RLS makes self-approval impossible. That is deliberate: it keeps a shop's
@@ -101,14 +104,15 @@ Point the scripts at a hosted project by setting `SUPABASE_URL`,
 ## Layout
 
 ```
-src/app/            routes; (app)/(tabs) holds Deck, Saved, Profile
+src/app/            routes; tabs are Buy, Search, Source, Saved, Profile
+src/features/       domain UI (filters, sourcing, dealers)
 src/components/     SwipeCard, DeckGrid, ListingRow, shared UI primitives
 src/data/           one module per entity, TanStack Query hooks
 src/lib/            supabase client, auth, design tokens, generated types
 src/providers/      session, query cache, theme
 scripts/            operator tools and RLS tests
 supabase/migrations schema and RLS
-supabase/functions  import-listings edge function
+supabase/functions  import-listings, send-inquiry
 ```
 
 ## Commands
@@ -124,4 +128,5 @@ supabase/functions  import-listings edge function
 | `npm run db:types` | Regenerate `src/lib/database.types.ts` from the live schema |
 | `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
 | `npm run import -- <url>` | Re-import a dealer you already added |
+| `npm run sweep` | Re-check approved dealers for sold watches |
 | `npm run dealers` | List, approve, revoke, remove or measure dealers |

@@ -35,7 +35,8 @@ Shutting down is the reverse. `colima stop` returns about 8GB of RAM.
 | `npm run demo:web` | Fixtures only, no backend needed |
 | `npm run build:preview:android` | Cloud APK with demo fixtures — install on a phone |
 
-Phone installs (no laptop left running): [PHONE.md](PHONE.md).
+Tabs in the app: Buy, Search, Source, Saved, Profile. Phone installs (no laptop
+left running): [PHONE.md](PHONE.md).
 
 With the dev server running, the terminal takes single keypresses:
 
@@ -117,9 +118,9 @@ idea the listing is gone, so the CLI clears it.
 ## Inquiry email
 
 A buyer swipes right to save. Sending an inquiry is a separate, deliberate act, and
-it is the only thing that emails a dealer. The mail comes from Graham with the
-buyer's address as Reply-To, so the dealer's reply goes straight to them. It opens
-with the buyer's name, which is why onboarding asks for one.
+it is the only thing that emails a dealer. The `send-inquiry` function sends mail from
+Graham with the buyer's address as Reply-To, so the dealer's reply goes straight to
+them. It opens with the buyer's name, which is why onboarding asks for one.
 
 Locally the mail lands in Mailpit (http://127.0.0.1:54324), same inbox as sign-in
 codes. In production set `RESEND_API_KEY` and the function uses Resend instead.
