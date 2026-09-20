@@ -33,6 +33,9 @@ Shutting down is the reverse. `colima stop` returns about 8GB of RAM.
 | `npm run web` | Browser. Fastest loop. |
 | `npm run ios` | iOS Simulator via Expo Go |
 | `npm run demo:web` | Fixtures only, no backend needed |
+| `npm run build:preview:android` | Cloud APK with demo fixtures — install on a phone |
+
+Phone installs (no laptop left running): [PHONE.md](PHONE.md).
 
 With the dev server running, the terminal takes single keypresses:
 
