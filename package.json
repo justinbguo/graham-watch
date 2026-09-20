@@ -51,6 +51,8 @@
     "demo": "EXPO_PUBLIC_DEMO=1 expo start --clear",
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --clear",
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
+    "build:preview:android": "npx eas-cli@latest build --profile preview --platform android",
+    "build:preview:ios": "npx eas-cli@latest build --profile preview --platform ios",
     "test:rls": "node scripts/test-rls.mjs",
     "import": "node scripts/import.mjs",
     "sweep": "node scripts/sweep.mjs",

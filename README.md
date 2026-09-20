@@ -7,6 +7,7 @@ Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and the
 import edge function.
 
 - Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
+- Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
 - Design system: [docs/DESIGN.md](docs/DESIGN.md)
 - Scraper options: [docs/SCRAPING.md](docs/SCRAPING.md)
@@ -23,6 +24,9 @@ Docker comes from Colima, not Docker Desktop. Install once with
 5. `npm run web` (browser) or `npm run ios` (simulator)
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
+
+To install on a real phone without leaving Metro running, use an EAS `preview`
+build (demo fixtures baked in). See [docs/PHONE.md](docs/PHONE.md).
 
 Only email codes are enabled. Apple and Google are written but switched off, because
 neither has credentials yet — see "Enabling Apple and Google" below.
@@ -113,6 +117,7 @@ supabase/functions  import-listings edge function
 | --- | --- |
 | `npm run web` / `ios` / `android` | Start the app |
 | `npm run demo:web` / `demo` | Run against fixtures, no backend needed |
+| `npm run build:preview:android` / `build:preview:ios` | EAS cloud build you can install on a phone |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
 | `npm run db:reset` | Re-apply migrations and seed |
