@@ -1,39 +1,15 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Field, Message, Screen } from '@/components/ui';
 import { useCompleteOnboarding, useProfile } from '@/data/profile';
 import { useFacets } from '@/data/search';
-import { HIT_TARGET, inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { BrandChip } from '@/features/profile/BrandChip';
+import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 type Step = 'name' | 'brands';
-
-function BrandChip({
-  label,
-  count,
-  selected,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(onboardingStyles);
-
-  return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected]}>
-      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text>
-      <Text style={[styles.chipCount, selected && styles.chipLabelSelected]}>{count}</Text>
-    </Pressable>
-  );
-}
 
 export default function Onboarding() {
   const { userId } = useSession();
@@ -159,33 +135,6 @@ const onboardingStyles = (theme: Theme) => ({
     flexWrap: 'wrap' as const,
     gap: space.sm,
     paddingBottom: space.md,
-  },
-  chip: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
-    paddingHorizontal: inset.chipX,
-    paddingVertical: inset.chipY,
-    minHeight: HIT_TARGET,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    backgroundColor: theme.color.surface,
-  },
-  chipSelected: {
-    backgroundColor: theme.color.accent,
-    borderColor: theme.color.accent,
-  },
-  chipLabel: {
-    ...type.label,
-    color: theme.color.text,
-  },
-  chipCount: {
-    ...type.caption,
-    color: theme.color.textFaint,
-  },
-  chipLabelSelected: {
-    color: theme.color.onAccent,
   },
   actions: {
     marginTop: 'auto' as const,

@@ -7,7 +7,7 @@ import { useSession } from '@/providers/session';
 
 import { keys } from './keys';
 
-export type Onboarding = {
+export type ProfileAnswers = {
   firstName: string;
   lastName: string;
   favoriteBrands: string[];
@@ -26,8 +26,11 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
   return data;
 }
 
-async function saveOnboarding(userId: string, answers: Onboarding) {
-  if (isDemo) return demo.completeOnboarding();
+async function saveOnboarding(userId: string, answers: ProfileAnswers) {
+  if (isDemo) {
+    demo.completeOnboarding(answers);
+    return;
+  }
 
   const { error } = await supabase
     .from('profiles')
@@ -36,6 +39,24 @@ async function saveOnboarding(userId: string, answers: Onboarding) {
       last_name: answers.lastName.trim(),
       favorite_brands: answers.favoriteBrands,
       onboarded_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) throw error;
+}
+
+async function saveProfile(userId: string, answers: ProfileAnswers) {
+  if (isDemo) {
+    demo.updateProfile(answers);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: answers.firstName.trim(),
+      last_name: answers.lastName.trim(),
+      favorite_brands: answers.favoriteBrands,
     })
     .eq('id', userId);
 
@@ -53,20 +74,40 @@ export function useProfile(userId: string | null) {
   });
 }
 
+function invalidateProfile(queryClient: ReturnType<typeof useQueryClient>, userId: string) {
+  queryClient.invalidateQueries({ queryKey: keys.profile(userId) });
+  // Favourite brands rank the deck, so the pile built before the answers
+  // existed is now in the wrong order.
+  queryClient.invalidateQueries({ queryKey: ['deck'] });
+}
+
 export function useCompleteOnboarding(userId: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (answers: Onboarding) => {
+    mutationFn: (answers: ProfileAnswers) => {
       if (!userId) throw new Error('Not signed in.');
       return saveOnboarding(userId, answers);
     },
     onSuccess: () => {
       if (!userId) return;
-      queryClient.invalidateQueries({ queryKey: keys.profile(userId) });
-      // Favourite brands rank the deck, so the pile built before the answers
-      // existed is now in the wrong order.
-      queryClient.invalidateQueries({ queryKey: ['deck'] });
+      invalidateProfile(queryClient, userId);
+    },
+  });
+}
+
+/** Same fields as onboarding, without flipping onboarded_at. */
+export function useUpdateProfile(userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (answers: ProfileAnswers) => {
+      if (!userId) throw new Error('Not signed in.');
+      return saveProfile(userId, answers);
+    },
+    onSuccess: () => {
+      if (!userId) return;
+      invalidateProfile(queryClient, userId);
     },
   });
 }
@@ -87,4 +128,11 @@ export function useOnboardingGate() {
 export function fullName(profile: Profile | null | undefined): string | null {
   const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim();
   return name || null;
+}
+
+export function brandsEqual(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((value, index) => value === right[index]);
 }

@@ -1,9 +1,16 @@
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Button, Eyebrow, Message, Screen } from '@/components/ui';
+import { Button, Eyebrow, Field, Message, Screen } from '@/components/ui';
 import { useSaved } from '@/data/listings';
-import { fullName, useProfile } from '@/data/profile';
+import {
+  brandsEqual,
+  fullName,
+  useProfile,
+  useUpdateProfile,
+} from '@/data/profile';
 import { useFacets } from '@/data/search';
+import { BrandChip } from '@/features/profile/BrandChip';
 import { signOut } from '@/lib/auth';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
@@ -20,31 +27,83 @@ export default function Profile() {
   const { data: saved = [] } = useSaved(userId);
   const { data: profile } = useProfile(userId);
   const { data: facets = [] } = useFacets();
+  const update = useUpdateProfile(userId);
   const { preference, setPreference } = useThemeContext();
   const styles = useThemedStyles(profileStyles);
 
-  const name = fullName(profile);
-  // favorite_brands stores brand_key; the facets carry the name a human wrote.
-  const favorites = (profile?.favorite_brands ?? []).map(
-    (key) => facets.find((facet) => facet.kind === 'brand' && facet.value === key)?.label ?? key
-  );
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [brands, setBrands] = useState<string[]>([]);
+
+  // Seed from the profile once it arrives, and again after a successful save
+  // so the form matches what dealers and the deck will see.
+  useEffect(() => {
+    if (!profile) return;
+    setFirstName(profile.first_name ?? '');
+    setLastName(profile.last_name ?? '');
+    setBrands(profile.favorite_brands ?? []);
+  }, [profile]);
+
+  const brandFacets = facets.filter((facet) => facet.kind === 'brand');
+  const named = Boolean(firstName.trim() && lastName.trim());
+  const dirty =
+    firstName.trim() !== (profile?.first_name ?? '').trim() ||
+    lastName.trim() !== (profile?.last_name ?? '').trim() ||
+    !brandsEqual(brands, profile?.favorite_brands ?? []);
+
+  const toggle = (value: string) =>
+    setBrands((current) =>
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    );
 
   return (
     <Screen title="Profile">
-      <View style={styles.body}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.identity}>
           <Eyebrow>Signed in as</Eyebrow>
-          <Text style={styles.email}>{name ?? session?.user.email ?? 'Signed in'}</Text>
-          {name ? <Message text={session?.user.email ?? ''} /> : null}
+          <Text style={styles.email}>
+            {fullName(profile) ?? session?.user.email ?? 'Signed in'}
+          </Text>
+          {session?.user.email ? <Message text={session.user.email} /> : null}
           <Message text={`${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`} />
         </View>
 
-        {favorites.length ? (
-          <View style={styles.section}>
-            <Eyebrow>Brands you follow</Eyebrow>
-            <Text style={styles.favorites}>{favorites.join(' · ')}</Text>
+        <View style={styles.section}>
+          <Eyebrow>Your name</Eyebrow>
+          <Message text="Dealers see this when you ask about a watch." />
+          <Field
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="First name"
+            autoComplete="given-name"
+            textContentType="givenName"
+            autoCapitalize="words"
+          />
+          <Field
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Last name"
+            autoComplete="family-name"
+            textContentType="familyName"
+            autoCapitalize="words"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Eyebrow>Brands you follow</Eyebrow>
+          <Message text="Watches from these come up first on the deck. Everything else still shows." />
+          <View style={styles.chips}>
+            {brandFacets.map((facet) => (
+              <BrandChip
+                key={facet.value}
+                label={facet.label}
+                count={facet.count}
+                selected={brands.includes(facet.value)}
+                onPress={() => toggle(facet.value)}
+              />
+            ))}
           </View>
-        ) : null}
+        </View>
 
         <View style={styles.section}>
           <Eyebrow>Appearance</Eyebrow>
@@ -67,18 +126,28 @@ export default function Profile() {
           </View>
         </View>
 
+        {update.error ? <Message text={update.error.message} tone="error" /> : null}
+
         <View style={styles.footer}>
+          <Button
+            label="Save changes"
+            disabled={!dirty || !named}
+            loading={update.isPending}
+            onPress={() =>
+              update.mutate({ firstName, lastName, favoriteBrands: brands })
+            }
+          />
           <Button label="Sign out" variant="secondary" onPress={() => signOut()} />
         </View>
-      </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const profileStyles = (theme: Theme) => ({
   body: {
-    flex: 1,
     paddingHorizontal: inset.screen,
+    paddingBottom: inset.screen,
     gap: stack.section,
   },
   identity: {
@@ -91,9 +160,10 @@ const profileStyles = (theme: Theme) => ({
   section: {
     gap: stack.related,
   },
-  favorites: {
-    ...type.body,
-    color: theme.color.textMuted,
+  chips: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: space.sm,
   },
   segmented: {
     flexDirection: 'row' as const,
@@ -121,7 +191,6 @@ const profileStyles = (theme: Theme) => ({
     color: theme.color.text,
   },
   footer: {
-    marginTop: 'auto' as const,
-    paddingBottom: inset.screen,
+    gap: stack.related,
   },
 });
