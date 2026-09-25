@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useSendInquiry } from '@/data/inquiries';
+import { inquiryByListing, useInquiries, useSendInquiry } from '@/data/inquiries';
 import { useListing } from '@/data/listings';
 import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -13,9 +13,15 @@ export default function InquiryScreen() {
   const { listingId } = useLocalSearchParams<{ listingId: string }>();
   const { userId } = useSession();
   const { data: card, isPending } = useListing(listingId);
+  const { data: inquiries = [] } = useInquiries(userId);
   const [message, setMessage] = useState('');
   const sendInquiry = useSendInquiry(userId);
   const styles = useThemedStyles(inquiryStyles);
+
+  const existing = useMemo(
+    () => inquiryByListing(inquiries).get(listingId),
+    [inquiries, listingId]
+  );
 
   if (isPending) {
     return (
@@ -36,13 +42,46 @@ export default function InquiryScreen() {
     );
   }
 
-  if (sendInquiry.isSuccess) {
+  if (card.sold_at) {
     return (
       <Screen title="Contact dealer">
         <Centered>
-          <Heading>Inquiry sent</Heading>
+          <Heading>Sold</Heading>
           <Message
-            text={`${card.dealer?.name ?? 'The dealer'} will get your message with a link to this watch.`}
+            text={`${card.dealer?.name ?? 'The dealer'} no longer has this watch. There is nothing to ask about.`}
+          />
+          <Button label="Close" variant="secondary" onPress={() => router.back()} />
+        </Centered>
+      </Screen>
+    );
+  }
+
+  if (existing?.status === 'sent' && !sendInquiry.isSuccess) {
+    return (
+      <Screen title="Contact dealer">
+        <Centered>
+          <Heading>Already contacted</Heading>
+          <Message
+            text={`You already reached ${card.dealer?.name ?? 'this dealer'} about this watch. Check your email for their reply.`}
+          />
+          <Button label="Done" onPress={() => router.back()} />
+        </Centered>
+      </Screen>
+    );
+  }
+
+  if (sendInquiry.isSuccess) {
+    const emailed = sendInquiry.data?.emailed ?? true;
+    return (
+      <Screen title="Contact dealer">
+        <Centered>
+          <Heading>{emailed ? 'Inquiry sent' : 'Preview only'}</Heading>
+          <Message
+            text={
+              emailed
+                ? `${card.dealer?.name ?? 'The dealer'} will get your message with a link to this watch.`
+                : `Preview builds do not email dealers. In a live build, ${card.dealer?.name ?? 'the dealer'} would get your message with a link to this watch.`
+            }
           />
           <Button label="Done" onPress={() => router.back()} />
         </Centered>
@@ -80,7 +119,7 @@ export default function InquiryScreen() {
 
         <View style={styles.actions}>
           <Button
-            label="Send inquiry"
+            label={existing ? 'Retry inquiry' : 'Send inquiry'}
             loading={sendInquiry.isPending}
             onPress={() => sendInquiry.mutate({ card, message })}
           />

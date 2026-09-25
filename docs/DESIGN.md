@@ -346,6 +346,10 @@ Choosing nothing is allowed and the button says "Skip for now" when you have.
 The gate is `profiles.onboarded_at`, not an empty brand list: picking nothing is an
 answer, and it has to be told apart from never having been asked.
 
+Profile keeps both answers editable. A typo in a name or a Skip that later feels
+wrong must not need a database edit — dealers read the name on every inquiry, and
+favourite brands keep ranking the deck.
+
 ## Two targets on a card
 
 The photograph pages through the dealer's other shots. A bar directly beneath it opens the
@@ -372,6 +376,20 @@ because a total quietly short by two reads as the whole answer. Mixed currencies
 total at all rather than adding pounds to dollars. An empty list shows nothing: "$0" beside
 the word Saved reads as a price. Sold watches are left out too, since their row shows "Sold"
 where the price was and a sum no visible price explains is worse than a smaller sum.
+
+## Contact on Saved is a status, not a habit
+
+The right-hand control on a Saved row is the introduction funnel in one word:
+
+- **Contact** — no inquiry yet. Opens the composer.
+- **Retry** — a previous send failed or never left. Same composer, same unique row.
+- **Contacted** — the email went. Plain text, not a button: tapping again cannot help.
+- **Gone** — the watch has `sold_at`. No control at all. Detail and the inquiry screen
+  refuse the same way, so a deep link cannot email a dealer about a sold watch.
+
+The success screen after send says "Inquiry sent" only when mail actually left. Preview
+builds record a local Contacted state and say "Preview only", so a phone install never
+lies that a dealer was emailed.
 
 ## A sold watch never enters the deck
 

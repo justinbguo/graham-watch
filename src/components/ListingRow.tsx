@@ -14,6 +14,7 @@ export function ListingRow({
   onLongPress,
 }: {
   card: DeckCard;
+  /** With onAction: a button. Alone: a status (Contacted) that is not tappable. */
   actionLabel?: string;
   onAction?: () => void;
   onPress?: () => void;
@@ -53,6 +54,8 @@ export function ListingRow({
         <Pressable accessibilityRole="button" onPress={onAction} hitSlop={space.md} style={styles.action}>
           <Text style={styles.actionLabel}>{actionLabel}</Text>
         </Pressable>
+      ) : actionLabel ? (
+        <Text style={styles.statusLabel}>{actionLabel}</Text>
       ) : null}
     </Pressable>
   );
@@ -110,5 +113,9 @@ const rowStyles = (theme: Theme) => ({
   actionLabel: {
     ...type.control,
     color: theme.color.text,
+  },
+  statusLabel: {
+    ...type.control,
+    color: theme.color.textFaint,
   },
 });

@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Divider, Message, Screen, Spinner } from '@/components/ui';
+import { inquiryByListing, useInquiries } from '@/data/inquiries';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe, useUnsave } from '@/data/swipes';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
@@ -55,11 +56,13 @@ export default function ListingScreen() {
   const { userId } = useSession();
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
+  const { data: inquiries = [] } = useInquiries(userId);
   const save = useRecordSwipe(userId);
   const unsave = useUnsave(userId);
   const styles = useThemedStyles(detailStyles);
 
   const isSaved = saved.some((entry) => entry.id === listingId);
+  const inquiry = inquiryByListing(inquiries).get(listingId);
 
   if (isPending) {
     return (
@@ -132,10 +135,17 @@ export default function ListingScreen() {
             }
           />
           {/* The whole point of tracking sold stock: no one writes to a dealer
-              about a watch that went months ago. */}
-          {card.sold_at ? null : (
+              about a watch that went months ago. Sent stays a label, not a
+              second email; failed and pending keep a retry. */}
+          {card.sold_at ? null : inquiry?.status === 'sent' ? (
+            <Button label="Contacted" variant="secondary" disabled onPress={() => undefined} />
+          ) : (
             <Button
-              label="Ask about this watch"
+              label={
+                inquiry?.status === 'failed' || inquiry?.status === 'pending'
+                  ? 'Retry inquiry'
+                  : 'Ask about this watch'
+              }
               onPress={() => router.push(`/inquiry/${card.id}`)}
             />
           )}

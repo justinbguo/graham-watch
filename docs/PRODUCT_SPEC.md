@@ -124,13 +124,13 @@ after the data path works end to end.
 
 ## 9. Known gaps before real users
 
-- Inquiries are recorded but nothing emails the dealer yet.
 - Nothing re-copies a photo when the dealer changes it upstream. `listing_photos`
   keeps `source_url` so a future job can diff, but that job does not exist.
-- Server state is hand-rolled per screen. It needs a query cache.
 - No dealer-facing view at all. Approval happens in the Supabase dashboard.
+- Dealer reputation on the detail panel is seeded placeholder data.
+- The Source tab is local-only until a real table exists.
 
 ## 10. Next phase, in rough order
 
-Send the inquiry emails, listing detail view, dealer claim flow, then payments only if
-the introduction model turns out not to be enough.
+Dealer claim flow, then payments only if the introduction model turns out not to
+be enough.

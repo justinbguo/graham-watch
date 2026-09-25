@@ -4,6 +4,7 @@ import type {
   CaseMaterial,
   Complication,
   DeckCard,
+  Inquiry,
   Profile,
   SwipeDirection,
   WatchStyle,
@@ -22,7 +23,8 @@ export const isDemo = process.env.EXPO_PUBLIC_DEMO === '1';
 
 export const DEMO_USER_ID = 'demo-user';
 
-const DEMO_PROFILE: Profile = {
+// Mutable so Profile edits and onboarding stick for the life of the process.
+let profile: Profile = {
   id: DEMO_USER_ID,
   first_name: 'Demo',
   last_name: 'Collector',
@@ -33,6 +35,8 @@ const DEMO_PROFILE: Profile = {
   handle: null,
   created_at: '2026-01-01T00:00:00.000Z',
 };
+
+const inquiries: Inquiry[] = [];
 
 const DEALER = { id: 'demo-dealer', name: 'Vintage Vault', website: 'https://vintagevault.test' };
 
@@ -189,9 +193,25 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
   dealer: DEALER,
 }));
 
+// Already in Saved and sold, so preview can show Contact gone without a live sweep.
+const SOLD: DeckCard = {
+  ...CARDS[1],
+  id: 'demo-sold',
+  model: 'Datejust (sold)',
+  source_url: `${DEALER.website}/sold`,
+  sold_at: '2026-01-15T00:00:00.000Z',
+  photos: CARDS[1].photos.map((photo, position) => ({
+    ...photo,
+    id: `demo-photo-sold-${position}`,
+    listing_id: 'demo-sold',
+  })),
+};
+
+CARDS.push(SOLD);
+
 // Swipes live for the life of the process, so the deck and Saved stay in sync
 // while you use the app. A reload starts over, which is what you want in a demo.
-const swiped = new Map<string, SwipeDirection>();
+const swiped = new Map<string, SwipeDirection>([['demo-sold', 'right']]);
 
 /** Mirrors search_listings closely enough that filters behave the same offline. */
 function matches(card: DeckCard, filters: Filters): boolean {
@@ -215,11 +235,43 @@ function matches(card: DeckCard, filters: Filters): boolean {
   return true;
 }
 
-export const demo = {
-  deck: (filters?: Filters) =>
-    CARDS.filter((card) => !swiped.has(card.id) && (!filters || matches(card, filters))),
+function forSale(card: DeckCard) {
+  return card.sold_at == null;
+}
 
-  search: (filters: Filters) => CARDS.filter((card) => matches(card, filters)),
+function brandFacets() {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const card of CARDS) {
+    if (!forSale(card) || !card.brand_key) continue;
+    const entry = counts.get(card.brand_key) ?? { label: card.brand, count: 0 };
+    entry.count += 1;
+    counts.set(card.brand_key, entry);
+  }
+  return [...counts.entries()]
+    .map(([value, { label, count }]) => ({
+      kind: 'brand',
+      value,
+      label,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export type DemoProfileUpdate = {
+  firstName: string;
+  lastName: string;
+  favoriteBrands: string[];
+};
+
+export const demo = {
+  // Sold watches stay out of the deck and search, matching search_listings.
+  deck: (filters?: Filters) =>
+    CARDS.filter(
+      (card) => forSale(card) && !swiped.has(card.id) && (!filters || matches(card, filters))
+    ),
+
+  search: (filters: Filters) =>
+    CARDS.filter((card) => forSale(card) && matches(card, filters)),
 
   recordSwipe: (listingId: string, direction: SwipeDirection) => {
     swiped.set(listingId, direction);
@@ -233,9 +285,67 @@ export const demo = {
   },
 
   // Demo mode is for looking around, so it starts past onboarding.
-  profile: () => DEMO_PROFILE,
+  profile: () => profile,
 
-  completeOnboarding: () => undefined,
+  completeOnboarding: (answers: DemoProfileUpdate) => {
+    profile = {
+      ...profile,
+      first_name: answers.firstName.trim(),
+      last_name: answers.lastName.trim(),
+      favorite_brands: answers.favoriteBrands,
+      onboarded_at: new Date().toISOString(),
+    };
+  },
+
+  updateProfile: (answers: DemoProfileUpdate) => {
+    profile = {
+      ...profile,
+      first_name: answers.firstName.trim(),
+      last_name: answers.lastName.trim(),
+      favorite_brands: answers.favoriteBrands,
+    };
+  },
+
+  inquiries: () => [...inquiries],
+
+  /**
+   * Preview cannot email a dealer. Still records a sent row so Saved can show
+   * Contacted — otherwise the funnel looks broken on a phone install.
+   */
+  recordInquiry: (input: {
+    listingId: string;
+    dealerId: string;
+    buyerId: string;
+    message: string;
+  }): Inquiry => {
+    const existing = inquiries.find(
+      (row) => row.listing_id === input.listingId && row.buyer_id === input.buyerId
+    );
+    if (existing?.status === 'sent') {
+      throw new Error('You already contacted this dealer.');
+    }
+
+    const now = new Date().toISOString();
+    if (existing) {
+      existing.message = input.message.trim() || null;
+      existing.status = 'sent';
+      existing.sent_at = now;
+      return existing;
+    }
+
+    const row: Inquiry = {
+      id: `demo-inquiry-${inquiries.length + 1}`,
+      listing_id: input.listingId,
+      dealer_id: input.dealerId,
+      buyer_id: input.buyerId,
+      message: input.message.trim() || null,
+      status: 'sent',
+      created_at: now,
+      sent_at: now,
+    };
+    inquiries.push(row);
+    return row;
+  },
 
   passCount: () => [...swiped.values()].filter((direction) => direction === 'left').length,
 
@@ -246,4 +356,6 @@ export const demo = {
   },
 
   listing: (listingId: string) => CARDS.find((card) => card.id === listingId) ?? null,
+
+  facets: () => brandFacets(),
 };

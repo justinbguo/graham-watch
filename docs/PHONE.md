@@ -12,7 +12,8 @@ install link. That replaces Metro on your machine and Expo Go on the phone.
 | `production` | Store build | Hosted Supabase (`EXPO_PUBLIC_*` secrets on EAS) |
 
 Start with `preview`. It is the same UI path as `npm run demo`, packaged as a
-real app.
+real app. Inquiries record as Contacted on the device but do not email a dealer —
+the success screen says "Preview only" so that is obvious.
 
 ## One-time setup (needs a computer once)
 

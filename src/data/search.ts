@@ -22,7 +22,7 @@ async function fetchSearch(filters: Filters, limit: number): Promise<DeckCard[]>
 }
 
 async function fetchFacets(): Promise<Facet[]> {
-  if (isDemo) return [];
+  if (isDemo) return demo.facets();
 
   const { data, error } = await supabase.rpc('listing_facets');
   if (error) throw error;
