@@ -2,120 +2,91 @@ import { Text, View } from 'react-native';
 
 import { formatPrice, formatSpecs, formatTitle } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
-import { inset, space, stack, type, type Theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * What a watch says about itself at a glance. Both variants keep one order —
- * name, specs, price — so the eye lands in the same place on every watch and
- * comparing two is a matter of looking twice. They differ in where the name
- * is, how much room a line gets, and where the dealer goes, which is why they
- * are written out rather than assembled from conditionals.
+ * Beside the photograph on a grid row: the name, its spec line, then the price
+ * and the dealer. The name stops at two lines. One watch fills the row, so a
+ * short name does not reserve a blank line under it.
+ *
+ * A swipe card does not use this. Its photograph carries the same three facts
+ * over the image, where a card that fills the screen can afford them.
  */
 export function ListingSummary({
   card,
-  variant = 'card',
+  titleInset = 0,
 }: {
   card: DeckCard;
-  variant?: 'card' | 'tile';
+  /**
+   * Room kept clear at the end of the title, for a control in the row's
+   * corner. The title is the line with slack — it wraps to two anyway — and
+   * the price and the dealer have to stay whole on one.
+   */
+  titleInset?: number;
 }) {
-  return variant === 'tile' ? <TileSummary card={card} /> : <CardSummary card={card} />;
-}
-
-/**
- * Full card width, set like the plate under a catalogue photograph: what it
- * costs, and who from. Nothing else. The name is on the photograph above, and
- * the reference and case size are rows in the table further down the card —
- * printing either one twice in two inches reads as a template, not a page.
- */
-function CardSummary({ card }: { card: DeckCard }) {
   const styles = useThemedStyles(summaryStyles);
 
   return (
     <View style={styles.summary}>
-      <View style={styles.priceRow}>
-        <Text style={styles.price}>{formatPrice(card)}</Text>
-        {card.dealer ? (
-          <Text style={styles.dealerName} numberOfLines={1}>
-            {card.dealer.name}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-/**
- * Half a phone wide, and the dealer back under the price. The name is one line
- * of one size, held to two lines of height whether it needs them or not: tiles
- * sit two to a row, and a name that wraps where its neighbour does not leaves
- * the row stepping. A cut name is a smaller loss than a ragged grid.
- */
-function TileSummary({ card }: { card: DeckCard }) {
-  const styles = useThemedStyles(summaryStyles);
-
-  return (
-    <View style={styles.summaryTile}>
-      <Text style={styles.titleTile} numberOfLines={2}>
+      <Text style={[styles.title, titleInset > 0 && { paddingRight: titleInset }]} numberOfLines={2}>
         {formatTitle(card)}
       </Text>
       <Text style={styles.meta} numberOfLines={1}>
         {formatSpecs(card)}
       </Text>
 
-      <View style={styles.priceBlockTile}>
-        <Text style={styles.priceTile}>{formatPrice(card)}</Text>
-        {card.dealer ? <Text style={styles.dealerTile}>{card.dealer.name}</Text> : null}
-      </View>
+      {/* One line, as on the card: the price and the dealer divided by a
+          middot. Stacked, they were a third and fourth line in a row that is
+          only as tall as its photograph. One space either side of the middot,
+          not the card's two — this line has a glyph at the end of it and the
+          dealer's name was arriving truncated by five pixels. */}
+      <Text style={styles.terms} numberOfLines={1}>
+        {/* Sold replaces the price rather than sitting beside it. A number next
+            to "Sold" reads as what it is going for, not what it went for. */}
+        <Text style={card.sold_at ? styles.sold : styles.price}>
+          {card.sold_at ? 'Sold' : formatPrice(card)}
+        </Text>
+        {card.dealer ? (
+          <>
+            {' · '}
+            <Text style={styles.dealer}>{card.dealer.name}</Text>
+          </>
+        ) : null}
+      </Text>
     </View>
   );
 }
 
 const summaryStyles = (theme: Theme) => ({
   summary: {
-    padding: inset.card,
-    gap: stack.tight,
-  },
-  summaryTile: {
     padding: space.md,
     gap: space.xs,
   },
-  // On the price baseline rather than in an outline beside the maker. A badge
-  // is a control, and the dealer's name is not something you press.
-  dealerName: {
-    ...type.labelStrong,
-    color: theme.color.brass,
-    flexShrink: 1,
-    textAlign: 'right' as const,
-  },
-  titleTile: {
+  title: {
     ...type.titleSmall,
     color: theme.color.text,
-    height: type.titleSmall.lineHeight * 2,
   },
   meta: {
     ...type.caption,
     color: theme.color.textMuted,
   },
-  priceBlockTile: {
-    gap: space.xs,
+  terms: {
+    ...type.caption,
+    color: theme.color.textFaint,
     paddingTop: space.sm,
   },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.md,
-  },
   price: {
-    ...type.price,
-    color: theme.color.text,
-  },
-  priceTile: {
     ...type.priceSmall,
     color: theme.color.text,
   },
-  dealerTile: {
+  sold: {
+    ...type.priceSmall,
+    color: theme.color.textFaint,
+  },
+  // Brass type, not an outlined badge: a badge is a control, and a dealer's
+  // name is not something you press.
+  dealer: {
     ...type.caption,
     color: theme.color.brass,
   },

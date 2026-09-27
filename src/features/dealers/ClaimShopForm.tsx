@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Text, View, type TextInput } from 'react-native';
 
 import { Button, Field, Heading, Message } from '@/components/ui';
 import { inset, radius, stack, type, type Theme } from '@/lib/theme';
@@ -20,6 +21,19 @@ export function ClaimShopForm({
   onApply?: (website: string) => void;
 }) {
   const styles = useThemedStyles(formStyles);
+  const siteRef = useRef<TextInput>(null);
+  const mailboxRef = useRef<TextInput>(null);
+  const codeRef = useRef<TextInput>(null);
+
+  // Each stage mounts a different field. Focus it once the stage is on screen,
+  // or the keyboard stays down until they tap.
+  useEffect(() => {
+    const target =
+      claim.step === 'code' ? codeRef : claim.step === 'address' ? mailboxRef : siteRef;
+    if (claim.step === 'done') return;
+    const id = setTimeout(() => target.current?.focus(), 300);
+    return () => clearTimeout(id);
+  }, [claim.step]);
 
   if (claim.step === 'done') {
     return (
@@ -45,6 +59,7 @@ export function ClaimShopForm({
           />
         </View>
         <Field
+          ref={codeRef}
           accessibilityLabel="Claim code"
           keyboardType="number-pad"
           textContentType="oneTimeCode"
@@ -80,6 +95,7 @@ export function ClaimShopForm({
             <View style={styles.inline}>
               <View style={styles.grow}>
                 <Field
+                  ref={mailboxRef}
                   accessibilityLabel="Mailbox name"
                   placeholder="you"
                   value={claim.localPart}
@@ -122,6 +138,7 @@ export function ClaimShopForm({
         <Message text="Type the website you sell from. We look for it among the shops already here." />
       </View>
       <Field
+        ref={siteRef}
         accessibilityLabel="Your shop's website"
         keyboardType="url"
         placeholder="your-shop.com"

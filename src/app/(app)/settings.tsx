@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
-import { useProfile } from '@/data/profile';
+import { useDeleteAccount, useProfile } from '@/data/profile';
 import { useFacets } from '@/data/search';
 import { signOut } from '@/lib/auth';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
@@ -20,6 +20,7 @@ export default function SettingsScreen() {
   const { data: profile } = useProfile(userId);
   const { data: facets = [] } = useFacets();
   const { preference, setPreference } = useThemeContext();
+  const remove = useDeleteAccount(userId);
   const styles = useThemedStyles(settingsStyles);
 
   const favorites = (profile?.favorite_brands ?? []).map(
@@ -68,6 +69,27 @@ export default function SettingsScreen() {
 
         <Divider />
         <Button label="Sign out" variant="outline" onPress={() => signOut()} />
+        {remove.error ? <Message text={remove.error.message} /> : null}
+        <Button
+          label="Delete account"
+          variant="ghost"
+          loading={remove.isPending}
+          onPress={() => {
+            const title = 'Delete account?';
+            const message =
+              'This removes your profile, saved watches, and inquiries. A shop you claimed stays listed and becomes unclaimed.';
+            const confirm = () => remove.mutate();
+            // Alert.alert on web is a single OK box; a mouse has no system sheet.
+            if (Platform.OS === 'web') {
+              if (globalThis.confirm(`${title} ${message}`)) confirm();
+              return;
+            }
+            Alert.alert(title, message, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete account', style: 'destructive', onPress: confirm },
+            ]);
+          }}
+        />
       </ScrollView>
     </Screen>
   );
@@ -89,7 +111,7 @@ const settingsStyles = (theme: Theme) => ({
   segmented: {
     flexDirection: 'row' as const,
     backgroundColor: theme.color.fill,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     padding: space.xs,
     gap: space.xs,
   },
@@ -97,7 +119,7 @@ const settingsStyles = (theme: Theme) => ({
     flex: 1,
     alignItems: 'center' as const,
     paddingVertical: space.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   segmentActive: {
     backgroundColor: theme.color.surface,

@@ -1,7 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 
+import { Boundary } from './Boundary';
 import { parseShops, type Rejection } from './domains';
-import { discoverShop, syncCatalog, type Discovery, type SyncResult } from './importer';
+import {
+  discoverShop,
+  previewShop,
+  syncCatalog,
+  type Discovery,
+  type Preview,
+  type SyncResult,
+} from './importer';
+import { ShopProducts } from './ShopProducts';
 import { confirmWrite } from './supabase';
 
 /**
@@ -31,6 +40,10 @@ type Row = {
   added?: SyncResult;
   error?: string;
   include: boolean;
+  /** The catalogue as the shop publishes it. Absent until the operator asks. */
+  preview?: Preview;
+  reading?: boolean;
+  previewError?: string;
 };
 
 /** Sites read at once. Enough to make forty shops bearable, few enough to be a
@@ -49,9 +62,38 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<false | 'reading' | 'adding'>(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const stop = useRef(false);
 
   const parsed = useMemo(() => parseShops(text), [text]);
+
+  /** Row edits that arrive on their own clock — an inspection, a tick. */
+  const patch = (domain: string, change: Partial<Row>) =>
+    setRows((was) =>
+      (was ?? []).map((row) => (row.domain === domain ? { ...row, ...change } : row))
+    );
+
+  /**
+   * Reads the whole catalogue of one shop and shows it, writing nothing.
+   *
+   * The sitemap count on the row is URLs, sold watches included, so a shop
+   * offering 80 reads as 970. This is the only way to see which is which, and
+   * it is a click rather than part of the bulk read because it costs a full
+   * walk of the shop's feed and one of the hour's new-shop budget.
+   */
+  async function inspect(row: Row) {
+    if (!row.found) return;
+
+    setOpen(row.domain);
+    patch(row.domain, { reading: true, previewError: undefined });
+
+    try {
+      patch(row.domain, { preview: await previewShop(row.found.catalogUrl), reading: false });
+    } catch (caught) {
+      const failure = caught as Error;
+      patch(row.domain, { reading: false, previewError: failure.message });
+    }
+  }
 
   async function readSites() {
     const start: Row[] = parsed.shops.map((shop) => ({
@@ -240,24 +282,40 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
                     }
                   />
                 </th>
+                <th />
                 <th>Shop</th>
-                <th className="num">Products</th>
+                <th className="num">Listed</th>
+                <th className="num">For sale</th>
                 <th>Platform</th>
                 <th>Contact</th>
+                <th>Instagram</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.flatMap((row) => [
                 <ShopRow
                   key={row.domain}
                   row={row}
                   locked={busy !== false}
-                  onToggle={(include) =>
-                    setRows(rows.map((it) => (it.domain === row.domain ? { ...it, include } : it)))
-                  }
-                />
-              ))}
+                  expanded={open === row.domain}
+                  onOpen={() => setOpen(open === row.domain ? null : row.domain)}
+                  onInspect={() => void inspect(row)}
+                  onToggle={(include) => patch(row.domain, { include })}
+                />,
+
+                open === row.domain ? (
+                  <tr key={`${row.domain}-detail`} className="detail-row">
+                    <td colSpan={9}>
+                      {/* One shop's catalogue must not be able to blank the
+                          list the operator is working through. */}
+                      <Boundary what={`${row.domain}'s catalogue`}>
+                        <ShopDetail row={row} onInspect={() => void inspect(row)} />
+                      </Boundary>
+                    </td>
+                  </tr>
+                ) : null,
+              ])}
             </tbody>
           </table>
 
@@ -273,12 +331,21 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
             </span>
           </div>
 
+          <p className="muted small legend">
+            <strong>Listed</strong> counts the product URLs in their sitemap, sold stock
+            included — a vintage dealer's catalogue is mostly watches they sold years ago.
+            <strong> For sale</strong> is what <em>Inspect</em> found in stock, and it is the
+            only one of the two an import can draw from. Inspect reads their whole catalogue
+            and writes nothing.
+          </p>
+
           {done.length > 0 ? (
             <p className="muted small legend">
               {done.length} shop{done.length === 1 ? '' : 's'} added, holding{' '}
-              {done.reduce((sum, row) => sum + (row.added?.found ?? 0), 0)} watches between them.
-              They are on <strong>Dealers</strong>, unpublished — import watches there, then
-              publish.
+              {done.reduce((sum, row) => sum + (row.added?.found ?? 0), 0)} products between
+              them, {done.reduce((sum, row) => sum + (row.added?.forSale ?? 0), 0)} of them for
+              sale. They are on <strong>Dealers</strong>, unpublished — import watches there,
+              then publish.
             </p>
           ) : null}
         </>
@@ -315,17 +382,31 @@ const STATE_LABEL: Record<RowState, string> = {
 function ShopRow({
   row,
   locked,
+  expanded,
+  onOpen,
+  onInspect,
   onToggle,
 }: {
   row: Row;
   locked: boolean;
+  expanded: boolean;
+  onOpen: () => void;
+  onInspect: () => void;
   onToggle: (include: boolean) => void;
 }) {
   const found = row.found;
   const email = row.fromFileEmail ?? found?.email;
+  const counts = row.preview?.counts;
+
+  const classes = [
+    row.state === 'unreadable' || row.state === 'failed' ? 'dim' : '',
+    expanded ? 'open' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <tr className={row.state === 'unreadable' || row.state === 'failed' ? 'dim' : undefined}>
+    <tr className={classes || undefined}>
       <td className="tick">
         <input
           type="checkbox"
@@ -335,15 +416,56 @@ function ShopRow({
         />
       </td>
 
+      <td className="tick">
+        {found ? (
+          <button
+            className="arrow"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Hide their catalogue' : 'Show their catalogue'}
+            onClick={onOpen}>
+            {expanded ? '▾' : '▸'}
+          </button>
+        ) : null}
+      </td>
+
       <td>
-        <strong>{row.fromFileName ?? found?.name ?? row.domain}</strong>
-        <br />
-        <span className="muted small">{row.domain}</span>
+        <div className="shopcell">
+          {found?.profile.logoUrl ? (
+            <img className="shopmark small" src={found.profile.logoUrl} alt="" loading="lazy" />
+          ) : null}
+          <div>
+            <strong>{row.fromFileName ?? found?.name ?? row.domain}</strong>
+            <br />
+            <span className="muted small">{row.domain}</span>
+          </div>
+        </div>
+      </td>
+
+      {/* Sitemap URLs, sold watches and all. The shop's storefront shows a
+          fraction of this, which is why the honest number is one click away. */}
+      <td className="num">
+        {found ? (
+          found.sitemapProducts || <span className="muted">?</span>
+        ) : (
+          <span className="muted">—</span>
+        )}
       </td>
 
       <td className="num">
-        {found ? (
-          found.productCount || <span className="muted">?</span>
+        {counts ? (
+          <>
+            <strong>{counts.for_sale}</strong>
+            <br />
+            <span className="muted small">{counts.sold} sold</span>
+            {counts.skipped > 0 ? (
+              <>
+                <br />
+                <span className="muted small">{counts.skipped} refused</span>
+              </>
+            ) : null}
+          </>
+        ) : row.reading ? (
+          <span className="muted small">reading…</span>
         ) : (
           <span className="muted">—</span>
         )}
@@ -375,6 +497,20 @@ function ShopRow({
       </td>
 
       <td>
+        {found?.profile.instagram ? (
+          <a
+            className="small"
+            href={`https://instagram.com/${found.profile.instagram}`}
+            target="_blank"
+            rel="noreferrer">
+            @{found.profile.instagram}
+          </a>
+        ) : (
+          <span className="muted">—</span>
+        )}
+      </td>
+
+      <td className="actions">
         {row.state === 'added' && row.added ? (
           <span className="badge ok">
             {row.added.found} watches
@@ -382,10 +518,71 @@ function ShopRow({
           </span>
         ) : row.error ? (
           <span className="error small">{row.error}</span>
+        ) : found ? (
+          <button className="ghost" disabled={locked || row.reading} onClick={onInspect}>
+            {row.reading ? 'Reading…' : row.preview ? 'Re-read' : 'Inspect'}
+          </button>
         ) : (
           <span className="muted small">{STATE_LABEL[row.state]}</span>
         )}
       </td>
     </tr>
+  );
+}
+
+/**
+ * One shop opened up: what their site says about them, then their catalogue.
+ *
+ * The catalogue is not read with the rest of the list. Forty shops inspected
+ * on a paste is forty full feed walks, and the point of the two-phase read is
+ * that the cheap pass comes first.
+ */
+function ShopDetail({ row, onInspect }: { row: Row; onInspect: () => void }) {
+  const found = row.found;
+  if (!found) return null;
+
+  return (
+    <div className="detail">
+      <div className="profile">
+        {found.profile.logoUrl ? (
+          <img className="shopmark" src={found.profile.logoUrl} alt="" loading="lazy" />
+        ) : null}
+        <div className="grow">
+          {found.profile.description ? (
+            <p className="small">{found.profile.description}</p>
+          ) : (
+            <p className="muted small">Their homepage says nothing about themselves.</p>
+          )}
+          <p className="muted small">
+            Catalogue:{' '}
+            <a href={found.catalogUrl} target="_blank" rel="noreferrer">
+              {found.catalogUrl}
+            </a>
+          </p>
+        </div>
+      </div>
+
+      {row.previewError ? <p className="error">{row.previewError}</p> : null}
+
+      {row.preview ? (
+        <>
+          <p className="muted small">
+            {row.preview.counts.read} products read via {row.preview.provider} ·{' '}
+            {row.preview.counts.for_sale} for sale · {row.preview.counts.sold} sold ·{' '}
+            {row.preview.counts.skipped} refused. Only the ones for sale can be imported.
+          </p>
+          <ShopProducts preview={row.preview} />
+        </>
+      ) : row.reading ? (
+        <p className="muted">Reading their catalogue…</p>
+      ) : (
+        <p className="muted small">
+          <button className="ghost" onClick={onInspect}>
+            Inspect
+          </button>{' '}
+          reads every product they publish. Nothing is written.
+        </p>
+      )}
+    </div>
   );
 }

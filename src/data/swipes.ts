@@ -6,6 +6,7 @@ import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
+import type { ListingCounts } from './listings';
 
 async function recordSwipe(actorId: string, listingId: string, direction: SwipeDirection) {
   if (isDemo) return demo.recordSwipe(listingId, direction);
@@ -79,18 +80,35 @@ export function useRecordSwipe(actorId: string | null) {
       // Every cached deck, not just the current filter's: the card is judged and
       // must not reappear by changing a filter and changing it back.
       const previous = queryClient.getQueriesData<DeckCard[]>({ queryKey: ['deck'] });
+      const previousCounts = queryClient.getQueriesData<ListingCounts>({
+        queryKey: ['listing-counts'],
+      });
+
+      // The header reads `matched`, which is what is left to see. Drop it with
+      // the card, and only for a pile that actually held the watch — a filter
+      // it never matched keeps its number. Waiting for `listing_counts` would
+      // leave the line a swipe behind the card.
+      for (const [key, deck] of previous) {
+        if (!deck?.some((card) => card.id === listingId)) continue;
+        queryClient.setQueryData<ListingCounts>(keys.counts(key[1]), (counts) =>
+          counts ? { ...counts, matched: Math.max(0, counts.matched - 1) } : counts
+        );
+      }
 
       queryClient.setQueriesData<DeckCard[]>({ queryKey: ['deck'] }, (deck) =>
         (deck ?? []).filter((card) => card.id !== listingId)
       );
 
-      return { previous };
+      return { previous, previousCounts };
     },
     onError: (_error, _variables, context) => {
       // Back in the order they were in, rather than on top like an undo: the
       // user did not ask for this card again, the write simply did not land.
       for (const [key, deck] of context?.previous ?? []) {
         queryClient.setQueryData(key, deck);
+      }
+      for (const [key, counts] of context?.previousCounts ?? []) {
+        queryClient.setQueryData(key, counts);
       }
     },
     onSuccess: () => {
@@ -121,16 +139,31 @@ export function useUndoPass(actorId: string | null) {
       return deleteSwipe(actorId, card.id);
     },
     onMutate: (card) => {
+      const deck = queryClient.getQueryData<DeckCard[]>(deckKey);
+      const already = deck?.some((entry) => entry.id === card.id) ?? false;
+      const previousCounts = queryClient.getQueryData<ListingCounts>(keys.counts(filters));
+
       // Onto the top of the pile, not wherever the server would rank it. The
       // user is correcting a thumb slip and expects that same watch back.
-      queryClient.setQueryData<DeckCard[]>(deckKey, (deck) =>
-        !deck || deck.some((entry) => entry.id === card.id) ? deck : [card, ...deck]
-      );
+      if (!already) {
+        queryClient.setQueryData<DeckCard[]>(deckKey, (current) =>
+          current ? [card, ...current] : [card]
+        );
+        queryClient.setQueryData<ListingCounts>(keys.counts(filters), (counts) =>
+          counts ? { ...counts, matched: Math.min(counts.total, counts.matched + 1) } : counts
+        );
+      }
+
+      return { already, previousCounts };
     },
-    onError: (_error, card) => {
+    onError: (_error, card, context) => {
+      if (context?.already) return;
       queryClient.setQueryData<DeckCard[]>(deckKey, (deck) =>
         (deck ?? []).filter((entry) => entry.id !== card.id)
       );
+      if (context?.previousCounts) {
+        queryClient.setQueryData(keys.counts(filters), context.previousCounts);
+      }
     },
     onSuccess: () => {
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
@@ -142,6 +175,12 @@ export function useUndoPass(actorId: string | null) {
       queryClient.invalidateQueries({
         queryKey: ['deck'],
         predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(deckKey),
+      });
+      // Other filters lost a count when the card left their pile. This one was
+      // put back by hand above; the rest ask the server.
+      queryClient.invalidateQueries({
+        queryKey: ['listing-counts'],
+        predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(keys.counts(filters)),
       });
     },
   });
@@ -167,6 +206,7 @@ export function useStartOver(actorId: string | null) {
     onSuccess: () => {
       // Every cached deck: the passes are gone for every filter, not just this one.
       queryClient.invalidateQueries({ queryKey: ['deck'] });
+      queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
@@ -201,6 +241,7 @@ export function useUnsave(actorId: string | null) {
       // back in the deck. Without this it stays missing from every cached deck
       // until something else forces a refetch.
       queryClient.invalidateQueries({ queryKey: ['deck'] });
+      queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });

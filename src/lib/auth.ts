@@ -24,12 +24,21 @@ export async function createSessionFromUrl(url: string) {
   return data.session;
 }
 
-export async function sendEmailLink(email: string) {
+/**
+ * One call serves both doors. Creating an account lets GoTrue mint the user;
+ * logging in does not, so an address nobody registered gets a 422 "Signups
+ * not allowed for otp" instead of a silent new account under a typo.
+ */
+export async function sendEmailCode(email: string, { createAccount }: { createAccount: boolean }) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
-    options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+    options: { emailRedirectTo: redirectTo, shouldCreateUser: createAccount },
   });
-  if (error) throw error;
+  if (!error) return;
+  if (!createAccount && /signups not allowed/i.test(error.message)) {
+    throw new Error('No account uses that address yet. Create one instead.');
+  }
+  throw error;
 }
 
 /**
@@ -92,14 +101,24 @@ export async function signInWithApple() {
  */
 export const GOOGLE_SIGN_IN_ENABLED = process.env.EXPO_PUBLIC_GOOGLE_SIGN_IN === '1';
 
-export async function signInWithGoogle() {
+const PROVIDER_LABEL = {
+  google: 'Google',
+  apple: 'Apple',
+} as const;
+
+/**
+ * The browser round trip Google and Apple-on-the-web share. Apple on an
+ * iPhone does not use this — that path is `signInWithApple`, which never
+ * leaves the device.
+ */
+export async function signInWithProvider(provider: keyof typeof PROVIDER_LABEL) {
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+    provider,
     options: { redirectTo, skipBrowserRedirect: true },
   });
   if (error) {
     if (/not enabled/i.test(error.message)) {
-      throw new Error('Google sign-in is not set up yet. Use an email link instead.');
+      throw new Error(`${PROVIDER_LABEL[provider]} sign-in is not set up yet. Use email instead.`);
     }
     throw error;
   }
@@ -111,7 +130,11 @@ export async function signInWithGoogle() {
   }
 }
 
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+export function signInWithGoogle() {
+  return signInWithProvider('google');
+}
+
+export async function signOut(options?: { scope?: 'global' | 'local' | 'others' }) {
+  const { error } = await supabase.auth.signOut(options);
   if (error) throw error;
 }

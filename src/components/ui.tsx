@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import type { PropsWithChildren, ReactNode } from 'react';
+import { type PropsWithChildren, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Wordmark } from '@/components/Wordmark';
 import {
   HIT_TARGET,
   inset,
@@ -48,6 +49,9 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  */
 export function Screen({
   title,
+  wordmark = false,
+  subtitle,
+  verified = false,
   action,
   width = 'reading',
   inTabs = false,
@@ -55,12 +59,19 @@ export function Screen({
   children,
 }: PropsWithChildren<{
   title?: string;
+  /** The app's name, in place of `title`. The deck is the only screen that wears it. */
+  wordmark?: boolean;
+  /** A line under the title: what the screen is holding right now. */
+  subtitle?: string;
+  /** The blue check after the title. The app's own name only. */
+  verified?: boolean;
   action?: ReactNode;
   width?: LayoutWidth;
   inTabs?: boolean;
   inSheet?: boolean;
 }>) {
   const styles = useThemedStyles(screenStyles);
+  const theme = useTheme();
   const isWide = useIsWide();
   const insets = useSafeAreaInsets();
   return (
@@ -75,10 +86,25 @@ export function Screen({
         },
       ]}>
       <View style={[styles.column, { maxWidth: layout[width] }]}>
-        {title || action ? (
+        {title || wordmark || action ? (
           <View style={styles.header}>
-            {title ? <Text style={styles.title}>{title}</Text> : null}
-            {action}
+            <View style={styles.heading}>
+              <View style={styles.titleRow}>
+                {wordmark ? <Wordmark fit /> : title ? <Text style={styles.title}>{title}</Text> : null}
+                {/* Spoken, unlike most glyphs beside a word: the check is a
+                    claim about the marketplace, not a picture of the word. */}
+                {verified ? (
+                  <MaterialCommunityIcons
+                    name="check-decagram"
+                    size={size.icon}
+                    color={theme.color.verified}
+                    accessibilityLabel="Verified"
+                  />
+                ) : null}
+              </View>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            </View>
+            {action ? <View style={styles.actionSlot}>{action}</View> : null}
           </View>
         ) : null}
         {children}
@@ -89,12 +115,15 @@ export function Screen({
 
 export function Button({
   label,
+  icon,
   onPress,
   variant = 'outline',
   loading = false,
   disabled = false,
 }: {
   label: string;
+  /** A glyph that names the same act as the label. Silent: the label is spoken. */
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress: () => void;
   variant?: 'outline' | 'solid' | 'ghost';
   loading?: boolean;
@@ -118,24 +147,51 @@ export function Button({
         isDisabled && styles.disabled,
       ]}>
       {loading ? (
-        <ActivityIndicator color={variant === 'solid' ? theme.color.onAccent : theme.color.text} />
+        <ActivityIndicator color={labelColour(theme, variant)} />
       ) : (
-        <Text style={[styles.label, variant === 'solid' && styles.labelSolid]}>{label}</Text>
+        <View style={styles.row}>
+          {icon ? (
+            <MaterialCommunityIcons
+              name={icon}
+              size={size.iconSmall}
+              color={labelColour(theme, variant)}
+              accessible={false}
+            />
+          ) : null}
+          <Text
+            style={[
+              styles.label,
+              variant === 'solid' && styles.labelSolid,
+              variant === 'ghost' && styles.labelGhost,
+            ]}>
+            {label}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
 }
 
-export function Field(props: TextInputProps) {
+/**
+ * A ghost button has no fill, so its spinner belongs to the page and takes
+ * `text`. A filled button is `accent`, so the spinner takes `onAccent`.
+ */
+function labelColour(theme: Theme, variant: 'outline' | 'solid' | 'ghost') {
+  if (variant === 'ghost') return theme.color.text;
+  return theme.color.onAccent;
+}
+
+export function Field({ ref, ...props }: TextInputProps & { ref?: Ref<TextInput> }) {
   const styles = useThemedStyles(fieldStyles);
   const theme = useTheme();
   return (
     <TextInput
-      placeholderTextColor={theme.color.textFaint}
+      ref={ref}
+      placeholderTextColor={theme.color.inkFaint}
       autoCapitalize="none"
       autoCorrect={false}
       {...props}
-      style={[styles.field, props.style]}
+      style={[props.multiline ? styles.multiline : styles.field, props.style]}
     />
   );
 }
@@ -232,24 +288,49 @@ const screenStyles = (theme: Theme) => ({
   },
   header: {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    // On the title's line, not the block's centre: a subtitle under the title
+    // would otherwise drag the controls half a line down with it.
+    alignItems: 'flex-start' as const,
     justifyContent: 'space-between' as const,
     gap: space.md,
     paddingHorizontal: inset.screen,
     paddingBottom: space.lg,
   },
+  heading: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  // The title is display size. Without this it keeps its width and pushes the
+  // control — the settings cog, the filters — off the trailing edge.
+  actionSlot: {
+    flexShrink: 0,
+    zIndex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   title: {
     ...type.display,
     color: theme.color.text,
+  },
+  subtitle: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
 });
 
 const buttonStyles = (theme: Theme) => ({
   base: {
-    backgroundColor: theme.color.fill,
-    borderRadius: radius.md,
+    backgroundColor: theme.color.accent,
+    borderRadius: radius.full,
     paddingVertical: inset.controlY,
-    paddingHorizontal: inset.controlX,
+    // Half the height: the rounded end of a capsule covers anything closer
+    // than that, and iOS clips to the curve.
+    paddingHorizontal: size.controlMin / 2,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     minHeight: size.controlMin,
@@ -266,30 +347,64 @@ const buttonStyles = (theme: Theme) => ({
   disabled: {
     opacity: 0.4,
   },
+  row: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: space.sm,
+  },
   label: {
-    ...type.label,
-    color: theme.color.text,
+    ...type.labelStrong,
+    flexShrink: 1,
+    maxWidth: '100%' as const,
+    textAlign: 'center' as const,
+    color: theme.color.onAccent,
   },
   labelSolid: {
     color: theme.color.onAccent,
+  },
+  labelGhost: {
+    color: theme.color.text,
   },
 });
 
 const fieldStyles = (theme: Theme) => ({
   field: {
-    ...type.body,
-    // A field takes the same fill as a button: both are things you act on, and
-    // the tone reads on a page and on a container alike.
+    // Face and size only. `type.body`'s line height is a paragraph measure;
+    // on a single line iOS applies it as a baseline offset to the value and
+    // not the placeholder, so the two do not share a line.
+    fontFamily: type.body.fontFamily,
+    fontSize: type.body.fontSize,
+    // A field stays `fill`. A button is `accent`, and a black field would
+    // read as a second button.
     backgroundColor: theme.color.fill,
     // An <input> on web carries an intrinsic width of about 20 characters, and
     // `min-width: auto` makes a flex row refuse to shrink past it. Two fields
     // side by side then run off the screen edge.
     minWidth: 0,
+    height: size.controlMin,
+    borderRadius: radius.md,
+    paddingHorizontal: inset.controlX,
+    // This face's x-height sits about 2px low in its box. Padding on the
+    // bottom only moves the centred line up by half of `space.xs`.
+    paddingTop: 0,
+    paddingBottom: space.xs,
+    color: theme.color.ink,
+    textAlignVertical: 'center' as const,
+    // Android adds the font's extra ascent above the letters.
+    includeFontPadding: false,
+  },
+  multiline: {
+    ...type.body,
+    backgroundColor: theme.color.fill,
+    minWidth: 0,
     borderRadius: radius.md,
     paddingHorizontal: inset.controlX,
     paddingVertical: inset.controlY,
-    color: theme.color.text,
-    minHeight: size.controlMin,
+    color: theme.color.ink,
+    minHeight: size.fieldMultiline,
+    textAlignVertical: 'top' as const,
+    includeFontPadding: false,
   },
 });
 
@@ -316,15 +431,15 @@ const choiceStyles = (theme: Theme) => ({
     opacity: 0.72,
   },
   label: {
-    ...type.label,
-    color: theme.color.text,
+    ...type.labelStrong,
+    color: theme.color.ink,
   },
   labelSelected: {
     color: theme.color.brass,
   },
   count: {
     ...type.caption,
-    color: theme.color.textFaint,
+    color: theme.color.inkFaint,
   },
 });
 
@@ -351,7 +466,7 @@ const messageStyles = (theme: Theme) => ({
   },
   centered: {
     flex: 1,
-    alignItems: 'center' as const,
+    alignItems: 'flex-start' as const,
     justifyContent: 'center' as const,
     padding: space.xxl,
     gap: stack.related,

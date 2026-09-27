@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { isDemo } from '@/lib/demo';
+import { NO_FILTERS } from '@/features/filters/types';
+import { demo, isDemo } from '@/lib/demo';
 import type { Database } from '@/lib/database.types';
 import type { DeckCard, Listing } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
@@ -387,5 +388,37 @@ export function useDealerReputation(dealerId: string | null) {
       return data?.[0] ?? null;
     },
     enabled: Boolean(dealerId) && !isDemo,
+  });
+}
+
+/** The shop a buyer opens: who they are, and every watch they still have for sale. */
+export function useDealerShop(dealerId: string) {
+  return useQuery({
+    queryKey: keys.dealerShop(dealerId),
+    queryFn: async () => {
+      if (isDemo) {
+        const listings = demo.search({ ...NO_FILTERS, dealers: [dealerId] });
+        return { dealer: listings[0]?.dealer ?? null, listings };
+      }
+
+      const [dealer, listings] = await Promise.all([
+        supabase
+          .from('dealers')
+          .select('id, name, website, description, instagram, logo_url')
+          .eq('id', dealerId)
+          .maybeSingle(),
+        supabase
+          .from('listings')
+          .select('*')
+          .eq('dealer_id', dealerId)
+          .eq('status', 'active')
+          .is('sold_at', null)
+          .order('created_at', { ascending: false }),
+      ]);
+      if (dealer.error) throw dealer.error;
+      if (listings.error) throw listings.error;
+
+      return { dealer: dealer.data, listings: await hydrate(listings.data ?? []) };
+    },
   });
 }

@@ -187,7 +187,7 @@ const rowStyles = (theme: Theme) => ({
     minHeight: HIT_TARGET,
     justifyContent: 'center' as const,
     backgroundColor: theme.color.fill,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
   },

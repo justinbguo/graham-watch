@@ -88,6 +88,7 @@ run them deliberately, and take a dump first if the data matters:
 npx supabase db dump --linked --data-only -f ~/graham-backups/data-$(date +%F).sql
 npx supabase db push
 npx supabase functions deploy send-inquiry
+npx supabase functions deploy inquiry-draft
 ```
 
 An operator on hosted is a row in `operators` there, and `npm run db:reset`
@@ -100,6 +101,7 @@ Almost every confusing failure is one of these being down. Ask "which of the thr
 before anything else.
 
 1. **Colima** — the Linux VM that runs containers. The database lives inside it.
+   Docker Desktop is not installed and is not a fallback.
 2. **Supabase** — ten containers: Postgres, auth, the REST API, Studio, the mail catcher.
 3. **Metro** — Expo's bundler. Compiles TypeScript into one JavaScript file and serves
    it to the simulator or browser. It prints `Bundled 3458ms`.
@@ -107,7 +109,7 @@ before anything else.
 ## Starting cold
 
 Colima does not start itself after a reboot. When the database seems to have vanished
-and `npm run db:start` fails with a Docker error, this is why.
+and `npm run db:start` fails because nothing is listening for containers, this is why.
 
 ```
 colima start
@@ -115,7 +117,9 @@ npm run db:start
 npm run ios        # or npm run web
 ```
 
-Shutting down is the reverse. `colima stop` returns about 8GB of RAM.
+Shutting down is the reverse. `colima stop` returns about 8GB of RAM. To rebuild
+the stack after changing `supabase/functions/.env`, use `npm run db:stop &&
+npm run db:start`. Do not reach for a container CLI.
 
 ## Running the app
 
@@ -166,16 +170,28 @@ bug as broken when it is working.
 
 | Column | Means | Set by |
 | --- | --- | --- |
-| `profiles.account_type` | Which door they picked at sign-up. **Routing only — proves nothing.** | The user, freely |
+| `profiles.account_type` | Always `buyer` from onboarding. **Routing only — proves nothing.** | Onboarding, not a question |
 | `dealers.claimed_by` | This account controls this shop: reads hidden listings, edits them, sees inquiries, refreshes the catalogue | Proving a mailbox on the shop's domain |
 | `dealers.permission` | Whether this shop's watches reach buyers' decks | An operator, from the CLI only |
 
-`account_type` grants nothing on purpose. A dealer who picks "buyer" loses no
-power, and a buyer who picks "dealer" gains none — they just see a different
-first screen. Every dealer power comes from `claimed_by`.
+`account_type` grants nothing on purpose. Onboarding no longer asks, and writes
+`buyer`. Every dealer power comes from `claimed_by`.
 
 `permission` is unreachable from the app by RLS, so a shop can never publish its
 own inventory. That is why importing a shop does not make it visible.
+
+Finishing onboarding also requires `profiles.date_of_birth` of 18 or over and
+a `profiles.handle`. The birthday is an age gate, not a permission. The handle
+is the username from slide 2: lowercase, unique, 3–20 characters, starting
+with a letter. `claim_username` reserves it there. A trigger refuses
+`onboarded_at` without either.
+
+The final onboarding slide calls `expo-notifications` for the OS permission.
+On Android it creates the `watch-updates` channel before the request; without a
+channel Android 13 does not show its prompt. The result is stored in
+`profiles.notifications_enabled`. That column is not a push token and no remote
+delivery exists yet. Push delivery requires a development build on Android;
+Expo Go cannot receive remote notifications there.
 
 ### The buyer path
 
@@ -373,6 +389,34 @@ The hour's ceiling is 200 new shops for an operator and 10 for anyone else, and
 the refusal is a 429 that names the wait. Shops already added are unaffected:
 refreshing and importing them are not metered.
 
+### What a refresh reads about the shop itself
+
+Besides the catalogue, a refresh takes three things off the shop's homepage and
+writes them to the dealer row: a description, an Instagram handle, and the icon
+the page declares. They are what a buyer sees on the dealer's page beside the
+name. Expand a shop to check what was found.
+
+All three come out of HTML the importer already downloads to read the shop's
+name, so they cost nothing beyond one request confirming the icon is really an
+image — Analog Shift declare one that 404s, and Squarespace answers that 404
+with a web page rather than an error, which stored unchecked is a permanently
+broken image next to a dealer's name.
+
+Coverage across eight real dealer sites: descriptions on 7, handles on 7, icons
+on 6. A phone number was there on 1 and a postal address on 0, which is why
+neither is collected — a field blank seven times in eight is a blank space on a
+page. Location was findable on 5 by reading contact pages as prose, and was left
+out because a pattern match eventually reads "we ship from Hong Kong" as an
+address, and a wrong city on a dealer's page is worse than no city.
+
+A refresh overwrites all three rather than filling blanks, unlike the contact
+address directly above. They are read off the page rather than typed by anyone,
+and a logo URL points into the shop's CDN, which does not survive a redesign —
+so refusing to overwrite would stop Refresh repairing the thing it is for.
+Nothing found leaves the old value alone, so a site that is briefly down does
+not blank a dealer's page. When dealers can edit their own, this needs the
+`edited_fields` treatment listings already carry.
+
 ### Who may run the importer
 
 `controls_dealer` is the one answer, and operator status is part of it only while
@@ -381,6 +425,20 @@ claimed shop shows `Import` disabled — see the ownership rules above for why
 widening that would undo them. `operator_dealers.can_import` is the same
 function the write itself consults, so the button cannot disagree with the
 policy.
+
+"One answer" took three migrations to become true. `sync_source_availability`
+and `adopt_existing_listings` kept a copy of the triple `controls_dealer`
+replaced until `20260920000101`, and both run inside every catalogue read — so
+an operator refreshing a shop added from the terminal tools watched the rows
+land and then read `You do not manage that shop.` from an RPC two statements
+later. The symptom of this class of bug is always that shape: a write that
+half happens.
+
+`public.dealer_stats` is the last copy of that triple and keeps it on purpose.
+A claim moves the shop — its contact address, its listings, its catalogue — but
+not its save and inquiry counts, which whoever imported it goes on reading. It
+is the one place `controls_dealer` is deliberately not the answer, so a change
+there is a product decision rather than a cleanup.
 
 The dealers table reads through `operator_dealers()` rather than the table,
 because `select` on `public.dealers` is granted column by column and
@@ -527,7 +585,7 @@ approved it. Claiming changed who controls the shop, not whether it publishes.
 The path for a shop we have never scraped, so pick a domain that is *not* in
 `npm run dealers`.
 
-1. Sign in as a new address, and pick **I sell watches** at sign-in.
+1. Sign in as a new address and finish onboarding. Profile offers **Claim your shop**.
 2. Type a website we do not hold. The form becomes an application.
 3. Fill in name, brands, volume. File it.
 4. Prove a mailbox on that domain; the code arrives in Mailpit.
@@ -545,10 +603,11 @@ No email ever leaves your machine. Supabase runs a fake mail server, so sign-in
 codes land in Mailpit instead of a real inbox — checking Gmail will never show one.
 
 1. Type any address in the app. `a@b.c` works as well as your real one.
-2. On the iOS Simulator or web, wait: the app reads the code from Mailpit and
-   signs you in. Confirmation still happens; you just do not open the inbox.
-3. On a physical phone, open http://127.0.0.1:54324 on the Mac and type the
-   six digit code. The phone cannot reach Mailpit.
+2. On the simulator, web, or a phone on the same Wi-Fi, wait: the app reads
+   the code from Mailpit and signs you in. The phone uses the Mac's LAN
+   address, because `127.0.0.1` on the phone is the phone.
+3. If the code does not fill in, open http://127.0.0.1:54324 on the Mac and
+   type the six digits. Checking a real inbox will not show it.
 
 The account is created on first use. Codes expire after an hour.
 
@@ -562,7 +621,9 @@ Working-as-designed, so do not debug these:
 
 | What you see | Why |
 | --- | --- |
-| Demo mode: dealer buttons and inquiries do nothing | `src/lib/demo.ts` fakes the buyer surfaces only — deck, search, saved, profile, one listing. Nothing else has a fixture. |
+| Demo mode: dealer buttons and `Send via Graham` do nothing | `src/lib/demo.ts` fakes the buyer surfaces only — deck, search, saved, profile, one listing, and a mail draft. Nothing else has a fixture. |
+| Demo mode: `Open in my mail app` opens a composer to `vintagevault.test` | `demoMailDraft` composes offline against the fixture shop. The address is not real; do not send it. |
+| A function returns `404 Function not found` locally, and the file is right there | The local stack reads the functions directory once, at `supabase start`, and keeps the list in an env var on the edge container. A function written since then is not served, and restarting the container does not help. `npm run db:stop && npm run db:start`. |
 | An anon REST request returns zero rows | Listings are invisible unauthenticated by policy. Says nothing about whether data exists; count with the service-role key. |
 | An imported shop's watches are not in any deck | `permission` is still `pending`. Needs `dealers -- approve`. |
 | A watch vanishes from the deck | Sold, deactivated, or its shop was revoked. `search_listings` filters all three. |
@@ -602,9 +663,50 @@ Postgres errors arrive through PostgREST with codes worth recognising:
 ## Inquiry email
 
 A buyer swipes right to save. Sending an inquiry is a separate, deliberate act, and
-it is the only thing that emails a dealer. The mail comes from Graham with the
-buyer's address as Reply-To, so the dealer's reply goes straight to them. It opens
-with the buyer's name, which is why onboarding asks for one.
+it is the only thing that reaches a dealer. Both routes open with the buyer's name,
+which is why onboarding asks for one.
+
+**Contact dealer** and **Ask about this watch** call `inquiry-draft` and hand the
+draft to Gmail, through `src/lib/mail.ts`. Four addresses for the same draft, and
+the first that opens wins:
+
+| Where | What opens |
+| --- | --- |
+| iPhone | `googlegmail:///co`, the installed Gmail app |
+| Android | Gmail's compose page, which the Gmail app claims |
+| Browser | Gmail's compose page in a second window |
+| Neither Gmail nor Mail | `mailto:`, then Gmail's compose page in a sheet inside the app |
+
+`mailto:` alone opens Apple Mail, and Mail with no account looks like a dead
+button, so it sits behind Gmail rather than in front of it. The in-app sheet is
+last because Safari inside an app has kept its own cookies since iOS 11: it asks
+the buyer to sign in to Google to reach a draft the Gmail app holds them signed
+in for. It is there because a simulator has no Gmail and no Mail, which used to
+make the button impossible to test.
+
+On the web the window is opened with `window.open`, not `Linking.openURL`:
+`openURL` assigns `window.location` there, so the composer would open by closing
+Graham. A browser that blocks the window raises an error, and the buyer keeps
+the app.
+
+The dealer's address is not
+encoded: an encoded `@` leaves the To line empty. Nothing is sent from our side, so the
+function stamps `opened_at` and leaves `status` at `pending` — the buyer can still
+close the composer without writing a word, and a lead we cannot confirm must not be
+counted as one.
+
+That function is the only way a dealer's address reaches a device.
+`20260912000007_dealer_contact_privacy.sql` revokes `contact_email` from `anon` and
+`authenticated` as a column grant, and that has to hold: the anon key ships inside the
+app binary, so a readable column is every shop's mailbox one query away. One address,
+for one watch a buyer deliberately asked about, is a different thing.
+
+**Send via Graham** (`send-inquiry`) mails the dealer with the buyer's address as
+Reply-To, so the reply still goes straight to them. This is the path for a device with
+no mail client, and the only one that knows the mail left.
+
+Both use the same subject line, from `_shared/listing-mail.ts`, so a dealer who gets
+one of each sees one thread about one watch.
 
 If the shop is unclaimed, a footer points them to sign in at `APP_ORIGIN/sign-in`
 with that same address. Claiming still happens in the app; the footer is how they

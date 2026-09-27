@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react';
 
-import { importListings, queueForImport, syncCatalog, type PublishTotals } from './importer';
+import { ImportPreview } from './ImportPreview';
+import {
+  importListings,
+  stageImport,
+  syncCatalog,
+  type ImportCandidate,
+  type PublishTotals,
+} from './importer';
 import { ShopListings } from './ShopListings';
 import { confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
 type Row = OperatorDealer;
+
+/**
+ * What the scrape read off the shop's own site. It comes from a plain table
+ * read rather than `operator_dealers`, because these three columns are granted
+ * to every signed-in reader while the RPC exists for the ones that are not.
+ */
+type Profile = { description: string | null; instagram: string | null; logo_url: string | null };
 
 const NEXT: Record<Permission, Permission> = {
   pending: 'approved',
@@ -12,15 +26,17 @@ const NEXT: Record<Permission, Permission> = {
   revoked: 'approved',
 };
 
-/** What one click imports, when the operator does not say otherwise. */
-const DEFAULT_IMPORT = 10;
+/** The shop whose catalogue is open, and what the read that opened it found. */
+type Picking = { dealer: Row; note: string | null };
 
 export function Dealers() {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [picking, setPicking] = useState<Picking | null>(null);
   const [query, setQuery] = useState('');
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
@@ -31,11 +47,26 @@ export function Dealers() {
       // An RPC, not a table read: contact_email is not granted to authenticated
       // and a pending shop's listings are not readable, so both would be missing
       // from anything PostgREST could return here. See 20260915000005.
-      const { data, error: failed } = await supabase.rpc('operator_dealers');
+      //
+      // The scraped profile comes alongside in one read for every shop, rather
+      // than a read per shop when a row is opened. It is three short columns,
+      // and they are columns on this table now.
+      const [{ data, error: failed }, shops] = await Promise.all([
+        supabase.rpc('operator_dealers'),
+        supabase.from('dealers').select('id, description, instagram, logo_url'),
+      ]);
 
       if (!live) return;
-      setError(failed?.message ?? null);
+      setError(failed?.message ?? shops.error?.message ?? null);
       setRows(data ?? []);
+      setProfiles(
+        Object.fromEntries(
+          (shops.data ?? []).map(({ id, description, instagram, logo_url }) => [
+            id,
+            { description, instagram, logo_url },
+          ])
+        )
+      );
     })();
     return () => {
       live = false;
@@ -74,49 +105,41 @@ export function Dealers() {
   }
 
   /**
-   * Turns catalogue rows into watches.
-   *
-   * The only action here that spends money — a model call and a photo download
-   * per watch — so the count is typed rather than defaulted, and anything left
-   * queued from an interrupted run is drained first.
+   * The one action that spends money: a model call and a photo download per
+   * watch. Everything before it — reading the shop, ticking rows, editing a
+   * title — is free and reversible, which is why the spend is confirmed here
+   * and nowhere earlier.
    */
-  function importSome(dealer: Row) {
-    const waiting = dealer.catalog_queued;
-    const available = Number(dealer.catalog_total) - Number(dealer.listings_held);
-
-    const answer = window.prompt(
-      [
-        `How many of ${dealer.name}'s watches should be imported?`,
-        '',
-        `Catalogue holds ${dealer.catalog_total}, already imported ${dealer.listings_held}.`,
-        waiting > 0 ? `${waiting} are queued from an earlier run and go first.` : '',
-        '',
-        'Each one costs a model call and downloads its photos.',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      String(Math.min(DEFAULT_IMPORT, Math.max(available, 0)) || DEFAULT_IMPORT)
-    );
-    if (answer === null) return;
-
-    const count = Number(answer);
-    if (!Number.isInteger(count) || count < 0) {
-      setError('That is not a whole number.');
+  function importSome(dealer: Row, candidates: ImportCandidate[]) {
+    const count = candidates.filter((candidate) => candidate.selected).length;
+    if (!dealer.website) {
+      setError(`${dealer.name} has no website, so stock cannot be verified before import.`);
       return;
     }
-    if (count === 0 && waiting === 0) return;
     if (!confirmWrite(`Import ${count} watch(es) from ${dealer.name}?`)) return;
-
+    setPicking(null);
     void run(dealer, async () => {
-      const queued = await queueForImport(dealer.id, count);
+      setProgress(`${dealer.name}: checking the shop for sold watches…`);
+      await syncCatalog({ sourceUrl: dealer.website!, dealerId: dealer.id });
+      const queued = await stageImport(dealer.id, candidates);
       const totals = await importListings(dealer.id, (at) =>
         setProgress(`${dealer.name}: ${at.published} imported, ${at.pending} to go…`)
       );
-      return summarise(dealer.name, queued + waiting, totals);
+      const result = summarise(dealer.name, queued, totals);
+      const sold = count - queued;
+      return sold > 0 ? `${sold} selected watch(es) were no longer for sale. ${result}` : result;
     });
   }
 
-  /** Re-reads the shop's catalogue. Costs HTTP; imports nothing. */
+  /**
+   * Re-reads the shop's site, then shows what they have. Costs HTTP and
+   * imports nothing.
+   *
+   * The read and the picker are one action because a refresh that only printed
+   * "3 new" left the operator with a number and no way to act on it. What a
+   * refresh is for is the stock that appeared since the last one, so it ends
+   * on the screen where those can be chosen.
+   */
   function refresh(dealer: Row) {
     if (!dealer.website) {
       setError(`${dealer.name} has no website to read.`);
@@ -124,7 +147,11 @@ export function Dealers() {
     }
     void run(dealer, async () => {
       const result = await syncCatalog({ sourceUrl: dealer.website!, dealerId: dealer.id });
-      return `${dealer.name}: ${result.found} in the catalogue, ${result.added} new, ${result.retired} gone.`;
+      setPicking({
+        dealer,
+        note: `Just read their site: ${result.forSale} for sale, ${result.added} we had not seen before, ${result.retired} gone.`,
+      });
+      return `${dealer.name}: ${result.found} in the catalogue, ${result.forSale} for sale, ${result.added} new, ${result.retired} gone.`;
     });
   }
 
@@ -161,15 +188,21 @@ export function Dealers() {
         </p>
       ) : (
         <>
+          {/* Nine columns fit a laptop; a narrow window or a zoomed page does
+              not. The table scrolls sideways inside the page rather than
+              pushing the page itself wider, which would take the header's
+              controls off screen with it. */}
+          <div className="scroller">
           <table>
             <thead>
               <tr>
-                <th />
+                <th className="tick" />
                 <th>Shop</th>
                 <th className="num">In the deck</th>
                 <th className="num">Imported</th>
                 <th className="num">Catalogue</th>
-                <th>Contact</th>
+                <th>Description</th>
+                <th>Instagram</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -180,6 +213,7 @@ export function Dealers() {
                 const expanded = open === dealer.id;
                 const held = Number(dealer.listings_held);
                 const inDeck = Number(dealer.listings_in_deck);
+                const profile = profiles[dealer.id];
 
                 return [
                   <tr key={dealer.id} className={expanded ? 'open' : undefined}>
@@ -189,24 +223,45 @@ export function Dealers() {
                         aria-expanded={expanded}
                         aria-label={expanded ? 'Hide watches' : 'Show watches'}
                         onClick={() => setOpen(expanded ? null : dealer.id)}>
-                        {expanded ? '▾' : '▸'}
+                        <Chevron />
                       </button>
                     </td>
 
                     <td>
-                      <strong>{dealer.name}</strong>
-                      <br />
-                      {dealer.website ? (
-                        <a
-                          className="muted small"
-                          href={dealer.website}
-                          target="_blank"
-                          rel="noreferrer">
-                          {dealer.website}
-                        </a>
-                      ) : (
-                        <span className="muted small">no website</span>
-                      )}
+                      <div className="shopcell">
+                        {/* The mark the scrape found, beside the name it belongs
+                            to. It used to appear only once a row was opened,
+                            which is the one place you already knew the shop. */}
+                        {profile?.logo_url ? (
+                          <img className="shopmark small" src={profile.logo_url} alt="" loading="lazy" />
+                        ) : null}
+                        <div className="grow">
+                          <strong>{dealer.name}</strong>
+                          {dealer.website ? (
+                            <a
+                              className="muted small"
+                              href={dealer.website}
+                              target="_blank"
+                              rel="noreferrer">
+                              {dealer.website}
+                            </a>
+                          ) : (
+                            <span className="muted small">no website</span>
+                          )}
+                          {/* Where the shop is reached, under the name it
+                              belongs to rather than in a column of its own: an
+                              address is identity, and 250px of email was the
+                              column that pushed the table off the window.
+                              send-inquiry has nowhere to send without it, so a
+                              buyer's question fails rather than goes
+                              unanswered — hence the badge, not a dash. */}
+                          {dealer.contact_email ? (
+                            <span className="muted small">{dealer.contact_email}</span>
+                          ) : (
+                            <span className="badge wait">no address — inquiries fail</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
                     <td className="num">
@@ -237,13 +292,29 @@ export function Dealers() {
                       ) : null}
                     </td>
 
-                    <td>
-                      {dealer.contact_email ? (
-                        <span className="small">{dealer.contact_email}</span>
+                    {/* Both read off the shop's own site by the scrape, and
+                        both are what a buyer sees on the dealer's page. They
+                        are columns because the only way to know the read worked
+                        is to look, and a column can be scanned down a list of
+                        forty shops. */}
+                    <td className="small prose">
+                      {profile?.description ? (
+                        <span title={profile.description}>{profile.description}</span>
                       ) : (
-                        // send-inquiry has nowhere to send without this, so a
-                        // buyer's question would fail rather than go unanswered.
-                        <span className="badge wait">no address — inquiries fail</span>
+                        <span className="muted">not read yet</span>
+                      )}
+                    </td>
+
+                    <td className="small">
+                      {profile?.instagram ? (
+                        <a
+                          href={`https://instagram.com/${profile.instagram}`}
+                          target="_blank"
+                          rel="noreferrer">
+                          @{profile.instagram}
+                        </a>
+                      ) : (
+                        <span className="muted">—</span>
                       )}
                     </td>
 
@@ -261,22 +332,22 @@ export function Dealers() {
                         disabled={busyId !== null || !dealer.can_import}
                         title={
                           dealer.can_import
-                            ? 'Read the catalogue again'
+                            ? "Read the shop's site again, then show what they have"
                             : 'The dealer manages this shop themselves'
                         }
                         onClick={() => refresh(dealer)}>
-                        Refresh
+                        Refresh from site
                       </button>
                       <button
                         className="ghost"
                         disabled={busyId !== null || !dealer.can_import}
                         title={
                           dealer.can_import
-                            ? 'Turn catalogue items into watches'
+                            ? 'Choose watches from the catalogue we already hold'
                             : 'The dealer manages this shop themselves'
                         }
-                        onClick={() => importSome(dealer)}>
-                        Import
+                        onClick={() => setPicking({ dealer, note: null })}>
+                        Add watches
                       </button>
                       <button
                         className={next === 'approved' ? '' : 'ghost'}
@@ -289,8 +360,8 @@ export function Dealers() {
 
                   expanded ? (
                     <tr key={`${dealer.id}-detail`} className="detail-row">
-                      <td colSpan={8}>
-                        <ShopListings dealerId={dealer.id} reload={tick} />
+                      <td colSpan={9}>
+                        <ShopListings dealerId={dealer.id} reload={tick} onChanged={reload} />
                       </td>
                     </tr>
                   ) : null,
@@ -298,18 +369,52 @@ export function Dealers() {
               })}
             </tbody>
           </table>
+          </div>
 
           <p className="muted small legend">
             <strong>In the deck</strong> is what a buyer can see right now: the watch is
             active, unsold, and the shop is approved. <strong>Imported</strong> is every
             watch we hold for them. <strong>Catalogue</strong> is what their site is
-            offering, which is what <em>Import</em> draws from. A gap between the first
-            two means some are sold or hidden — or that the shop is not approved, in
-            which case none of them show and <em>Publish</em> is what changes that.
+            offering. A gap between the first two means some are sold or hidden — or
+            that the shop is not approved, in which case none of them show.
+          </p>
+
+          <p className="muted small legend">
+            The three actions do different jobs. <strong>Refresh from site</strong> reads
+            their site again for stock we have not seen and then shows it — free, and it
+            imports nothing on its own. <strong>Add watches</strong> opens the same list
+            without re-reading, so you can pick from the catalogue we already hold;
+            importing is the only step that spends a model call per watch.{' '}
+            <strong>Publish</strong> and <strong>Pull back</strong> decide whether buyers
+            see the watches we have already imported.
           </p>
         </>
       )}
+
+      {picking ? (
+        <ImportPreview
+          dealerId={picking.dealer.id}
+          dealerName={picking.dealer.name}
+          note={picking.note}
+          onClose={() => setPicking(null)}
+          onImport={(candidates) => importSome(picking.dealer, candidates)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+/**
+ * `chevron-right` from Material Community Icons, the set the app draws from,
+ * as a path rather than a font: the console loads no icon font, and a typed
+ * triangle (▸) is a character whose size and weight come from whatever the
+ * system decided. CSS turns it a quarter when the row is open.
+ */
+function Chevron() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8.59 16.58 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.42Z" />
+    </svg>
   );
 }
 

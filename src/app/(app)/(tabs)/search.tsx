@@ -1,12 +1,14 @@
-import { useRouter } from 'expo-router';
 import { FlatList, Text, View } from 'react-native';
 
 import { FilterButton } from '@/components/FilterButton';
 import { ListingRow } from '@/components/ListingRow';
 import { Field, Message, Screen, Spinner } from '@/components/ui';
+import { usePrimeListing } from '@/data/listings';
 import { useSearch } from '@/data/search';
+import { useOpenFilters } from '@/features/filters/open';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
+import { useOpenStack } from '@/lib/openStack';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -14,8 +16,10 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function Search() {
   const styles = useThemedStyles(searchStyles);
-  const router = useRouter();
+  const open = useOpenStack();
+  const primeListing = usePrimeListing();
   const { filters, setOne } = useFilters('search');
+  const openFilters = useOpenFilters();
   const { data: results = [], isPending, error } = useSearch(filters);
 
   // The typed query is a filter like any other, but it is the one people reach
@@ -27,7 +31,7 @@ export default function Search() {
       title="Search"
       inTabs
       action={
-        <FilterButton count={chipCount} onPress={() => router.push('/filters/search')} />
+        <FilterButton count={chipCount} onPress={() => openFilters('search')} />
       }>
       <View style={styles.queryRow}>
         <Field
@@ -58,7 +62,19 @@ export default function Search() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
-            <ListingRow card={item} onPress={() => router.push(`/listing/${item.id}`)} />
+            <ListingRow
+              card={item}
+              onPress={() => {
+                primeListing(item);
+                // The page cannot tell a search result from a deck card on its
+                // own, and the two carry different verdicts.
+                open(
+                  'listing/[listingId]',
+                  { listingId: item.id, from: 'search' },
+                  `/listing/${item.id}?from=search`
+                );
+              }}
+            />
           )}
         />
       )}
@@ -68,6 +84,10 @@ export default function Search() {
 
 const searchStyles = (theme: Theme) => ({
   queryRow: {
+    // The header leaves space.lg under every title. This field is that title's
+    // own control, so it sits space.sm under "Search". Saved and Profile keep
+    // the wider gap.
+    marginTop: space.sm - space.lg,
     paddingHorizontal: inset.screen,
     paddingBottom: space.md,
     gap: space.sm,
@@ -79,6 +99,7 @@ const searchStyles = (theme: Theme) => ({
   list: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxxl,
+    gap: space.lg,
   },
   state: {
     padding: inset.screen,

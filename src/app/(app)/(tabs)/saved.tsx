@@ -1,11 +1,13 @@
-import { router } from 'expo-router';
-import { FlatList, Text, View } from 'react-native';
+import { Alert, FlatList, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
+import { SwipeToRemove } from '@/components/SwipeToRemove';
 import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useSaved } from '@/data/listings';
+import { useOpenMailDraft } from '@/data/inquiries';
+import { usePrimeListing, useSaved } from '@/data/listings';
 import { useUnsave } from '@/data/swipes';
-import { totalPrice } from '@/lib/format';
+import { useOpenStack } from '@/lib/openStack';
+import { formatTitle, totalPrice } from '@/lib/format';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -16,6 +18,9 @@ export default function Saved() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error } = useSaved(userId);
   const unsave = useUnsave(userId);
+  const contact = useOpenMailDraft(userId);
+  const primeListing = usePrimeListing();
+  const open = useOpenStack();
   const styles = useThemedStyles(savedStyles);
 
   if (isPending) {
@@ -53,26 +58,35 @@ export default function Saved() {
         data={cards}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <ListingRow
-            card={item}
-            actionLabel="Contact"
-            onPress={() => router.push(`/listing/${item.id}`)}
-            onAction={() => router.push(`/inquiry/${item.id}`)}
-            onLongPress={() => unsave.mutate(item.id)}
-          />
+          <SwipeToRemove
+            accessibilityLabel={`Remove ${formatTitle(item)} from Saved`}
+            onRemove={() => unsave.mutate(item.id)}>
+            <ListingRow
+              card={item}
+              actionIcon="email"
+              actionLabel="Contact dealer"
+              actionPending={contact.isPending && contact.variables?.card.id === item.id}
+              onPress={() => {
+                primeListing(item);
+                open('listing/[listingId]', { listingId: item.id }, `/listing/${item.id}`);
+              }}
+              onAction={() => {
+                contact.mutate(
+                  { card: item, message: '' },
+                  {
+                    onError: (error) => Alert.alert('Could not open Gmail', error.message),
+                  }
+                );
+              }}
+            />
+          </SwipeToRemove>
         )}
         ListEmptyComponent={
           <Centered>
             <Heading>Nothing saved yet</Heading>
             <Message text="Swipe right on the deck and it lands here." />
           </Centered>
-        }
-        ListFooterComponent={
-          cards.length ? (
-            <Text style={styles.footerHint}>Long-press a watch to remove it.</Text>
-          ) : null
         }
       />
     </Screen>
@@ -93,16 +107,8 @@ const savedStyles = (theme: Theme) => ({
   },
   list: {
     paddingHorizontal: inset.screen,
+    paddingBottom: space.xxxl,
+    gap: space.lg,
     flexGrow: 1,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.color.border,
-  },
-  footerHint: {
-    ...type.caption,
-    color: theme.color.textFaint,
-    paddingVertical: space.xl,
-    textAlign: 'center' as const,
   },
 });

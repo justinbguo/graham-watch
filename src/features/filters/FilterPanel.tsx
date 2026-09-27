@@ -38,11 +38,13 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  */
 export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
-  const { filters, toggle, setOne, setPrice, clear } = useFilters(surface);
+  const { filters, toggle, setPrice, togglePrice, clear } = useFilters(surface);
   const { data: facets = [] } = useFacets();
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
   const count = activeCount(filters);
+  // The boxes can show one band. Several selected prices have no single pair.
+  const typedPrice = filters.prices.length === 1 ? filters.prices[0] : { min: null, max: null };
 
   return (
     <ScrollView
@@ -53,37 +55,33 @@ export function FilterPanel({ surface }: { surface: Surface }) {
         <Text style={styles.groupTitle}>Price</Text>
         <View style={styles.range}>
           <Field
-            value={dollarsForInput(filters.priceMin)}
-            onChangeText={(text) => setPrice(centsFromInput(text), filters.priceMax)}
+            value={dollarsForInput(typedPrice.min)}
+            onChangeText={(text) => setPrice(centsFromInput(text), typedPrice.max)}
             placeholder="$ min"
             keyboardType="number-pad"
             style={styles.rangeField}
           />
           <Text style={styles.rangeJoin}>to</Text>
           <Field
-            value={dollarsForInput(filters.priceMax)}
-            onChangeText={(text) => setPrice(filters.priceMin, centsFromInput(text))}
+            value={dollarsForInput(typedPrice.max)}
+            onChangeText={(text) => setPrice(typedPrice.min, centsFromInput(text))}
             placeholder="$ max"
             keyboardType="number-pad"
             style={styles.rangeField}
           />
         </View>
-        {/* Shortcuts that fill the boxes above rather than a second, competing
-            way to say the same thing. Tapping the live one empties them. */}
+        {/* One selected band fills the boxes. Two bands are not one pair of
+            numbers, so the boxes stay empty until someone types, and typing
+            then replaces the bands with that pair. */}
         <View style={styles.choices}>
-          {PRICE_PRESETS.map((preset) => {
-            const live = isPricePreset(filters, preset);
-            return (
-              <ChoiceRow
-                key={preset.id}
-                label={preset.label}
-                selected={live}
-                onPress={() =>
-                  live ? setPrice(null, null) : setPrice(preset.min, preset.max)
-                }
-              />
-            );
-          })}
+          {PRICE_PRESETS.map((preset) => (
+            <ChoiceRow
+              key={preset.id}
+              label={preset.label}
+              selected={isPricePreset(filters, preset)}
+              onPress={() => togglePrice(preset)}
+            />
+          ))}
         </View>
       </View>
 
@@ -92,8 +90,8 @@ export function FilterPanel({ surface }: { surface: Surface }) {
           <ChoiceRow
             key={preset.id}
             label={preset.label}
-            selected={filters.era === preset.id}
-            onPress={() => setOne('era', preset.id)}
+            selected={filters.eras.includes(preset.id)}
+            onPress={() => toggle('eras', preset.id)}
           />
         ))}
       </Group>
@@ -103,8 +101,8 @@ export function FilterPanel({ surface }: { surface: Surface }) {
           <ChoiceRow
             key={preset.id}
             label={preset.label}
-            selected={filters.size === preset.id}
-            onPress={() => setOne('size', preset.id)}
+            selected={filters.sizes.includes(preset.id)}
+            onPress={() => toggle('sizes', preset.id)}
           />
         ))}
       </Group>

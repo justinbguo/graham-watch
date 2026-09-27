@@ -1,15 +1,14 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { Message } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { fullName, useProfile, useSetAvatar } from '@/data/profile';
-import { HIT_TARGET, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
-import { useTheme, useThemedStyles } from '@/providers/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 /**
  * expo-image-picker is the system photo sheet. A text field for a URL would
@@ -23,7 +22,6 @@ export function ProfileHeader() {
   const setAvatar = useSetAvatar(userId);
   const [pickError, setPickError] = useState<string | null>(null);
   const styles = useThemedStyles(headerStyles);
-  const theme = useTheme();
 
   const name = fullName(profile) ?? 'Collector';
   const savedLabel = `${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`;
@@ -58,24 +56,20 @@ export function ProfileHeader() {
           accessibilityLabel={photoLabel}
           disabled={setAvatar.isPending}
           onPress={pickPhoto}
-          style={({ pressed }) => [pressed && styles.pressed]}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.photo} contentFit="cover" />
-          ) : (
-            <View style={[styles.photo, styles.photoEmpty]}>
-              <MaterialCommunityIcons
-                name="account-outline"
-                size={size.icon}
-                color={theme.color.textMuted}
-              />
-            </View>
-          )}
+          style={({ pressed }) => [styles.photoPress, pressed && styles.pressed]}>
+          <Avatar url={profile?.avatar_url ?? null} px={size.thumb} />
         </Pressable>
+
         <View style={styles.copy}>
           <Text style={styles.name}>{name}</Text>
+          {profile?.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}
+          {profile ? (
+            <Text style={styles.saved}>{`Collector #${profile.collector_number}`}</Text>
+          ) : null}
           <Text style={styles.saved}>{savedLabel}</Text>
         </View>
       </View>
+
       {errorText ? <Message text={errorText} tone="error" /> : null}
     </View>
   );
@@ -86,22 +80,20 @@ const headerStyles = (theme: Theme) => ({
     gap: stack.related,
     paddingVertical: space.md,
   },
+  // The face and who you are, side by side. Aligned at the top, so the name
+  // starts on the photo's top edge rather than floating against its middle.
   row: {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.lg,
-    minHeight: HIT_TARGET,
+    alignItems: 'flex-start' as const,
+    gap: space.md,
   },
-  photo: {
-    width: size.thumb,
-    height: size.thumb,
-    borderRadius: radius.sm,
-    backgroundColor: theme.color.surfaceSunken,
+  // The photo is `size.thumb`, wider than a hit target already. Left to
+  // stretch it would be a press area the height of the whole block.
+  photoPress: {
+    alignSelf: 'flex-start' as const,
   },
-  photoEmpty: {
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
+  // Takes the rest of the row, so a long name wraps inside it instead of
+  // pushing the block wider than the page.
   copy: {
     flex: 1,
     gap: stack.tight,
@@ -109,6 +101,10 @@ const headerStyles = (theme: Theme) => ({
   name: {
     ...type.title,
     color: theme.color.text,
+  },
+  handle: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
   saved: {
     ...type.caption,

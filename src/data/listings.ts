@@ -35,7 +35,7 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
       .order('position'),
     supabase
       .from('dealers')
-      .select('id, name, website')
+      .select('id, name, website, description, instagram, logo_url')
       .in('id', [...new Set(listings.map((l) => l.dealer_id))]),
   ]);
 
@@ -128,7 +128,14 @@ export function usePrimeListing() {
   );
 }
 
-export function useDeck(limit = 20) {
+/**
+ * One pile at a time. The deck is not paged: it is fetched once, swiped down,
+ * and refilled by a refresh, so this is also the most a screen can truthfully
+ * say is left.
+ */
+export const DECK_LIMIT = 20;
+
+export function useDeck(limit = DECK_LIMIT) {
   const { filters } = useFilters('deck');
 
   return useQuery({
@@ -138,6 +145,44 @@ export function useDeck(limit = 20) {
     // would shuffle cards out from under the user's thumb.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+  });
+}
+
+export type ListingCounts = { matched: number; total: number };
+
+async function fetchCounts(filters: Filters): Promise<ListingCounts> {
+  if (isDemo) return demo.counts(filters);
+
+  const { data, error } = await supabase.rpc('listing_counts', {
+    p_exclude_swiped: true,
+    ...toRpcArgs(filters),
+  });
+  if (error) throw error;
+
+  const row = data?.[0];
+  return { matched: Number(row?.matched ?? 0), total: Number(row?.total ?? 0) };
+}
+
+/**
+ * How many watches the filters leave, and how many the marketplace holds. The
+ * deck cannot answer either: it is one pile deep, so its length tops out at
+ * `DECK_LIMIT` and the header had to say "20+".
+ *
+ * Counted in the database, in one round trip, by `listing_counts` — the same
+ * predicate the deck is drawn with. A count assembled here from the rows we
+ * happen to hold would be a different number from the deck's the moment a
+ * dealer is approved.
+ */
+export function useListingCounts() {
+  const { filters } = useFilters('deck');
+
+  return useQuery({
+    queryKey: keys.counts(filters),
+    queryFn: () => fetchCounts(filters),
+    // `matched` moves in the cache the moment a swipe lands (`useRecordSwipe`).
+    // This fetch is the correction, not the animation: a minute is long enough
+    // that a swipe does not wait on it.
+    staleTime: 60_000,
   });
 }
 

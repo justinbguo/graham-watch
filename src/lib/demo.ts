@@ -29,13 +29,30 @@ const DEMO_PROFILE: Profile = {
   onboarded_at: '2026-01-01T00:00:00.000Z',
   // Demo mode is a deck to look at, and the dealer half needs a real shop row.
   account_type: 'buyer',
+  date_of_birth: '1990-01-01',
+  collecting_years: 'one_to_five',
+  collection_size: 'one_to_three',
+  hunting_for: ['sports'],
+  notify_new_arrivals: false,
+  notify_saved_watches: false,
+  notifications_enabled: false,
+  search_pain_points: ['verifying_originality', 'finding_fair_prices'],
   avatar_url: null,
   bio: null,
+  collector_number: 1,
   handle: null,
   created_at: '2026-01-01T00:00:00.000Z',
 };
 
-const DEALER = { id: 'demo-dealer', name: 'Vintage Vault', website: 'https://vintagevault.test' };
+const DEALER = {
+  id: 'demo-dealer',
+  name: 'Vintage Vault',
+  website: 'https://vintagevault.test',
+  description: 'Twenty years of honest vintage. Every watch serviced, photographed and described in house.',
+  instagram: 'vintagevault',
+  // No mark: the demo answers from fixtures and must not reach the network.
+  logo_url: null,
+};
 
 type Fixture = {
   brand: string;
@@ -194,6 +211,23 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
 // Swipes live for the life of the process, so the deck and Saved stay in sync
 // while you use the app. A reload starts over, which is what you want in a demo.
 const swiped = new Map<string, SwipeDirection>();
+const followed = new Set<string>();
+
+/** A value matches when it sits in any chosen band. No bands means no filter. */
+function inSomeBand(
+  value: number | null,
+  mins: (number | null)[] | undefined,
+  maxs: (number | null)[] | undefined
+): boolean {
+  if (!mins || !maxs) return true;
+  if (value == null) return false;
+  return mins.some((lo, index) => {
+    const hi = maxs[index];
+    if (lo != null && value < lo) return false;
+    if (hi != null && value > hi) return false;
+    return true;
+  });
+}
 
 /** Mirrors search_listings closely enough that filters behave the same offline. */
 function matches(card: DeckCard, filters: Filters): boolean {
@@ -207,14 +241,49 @@ function matches(card: DeckCard, filters: Filters): boolean {
   if (f.p_materials && (!card.case_material || !f.p_materials.includes(card.case_material))) return false;
   if (f.p_windings && (!card.winding || !f.p_windings.includes(card.winding))) return false;
   if (f.p_complications && !f.p_complications.every((c) => card.complications.includes(c))) return false;
-  if (f.p_price_min != null && (card.price_cents ?? -1) < f.p_price_min) return false;
-  if (f.p_price_max != null && (card.price_cents ?? Infinity) > f.p_price_max) return false;
-  if (f.p_size_min != null && Number(card.case_size_mm ?? -1) < f.p_size_min) return false;
-  if (f.p_size_max != null && Number(card.case_size_mm ?? Infinity) > f.p_size_max) return false;
-  if (f.p_year_min != null && (card.year ?? -1) < f.p_year_min) return false;
-  if (f.p_year_max != null && (card.year ?? Infinity) > f.p_year_max) return false;
+  if (!inSomeBand(card.price_cents, f.p_price_mins, f.p_price_maxs)) return false;
+  if (!inSomeBand(card.case_size_mm, f.p_size_mins, f.p_size_maxs)) return false;
+  if (!inSomeBand(card.year, f.p_year_mins, f.p_year_maxs)) return false;
 
   return true;
+}
+
+/**
+ * The mail draft the `inquiry-draft` function would return, composed offline.
+ *
+ * Wording is duplicated from that function rather than shared: it runs on Deno
+ * in `supabase/functions` and nothing there is importable from the app bundle.
+ * Change the wording in one place and change it in the other.
+ */
+export function demoMailDraft(card: DeckCard, message: string) {
+  const name = [DEMO_PROFILE.first_name, DEMO_PROFILE.last_name].filter(Boolean).join(' ');
+  const named = [card.brand, card.model].filter(Boolean).join(' ') || 'a watch';
+  const watch = card.year ? `${card.year} ${named}` : named;
+  const subject = card.reference ? `${watch} (ref. ${card.reference})` : watch;
+  const price =
+    card.price_cents === null
+      ? 'price on request'
+      : new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: card.currency ?? 'USD',
+          maximumFractionDigits: 0,
+        }).format(card.price_cents / 100);
+
+  return {
+    to: `hello@${new URL(DEALER.website).hostname}`,
+    subject: `Inquiry: ${subject}`,
+    body: [
+      `Hi ${DEALER.name},`,
+      '',
+      `My name is ${name}. I'm interested in the ${subject} you have listed at ${price} — is it still available?`,
+      ...(message.trim() ? ['', message.trim()] : []),
+      '',
+      `Listing: ${card.source_url}`,
+      '',
+      'Thanks,',
+      name,
+    ].join('\n'),
+  };
 }
 
 export const demo = {
@@ -222,6 +291,11 @@ export const demo = {
     CARDS.filter((card) => !swiped.has(card.id) && (!filters || matches(card, filters))),
 
   search: (filters: Filters) => CARDS.filter((card) => matches(card, filters)),
+
+  counts: (filters: Filters) => ({
+    matched: CARDS.filter((card) => !swiped.has(card.id) && matches(card, filters)).length,
+    total: CARDS.length,
+  }),
 
   recordSwipe: (listingId: string, direction: SwipeDirection) => {
     swiped.set(listingId, direction);
@@ -252,4 +326,17 @@ export const demo = {
   },
 
   listing: (listingId: string) => CARDS.find((card) => card.id === listingId) ?? null,
+
+  follows: (): { id: string; name: string; logo_url: string | null }[] =>
+    followed.has(DEALER.id)
+      ? [{ id: DEALER.id, name: DEALER.name, logo_url: DEALER.logo_url }]
+      : [],
+
+  follow: (dealerId: string) => {
+    followed.add(dealerId);
+  },
+
+  unfollow: (dealerId: string) => {
+    followed.delete(dealerId);
+  },
 };

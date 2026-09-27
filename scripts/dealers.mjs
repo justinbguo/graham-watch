@@ -112,9 +112,10 @@ async function confirmByName(name) {
  */
 function printSample(listings) {
   for (const listing of listings) {
+    const state = listing.skipped ? `refused: ${listing.skipped}` : listing.available ? 'for sale' : 'sold';
     console.log(`  ${listing.title || listing.source_url}`);
     console.log(
-      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos`
+      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos · ${state}`
     );
   }
 }
@@ -150,7 +151,11 @@ async function add() {
   console.log(`\n  ${name}`);
   console.log(`  ${found.platform} · ${catalogUrl}`);
   console.log(`  ${email ?? 'no contact address found — set one with --email'}`);
-  if (found.productCount) console.log(`  about ${found.productCount} products listed in their sitemap`);
+  if (found.sitemapProducts) {
+    console.log(
+      `  ${found.sitemapProducts} products in their sitemap — sold stock included, so not their stock`
+    );
+  }
   if (!found.sawSitemap) console.log('  no sitemap, so the catalog URL is a guess — pass --url to set it');
   if (found.platform === 'generic') {
     console.log('  unknown shop software: falls back to scraping, which is slower and less exact');
@@ -184,7 +189,8 @@ async function add() {
   });
 
   console.log(
-    `\nRead ${synced.found} watches via ${synced.provider}: ${synced.added} new, ${synced.changed} changed, ${synced.retired} retired.`
+    `\nRead ${synced.found} products via ${synced.provider} (${synced.forSale} for sale): ` +
+      `${synced.added} new, ${synced.changed} changed, ${synced.retired} retired.`
   );
 
   const picked = await choose({ dealerId: synced.dealerId, limit, token: operator.token });

@@ -161,11 +161,10 @@ function decode(text: string): string {
 // A page title of "Home" or "Shop" names the page, not the business.
 const GENERIC_TITLE = /^(home|shop|store|watches|index|welcome)$/i;
 
-async function shopName(origin: string): Promise<string | null> {
+async function shopName(origin: string, html: string | null): Promise<string | null> {
   const meta = await getJson(`${origin}/meta.json`);
   if (typeof meta?.name === 'string' && meta.name.trim()) return decode(meta.name.trim());
 
-  const html = await get(origin);
   if (!html) return null;
 
   const candidates = [
@@ -227,14 +226,152 @@ function bestEmail(emails: string[], origin: string): string | null {
   return ranked[0];
 }
 
-async function contactEmail(origin: string, urls: string[]): Promise<string | null> {
+async function contactEmail(
+  origin: string,
+  urls: string[],
+  home: string | null
+): Promise<string | null> {
   const fromSitemap = urls.filter((url) => CONTACT_LIKE.test(url)).slice(0, MAX_CONTACT_PAGES);
+  // The homepage is already in hand, and it is where a footer address lives.
   const candidates = [
-    ...new Set([origin, ...CONTACT_PATHS.map((path) => `${origin}${path}`), ...fromSitemap]),
-  ];
+    ...new Set([...CONTACT_PATHS.map((path) => `${origin}${path}`), ...fromSitemap]),
+  ].filter((url) => url !== origin);
 
   const pages = await Promise.all(candidates.map(get));
-  return bestEmail(pages.flatMap(emailsIn), origin);
+  return bestEmail([home, ...pages].flatMap(emailsIn), origin);
+}
+
+/* ------------------------------------------------------------------ profile */
+
+/**
+ * What a shop says about itself, for its page in the app.
+ *
+ * All of it comes out of the homepage we have already downloaded to read the
+ * shop's name, so none of this costs a request beyond confirming the icon
+ * loads. That is the whole reason these three were chosen over a phone number
+ * or an address: those needed a contact page parsed as prose, and were there
+ * to find on one site in eight anyway.
+ */
+export type Profile = {
+  description: string | null;
+  instagram: string | null;
+  logoUrl: string | null;
+};
+
+export const NO_PROFILE: Profile = { description: null, instagram: null, logoUrl: null };
+
+/** Attribute order in a `<meta>` varies by platform, so match the tag first. */
+function metaContent(html: string, key: 'name' | 'property', value: string): string | null {
+  const wanted = new RegExp(`${key}=["']${value}["']`, 'i');
+
+  for (const tag of html.matchAll(/<meta\s([^>]*)>/gi)) {
+    if (!wanted.test(tag[1])) continue;
+    const content = /content=["']([^"']*)["']/i.exec(tag[1])?.[1];
+    if (content) return content;
+  }
+  return null;
+}
+
+// Long enough to be a sentence about a business rather than a page label:
+// "Watches", "Home page" and the shop's own name are what this rejects. Not
+// higher — Watch Steez describe themselves in 35 characters and mean it.
+const MIN_DESCRIPTION = 25;
+const MAX_DESCRIPTION = 400;
+
+export function descriptionIn(html: string): string | null {
+  const raw =
+    metaContent(html, 'name', 'description') ?? metaContent(html, 'property', 'og:description');
+
+  const text = decode(raw ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text.length < MIN_DESCRIPTION) return null;
+  return text.length > MAX_DESCRIPTION ? `${text.slice(0, MAX_DESCRIPTION - 1).trim()}…` : text;
+}
+
+// instagram.com paths that are not an account: share widgets, and Instagram's
+// own sections. Without this, a "share this" button makes every shop @p.
+const NOT_A_HANDLE =
+  /^(p|reel|reels|tv|stories|explore|accounts|about|legal|developer|directory|privacy)$/i;
+
+export function instagramIn(html: string): string | null {
+  for (const match of html.matchAll(
+    /(?:https?:)?\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9_.]{1,30})/gi
+  )) {
+    if (/sharer|\/share|intent|plugins|embed/i.test(match[0])) continue;
+
+    const handle = match[1].replace(/\.+$/, '');
+    if (handle && !NOT_A_HANDLE.test(handle)) return handle;
+  }
+  return null;
+}
+
+/**
+ * The icon the page declares, largest first.
+ *
+ * Not `/favicon.ico`: of eight real dealer domains, three served one. A
+ * Shopify or Squarespace shop declares its icon in HTML and serves it from a
+ * CDN, and reading that found six of the eight. apple-touch-icon is preferred
+ * because it is 180px by convention — a bare "shortcut icon" is often 16, which
+ * is a blur at the size this is shown.
+ */
+export function declaredIcon(html: string, origin: string): string | null {
+  const icons = [...html.matchAll(/<link\s([^>]*)>/gi)]
+    .map((tag) => tag[1])
+    .filter((attrs) => /rel=["'][^"']*\bicon\b[^"']*["']/i.test(attrs))
+    .map((attrs) => ({
+      href: /href=["']([^"']+)["']/i.exec(attrs)?.[1] ?? '',
+      apple: /apple-touch-icon/i.test(attrs),
+      size: Number(/sizes=["'](\d+)/i.exec(attrs)?.[1] ?? 0),
+    }))
+    .filter((icon) => icon.href && !icon.href.startsWith('data:'))
+    .sort((a, b) => Number(b.apple) - Number(a.apple) || b.size - a.size);
+
+  for (const icon of icons) {
+    try {
+      const url = new URL(decode(icon.href), origin).toString();
+      // https only: the app hands this to an <Image> under App Transport
+      // Security, which refuses plain http and shows nothing.
+      if (url.startsWith('https://') && isPublicHttpUrl(url)) return url;
+    } catch {
+      // A malformed href is the shop's typo. Try the next icon.
+    }
+  }
+  return null;
+}
+
+/**
+ * Confirms a URL is really a picture before we store it.
+ *
+ * Analog Shift declares an icon whose URL 404s, and Squarespace answers that
+ * 404 with an HTML page rather than an error the fetch would reject. Stored
+ * unchecked, that is a permanently broken image beside a dealer's name.
+ */
+async function isImage(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(TIMEOUT.source),
+    });
+    return response.ok && (response.headers.get('content-type') ?? '').startsWith('image/');
+  } catch {
+    return false;
+  }
+}
+
+export async function readProfile(origin: string, page?: string | null): Promise<Profile> {
+  const html = page === undefined ? await get(origin) : page;
+  if (!html) return NO_PROFILE;
+
+  const icon = declaredIcon(html, origin);
+
+  return {
+    description: descriptionIn(html),
+    instagram: instagramIn(html),
+    logoUrl: icon && (await isImage(icon)) ? icon : null,
+  };
 }
 
 async function platform(origin: string, catalogUrl: string): Promise<string> {
@@ -252,9 +389,17 @@ export type Discovery = {
   name: string;
   email: string | null;
   catalogUrl: string;
-  productCount: number;
+  /**
+   * Product URLs the shop's sitemap lists. Not stock, and usually nowhere near
+   * it: a vintage dealer keeps every watch they ever sold published, so
+   * Collectors Corner NY list 970 and offer 87. Discovery reads a sitemap and
+   * nothing else, so it cannot tell which is which — `preview` can, and the
+   * operator console asks for that before anyone reads this as inventory.
+   */
+  sitemapProducts: number;
   platform: string;
   sawSitemap: boolean;
+  profile: Profile;
 };
 
 export async function discover(input: string): Promise<Discovery> {
@@ -268,10 +413,16 @@ export async function discover(input: string): Promise<Discovery> {
   const catalog = catalogPath(urls, origin);
   const catalogUrl = catalog ? `${origin}${catalog.path}` : origin;
 
-  const [name, detected, email] = await Promise.all([
-    shopName(origin),
+  // Read once, used three ways: the shop's name, an address in the footer, and
+  // everything on its page in the app. Three callers each fetching it was the
+  // shape before, and the name was the only thing kept.
+  const home = await get(origin);
+
+  const [name, detected, email, profile] = await Promise.all([
+    shopName(origin, home),
     platform(origin, catalogUrl),
-    contactEmail(origin, urls),
+    contactEmail(origin, urls, home),
+    readProfile(origin, home),
   ]);
 
   return {
@@ -279,8 +430,9 @@ export async function discover(input: string): Promise<Discovery> {
     name: name ?? new URL(origin).hostname.replace(/^www\./, ''),
     email,
     catalogUrl,
-    productCount: catalog?.count ?? 0,
+    sitemapProducts: catalog?.count ?? 0,
     platform: detected,
     sawSitemap: urls.length > 0,
+    profile,
   };
 }

@@ -1,4 +1,4 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import {
   createContext,
@@ -29,8 +29,8 @@ import { useThemedStyles } from '@/providers/theme';
 /**
  * A saved watch travels to the Saved tab instead of leaving the screen. A right
  * swipe files the watch somewhere the user can go and find it, and the flight
- * is the only thing that says where — the tab carries no count and the deck
- * never mentions the save again.
+ * is the only thing that says where in the moment; the count on the tab is
+ * what says it afterwards.
  *
  * The copy flies in an overlay above the tab bar rather than inside the deck,
  * so the deck can retire the real card in the same frame. Holding the next card
@@ -219,9 +219,9 @@ export function SaveTargetIcon({ color, focused }: { color: ColorValue; focused:
 
   return (
     <Animated.View ref={frame} collapsable={false} onLayout={measure} style={pulseStyle}>
-      <MaterialCommunityIcons
+      <Ionicons
         name={focused ? 'bookmark' : 'bookmark-outline'}
-        size={size.icon}
+        size={size.tabIcon}
         color={color}
       />
     </Animated.View>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 
-import { NO_FILTERS, type Filters } from './types';
+import { NO_FILTERS, toggleRange, type Filters, type Preset } from './types';
 
 /**
  * The deck and the search tab filter independently. They are different jobs:
@@ -10,15 +10,16 @@ import { NO_FILTERS, type Filters } from './types';
  */
 export type Surface = 'deck' | 'search';
 
-type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'complications';
-type SingleKey = 'query' | 'size' | 'era';
+type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'complications' | 'sizes' | 'eras';
 
 export type FilterApi = {
   filters: Filters;
   toggle: <K extends ListKey>(key: K, value: Filters[K][number]) => void;
-  setOne: <K extends SingleKey>(key: K, value: Filters[K]) => void;
-  /** Both ends at once, so a preset chip does not land as two renders. */
+  setOne: (key: 'query', value: string) => void;
+  /** Both ends at once, so a typed range does not land as two renders. */
   setPrice: (min: number | null, max: number | null) => void;
+  togglePrice: (preset: Preset) => void;
+  replace: (next: Filters) => void;
   clear: () => void;
 };
 
@@ -61,14 +62,20 @@ export function useFilters(surface: Surface): FilterApi {
             [key]: list.includes(item) ? list.filter((v) => v !== item) : [...list, item],
           };
         }),
-      // Ranges are single-choice: tapping the active one turns it off.
-      setOne: (key, next) =>
+      setOne: (key, next) => update(surface, (current) => ({ ...current, [key]: next })),
+      // The boxes are one range. Typing replaces every selected price band
+      // with that range; clearing both ends clears price.
+      setPrice: (min, max) =>
         update(surface, (current) => ({
           ...current,
-          [key]: current[key] === next && key !== 'query' ? null : next,
+          prices: min == null && max == null ? [] : [{ min, max }],
         })),
-      setPrice: (min, max) =>
-        update(surface, (current) => ({ ...current, priceMin: min, priceMax: max })),
+      togglePrice: (preset) =>
+        update(surface, (current) => ({
+          ...current,
+          prices: toggleRange(current.prices, { min: preset.min, max: preset.max }),
+        })),
+      replace: (next) => update(surface, () => next),
       clear: () => update(surface, () => NO_FILTERS),
     }),
     [bySurface, surface, update]

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
+import { price, watchName, watchSubject, type MailListing } from '../_shared/listing-mail.ts';
 import { send } from '../_shared/mailer.ts';
 
 const CORS = {
@@ -20,25 +21,8 @@ type Inquiry = {
   message: string | null;
   status: string;
   dealer_id: string;
-  listings: {
-    brand: string | null;
-    model: string | null;
-    reference: string | null;
-    year: number | null;
-    price_cents: number | null;
-    currency: string | null;
-    source_url: string;
-  } | null;
+  listings: MailListing | null;
 };
-
-function price(cents: number | null, currency: string | null): string {
-  if (cents === null) return 'price on request';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency ?? 'USD',
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
 function signInUrl(): string {
   const origin = (Deno.env.get('APP_ORIGIN') ?? 'https://graham.app').replace(/\/$/, '');
@@ -53,10 +37,9 @@ function compose(
   claimed: boolean
 ) {
   const listing = inquiry.listings!;
-  const watch = [listing.brand, listing.model].filter(Boolean).join(' ') || 'a watch';
+  const watch = watchName(listing);
   const details = [
     listing.reference ? `Reference ${listing.reference}` : null,
-    listing.year ? `${listing.year}` : null,
     price(listing.price_cents, listing.currency),
   ].filter(Boolean);
 
@@ -74,7 +57,9 @@ function compose(
     to: dealerEmail,
     // The dealer answers the buyer, not us. Graham is out of the way after this.
     replyTo: buyerEmail,
-    subject: `Inquiry: ${watch}`,
+    // Same line the buyer's own mail app puts there, so a dealer who gets both
+    // sees one thread about one watch rather than two about "an Omega".
+    subject: `Inquiry: ${watchSubject(listing)}`,
     text: [
       `${buyerName ?? 'A buyer'} on Graham is interested in your ${watch}.`,
       '',

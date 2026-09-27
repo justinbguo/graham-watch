@@ -40,6 +40,14 @@ async function sendViaResend(email: Email, from: string, apiKey: string): Promis
   }
 }
 
+function deadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: number;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Mail server did not answer within ${ms}ms.`)), ms);
+  });
+  return Promise.race([work, expired]).finally(() => clearTimeout(timer));
+}
+
 async function sendViaSmtp(email: Email, from: string): Promise<void> {
   const hostname = Deno.env.get('SMTP_HOST');
   if (!hostname) {
@@ -52,19 +60,24 @@ async function sendViaSmtp(email: Email, from: string): Promise<void> {
       port: Number(Deno.env.get('SMTP_PORT') ?? 25),
       tls: false,
     },
-    // Mailpit speaks plaintext on a private docker network and wants no
-    // password. denomailer refuses that by default. Production uses Resend.
-    debug: { allowUnsecure: true },
+    // Mailpit speaks plaintext and does not implement STARTTLS. With tls off,
+    // denomailer sends STARTTLS anyway, Mailpit answers 500, and the client
+    // waits until the runtime kills the function. The inquiry is already
+    // marked sent by then, so the next tap reports success and never mails.
+    debug: { allowUnsecure: true, noStartTLS: true },
   });
 
   try {
-    await client.send({
-      from,
-      to: email.to,
-      replyTo: email.replyTo,
-      subject: email.subject,
-      content: email.text,
-    });
+    await deadline(
+      client.send({
+        from,
+        to: email.to,
+        replyTo: email.replyTo,
+        subject: email.subject,
+        content: email.text,
+      }),
+      TIMEOUT.mail,
+    );
   } finally {
     // close() throws on a connection that never opened, which would replace the
     // error that stopped us connecting in the first place.

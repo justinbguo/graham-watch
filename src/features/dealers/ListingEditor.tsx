@@ -480,7 +480,7 @@ const editorStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   option: {
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
     minHeight: HIT_TARGET,

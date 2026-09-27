@@ -4,15 +4,19 @@ import { extractListings } from './extract.ts';
 import { contentFingerprint, textFingerprint } from './hash.ts';
 import { scrape } from './scrape.ts';
 import { fetchShopifyItems } from './shopify.ts';
-import { productKey, type SourceItem } from './source.ts';
+import { productKey, type AdapterRead, type SkippedItem, type SourceItem } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
 
 /**
  * How deep a catalogue read goes. This is a read of feeds the shop publishes
  * anyway, with no model call behind it, so it can afford the whole shop where
  * the old import had to stop at what it could pay to extract in one request.
+ *
+ * 1000 rather than 500 because a vintage dealer's shop is mostly sold stock:
+ * Collectors Corner NY publish 970 products holding 87 watches for sale, and a
+ * 500 cap read none of the second half — including whatever is for sale there.
  */
-export const MAX_CATALOG_ITEMS = 500;
+export const MAX_CATALOG_ITEMS = 1000;
 
 /**
  * A grid tile sometimes carries one photo and the product page carries eight,
@@ -31,21 +35,27 @@ const UPSERT_CHUNK = 100;
  */
 const ADAPTERS: Record<
   string,
-  (url: string, limit: number, minPhotos: number) => Promise<SourceItem[] | null>
+  (url: string, limit: number, minPhotos: number) => Promise<AdapterRead | null>
 > = {
   shopify: fetchShopifyItems,
   squarespace: fetchSquarespaceItems,
 };
 
-/** The first adapter that recognises the shop. */
+/**
+ * The first adapter that recognises the shop.
+ *
+ * Recognised, not productive: a shop whose every product was discarded still
+ * belongs to its adapter, and falling through to the scraper there would pay a
+ * model call to re-read a feed we already understood.
+ */
 export async function adapterItems(
   sourceUrl: string,
   limit: number,
   minPhotos = MIN_PHOTOS_IN_CATALOG
-): Promise<{ provider: string; items: SourceItem[] } | null> {
+): Promise<{ provider: string } & AdapterRead | null> {
   for (const [name, run] of Object.entries(ADAPTERS)) {
-    const items = await run(sourceUrl, limit, minPhotos);
-    if (items?.length) return { provider: name, items };
+    const read = await run(sourceUrl, limit, minPhotos);
+    if (read && (read.items.length || read.skipped.length)) return { provider: name, ...read };
   }
   return null;
 }
@@ -53,6 +63,8 @@ export async function adapterItems(
 export type CatalogRead = {
   provider: string;
   items: SourceItem[];
+  /** What the shop publishes that is not a watch we can hold, and why. */
+  skipped: SkippedItem[];
   /** Pre-typed by the page read, so these skip the extraction queue entirely. */
   extracted: Map<string, Record<string, unknown>>;
 };
@@ -66,7 +78,14 @@ export type CatalogRead = {
  */
 export async function readCatalog(sourceUrl: string, limit: number): Promise<CatalogRead> {
   const found = await adapterItems(sourceUrl, limit);
-  if (found) return { provider: found.provider, items: found.items, extracted: new Map() };
+  if (found) {
+    return {
+      provider: found.provider,
+      items: found.items,
+      skipped: found.skipped,
+      extracted: new Map(),
+    };
+  }
 
   const { markdown, provider } = await scrape(sourceUrl);
   const listings = await extractListings(markdown, sourceUrl);
@@ -98,7 +117,9 @@ export async function readCatalog(sourceUrl: string, limit: number): Promise<Cat
     extracted.set(externalId, fields);
   }
 
-  return { provider, items, extracted };
+  // The extractor is asked for watches and returns watches, so there is no
+  // discard pile on this path — anything it passed over left no record.
+  return { provider, items, skipped: [], extracted };
 }
 
 export type SyncResult = {
@@ -108,6 +129,10 @@ export type SyncResult = {
   changed: number;
   adopted: number;
   retired: number;
+  /** For sale right now, of the ones found. The rest are the shop's sold stock. */
+  forSale: number;
+  /** Products the shop publishes that this read refused, and will not hold. */
+  skipped: number;
   /** False when the shop has more watches than one read is allowed to walk. */
   complete: boolean;
 };
@@ -127,7 +152,7 @@ export async function syncCatalog(
   sourceUrl: string,
   limit: number
 ): Promise<SyncResult> {
-  const { provider, items, extracted } = await readCatalog(sourceUrl, limit);
+  const { provider, items, skipped, extracted } = await readCatalog(sourceUrl, limit);
   const readAt = new Date().toISOString();
 
   const { data: before } = await supabase
@@ -210,6 +235,8 @@ export async function syncCatalog(
     changed,
     adopted: (adopted.data as number) ?? 0,
     retired: (retired.data as number) ?? 0,
+    forSale: items.filter((item) => item.available).length,
+    skipped: skipped.length,
     complete: items.length < limit,
   };
 }

@@ -24,16 +24,20 @@ literal hex in a component.
 | `background` | The page itself |
 | `surface` | The fill of anything sitting on the page: cards, tiles, the tab bar |
 | `surfaceSunken` | A well inside a fill: image placeholders, a chosen row |
-| `fill` | Anything you press or type into: buttons, toggles, inputs |
+| `fill` | A field, a segment, a chip. Not a button |
 | `border` | Hairlines *between* content, and nothing else |
-| `scrollThumb` | The web scrollbar thumb, and only that |
-| `text` | Primary reading colour |
-| `textMuted` | Supporting copy, specs, eyebrows |
+| `text` | Primary reading colour, on the page |
+| `textMuted` | Supporting copy, descriptions, eyebrows |
 | `textFaint` | Hints and placeholders you should be able to ignore |
-| `accent` / `onAccent` | The final solid action and its text |
+| `ink` / `inkMuted` / `inkFaint` | The same three jobs, on a `surface` or a `fill` |
+| `accent` / `onAccent` | A filled button and the type and icons on it. The inverse of the page |
 | `brass` | The one warm highlight: dealer names, selected states |
 | `save` / `danger` | The two irreversible directions, and nothing else |
+| `verified` | The blue check after the app's own name, and nothing else |
 | `overlay` / `onOverlay` | A flat plate on a photograph and the type on it |
+| `onOverlayFaint` / `onOverlayAccent` | The roll's unread bars, and the one tan mark on a photograph |
+| `bar` / `onBar` / `onBarActive` | The tab bar's floor, its idle glyphs at 55% white, and the one you are on in full white |
+| `raised` | The swipe card, which floats on `shadow.card` instead of stepping |
 
 `scrim` sits outside the table because it is not themed: it is the fade a caption sits on
 over a photograph, dark in both schemes. It is a CSS gradient string, drawn from
@@ -47,7 +51,12 @@ Rules:
 - `save` and `danger` mean save and pass. Never use them for decoration.
 - Dark mode is not inverted light mode. It is a warm charcoal (`#121110`), not
   black, and text is `#F3EFE8`, not white. Pure black plus pure white on OLED
-  vibrates and makes photographs look blown out.
+  vibrates and makes photographs look blown out. The app opens in this scheme.
+  Settings can switch to light or follow the system; a choice already saved
+  there is kept.
+- `ink` equals `text` in both warm schemes, so reach for whichever names where
+  the type sits. They only differ in a palette that lights a container
+  differently from the page under it, which no palette does today.
 - Contrast floor is 4.5:1 for body text, 3:1 for large text and icons.
 
 ## Nothing is drawn with an outline
@@ -62,13 +71,21 @@ Three fills do all of it:
 - `surfaceSunken` — a recess inside one of those: an empty photo slot, a chosen
   row. Only ever inside a container, because in the dark scheme it is darker
   than the page and would vanish on it.
-- `fill` — a control that carries words: a button, a segmented control, an
-  input. It is the one tone that has to read against the page *and* against a
-  card, which is why it sits a shade under `surface` on paper and a shade over
-  it in the dark.
+- `fill` — a field, a segmented control, a chip. It has to read against the
+  page *and* against a card, which is why it sits a shade under `surface` on
+  paper and a shade over it in the dark. A button is not `fill`. A button is
+  `accent`, the page's own type colour, with `onAccent` for its label and
+  icons, so a light page gets a near-black button with light type and a dark
+  page gets the reverse.
+
+One exception, and it is a gesture rather than a thing: a card being swiped
+wears a ring in green or red while the thumb is down. An outline is banned here
+because it is a weak way to say what something *is*; this says what is about to
+happen, for as long as a finger is on the glass, and a fill would have to tint
+the photograph to be seen.
 
 An icon-only control gets none of the three. It is the glyph and nothing else:
-undo, the filter funnel, the view toggle, a close, a row's edit and hide. A
+undo, the filter funnel, the view toggle, a close, a back arrow, a row's edit and hide. A
 block behind a glyph is a second shape repeating what the glyph already said,
 and three of them in a header turn a title row into a toolbar. The touch target
 is `HIT_TARGET` (44) of empty space around it, which is invisible and enough.
@@ -92,44 +109,54 @@ Hairlines survive where they separate content rather than enclose it — the rul
 above a price, the divider under a `ChoiceRow`, the tab bar's top edge, the brass
 mark on a chosen row's left. A single edge is punctuation. Four edges are a box.
 
-What this costs: a fill cannot float. Depth here comes from the colour step
-alone, so a modal over a card over a page is at most two steps of contrast, and
-anything needing a third needs rethinking instead of a shadow.
+One thing floats, and it is the swipe card. It is `raised` — plain white on the
+warm-white page — with `shadow.card` under it: a tight cast that reads as
+contact and a wide soft one that reads as height. There is no colour step left
+to separate white from near-white, and the card is the one thing on screen
+meant to look like an object in a hand rather than a region of the page. In the
+dark scheme a shadow is nothing against a near-black page, so `raised` is a
+tone above `surface` there instead.
+
+What this costs everywhere else: a fill cannot float. Depth comes from the
+colour step alone, so a modal over a tile over a page is at most two steps of
+contrast, and anything needing a third needs rethinking rather than a second
+shadow.
 
 ## Typography
 
-**SF Pro**, in three weights, and that is the whole system.
+**Neue Haas Grotesk**, for the entire interface. One word is set in something
+else — see Identity — and it is loaded as one file, in one cut.
 
-It is the system face, so nothing is bundled and nothing is loaded. On iOS the
-way to ask for it is to name no family at all: `family` is `undefined` there,
-which also gets the optical cut Apple drew for the size — SF Pro Text below
-20pt, SF Pro Display above it, with the tighter spacing and shorter ascenders
-that go with each. Naming `"SF Pro"` as a family would lose that. On web the
-stack starts at `-apple-system`, which is SF Pro on Apple hardware and the
-platform's own UI face everywhere else. Apple does not license SF Pro to ship
-off its platforms, so an Android build gets Roboto and should.
+The family is cut in two optical sizes, and this app uses both. `face.text`
+below 20pt, `face.display` at 20 and above. SF Pro used to pick that split on
+its own; Haas ships them as different files, so each style in `type` names the
+file. The six files load once, in the root layout, in the same `useFonts` call
+as the wordmark.
 
-Weight does the work a second family used to. `regular` (400) is for reading,
-`semibold` (600) leads a block, `bold` (700) announces a screen. There is no
-medium: four weights put two of them within a hair of each other, and the
-choice between them turns into a coin toss on every new screen.
+The file is the weight. `regular` (Roman, 55) is for reading, `medium` (65)
+leads a block, `bold` (75) announces a screen. There is no semibold cut, and
+no fourth. A `fontWeight` on top of one of these files synthesises a fake bold
+on Android, so Android styles set `fontFamily` and nothing else. iOS groups
+the files into one family and serves Roman unless the style also names the
+weight, which is why a phone can show GRAHAM in Roman while the simulator
+shows Bold. `cut` adds that weight on iOS only.
 
-Only the sizes above the body scale take `letterSpacing`, and only a little —
-SF tracks itself tighter as it grows. Tracking small system text is how an
-interface starts to look like a slide deck.
+Only the sizes above the body scale take `letterSpacing`, and only a little.
+Tracking small text is how an interface starts to look like a slide deck.
 
 | Style | Use |
 | --- | --- |
-| `wordmark` | "Graham" on sign-in. Once per app |
+| `wordmark` | `GRAHAM`. Display bold, tracked at `tracking.wordmark`. Sign-in, and the deck's title |
 | `display` | Screen titles |
 | `title` | Watch model, section headings, empty-state headlines |
 | `editorial` | Short atmospheric copy, never paperwork |
 | `body` / `bodyStrong` | Paragraphs and input text |
-| `label` | Buttons |
+| `label` | Segments and field copy |
+| `labelStrong` | Button labels, the doors on sign-in, and `ChoiceRow`. Medium is this app's semibold |
 | `control` | Compact actions: text toggles, tile buttons |
 | `caption` | Specs, helper text, hints |
-| `price` | Prices. SF Pro's lining figures align down a column |
-| `tab` | Tab bar labels |
+| `badge` | A count on a tab glyph. Caption size, bold cut |
+| `price` | Prices. Lining figures align down a column |
 | `eyebrow` | Run-in above a title — the brand, a section name |
 
 Rules:
@@ -140,8 +167,8 @@ Rules:
 - One `display` per screen. Two headlines means neither is the headline.
 - `editorial` is the regular weight at 20pt, for one or two short lines under a
   title. It is not a paragraph style.
-- Weight comes from `type` too. A one-off `fontWeight` in a component is a
-  fourth weight nobody agreed to.
+- Weight comes from `type` too. A one-off `fontFamily` or `fontWeight` in a
+  component is a cut nobody agreed to.
 
 ## Capitalization
 
@@ -150,9 +177,12 @@ literals. Uppercase text loses the word shapes that make a line quick to skim,
 and a row of capitals in a UI face reads as shouting rather than as a heading.
 
 - Sentence case for everything we write — headings, buttons, labels, hints.
-  "Email me a sign-in code", not "EMAIL ME A SIGN-IN CODE" or "Email Me A Sign-In Code".
+  "Create account with email", not "CREATE ACCOUNT WITH EMAIL".
 - Title case only for proper nouns and the words on our own chrome that are
-  already names: the "Graham" wordmark, tab names like "Search" and "Saved".
+  already names: tab names like "Search" and "Saved".
+- The wordmark is the one string set in capitals, and the letters are written
+  that way. `textTransform` stays banned, so nothing else can inherit the
+  treatment.
 - The `eyebrow` separates itself from the title under it by weight and colour,
   not by capitals.
 - Listing text is dealer data, printed as imported. An initialism like IWC or a
@@ -161,15 +191,157 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 
 ## Identity
 
-The provisional identity is a text lockup: `Graham`, one brass hairline, then
-“Find the watch. Meet the dealer.” in `type.editorial`. Do not invent a crest,
-heritage date, seal, or generated logo to imply history the product does not
-have. The restraint is the identity until commissioned assets replace it.
+The identity is one word: `GRAHAM`, drawn by `Wordmark`. It sits at the left of
+the sign-in column, and it is the deck's title. Both read the same letters, the
+same cut, and the same tracking. Do not invent a crest, heritage date, or seal
+to imply history the product does not have. The deck header may shrink the size
+to stay on one line beside its check and controls; sign-in does not.
 
-The wordmark is set in the system face like everything else, which is honest
-about it being provisional: a lockup in a face every other app on the phone
-also uses is a placeholder, not a mark. A drawn wordmark is the one place a
-second face would ever be worth loading.
+The mark — the launcher icon's gold `G` — stays on the launcher. It stood
+beside the word on sign-in for a while, and that made the screen a poster
+before it was a form. No screen wears the mark in its header either: a header
+holds a word, a count, and controls, and the word is the name.
+
+One sentence sits under the wordmark, and only there. It is `body` in
+`textMuted`, left aligned, grouped to the word with `stack.tight`. It is not
+a second heading, and it does not appear on any other screen. Its width is
+the room left beside the watch, wider than the word itself. The sentence
+and the word together are about as tall as the watch beside them: the copy
+column is measured, and the photograph's frame takes that height.
+
+A watch sits to the left of that pair. Four photographs in `assets/sign-in/`,
+one showing at a time, crossfading every `motion.rotate`. The frame is
+`size.wordmarkWatchWidth` wide. The top and bottom of the frame fade into the
+page over `space.md`, so the photograph does not end in a hard edge. The photographs are decoration. They are not
+listings, and a screen reader does not announce them.
+
+`GRAHAM` is Neue Haas Grotesk Display Bold, at 44pt, tracked at
+`tracking.wordmark` (−2.2). Capitals at that size want to drift apart; pulling
+them together is what makes six letters read as a mark instead of a heading.
+It uses a cut the interface already loads, so the wordmark costs no second
+download.
+
+### Onboarding is one slide grammar
+
+Every onboarding question uses `StepShell`. The display heading, supporting
+sentence, content, error, and footer actions appear in that order. The shell
+owns safe-area padding and reading width through `Screen`; a step does not
+recreate either.
+
+Choice slides keep the answer on screen after a tap. The footer is **Continue**,
+using the default fill, and it never advances as a side effect of selecting a
+row. Continue stays disabled until a row is chosen. There is no **Skip for now**.
+An empty brand list is the one exception: the catalogue has nothing to pick, so
+Continue is enabled. The notification slide still offers **Not now**. That
+declines a permission. It is not a skip of a question.
+
+Back is an arrow on its own row above the heading, at the left, `arrow-left`
+at `size.icon`, with no fill behind it. The touch target is `HIT_TARGET`, and
+the glyph lines up with the heading. The first slide has nowhere to return, so
+it has no arrow. The age-blocked slide has none either; sign-out is its only exit.
+
+The watch-count answers are numerals: 0, 1, 2–3, 4–6, 7–10, 11–20, 21+.
+
+A typed answer is a line, not a field. Name and username are `type.title`
+(22, display medium) with the line height left off, for the same reason a
+field leaves it off: iOS would shift the value and not the placeholder. There
+is no fill and no corner radius. A hairline in `border` sits under the
+letters, with `space.sm` between the baseline and the rule. The placeholder is
+`textMuted`. The shop claim stays `Field`. That form is the one Profile shows
+later, and the two cannot drift.
+
+The username line starts with an @ the person does not type. It is the same
+face and size as the letters, on their baseline, with `space.md` between the
+mark and the name. The hairline runs under both. What is saved
+is the name without the mark. Under the line, in `body` and `textMuted`:
+"You are Collector #N on Graham". N is `profiles.collector_number`, assigned
+when the account is created, and it does not move if someone else leaves.
+
+The slide starts `space.xl` below the top inset `Screen` already applied, so
+the question sits lower than a settings page. The footer stays at the bottom.
+
+Rows use `ChoiceRow`: a hairline list with the brass mark on the chosen row,
+not cards around every option. The label is `labelStrong`, the medium cut.
+A long set scrolls while the footer stays fixed.
+That preserves the same action position from Name through Notifications and
+keeps the home indicator clear.
+
+When the keyboard is open the footer sits above it, with `inset.screen`
+between the button and the keys. The pad is the keyboard height minus the
+home-indicator inset `Screen` already applied, since that inset lies inside
+the keyboard. A slide whose answer is typed opens that keyboard itself: the
+first field is focused once the slide has settled, and a tap on the footer
+does not dismiss it. The next slide then takes the same keyboard. The birthday
+slide has no field, so it dismisses the keyboard.
+
+The birthday is three wheels — month, day, year — not three boxes and not
+sliders. A slider has to be aimed at one year out of a hundred, and a thumb
+cannot sit on a single year. Each wheel snaps to a name or a number. The
+selected row is the center, marked with `fill`, and the date written above
+the wheels is what Continue saves. The wheels open on the date eighteen years
+ago, the youngest birthday the age gate accepts. Scrolling younger still
+continues; the blocked screen is what refuses it. The wheels hide the scroll
+indicator: a bar between the columns would read as a seam, and the center row
+is the position.
+
+The notification slide is the one exception in behavior, not shape. Continue
+opens the OS permission prompt on iOS and Android, then finishes onboarding;
+Not now finishes without it. Android creates its notification channel before
+requesting permission, because Android 13 will not show the prompt otherwise.
+Web records no permission because `expo-notifications` has no browser API.
+
+### Sign-in is a page with doors on it
+
+Sign-in runs on the same scheme as everything else. A green page (`forest`)
+lived here for a while as a test of whether the app should be green at all; it
+answered no, and the palette and the `ThemeOverride` that carried it are gone.
+One scheme, keyed off the system, and the status bar follows it like every
+other screen.
+
+The screen is the wordmark, the sentence under it, the watch beside that
+pair, and a column of doors: Apple, Google, a rule with `or` on it, then
+email. Apple's native button stands first on an
+iPhone. Everywhere else Apple is our door, because the native view does not
+exist in a browser or in Expo Go.
+A door is `SignInOption` in `src/features/auth/` — the same capsule as
+`Button`: `size.controlMin` tall, `radius.full`, `accent` on the page, mark
+and `labelStrong` label centred as one group in `onAccent`.
+
+The doors name the mode. Sign-in opens on creating an account, because the
+screen exists for people who are not in yet; a ghost line under the doors —
+`Already have an account? Log in` — flips the doors to `Log in with`, and
+back. There is no heading for the mode. The providers do not know which
+mode they are in. Email does: creating an account
+lets an unknown address join, logging in refuses it with a sentence pointing at
+the other mode. The typed address survives the flip, because "that address has
+no account" is the usual reason to flip.
+
+Email is three stages on one screen: the doors, then the address with `Send me
+a code`, then the code with `Continue`. `Back` under each is a `ghost` and
+steps back one stage. The mode line hides once a code is in flight — switching
+modes mid-code would send a second, different email.
+
+### A provider's mark is the provider's
+
+The door is ours. Google's and Apple's and the email door share `Button`'s
+capsule, so each one contrasts the page. What we do not recolor is the mark.
+
+Apple draws its own button, so we pick the style that matches `accent`: black
+on a light page, white on a dark one. Its label is Apple's, not ours: `SIGN_UP`
+while creating an account, `SIGN_IN` while logging in. Apple does not offer
+"Create account with", and we do not redraw their button to force it. It
+stands first in the column, which is where Apple's guidelines ask for it when
+other providers are offered.
+
+Google's door is `SignInOption`. The mark is `assets/google-g.png`, the
+four-color G, drawn by `expo-image`. The file arrived on a white square; the
+white is knocked out, including the counter, so the button shows through and
+the G holds on both a black door and a white one. Do not recolor those four
+colors and do not swap in a glyph. `size.providerMark` (18) is the mark
+against a 14pt label, which is `type.labelStrong`.
+
+The email door is the same component with `email-outline` in that same box,
+in `onAccent`, so the envelope flips with the label.
 
 ## Space and shape
 
@@ -183,10 +355,13 @@ Named jobs sit on top of that scale so a screen does not guess:
 - `inset.screen` (24) is the page gutter. Cards and nested panels use
   `inset.card` (also 24). Sheets and full-screen modals use the same gutter —
   a modal is still a page, not a control.
-- `inset.controlY` (8) / `inset.controlX` (16) pad buttons and text fields.
+- `inset.controlX` (16) pads a field on the left and right.
   Never put the page gutter inside a field. A search box already sits in a 24px
   margin; 24px more inside it leaves the cursor floating in empty chrome, and
-  two price fields side by side become unusable.
+  two price fields side by side become unusable. A single-line field has no
+  vertical padding on top: see "Fields" below. A capsule's horizontal padding
+  is half its height (`size.controlMin / 2`). Anything closer sits under the
+  rounded end, and iOS clips it.
 - `inset.compactY` / `inset.compactX` pad compact enum options and header
   controls.
 - `stack.tight` groups a title with its caption. `stack.related` groups a
@@ -196,17 +371,31 @@ Named jobs sit on top of that scale so a screen does not guess:
   `stack.section` or `space.xxxl` as scroll padding just to clear a sibling.
 
 Fields share `size.controlMin` (52) with buttons so a single-line input is a
-thumb target. Vertical padding is `sm` so 16/24 text plus padding does not
-exceed that height and then fight it. Multiline fields use
-`size.fieldMultiline` (120) and pin `textAlignVertical` to the top.
+thumb target. A single-line field does not take `lineHeight`. `type.body`'s
+24px line is for a paragraph that wraps. On iOS a text field turns the extra
+into a baseline offset on the typed value only, so the placeholder and the
+value do not share a line, and the letters sit under a gap. The field takes
+the face and the size from `type.body`, a fixed height, and
+`inset.controlX` on the sides.
+
+This text face's x-height sits about 2px low in its own box, so a centred em
+box still leaves more air above the letters than below them. `paddingTop` is
+0 and `paddingBottom` is `space.xs` (4). The line moves up by half of that,
+and the letters sit in the middle. Android also turns `includeFontPadding`
+off. Left on, the font's extra ascent comes back as a gap above the letters.
+
+Multiline fields keep the whole of `type.body`, including the line height,
+because a wrapped paragraph wants even lines. They use `size.fieldMultiline`
+(120), `inset.controlY` on both edges, and `textAlignVertical` at the top.
 
 The room around a watch is the product. Prefer the next larger step over
 squeezing copy in — on photographs and page sections, not inside inputs.
 
-Radius comes from `radius` — `sm` 4 for thumbnails and compact controls, `md` 6
-for buttons, fields, and tiles, `lg` 10 for the swipe card. There is no capsule
-radius. Metal, glass, and printed catalogues have edges; rounding a control into
-a capsule makes the app read like generic consumer SaaS.
+Radius comes from `radius` — `sm` 4 for thumbnails, `md` 6 for fields and
+tiles, `lg` 10 for the swipe card, and `full` for anything you press that
+carries a word: a button, a chip, a segment, a door on sign-in. A thumbnail
+or a field is not pressed, so it keeps its corners. A circle on a photograph
+is still wrong — a photo is not a control.
 
 ## Touch and motion
 
@@ -218,17 +407,17 @@ a capsule makes the app read like generic consumer SaaS.
 - Animation runs in Reanimated worklets on the UI thread. Never drive a frame
   from React state.
 - Every gesture needs a visible response before the network is involved. The
-  commit wash appears as the card moves, not after the row is written.
+  commit ring appears as the card moves, not after the row is written.
 - Crossing the swipe commit point produces one selection tick. Committing
   produces one rigid impact. Never call haptics on every gesture frame.
 
-The swipe deck is one axis. A card tracks the thumb left and right and never
-moves vertically or rotates free of that travel, because the only two answers
-are save and pass. Giving it a second axis invites a gesture that means nothing.
-
-Drag is elastic, not linear: to the commit point the card follows the thumb
-exactly, past it the card returns about a third of the travel. The tension is
-what tells you the swipe has caught before the colour does.
+The swipe deck answers save and pass on the horizontal axis. The card also lifts
+straight up, and only up, when the drag starts on the photograph. That shows the
+next watch in the gap and always returns. It is a preview, not a third answer,
+and it does not rotate. Drag is elastic, not linear: to the commit point the card
+follows the thumb exactly, past it the card returns about a third of the travel.
+The same resistance caps the lift once enough of the next photograph is visible.
+The tension is what tells you the swipe has caught before the colour does.
 
 Nothing bounces. A released card settles to rest with easing and stops. Spring
 overshoot on a declined swipe looks like the card rejected the drop. Haptics
@@ -244,31 +433,73 @@ or dictation, and the gesture must remain understandable without them.
   `<thing>Styles`.
 - If two screens need the same piece, it moves to `src/components/`. Rule of
   three applies to styles as much as to code.
+- A line under a screen's title is `Screen`'s `subtitle`, not a `Text` laid on
+  the page under the header. The header keeps its controls on the title's line
+  whether the subtitle is there or not.
 
 ### Button hierarchy
 
-The default button is a `fill` block with no outline. `ghost` drops the fill
-for a subordinate way back. `solid` is reserved for the
-last irreversible handoff: `Send inquiry`. Opening the inquiry, signing in,
-posting a request, saving edits, and moving through onboarding are important,
-but filling all of them with ink turns every screen into a contest for the
-same emphasis.
+A filled button is an `accent` capsule. The label and any icon we draw are
+`onAccent`, and both are centred. On the light page that is a near-black
+button with light type. On the dark page it flips. `ghost` drops the fill;
+its label is `text`, still centred, which is how a second action stays quiet.
 
-Callers ask for `solid` explicitly. There is no generic “primary” variant whose
-meaning changes from screen to screen.
+`solid` is the same pair. It used to be the one ink button on a screen of
+`fill` buttons, reserved for `Open in my mail app`. A button that did not
+contrast the page stopped reading as a button, so the loud step and the
+ordinary one are now one colour. Ghost is the remaining quieter step.
+
+## Alignment
+
+Type on the page aligns left. A heading, a paragraph, an empty state, and the
+wordmark all start at the left padding of their column.
+
+A button is the exception. Its label and its icons are centred in the capsule.
+A glyph that is the whole control sits in the middle of its hit target. A word
+that fills a fixed slot — one segment of the appearance control — stays
+centred in that slot. The content column is still centred in a wide window:
+that is where the column sits, not how the type inside it is set.
 
 ## Iconography
 
-One family: `MaterialCommunityIcons`, outline when idle and solid when active.
-Size comes from `size.icon` for a tab or a header control and `size.iconSmall`
-inline with text. Mixing families is the fastest way to make chrome look
-assembled rather than designed, so a glyph that is not in that family waits for
-the commissioned set.
+One family: `MaterialCommunityIcons`, outline when idle and solid when active,
+at `size.icon` for a header control and `size.iconSmall` inline with text.
+A glyph that is not in that family waits for the commissioned set.
 
-Icons carry the repeated controls — the four tabs, Undo, Filters, the view
+The tab bar is the single exception, and it is a job difference rather than a
+taste one. Its glyphs have no word under them and have to hold a screen alone,
+so they are `Ionicons` at `size.tabIcon` — a heavier stroke at a larger size.
+A glyph that sits beside a label has the opposite job and stays on the lighter
+family. Two families, one rule each; a third, or either one used outside its
+job, is how chrome starts to look assembled.
+
+Icons carry the repeated controls — the six tabs, Undo, Filters, the view
 toggle, Close, the dealer row actions. A control with no
-honest glyph keeps its word instead: `Mark sold`, `Start over`, `Send inquiry`.
+honest glyph keeps its word instead: `Mark sold`, `Start over`, `Send via Graham`.
 Never invent a symbol to avoid a label.
+
+The specification table is the one place a glyph appears next to something
+that is not a control, and there it does the naming. A row is a glyph and the
+fact — a calendar and "1972", a diameter and "42mm" — at `size.iconSmall` in
+`text`, the value at `labelStrong`. Both are full strength, because the table
+is what a buyer came for and a faint glyph beside muted type reads as a
+footnote.
+
+The words used to sit between them: "Year", "Case", "Material", a column of
+type saying what the value already said. They are gone. That makes the glyph
+the only thing naming the row, which is exactly why none of them is a
+metaphor — each is the literal object, and a row whose picture has to be worked
+out is now unreadable rather than merely slow.
+
+Two facts cannot speak alone. "Yes" means nothing without its word, so box and
+papers print the noun instead: "Box", or "No papers" — absence is worth saying
+on a vintage watch. And a value is dropped if an earlier row already said it,
+because a chronograph is often both the style and the only complication, and
+the same word printed twice under two glyphs reads as a fault in the listing.
+
+The word survives where it is needed: the row's `accessibilityLabel` is "Year:
+1972", spoken once. The glyph is inside that label rather than announced
+beside it, so a reader does not stutter "calendar" through twelve rows.
 
 An icon-only control needs an `accessibilityLabel` that reads as the sentence a
 user would say — "Undo, bring back the watch you passed on", not "undo".
@@ -291,11 +522,12 @@ Every screen is a centred column with a ceiling, from `layout`:
 | `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
 | `layout.card` | 480 | The swipe stage. |
 | `layout.grid` | 1280 | The browse grid. |
-| `layout.rail` | 176 | Text-first navigation on a wide window. |
+| `layout.rail` | 88 | The glyph column on a wide window. |
 
-`Screen` applies the cap and centres itself, so a new screen is capped without
-doing anything. Pass `width` only to leave the default: the deck asks for
-`card` in swipe view and `grid` in grid view.
+`Screen` applies the cap and centres the column in the window, so a new screen
+is capped without doing anything. The type inside that column aligns left.
+Pass `width` only to leave the default: the deck asks for `card` in swipe
+view and `grid` in grid view.
 
 A phone is narrower than all three, so these values change nothing on a phone.
 They exist for the case the app already supports and nobody looks at.
@@ -307,9 +539,9 @@ Why each one:
   the eye cannot find the start of the next line.
 - A swipe card stays hand-sized. Stretched to a desktop window it is a
   billboard, and the gesture that matches it is a shove rather than a flick.
-- The grid is the one surface that earns width, because it spends it on more
-  columns rather than on longer lines. It still stops, so tiles do not thin out
-  to a single row on an ultrawide monitor.
+- The grid is one watch per row, photograph on the left and the details on
+  the right. The extra width goes to that row, and it still stops, so a row
+  does not become a banner on an ultrawide monitor.
 
 ### Size comes from measurement, not from the window
 
@@ -323,7 +555,7 @@ swipe commit point is a quarter of the *card*, measured with `onLayout`, since
 the card is capped and no longer tracks the window. Distance to fly off screen
 is a window question, so that one reads `useWindowDimensions`.
 
-A grid that caps its width counts columns against the cap, not the window.
+A grid that caps its width measures the row against the cap, not the window.
 
 ### Safe area, and who owns which edge
 
@@ -342,7 +574,7 @@ Left and right are never in doubt. Top and bottom each have exactly one owner,
 so a screen declares when it is not the one paying:
 
 - A screen inside `(tabs)` passes `inTabs`. Below `WIDE_BREAKPOINT`, the bottom
-  tab bar already stands in the home-indicator strip — `size.tabBar` (56) of
+  tab bar already stands in the home-indicator strip — `size.tabBar` (68) of
   bar with the inset padded under it — so a screen that pads the bottom as well
   leaves a dead band above the bar. On a wide layout the rail is at the left,
   so `Screen` restores its own bottom inset. The rail takes the top inset
@@ -370,30 +602,39 @@ full-bleed black, and it positions its own close button with `useSafeAreaInsets`
 ### Browser chrome
 
 The scrollbar is the one piece of the interface the browser draws for us, and
-its default is a grey trough beside the photographs. It is styled down to a
-thin thumb in `scrollThumb` on a transparent track, `size.scrollbar` (8) wide,
-lifting to `textFaint` on hover.
+it is not drawn. `hideScrollbars` writes `scrollbar-width: none` and an empty
+`::-webkit-scrollbar` to `document.head`, once, because CSS there is outside
+React's reach and there is no style prop for browser chrome.
 
-Subtle, not gone. Hiding the bar outright costs the only cue for how much of a
-list is left, and `showsVerticalScrollIndicator={false}` is a blunt way to say
-it — per scroll view, and invisible from the design tokens. The rule lives in
-`applyScrollbarStyle`, which the theme provider repaints when the scheme flips
-because CSS in `document.head` is outside React's reach.
+A styled thin thumb came first and was still wrong. On Windows and Linux the
+bar is permanent, so every scroll view in the app carried a grey column beside
+its photographs — including the ones inside a card, where a second vertical
+line an inch from the card's edge reads as a seam. The app is a deck of
+photographs; nothing is allowed to stand next to them.
+
+What this costs, plainly: the bar was the only cue for how much of a list is
+left, and the only way to drag to a position with a mouse. The card gives its
+own cue, since content runs off its bottom edge, and no surface here is long
+enough that wheel, trackpad, or keyboard is not enough to cross it.
+
+Native keeps its own indicator, which appears under a thumb and fades — that is
+the platform's, not ours. Two exceptions pass
+`showsVerticalScrollIndicator={false}`. The swipe card does, because on a held
+card the bar runs down the right edge of the photograph, which is the line the
+whole app is arranged to keep clear. The birthday wheels do, because a bar
+between the three columns reads as a seam and the center row is the position.
 
 ### Pointer and keyboard
 
 - A swipe needs a thumb. Below `WIDE_BREAKPOINT` (900) the deck opens on cards;
   above it, on the grid. Either view is reachable at any width — the breakpoint
   picks the opening move, it does not lock a door.
-- Navigation is an icon over a label. Below the breakpoint it runs along the
-  bottom; above it the same routes move into `layout.rail` at the left, glyph
-  beside label. A desktop bottom strip under a narrow content column reads like
-  a phone screenshot.
-- The current tab is brass, glyph and label. On the rail it is also a
-  `surfaceSunken` row with a brass left rule, the same language as a chosen
-  filter.
+- Navigation is a column of glyphs. Below the breakpoint it runs along the
+  bottom; above it the same routes stand in `layout.rail` at the left. A desktop
+  bottom strip under a narrow content column reads like a phone screenshot.
+- The current tab is the white one, on the bar and on the rail alike.
 - Anything doable by swipe is doable without one. The grid takes arrow keys to
-  move, `s` to save, `x` to pass, and Enter to open.
+  move and Enter to open the listing. Pass and save live on that screen.
 - Hover is a web-only hint and never the only signal. A control that only
   reveals itself on hover is invisible on a touchscreen.
 - `HIT_TARGET` stays 44 on every platform. A mouse is precise, but the same
@@ -420,13 +661,16 @@ Things we have not decided yet. Move them up into rules once we do.
 ## Price is typed, everything else is a preset
 
 Size and era are ranges nobody holds a precise opinion about: "36 to 39mm" is as
-exact as anyone gets, so the rows are the whole control. A budget is different —
-people arrive with a number. So price is two boxes, and the preset rows below them
-are shortcuts that fill the boxes rather than a second way to say the same thing.
-Tapping the live row empties them.
+exact as anyone gets, so the rows are the whole control. Every row toggles, and
+several may be on at once. Within a group a watch matches if it fits any chosen
+row: 34mm or 39mm, the 1960s or the 1970s. Across groups they still all have to
+match: a Rolex and a 1960s watch.
 
-One state, not two. The row reads as selected when the numbers happen to match it,
-which means typing $5,000 to $15,000 by hand marks "$5k–15k" on its own.
+A budget is different — people arrive with a number. So price is two boxes, and
+the preset rows below them are the same kind of choice as era. One selected row
+fills the boxes, and typing $5,000 to $15,000 by hand marks "$5k–15k" on its own.
+A second row joins the first. The boxes go blank then, because two ranges are not
+one pair of numbers. Typing after that replaces the rows with the range in the boxes.
 
 ## Filter by dealer
 
@@ -452,7 +696,9 @@ fields with presets underneath, because a floor and a ceiling are amounts, not n
 
 Ranges are presets, not sliders. Dragging two handles to "36 to 39mm" is slow on a
 phone and the precision buys nothing — nobody wants a 37.5mm floor. Presets also keep
-filter state small enough to be a cache key.
+filter state small enough to be a cache key. Every option toggles, including era,
+case size, and the price rows. Complications stay "all of these": a date and a
+chronograph means a watch that has both.
 
 Only offer a filter something can match. Options come from `listing_facets`, so a brand
 appears once a visible listing is that brand. A filter that can only return nothing is a
@@ -472,39 +718,133 @@ photograph fills its frame with `cover`, edge to edge. A watch floating in a
 band of matte reads as a broken image, and the frame is the product: a full-bleed
 plate is what a catalogue prints. The full-screen viewer is the one exception and
 uses `contain` on black, because that is where a buyer inspects a bracelet and
-nothing may be cropped. Grid and detail frames use 4:5; row thumbnails stay
-square because they are wayfinding, not the product view. Photo-heavy surfaces
+nothing may be cropped. Every frame a buyer browses uses 4:5, the grid row and
+the detail hero alike; the square thumbnail survives only on the dealer's own
+inventory rows, where it is wayfinding rather than the product view. Photo-heavy surfaces
 use `expo-image` so the same dealer image is cached rather than fetched on every
 return.
 
-The photo set is counted, not barred: `1 / 3` on a plate in the top right corner, above the
-watch's name at the bottom.
-Segments across the top borrowed a social app's grammar, said how far along you
-were without saying how many there are, and went invisible on the white studio
-background half of these watches are shot against. Only the top card takes taps;
-a card underneath is not being read.
+The photo set is barred, not counted: one three-point rule per photograph along the very
+top edge, the current one in `onOverlayAccent` and the rest at `onOverlayFaint`. It is the grammar every phone owner
+already has for "there are more of these", and it reads without being read — a `1 / 3`
+plate is a thing you have to stop and parse on a card you are about to swipe.
+
+Tan for the current bar, white for the rest. Everything else on a photograph is white, so
+the one mark saying where you are in the roll is the one thing that is not, and it does
+that at three points tall where a brighter white could not. `brass` is the same idea on
+paper and cannot be used here: it is mixed against a warm page and goes to mud over a
+dark scrim.
+
+The bars sit on `scrimTop`, a shallow fade down from the top edge, because half these
+watches are shot on white and a white rule on a white wall is not there. The fade is
+weaker and shorter than the caption's at the bottom: it is holding up three-point rules,
+not a title, and a heavy band across the top of every photograph reads as a letterbox.
+
+The top edge means the photograph's, not the screen's. On a card the two are the same,
+because the plate fills the frame. The viewer shows the whole photograph on black, so
+one that is not the window's shape leaves a band above it, and bars floating in that
+band belong to nothing. The frame is measured with `onLayout`, and half the leftover
+height is where the bars go. They never go above the safe-area inset: a portrait
+photograph fills the window, and its top edge is under the Dynamic Island.
+
+The proportions are read before the photograph is shown, with `Image.loadAsync` on the
+one being looked at and the one after it. `onLoad` alone reports them a frame late, so
+every tap forward threw the bars up to the status bar and then dropped them onto the
+photograph — the roll looked like it was reassembling itself on each tap. The same call
+loads the bytes, so in the viewer it also does the work `prefetch` does on a card.
+
+A photograph whose shape is not known yet has no top edge to sit on, so the viewer's
+bars wait for it rather than start at the status bar and move. Arriving with the
+photograph reads as one thing appearing; moving afterwards reads as a fault.
+
+Bars are drawn, not spoken. The count rides on the paging controls instead, as an
+`accessibilityValue` of "2 of 3" on the tap zones, so a screen reader still knows where
+it is in the roll. Only the top card takes taps; a card underneath is not being read.
 
 ## Deck views
 
-Two ways to read the same queue, chosen from the toggle beside the title. Cards are for
-deciding, one watch at a time, and a card holds everything that decision needs. The grid is
-for scanning, and a tap there opens the listing route, because a tile is too small to read
-in. There is one way to save and it is a swipe.
+Two ways to read the same queue. Cards are for deciding, one watch at a time, and a card
+holds everything that decision needs. The grid is for scanning, and a tap there opens the
+listing route, because a tile is too small to read in. Pass and save happen on that
+screen. On the cards, a swipe is still the decision.
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
-A tile is half a phone wide, so it takes the type scale down a step: `titleSmall` for the
-watch name, `priceSmall` for the price.
+The switch is one button beside the title, and it shows the destination, not the state: the
+grid glyph while you are on cards, the cards glyph while you are on the grid. Two glyphs
+used to sit there, one lit in brass and one faint — a segmented control drawn without its
+frame, asking you to work out which half was a label and which was a button.
+
+Both readings are defensible, so the animation settles it. On press the outgoing glyph turns
+a quarter turn out and shrinks away while the incoming one turns in, `motion.fast` on the UI
+thread. You see the control change, which is the only thing that distinguishes "you are
+here" from "go here". Swapping the glyph on the frame the state changes gives the same
+information as a flicker, and the button reads as broken.
+
+The views behind it cross-fade at `motion.base`, entering only. There is no exit animation
+because the outgoing view is unmounted the frame the state changes; the new one fades up over
+the page. The fade also covers the column width changing — `card` is 480 and `grid` is 1280
+on a desktop — which is a snap nobody would read as intentional.
+
+A row is one watch. The photograph sits on the left, `size.gridPhoto` wide and
+5/7 tall, and the details sit to its right. It takes the type scale down a step:
+`titleSmall` for the watch name, `priceSmall` for the price. The row does not
+decide. A tap opens the listing, and Pass or Save there is the verdict.
+
+`size.gridPhoto` is a quarter of a phone's width, not a third. At 128 the
+photograph was big enough to inspect and three rows filled the screen, so a
+list of fifty watches read as a stack of posters and scanning it meant
+scrolling. Inspecting happens on the listing; a row only has to be recognised.
+
+The price and the dealer share one line, divided by a middot with air around
+it, exactly as they do on the card. Stacked they were a third and a fourth line
+of type in a block that is only as tall as its photograph.
 
 Maker and model are one line in one size — `formatTitle`, "Omega Speedmaster Professional,
-1972" — and that line is two lines tall whether it needs the second or not. Tiles sit two to
-a row: a name that wraps where its neighbour does not leaves the prices under it stepping,
-and a row you cannot read across is worse than a name cut to "Omega Speedmaster …". The
-brand used to be an `eyebrow` over the model, which made every tile look like a section
-heading and gave a short name and a long one different heights.
+1972" — and that line stops at two. A short name does not reserve a blank line under
+it. The brand used to be an `eyebrow` over the model, which made every row look like a
+section heading.
 
-The search row is set the same way, at `bodyStrong`: one name, one voice, clamped to two
-lines.
+Every list of watches uses that row: the deck's grid, Saved, search, and a
+dealer's shop. One component, `ListingRow`, so a watch is the same object
+wherever you meet it. Search and Saved used to set a 72px square thumbnail
+beside `bodyStrong` type, which made the same watch a different size depending
+on which tab you were standing in, and made the photograph too small to be
+worth looking at.
+
+A row is its own block on `surface` with `radius.md`, and lists separate them
+with `space.lg` rather than a hairline. Two blocks with a rule between them
+read as one table cut in half.
+
+The frame is a fixed 5/7 — roughly what a dealer shoots, a watch upright in a
+portrait photograph — and the whole photograph is shown inside it, `contain`
+rather than the card's `cover`. Its height used to come from the type beside
+it, so a name that wrapped to a second line made the frame taller, and the
+same photograph was magnified and cut differently in one row than in the next.
+A crop at this size is also the wrong trade: it magnifies the dial past the
+case shape, and the case is most of what tells one vintage watch from another.
+Inspecting still happens on the listing; a row only has to be recognised. The
+frame is centred, so type at a large accessibility size grows the block
+without changing the photograph's shape.
+
+Where a row carries an action — **Contact dealer** in Saved — it is a glyph in
+the row's top corner, `size.icon`, in `textMuted`, with no fill behind it.
+Every row in every list is then the same height. The word "Contact dealer"
+cost a line of its own under the summary, which made a saved watch half again
+as tall as the same watch in search; beside the summary the label took the
+width the name needed and "$14,950" broke across two lines. The glyph keeps
+the label as its accessibility name, so a screen reader still says "Contact
+dealer".
+
+The glyph sits out of the flow, and the title reserves the room for it instead.
+As an ordinary child of the row it took its width off every line of the
+summary, and the dealer's name came back five pixels short. The title is the
+line that can afford it: it wraps to two lines anyway, while the price and the
+dealer have to stay whole on one.
+
+It is a button of its own rather than a press inside the row's press: the
+photograph and the type each open the watch, and the three sit side by side
+instead of nested.
 
 ## Onboarding asks twice, and no more
 
@@ -515,72 +855,120 @@ actually holds, with the count beside each one.
 
 Brands rank the deck; they never filter it. A first-run answer is a guess, and hiding
 the catalogue behind a guess costs more than dealing it in a slightly worse order.
-Choosing nothing is allowed and the button says "Skip for now" when you have.
+Choosing nothing is not offered. Continue stays disabled until at least one
+brand is selected, unless the catalogue has no brands to show.
 
 The gate is `profiles.onboarded_at`, not an empty brand list: picking nothing is an
 answer, and it has to be told apart from never having been asked.
 
 ## Profile is who you are, then the shop
 
-The Profile tab opens on the person: a square `size.thumb` photo beside their
-name and how many watches they have saved. Settings keeps the email, theme, and
-sign-out. Putting the name behind a cog made the tab look empty for anyone who
-had not claimed a shop.
+The Profile tab opens on the person: a square `size.thumb` photo, and to the
+right of it their name, `@handle`, "Collector #N" at `caption`, and how many
+watches they have saved. The two are aligned at the top, so the name starts on
+the photo's top edge instead of floating against its middle, and the block of
+type takes the rest of the row so a long name wraps rather than widening the
+page. Stacked, the photo and four short lines under it cost a third of the
+screen before the first watch.
+
+Under that, the saved watches run in a horizontal row, newest first, under a
+"Saved watches" eyebrow. Every other block on this page names itself —
+"Following", "Your shop" — and one unlabelled strip of photographs between two
+labelled sections read as decoration rather than a section.
+Each photograph is `size.gridPhoto` wide at 5/7, the same frame as a watch in
+a list, with the name and the price under it. A tap opens the listing. Nothing
+saved draws no row, and no eyebrow either: a heading is a promise that
+something is under it. The username slide still says "You are Collector #N on
+Graham"; the profile keeps the number only. Settings keeps the email, theme,
+sign-out, and delete account. Putting the name behind a cog made the tab look
+empty for anyone who had not claimed a shop.
 
 The photo is optional. Tap the tile to pick one from the library. It uses
-`radius.sm` like every other thumbnail — not a circle. A circle is a capsule,
-and capsules are the thing this system does not do. An empty tile is a sunken
+`radius.sm` like every other thumbnail — not a circle. The capsule is for
+things you press; a photograph is not a control. An empty tile is a sunken
 well with the account glyph, the same empty language as a listing row with no
 photograph.
 
 ## The card is the whole listing
 
-A card scrolls. Under the photograph and the summary sit the dealer's
-description, the specification table, who is selling it, and the button that
-writes to them — the same `ListingDetails` block the listing route renders.
+A card scrolls. Under the photograph sit the dealer's description, the
+specification table, who is selling it, and the button that writes to them — the same `ListingDetails` block the listing route renders.
 Deciding on a five-figure watch takes the reference and the caliber, and a card
 that made you leave to read them turned one decision into a navigation.
 
+The block under the photograph opens on "About this watch" when the dealer wrote
+one, then the description. The heading is `bodyStrong`, one step above the
+description, which stays at `label`. Everything else under the photograph is
+`label`, 14pt, the description in regular and the specification values in
+semibold. The description used to be `body` over specs at `label`, which made
+the dealer's sentence the loudest thing on a card whose facts are the reason
+to read it.
+
+Both are full-strength `text` — white in the dark scheme — with nothing under
+the photograph in a muted tone, because a muted paragraph on a raised card
+reads as disabled rather than secondary.
+
+The block is spaced at `stack.related` between its parts and `space.sm`
+between specification rows, not the `stack.group` a page uses. A card is read
+in the hand at arm's length and a page is scanned; the same air that looks
+generous on a screen looks like padding on an object. Tighter than this and
+the glyph rows touch.
+
 The photograph takes 58% of the card's height, capped at 5:4 of its width, so
-two things hold on every phone: the price never starts below the fold, and the
+two things hold on every phone: the plate never starts below the fold, and the
 description is always cut off mid-sentence at the bottom edge. The cut is the
 only thing that says the card continues. Sizing the photo by aspect ratio alone
-can only promise that on the screen the ratio was picked on.
+can only promise that on the screen the ratio was picked on. The cap changes
+the height only. The plate stays the full width of the card, and `cover`
+centres the watch in it. A ratio applied on top of the cap narrows the plate
+and leaves the card showing down the right edge.
 
 Three gestures, one surface, and they must not fight:
 
-- Drag sideways and the card leaves. The pan activates after 12pt of horizontal
-  travel and gives up after 12pt of vertical, so a thumb reading the spec table
-  never flings the watch away.
-- Drag up and the card scrolls. That is React Native's `ScrollView`, not Gesture
-  Handler's: Gesture Handler's wraps a native gesture that takes the whole touch
-  on web, and the card then does not move at all, with or without a blocking
-  relation between the two. The axes never contend because the content is taller
-  than the card but never wider.
+- Drag sideways and the card leaves. The pan claims the gesture once the
+  horizontal travel wins, so a thumb reading the spec table never flings the
+  watch away.
+- Drag up on the photograph and the card lifts inside its own frame. The watch
+  behind is the same size, so the gap shows that watch's photograph rather than
+  the buttons at the bottom of its card. Let go and the card settles back. A
+  lift is not a pass and not a save.
+- Drag up on the words and the card scrolls. That is React Native's `ScrollView`,
+  not Gesture Handler's: Gesture Handler's wraps a native gesture that takes the
+  whole touch on web, and the card then does not move at all, with or without a
+  blocking relation between the two. The axes never contend because the content
+  is taller than the card but never wider.
 - Tap the photograph's left or right to page it, long press to open it full
-  screen. Only the top card takes any of this.
+  screen, pinch to magnify it. Only the top card takes any of this.
 
 The listing route still exists for the surfaces with no card to scroll: a Saved
 row, a search result, a grid tile. It shows the same block under a bigger
 headline, and adds the Save toggle a deck card does not need — there a right
-swipe is the save.
+swipe is the save. Opened from the grid, it also offers Pass, the left swipe.
+Passing closes the listing and the row is gone from the deck.
 
-### The name is on the photograph
+That headline heads the page: the name in `display` above the photograph, with
+the price on the right of it, sharing the name's first baseline. A page has a
+column to head, and the name is the one thing that says what you opened. The
+card is the other way round — both words sit over the image — because a card is
+the object itself and has no column above it. Baseline, not centre: the 18pt
+price centred against a name that wraps to two lines floats between them.
 
-"Rolex Datejust, 1968", in the semibold over the bottom of the photo, with the year in the
-regular weight after the comma — a dating app puts the name and the age on the face, and this
-deck is the same act performed on watches. The first thing a card says now sits on the
-thing the eye is already looking at.
+### The whole plate is on the photograph
+
+The plate is two lines over the bottom of the photo. "Rolex Datejust, 1968", then
+`$7,850 · Vintage Vault`. A dating app puts the name and the age on the face, and this deck is the
+same act performed on watches. Everything a card exists to say now sits on the thing the
+eye is already looking at, and the block under the photograph opens on "About this watch"
+and then the dealer's own description, instead of repeating the facts above it.
 
 The year rides with the name everywhere, not in the specification line. It is the second
 thing anyone asks about a vintage watch, and "1601 · 1968 · 36mm" made a 1968 Datejust look
 like a 2015 one. `formatTitle` carries it on a tile, a row, and the listing headline;
 `formatSpecs` is the tile's one spec line — reference and case size.
 
-Under the photograph a card says the price and the dealer, and nothing else. The reference
-and the case size are rows in the table the card scrolls to, a few lines down; printing
-either one twice inside two inches reads as filler. The listing route drops them from its
-headline for the same reason.
+The reference and the case size stay off the plate. They are rows in the table the card
+scrolls to, a few lines down, and printing either one twice inside two inches reads as
+filler. The listing route drops them from its headline for the same reason.
 
 White type never sits straight on a photograph. It sits on `scrim`, a fade to a warm black
 that is the same in both schemes, because half these watches are shot on white and a
@@ -588,16 +976,40 @@ photograph is not themed. A fade rather than a band: a hard edge across the fram
 the watch a second time. The type carries a soft shadow as well, for the top of the line
 where the fade is thinnest.
 
-Under the photograph the block is set like the plate under a catalogue picture: the
-specification line, a hairline rule, then the price on the left and the dealer's name in
-brass on the same baseline to the right. The name is not repeated there — twice in two
-inches reads as a template rather than a page. The rule separates the watch from the
-transaction, so the eye lands on what it costs as a conclusion.
+The name and the year are one line of `formatTitle` when they fit. It reads the way it
+reads on a tile and in a search row, which is the point: one watch, one voice, wherever
+you meet it. "Rolex Datejust, 1968" stays on that line. "Omega Speedmaster Professional,
+1972" does not: the year leaves the name and joins the price and the dealer, so the plate
+stays two lines. The name is then one line, and it ellipsizes if it is longer than the
+card. Giving the year a line of its own on every card spent a line of photograph on the
+short names. Giving the price a third line on the long ones covers the watch the caption
+is there to name.
 
-The dealer is on the price baseline at `labelStrong`, not in an outline beside
-the maker. Who is selling it is half of what a vintage watch costs you, so it
-gets equal weight to the price — but a box around a name makes it look like a
+One weight throughout, and one colour with one exception. On a photograph a change of
+weight or tone is a change the eye has to attribute either to the type or to the picture
+behind it, and it guesses wrong as often as not, so the hierarchy is size alone:
+`titleSmall` for the name and the year, `bodyStrong` for the price. The year keeps
+`titleSmall` after it moves down. The price does not grow to meet it.
+
+The exception is the dealer's name, in `onOverlayAccent` — the same tan as the roll's
+current bar, so the two marks on a photograph are one colour rather than two accents
+arguing. It is the only word on the plate that names a party rather than the watch, and
+tan is what the app has always used to mean "a person is involved". On paper that is
+`brass`, which is mixed against a warm page and goes to mud over a dark scrim.
+
+Set tight: the lines lead at three points over their size rather than the token's leading,
+which is drawn for type with paper around it. The year's leading locks to the price line
+once it sits there, so the plate does not grow by a point. Two lines on a photograph have
+to read as one block, or the plate looks like two captions that landed together.
+
+The price and the dealer share the bottom line, split by a middot with air around it. When
+the year has moved down, it leads that line, and the same middot divides it from the price.
+Who is selling it is half of what a vintage watch costs you, so the two belong in one breath —
+but never in an outline beside the maker, because a box around a name makes it look like a
 control, and a dealer's name on a card is not something you press.
+
+A grid row keeps its own block beside the photograph, at `ListingSummary`. Three
+lines of type over a photograph that size is a stamp, not a caption.
 
 ## What Saved adds up to
 
@@ -609,6 +1021,30 @@ because a total quietly short by two reads as the whole answer. Mixed currencies
 total at all rather than adding pounds to dollars. An empty list shows nothing: "$0" beside
 the word Saved reads as a price. Sold watches are left out too, since their row shows "Sold"
 where the price was and a sum no visible price explains is worse than a smaller sum.
+
+## Removing a saved watch is a swipe
+
+A row in Saved slides left to reveal `Remove` in `danger`. The action is the
+same size as the row's Contact dealer control: `inset.compactX` by `inset.compactY`,
+a capsule.
+
+It replaced a long press, which nothing on a phone teaches and which had to be
+explained by a line of instruction under the list — the line is gone with it.
+
+The swipe reveals; the tap removes. A gesture that deleted on release would mean the same
+flick that pushes a row aside also throws the watch away, and the list has no undo.
+
+The row is `ReanimatedSwipeable`, from Gesture Handler, which is already a dependency and
+already runs its pan on the UI thread. Hand-rolling it would mean re-deriving the two parts
+that are easy to get wrong: scroll-versus-swipe arbitration inside a list, and closing the
+open row when another opens.
+
+A drag must never count as a tap. React Native Web fires the row's click at the end of a
+drag, so swiping a row open also opened the watch; `useSwipeGuard` wraps a row's handlers
+and drops the press while the row is off its mark. It reads a ref at the moment of the
+press rather than state from a render, because the press and the render race.
+
+There is no swipe on a search result. Nothing there is yours to remove.
 
 ## A sold watch never enters the deck
 
@@ -644,19 +1080,70 @@ A long press on the photo opens it alone, full screen and black, with the paging
 nothing else on it. Long press because tap is already spoken for by paging, and because
 wanting a closer look is a deliberate act rather than a stray thumb.
 
-Saving is a swipe on the deck and a button on the detail screen, sitting above the inquiry
-button. Both write the same right swipe. The button reads "Saved" afterwards and undoes it
-when pressed again, because a control that greys out once used leaves the user stuck with
-a decision they made by accident.
+A pinch magnifies the photograph in place, up to four times. The dial's printing, the
+crown's teeth, the stretch in a bracelet: everything a buyer is actually deciding on is
+smaller on the screen than the words beside it. The magnification follows the point
+between the fingers, because a pinch that scales about the frame's middle slides the part
+you were looking at out from under your hand.
+
+On a card the zoom springs back when the fingers lift. A card left magnified would be a
+card that no longer behaves like the rest of the deck, and the swipe that comes next would
+start on a photograph that is no longer where it was. In the full-screen viewer the zoom
+is held, one finger moves the photograph around, and a double tap is the way in and back
+out — you opened that screen to study one watch, and a magnification you have to keep two
+fingers on is one you cannot look at. Panning stops at the photograph's own edge, not the
+window's, so black never slides in beside a photograph shown `contain`.
+
+Two fingers on a card is a pinch, never a drag: the deck's swipe gives up the moment a
+second finger lands. Left to it, the first finger would have flung the watch away while
+the other was still zooming in on the dial. The paging zones over the photograph are off
+while it is magnified, or the finger lifting out of a pinch lands in a zone and pages the
+roll.
+
+It all runs in Reanimated worklets on the UI thread. A magnification driven by React state
+re-renders per frame, and it would drop them on the one interaction that exists to be
+looked at closely.
+
+Saving is a right swipe, and the same act as a button: **Save watch**, with a
+filled `bookmark` at `size.iconSmall` beside the label. **Ask about this watch**
+carries a filled `email`, and **Pass** a filled `close`. They sit between the
+specification table and the dealer, on the card and on the detail screen alike:
+saving and asking are about the watch, and the shop under them is who you would
+be writing to. Under the dealer they were the last thing on a block that had
+already changed subject.
+Both write the same right swipe. On the card the watch leaves, the way a swipe
+does.
+
+A watch already in Saved shows none of the three on the detail screen. Nothing
+is left to decide about a watch you have chosen, and the row in Saved already
+carries **Contact dealer** and slides left to remove, so the page repeated a
+verdict twice over and put the save above the one button still worth pressing.
+The page goes by what is saved, not by the screen you came from: opened from
+search, a saved watch reads the same as it does from Saved.
+
+From Search the page offers **Save watch** alone. Search is a place to look:
+passing there would drop a watch out of a deck the reader has not come to yet,
+and writing to a dealer is a step you take about a watch you have kept. Search
+says so in the link — `?from=search` — because one page serves the deck grid,
+Saved, a dealer's shop, and search, and it cannot otherwise tell which row was
+pressed. The deck grid keeps all three: it is the deck, and the deck is where a
+watch is judged.
 
 Full screen is the right weight for that screen. A sheet leaves the deck showing behind it
 and invites a swipe to dismiss, which is the gesture that means save.
 
 ## The dealer panel counts, it does not estimate
 
-Every figure on the panel is counted from this shop's own rows by
-`dealer_reputation`: how long they have been here, how many watches they have
-for sale, how many have sold, and when we last checked their site.
+Two figures, both counted from this shop's own rows by `dealer_reputation`:
+how long they have been here, and how many watches they have for sale.
+
+It showed two more and they are gone. **Sold here** was a dash on nearly every
+shop, because it only counts a sale we watched happen, and a dash is a shrug
+where a number was promised. **"Stock checked against this shop's own site
+four days ago"** was a sentence about our importer printed on a page about a
+dealer — a buyer deciding whether to write to someone does not need our
+refresh schedule. What is left is one line: inquiries reach this shop by
+email.
 
 It used to show a rating in brass stars, a review count, years trading and a
 reply time, all invented and seeded from the dealer id, behind a "Sample"
@@ -666,15 +1153,61 @@ unreadable as well, because now the reader has to decide which is which.
 
 Two consequences worth keeping:
 
-- **A young shop looks young.** "Sep 2026" and a dash where sales would go is
-  the honest picture of a marketplace weeks old, and it is what the panel
-  shows. Tenure names the month until the shop has a year behind it, because
-  "0 yrs" reads as a bug.
-- **Sold counts what we watched happen.** A watch the shop's own feed stopped
-  offering, or one the dealer retired here. It undercounts a dealer's real
-  trade, which is the safe direction: we never claim a sale we did not see.
+- **A young shop looks young.** "Sep 2026" is the honest picture of a
+  marketplace weeks old, and it is what the panel shows. Tenure names the
+  month until the shop has a year behind it, because "0 yrs" reads as a bug.
+- **Two true figures beat four hedged ones.** The panel is short because that
+  is all we can count. It gets longer when there is something real to add.
 
-A rating goes back the day a buyer can leave one, and not before.
+A rating goes back the day a buyer can leave one, and not before. The RPC still
+returns `watches_sold` and `last_refreshed_at`; nothing reads them, and they
+are the obvious inputs the day the panel earns a second row.
+
+**The shop's own mark sits beside its name.** Nobody uploads a logo to Graham
+— a dealer is imported — so their favicon is the only piece of their own
+design the app holds, and the panel draws it at `size.icon`, `radius.sm`, and
+`contentFit="contain"`. Contain, not cover: a logo cropped square is a
+different logo, while a letterboxed one is only a margin. It is
+`accessible={false}`, because the name it sits next to is already read out.
+
+It comes from `unavatar.io` with `fallback=false`, which is the entire reason
+for that service over Google's or DuckDuckGo's. Both of those answer a miss
+with a generic globe — a real image, under a 404 a browser ignores — and a grey
+blob beside a dealer's name is an invented mark, the same mistake as the stars.
+`fallback=false` answers a miss with nothing, the image fails, and
+`DealerMark` returns null: the name simply sits flush left.
+
+The dealer's own `/favicon.ico` would need no third party and does not work.
+Six real dealer domains, one served one. A Shopify or Squarespace shop declares
+its icon in HTML and serves it from a CDN, so only a service that reads the
+page finds it. Two costs, both real: the domain a buyer is reading reaches
+`unavatar.io`, and a free service sits in the path of a card. The fix, when a
+dealer's mark is worth owning, is to resolve it once at import and store the
+URL on the dealer row.
+
+**The site and the handle are each their own row.** The words are `body` in
+`text` — the light type on a dark page — and the row is at least `HIT_TARGET`
+tall, because a caption was too small to tap. The site opens in the browser.
+A filled `web` glyph at `size.icon` sits beside the domain, with the scheme
+and `www` left off. The handle opens Instagram. Its mark is the white glyph
+in `assets/instagram.png`, tinted to `text` so a light page does not lose it,
+at the same size as the globe. The handle is the label. The mark stays silent.
+
+The panel reads in one order: the mark and the name, the shop's own sentence
+about itself, then the two counts. Identity first, then what is true about
+them. The controls come after the facts they are about.
+
+**Follow** sits under the counts, a filled capsule with `account-plus`. Once
+followed it reads **Following** and the glyph is `account-check`. Pressing it
+again stops. The shops you follow are a list on Profile, under Following. A row
+opens that shop.
+
+**More watches** is a `ghost` button under those links, with a filled `watch`.
+It opens that shop's own page: the description, and every watch the shop still
+has for sale. Ghost rather than filled, because leaving for a whole catalogue is
+a detour from deciding on the watch above it, and a third filled capsule in one
+block makes all three read as equal. A buyer sees it. The shop's own card does
+not.
 
 ## A contact address is never spelled out on screen
 
@@ -686,6 +1219,55 @@ the thing the column grants were added to stop.
 
 Same rule after a code is sent: the screen says where to look using the masked
 form, never the full address, even when the dealer typed it themselves.
+
+## Graham wears a check
+
+A blue `check-decagram` at `size.icon` after the title on the deck, in `verified` — the
+only cool colour in a warm palette, and on purpose the platform's blue rather than one
+tuned to the page. A check in a bespoke colour is a check somebody drew; this mark works
+because it looks like the one every other app uses.
+
+It is spoken, unlike most glyphs beside a word. The others name the word they sit next to
+and are silent for it; this one is a claim, so it carries `accessibilityLabel="Verified"`.
+
+It goes after the app's own name and nowhere else. On a section title it would be a
+decoration, and on a dealer's name it would be a promise about someone we import rather
+than vet — the same line the invented star rating crossed.
+
+## The deck says how much of the marketplace you are seeing
+
+Under the wordmark, a line of `caption` in `textMuted`. Filtered, it is two numbers —
+"12 of 148 watches available". Unfiltered, before a swipe, one: "148 watches available",
+the size of the catalogue. After a swipe the first number is what is left, so the line
+is "147 of 148 watches available".
+
+Two numbers because one of them is meaningless alone. "12 watches available" reads as an
+empty marketplace when it means a narrow filter, and the difference matters: the first
+number is a reason to widen the filter, the second is a reason to come back tomorrow. The
+brass count on the Filters button beside it says how many choices made the first number
+small. Naming the filters in the line as well wrapped it to two lines to repeat something
+already on screen.
+
+Both are counted in the database by `listing_counts`, in one round trip, with the deck's
+own predicate. It used to count the pile in hand, which is fetched one pile deep, so it
+capped at `DECK_LIMIT` and printed "20+" — a hedge that was never the answer to either
+question.
+
+The line still has to move with the thumb. `matched` is what is left to see, so a swipe
+drops it in the cache at the same moment the card leaves, and an undone pass puts it
+back. The refetch is the correction, held for a minute, not the thing the header waits on.
+Unfiltered, before any swipe, `matched` and `total` are one number and the line says so.
+After a swipe they differ, and the line becomes "147 of 148 watches available".
+
+`matched` drops what you have already swiped, because that is what is left for you to
+look at. `total` keeps it: "on the marketplace" is a fact about the marketplace, not
+about your history. Both drop your own imports, since a shop's own window is not a
+listing offered to them.
+
+The slot is `Screen`'s `subtitle`, so any screen can say what it is holding in the same
+place, in the same tone, without inventing a second header. Nothing shows until the count
+lands; a number that changes once the query returns is worse than a line that arrives
+late.
 
 ## The end of the deck
 
@@ -722,31 +1304,67 @@ A drag shows its direction in colour alone: green for save, red for pass. The wo
 and "Pass" are gone, and so is the instruction under the deck. A first swipe teaches the
 gesture faster than a caption, and the caption never stops taking up room.
 
-The colour fills the card below the photograph and fades in with the drag, at 0.28 by the
-commit point. It stops at the photo on purpose: a tint over the picture colours the watch
+The colour is a ring around the card, `size.ring` thick on the card's own frame. It fades
+in with the drag and is solid exactly at the commit point, so the edge going full strength
+is the card saying "let go now".
+
+An edge rather than a tint, for two reasons. A wash over the photograph colours the watch
 itself, which is the one thing on screen that has to stay true — a green Submariner is a
-different watch. It is a fill rather than an edge because nothing in this app is drawn with
-an outline.
+different watch. And a card scrolls: a fill that started under the photograph was drawn
+against a layout that only exists at the top of the scroll, and it cut a straight line
+across the specification table anywhere else. The frame is the one part of a scrolling
+card that holds still.
 
-## The tab bar is ours
+This is the single outline in the app, and it is allowed because it is not a state. It
+exists while a thumb is down and is gone when the thumb lifts.
 
-`TabBar` draws the four tabs; the navigator only says which routes exist, what each is
-called, and which edge the bar sits on. Its own bar packs a glyph and a word into a fixed
-49pt strip and exposes nothing else, and the last pass was already overriding the icon
-height to stop the labels from clipping. A bar this permanent should not be a pile of
-overrides.
+## The tab bar is a dark floor
 
-What it draws that the navigator could not:
+`TabBar` draws the six tabs; the navigator only says which routes exist, what each is
+called, what count it carries, and which edge the bar sits on. Its own bar packs a glyph
+and a word into a fixed 49pt strip and exposes nothing else. A bar this permanent should
+not be a pile of overrides.
 
-- The current tab in brass, glyph and word together, against `textFaint` for the rest.
-  The tab is the mark; there is no separate rule or slab drawn over it to say so.
-- A press that gives: the glyph and label scale to 0.92 in 90ms and come back. On a phone
-  the tap also fires `Haptics.selectionAsync`, so the bar answers before the screen does.
-- The rail as a real list — glyph beside label, `size.controlMin` tall, the current route a
-  `surfaceSunken` row with a brass left rule, brass glyph, and brass label. That is
-  `ChoiceRow`'s selected state exactly, because a rail is a list of choices.
+It is the one surface that does not follow the scheme. `bar` is near-black on paper and
+darker still in the dark, with `onBar` glyphs at 55% white and an `onBarActive` full white
+for the tab you are on — the same three tones in both schemes. The app is pale, so the
+floor under it is dark, and a floor that changed colour with the page would stop reading
+as one thing.
 
-Brass in the bar does not spend the screen's one warm accent. The seasoning rule is about
+The tab you are on used to be brass. On a black floor that is a third colour doing a job
+two already do: the glyph goes solid from outline and steps from 55% to 100% white, which
+is the contrast the eye actually reads. Brass is the accent for selection *on the page* —
+a chosen filter, a paging bar — and the bar is not the page.
+
+**No words under the glyphs.** Four labels at 11pt were four things to read on every
+screen, and at that size they were decoration more than instruction. The word survives as
+each tab's accessibility label, which is what a screen reader announces and what a pointer
+shows on hover.
+
+**Glyphs carry it alone, so they are drawn heavier.** `Ionicons` at `size.tabIcon`, 28pt,
+outline when idle and solid when active. That is the only place in the app that leaves
+`MaterialCommunityIcons` — see Iconography.
+
+**A tab may carry a count.** The screen declares it with `tabBarBadge`; the bar draws it
+half on the glyph's top-right corner — `space.xs` out on each side, so it overlaps the way
+a sticker lands rather than floating beside the glyph as a third item in the row — and
+folds it into the spoken label as "Saved, 3". Over 99 it reads `99+`.
+
+The pill inverts with the tab. Idle, it is `onBarActive` with `bar` numerals: a white disc
+on a grey bookmark. Active, it is `bar` with white numerals, because a white pill on a
+white glyph is one white shape and the bookmark loses the corner the count sits on. The
+dark pill cuts the count out of the glyph instead. A ring around the pill would say it
+more plainly and is an outline. The bar never runs
+a query to find a number out: the Saved count comes from the same cached list the Saved
+screen renders, through `useSavedCount`, so the two cannot disagree.
+
+**A press gives**: the glyph scales to 0.92 in 90ms and comes back. On a phone the tap
+also fires `Haptics.selectionAsync`, so the bar answers before the screen does.
+
+On a wide window the same strip stands on its end: an 88pt column of glyphs, no labels,
+no selected slab — one chrome rather than two that happen to share a palette.
+
+Gold in the bar does not spend the screen's one warm accent. The seasoning rule is about
 a page's content; chrome that is always on screen needs a selected state that is always
 the same colour.
 
@@ -758,6 +1376,172 @@ The one thing lost is the anchor the default bar renders on web, so a tab is a b
 than a link there — no middle-click, no URL on hover. The hook that builds those hrefs is
 internal to the vendored navigator, and reaching into `expo-router/build` to get it would
 break on the next upgrade.
+
+## Exchange
+
+The fifth tab, between Search and Saved. Two arrows (`swap-horizontal`, outline when idle).
+A public board: a person posts a watch they are selling, buying, or trading, and anyone
+signed in can comment. The comment is the public record that they are in the deal.
+
+A post opens with the person who wrote it, on one line: their photograph at
+`size.avatarSmall`, their name, `Collector #N` in a quiet capsule, and how long ago. A
+post from a stranger is a person first — the title said what the watch was and nothing
+about who was offering it. The byline was two lines deep, the name over the handle, and
+it was taking more room above the title than the fact it carried; the handle now lives on
+the profile and in the spoken label. Someone with no photograph gets the account glyph,
+the same empty state the profile page uses. The name and the photograph are read live
+from the profile, so changing either changes every post; the handle and the collector
+number are stamped onto the row when it is written.
+
+Then the watch: the title, and under it two capsules — the intent, Selling or Buying or
+Trading, and the price. Beside the title the intent fought it for the first line and the
+price sat in a line of its own below; as a pair of flairs they are two facts read at a
+glance and the title keeps the full width. They are set at caption size, smaller than the
+intent chips at the top of the feed, so a label does not look like a filter someone left
+switched on. That capsule is `Tag`, in two tones: white type for a fact about the post,
+grey for a badge that belongs to the byline.
+
+The photograph follows, then the description: the picture is what the words are about, so
+the words follow it. It is square and as wide as the post. Up to six photos; the feed
+shows the first and three lines of the description, in `text` — a post's own words were
+the faintest type in the row, under the handles and the counts. A selling post states a
+price. A buying post may state a budget, and it must include a photo. A trade states
+neither. The body is the condition, what is included, and the terms the two people still
+have to agree. The composer asks for the photo before the description for the same
+reason.
+
+In the thread the roll pages one photograph at a time, with a chevron on a scrim disc at
+each edge and a dot per photo at the foot. It was a strip of 240×180 thumbnails, which
+made every watch a contact sheet beside its own description. The deck's invisible tap
+zones would not do here: on the deck a tap is the whole grammar of the screen, but a post
+is read and scrolled, so the way through has to be visible. Paging does not wrap and a
+chevron is gone when there is nothing that way. The dots ride their own scrim, because a
+white dot vanishes into a steel bracelet and every photo in the roll is a different
+background; the one you are on is the warm tan, the same accent the deck's bars use, so
+the mark is the one thing on a photograph that is not white. The next photo is prefetched
+while this one is being looked at.
+
+Everything you can do about a post is in one row of capsules at its foot: the votes, the
+comment count, and — on anyone else's post — writing to them. That row is `ActionBar`,
+and each capsule is an `ActionPill`: a glyph at `size.icon` with a count or a word beside
+it, filled with `fill` rather than outlined, because a row of outlines reads as a row of
+empty boxes and this app keeps depth in the step between surfaces. The controls were
+spread through the lines above instead, a count in the corner of the byline and the votes
+under the name; gathered at the end, the post is read top to bottom and acted on once.
+
+Every post and every comment carries both votes: an up arrow, the score, and a down arrow
+in one capsule at `size.icon`, first in that row. Brass fills the arrow you pressed,
+either way — the same brass the
+Filters button uses to say a control is doing something. Red would read as delete, since
+in this app `danger` means destroy rather than disagree, and two colours would say a
+downvote is a different kind of act.
+
+One vote per person per thing. Pressing the other arrow swings the score by two; pressing
+the arrow you already chose takes the vote back. The score can stand below zero, which is
+the point of having a down arrow at all: an up arrow alone could only say "worth
+answering", while a price nobody would pay and an offer nobody trusts both sit at zero.
+The score moves the moment the thumb lifts and is put back only if the write fails — a
+vote that waits for the network reads as a broken button. Votes do not reorder anything.
+The feed stays newest-first because a board where a watch is for sale today is a record of
+what is on offer now, not a ranking.
+
+The payment line is not on the feed. An information icon sits beside the plus. It says
+you pay the other person directly, and that Graham does not hold the money or the watch.
+Comment on a post before you deal with them. The comments go with a deleted post.
+
+On their own post the author gets three dots at the far end of the byline, holding Edit
+and Delete in `danger`. Two full-width buttons under every post
+gave the rarest pair of actions the most weight on the page, and put an irreversible one
+a thumb's width from the description. The menu opens inside the post, not over the
+screen, so it travels with the post as the thread scrolls; a second tap on the dots, or
+choosing, closes it. The line that holds the dots carries its own stacking order —
+without one the photograph under it paints over the open menu.
+
+A row of chips under the header filters the feed to one intent. Tap the lit chip again
+to see every post.
+
+A comment is one line and a round send button, nothing else. A comment is a reply, not a
+second offer: asking someone to name buying, selling, or trading before they could type a
+word was three chips, a label, and a full-width button in the way of one sentence. So
+comments carry no intent and the thread does not sort them.
+
+That one line is `SendBar`, the same control a conversation uses, because saying one
+thing to whoever is already on the screen is the same act in both places. It sits on the
+keyboard's top edge while it is being typed into, the same way the onboarding footer
+does: the screen pads its bottom by `useKeyboardLift`, which is the keyboard's coverage
+minus whatever already stands there — the tab bar and the home indicator inside the tabs,
+the home indicator alone on a pushed screen. `KeyboardAvoidingView` adds the whole
+keyboard on top of that instead, which left the field a tab bar's height above the keys,
+and before that invisible behind them.
+
+A comment is built the same way: the byline, what they said, then its own action bar.
+Reply points the composer at that person — its placeholder becomes their handle, and a
+line above the field says who is being answered with a way out of it. The answer is
+indented by one small avatar, so it starts under the name it is answering.
+
+Nesting stops at one level. A reply to a reply attaches to the same root, because a tree
+deep enough to need a rule down the left margin is a tree nobody can follow on a phone,
+and the database flattens it rather than trusting every client to.
+
+Anyone else's post or comment ends its action bar with a message pill. It opens the
+conversation with that person, and finds the one already there if you have written
+before. Your own post has no such pill — writing to yourself is not a thing — and the
+three dots in the byline are what stands in its place.
+
+In a feed row the byline and the action bar sit beside the part of the row that opens the
+post, not inside it. A control nested in a control is a button inside a button on the
+web, which is invalid markup, and the one tap would both vote and open the thread. So the
+title, the flairs, the photo, and the description open the post, and the person above
+them and the controls below them do not.
+
+New post, the editor, and the thread stay inside the tab. The header's trailing icons are
+the information mark and plus on the feed, and a back arrow on the other two. The back
+arrow is trailing because that slot is where a screen's header controls live.
+
+## Messages
+
+The fourth tab, between Exchange and Saved. Two things end up here: the shops you have
+asked about a watch, and the people you have written to from the exchange. They are the
+same kind of object — a thread with one other party — so they are one list, ordered by
+whichever moved last.
+
+There is no way to look someone up. A conversation starts from something a person put on
+the board or a watch a shop is selling, never from a search box, because a directory of
+collectors is a directory of strangers to be written to unasked.
+
+A row is the other party's photograph, their name, the last line said, and when. A shop
+has no photograph, so it gets the storefront glyph the way a person with no photograph
+gets the account glyph. Unread is a dot at the end of the line rather than a count: how
+many messages are waiting does not change what you do about them, and a number on every
+row turns a list into a scoreboard. The tab's badge counts threads, not messages, for
+the same reason.
+
+In a thread, yours are on the right in the accent and theirs are on the left in the
+fill. Alignment alone fails the moment a message wraps to the width of the column, so
+the two sides differ in colour as well. A run of messages from one person shows one time
+under the last of them; a time on every bubble doubles the height of a conversation to
+say almost nothing.
+
+A thread catches up every five seconds while it is open, and the list every thirty. That
+is polling, not a live connection: a websocket is a second thing to authorise and
+reconcile, and an answer that lands within a few seconds reads as live. It is the first
+thing to change if a slow answer starts costing a deal.
+
+### A shop that has not claimed its account
+
+Asking a shop about a watch still sends the email it always did. The thread is what that
+email leaves behind: each inquiry is a message in it, captioned with the watch it named
+and marked as sent by email.
+
+If nobody at the shop has claimed it on Graham, the composer is replaced by a line
+saying so and where the answer will arrive. A field that accepted a message nobody could
+read would be the worst of the three options; hiding the thread entirely would be the
+second, because the buyer still needs to see what they asked and when.
+
+The moment the shop claims its account, the same threads become writable on both sides.
+Nothing is copied at the time of the inquiry — the shop's side of a conversation is the
+claim itself, read fresh — so a claim made next week collects the threads opened this
+week, and a claim that moves takes them with it.
 
 ## A save flies to the Saved tab
 
@@ -777,9 +1561,65 @@ unreadable within a frame of the shrink, and a reframe mid-flight would break th
 that it is the same object.
 
 Where it lands is measured from the bookmark itself, never worked out from the tab count.
-The bar moves to the left rail on a wide window, its height carries the home-indicator
-inset, and the glyph sits above the word rather than at the tab's centre. Until that measurement arrives the watch is still saved and simply
-goes quietly: a save is never blocked on the animation being possible.
+The bar moves to the left rail on a wide window and its height carries the home-indicator
+inset. Until that measurement arrives the watch is still saved and simply goes quietly: a
+save is never blocked on the animation being possible.
 
-Only from the cards view. The grid saves from a tile, and a card flying out of a stage the
-deck is not showing would come from nowhere.
+Only from the cards view. The grid opens the listing instead of saving in
+place, and a card flying out of a screen that is not the deck would come from
+nowhere.
+
+## The operator console wears the app's clothes
+
+The console is a separate web app — Vite and plain CSS, no React Native — and
+it used to look like one: the system sans, its own near-miss greys, brass
+fills on every button, outlined boxes. A shop's name looked one way there and
+another in the deck, and neither told you anything about the other. Every
+value in `operator/src/index.css` is now copied from `src/lib/design.ts`: the
+dark palette, the type scale in px, the space and radius steps, `HIT_TARGET`,
+and the six Neue Haas files, referenced out of `assets/fonts/` rather than
+copied, because two copies of a licensed font drift.
+
+Two departures, and no others:
+
+- **It is dark only.** The app follows the system scheme. A tool nobody sees
+  but us does not need a second palette maintained.
+- **Tables are set at `label` and `caption`, not `body`.** The scale is the
+  app's; the density is a tool's. 14px in a row of forty shops, 13px for the
+  headers above them.
+
+A filled button is `accent` with `onAccent` type, so the one consequential
+action on a row — **Publish**, **Pull back** — is the one that is light.
+Everything reversible is `ghost`, which is `fill` with `ink`. Selection is the
+same accent capsule the app uses for a chip. Nothing carries an outline: a
+well inside the page is `surfaceSunken`, a panel on it is `surface`, and the
+one hairline allowed is the separator under a table row.
+
+**Dealers comes first and opens first.** Applications used to. Approving the
+occasional application is a few seconds a week; the shops themselves are the
+screen the tool exists for, and the one you return to after every action on
+it.
+
+**A row's facts are columns, not a disclosure.** The description the scrape
+read off the shop's site and their Instagram handle were inside the dropdown,
+one shop at a time — and the only way to know a read worked is to look. As
+columns they can be scanned down a list of forty. The description clamps to
+two lines with the full text on hover, so one long import cannot set the
+height of every row.
+
+What stays in the dropdown is the shop's watches, because that is a list
+rather than a fact. The arrow that opens it is a `chevron-right` path from
+Material Community Icons — the set the app draws from — in a 44px box,
+turning a quarter when the row opens. It was a 0.9rem triangle typed as a
+character, which is a target you aim at twice and a glyph whose weight came
+from whatever the system decided.
+
+**A header names its column on one line.** "In the deck" broke over two and
+took every row's height with it. Which means the table has to fit the window
+instead: gutters are `space.sm`, a row's own buttons take the compact
+padding rather than the capsule's 26px each side, and the shop's contact
+address moved under its name — 250px of email was the column that pushed the
+table off screen, and where a shop is reached is part of who it is. Nine
+columns fit a laptop at 1440. A narrower window scrolls the table sideways
+inside the page, never the page itself, which would carry the header's
+controls away with it.

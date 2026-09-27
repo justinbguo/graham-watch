@@ -7,7 +7,7 @@ A refresh is split by what it costs.
 **Read the catalogue** (`action: 'sync'`). Ask the shop what it sells and store
 one row per product in `source_items`, with a hash of the prose and a hash of
 everything else. Costs HTTP and nothing more, so it walks the whole shop —
-`MAX_CATALOG_ITEMS`, currently 500. Idempotent: run it twice and the second run
+`MAX_CATALOG_ITEMS`, currently 1000. Idempotent: run it twice and the second run
 writes nothing.
 
 **Publish** (`action: 'publish'`). Take a bounded slice of the queue, type each
@@ -53,10 +53,17 @@ It is the richest source we have: `vendor` states the brand outright, so that is
 one field the model never guesses. Prices, SKUs and full galleries come with it.
 
 A collection URL reads `/collections/<handle>/products.json` rather than the whole
-shop. Dealers also sell straps, books and tools, so products whose `product_type`
-does not look like a watch are skipped — but an untyped product is kept, because
-plenty of shops leave the field blank. Currency lives in `/meta.json`, never in
-`products.json`. Images take `?width=1500`, which cut a sample from 592KB to 415KB.
+shop. Dealers also sell straps, books and tools, so a `product_type` naming one of
+those is refused — a denylist, not a list of watch words. `product_type` is the
+shop's own taxonomy, not a description: Collectors Corner NY type their watches
+`DRESS`, `SPORT`, `DIVER` and `MILITARY/FIELD`, and requiring the word "watch" kept
+3 of their 87 available watches. An untyped product is kept, because plenty of shops
+leave the field blank. The word "watch" earns a type nothing either — `Watch Straps`
+is a strap. Every refusal is returned with its reason and listed in the operator
+console, so a wrong call here is visible rather than silent.
+
+Currency lives in `/meta.json`, never in `products.json`. Images take `?width=1500`,
+which cut a sample from 592KB to 415KB.
 
 ### Squarespace
 
@@ -85,6 +92,14 @@ The `discover` action turns a bare domain into a catalog URL. Product pages vast
 outnumber everything else in a sitemap, so the directory holding the most URLs is the
 catalog. Squarespace nests products as `/<collection>/p/<slug>`, so a trailing `/p`
 is dropped — the importable URL is the collection.
+
+That same tally is `sitemapProducts`, and it is a count of URLs, not of stock. A
+dealer keeps every watch they ever sold published, so Collectors Corner NY list 970
+and offer 79. Discovery reads a sitemap and cannot tell those apart. `preview` can:
+it walks the shop's feed, writes nothing, and returns every product with the fields
+the shop states and whether a catalogue read would keep it. That is what the
+**Inspect** button on Add shops calls, and why the two numbers sit in separate
+columns instead of one number that is wrong twice over.
 
 It lives in the import function. It needs no secrets and used to run in the CLI, but
 the operator UI needs the same answer and a browser cannot read another origin's
@@ -153,10 +168,15 @@ tying extraction quality to the scrape vendor.
 
 ## Pagination
 
-Both adapters page their own feeds, to `MAX_CATALOG_ITEMS` (500). A read that
+Both adapters page their own feeds, to `MAX_CATALOG_ITEMS` (1000). A read that
 hits the cap reports `complete: false`; running it again reads no further today,
-because paging restarts from the top — a shop with more than 500 products needs
+because paging restarts from the top — a shop with more than 1000 products needs
 a cursor stored on the dealer, which is the next piece of work here.
+
+The cap is 1000 rather than 500 because a vintage dealer's catalogue is mostly
+sold stock. Collectors Corner NY publish 970 products holding 79 watches for
+sale, scattered throughout, so a 500 cap read half the shop and no one could
+say which half.
 
 The generic scrape path still reads one page only. Crawling — Firecrawl
 `/v2/crawl` or Browserbase clicking through — is what that would need.

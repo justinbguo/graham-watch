@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 
-import { formatPrice, photoUrl } from './importer';
-import { supabase, type Database } from './supabase';
+import { deleteListing, formatPrice, photoUrl } from './importer';
+import { confirmWrite, supabase, type Database } from './supabase';
 
 type Listing = Database['public']['Functions']['operator_listings']['Returns'][number];
 type Problem = Database['public']['Functions']['operator_catalog_problems']['Returns'][number];
 
 /**
- * One shop's watches, as imported.
+ * One shop's watches, as imported. What the scrape read about the shop itself
+ * — its mark, its description, its Instagram — is on the row above rather than
+ * in here: those are three facts about the shop, and a column can be scanned
+ * down a list of forty of them.
  *
  * Both reads are RPCs: a pending shop's listings and catalogue rows are
  * readable only by whoever imported them, so an operator asking PostgREST for
@@ -17,10 +20,20 @@ type Problem = Database['public']['Functions']['operator_catalog_problems']['Ret
  * forty shops means some of them read badly, and a shop reporting ten watches
  * against a catalogue of five hundred needs to be able to say why.
  */
-export function ShopListings({ dealerId, reload }: { dealerId: string; reload: number }) {
+export function ShopListings({
+  dealerId,
+  reload,
+  onChanged,
+}: {
+  dealerId: string;
+  reload: number;
+  /** A delete changes the counts on the shop's row above, not just this list. */
+  onChanged: () => void;
+}) {
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -40,6 +53,39 @@ export function ShopListings({ dealerId, reload }: { dealerId: string; reload: n
     };
   }, [dealerId, reload]);
 
+  /**
+   * Deleting is permanent and takes a buyer's saved watch with it, so the
+   * question names what goes rather than asking "are you sure".
+   */
+  async function remove(listing: Listing) {
+    const name = [listing.brand, listing.model].filter(Boolean).join(' ') || 'this watch';
+    const losses = [
+      listing.saved_count > 0 ? `${listing.saved_count} buyer save(s)` : '',
+      listing.inquiry_count > 0 ? `${listing.inquiry_count} inquiry(s)` : '',
+    ].filter(Boolean);
+
+    const asked = [
+      `Delete ${name} and its photographs for good?`,
+      losses.length ? `This also deletes ${losses.join(' and ')}.` : '',
+      "The shop's catalogue keeps it, so it can be imported again.",
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!confirmWrite(asked)) return;
+
+    setRemoving(listing.id);
+    setError(null);
+    try {
+      await deleteListing(listing.id);
+      onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete that watch.');
+    } finally {
+      setRemoving(null);
+    }
+  }
+
   if (error) return <p className="error">{error}</p>;
   if (listings === null) return <p className="muted">Loading…</p>;
 
@@ -47,7 +93,7 @@ export function ShopListings({ dealerId, reload }: { dealerId: string; reload: n
     <div className="detail">
       {listings.length === 0 ? (
         <p className="muted">
-          No watches imported yet. Use <strong>Import</strong> on the row above.
+          No watches imported yet. Use <strong>Add watches</strong> on the row above.
         </p>
       ) : (
         <table className="inner">
@@ -59,7 +105,9 @@ export function ShopListings({ dealerId, reload }: { dealerId: string; reload: n
               <th className="num">Size</th>
               <th className="num">Price</th>
               <th>Condition</th>
+              <th>Description</th>
               <th>State</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -94,6 +142,15 @@ export function ShopListings({ dealerId, reload }: { dealerId: string; reload: n
                   </td>
                   <td className="num">{formatPrice(listing.price_cents, listing.currency)}</td>
                   <td className="small">{listing.condition ?? <span className="muted">—</span>}</td>
+                  <td className="small prose">
+                    {listing.description ? (
+                      // The full text on hover: the cell clamps to two lines so
+                      // one long import cannot set the height of every row.
+                      <span title={listing.description}>{listing.description}</span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
                   <td>
                     {listing.sold_at ? (
                       <span className="badge wait">sold</span>
@@ -102,6 +159,22 @@ export function ShopListings({ dealerId, reload }: { dealerId: string; reload: n
                     ) : (
                       <span className="badge wait">{listing.status}</span>
                     )}
+                    {listing.saved_count > 0 ? (
+                      <>
+                        <br />
+                        <span className="muted small">{listing.saved_count} saved</span>
+                      </>
+                    ) : null}
+                  </td>
+
+                  <td className="actions">
+                    <button
+                      className="ghost"
+                      disabled={removing !== null}
+                      title="Delete this watch and its photographs for good"
+                      onClick={() => void remove(listing)}>
+                      {removing === listing.id ? 'Deleting…' : 'Delete'}
+                    </button>
                   </td>
                 </tr>
               );

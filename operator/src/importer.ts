@@ -9,16 +9,48 @@
  * are what make each one deliberate.
  */
 
-import { supabase } from './supabase';
+import { supabase, type Database } from './supabase';
+
+export type Profile = {
+  description: string | null;
+  instagram: string | null;
+  logoUrl: string | null;
+};
 
 export type Discovery = {
   origin: string;
   name: string;
   email: string | null;
   catalogUrl: string;
-  productCount: number;
+  /** Product URLs in their sitemap — sold stock included. Not what is for sale. */
+  sitemapProducts: number;
   platform: string;
   sawSitemap: boolean;
+  profile: Profile;
+};
+
+/** One product as the shop publishes it, kept by a read or refused with a reason. */
+export type PreviewProduct = {
+  source_url: string;
+  external_id: string | null;
+  title: string;
+  price_cents: number | null;
+  currency: string | null;
+  photo_url: string | null;
+  photo_count: number;
+  available: boolean;
+  vendor: string | null;
+  product_type: string | null;
+  sku: string | null;
+  published_at: string | null;
+  updated_at: string | null;
+  skipped: string | null;
+};
+
+export type Preview = {
+  provider: string;
+  counts: { read: number; for_sale: number; sold: number; skipped: number };
+  listings: PreviewProduct[];
 };
 
 export type SyncResult = {
@@ -28,6 +60,8 @@ export type SyncResult = {
   added: number;
   changed: number;
   retired: number;
+  forSale: number;
+  skipped: number;
   complete: boolean;
 };
 
@@ -38,6 +72,32 @@ export type PublishTotals = {
   failed: number;
   pending: number;
 };
+
+/**
+ * Where one of the shop's watches stands with us.
+ *
+ * `imported` rows are in the deck already and are here to be seen, not chosen:
+ * the question this screen answers is "what does this shop have that we do
+ * not", and that cannot be read from a list of only the things we lack.
+ */
+export type CandidateState = 'new' | 'queued' | 'imported' | 'failed';
+
+export type ImportCandidate = {
+  id: string;
+  sourceUrl: string;
+  title: string;
+  description: string;
+  priceCents: number | null;
+  currency: string | null;
+  photoUrls: string[];
+  state: CandidateState;
+  error: string | null;
+  selected: boolean;
+  edited: boolean;
+};
+
+/** One read of a shop's catalogue. Enough for any dealer we have met. */
+export const CANDIDATE_LIMIT = 500;
 
 /** A guard on a bug, not a limit on a shop. Each pass reports what is left. */
 const MAX_PASSES = 200;
@@ -89,6 +149,38 @@ export function discoverShop(domain: string): Promise<Discovery> {
 }
 
 /**
+ * Deletes one imported watch for good, with its photographs, saves and
+ * inquiries. The dealer's catalogue row survives and can be imported again.
+ */
+export function deleteListing(listingId: string): Promise<{ photos: number }> {
+  return call<{ photos: number }>({ action: 'delete-listing', listingId });
+}
+
+/**
+ * Reads a shop's whole catalogue and writes nothing.
+ *
+ * The only way to answer what a shop actually holds before we take it on: a
+ * sitemap count says 970 where 87 are for sale, and the gap is per product.
+ * Costs HTTP on a platform we have an adapter for, and spends one of the
+ * hour's new-shop budget because it reads a site nobody here owns yet.
+ */
+export async function previewShop(sourceUrl: string): Promise<Preview> {
+  const preview = await call<Preview>({ action: 'preview', sourceUrl });
+
+  // The console and the import function deploy separately, and the one that
+  // shipped before this screen answers with `listings` and no `counts`.
+  // Reading through the missing field threw during render, which unmounts
+  // React and leaves a black page — no message, nothing to click.
+  if (!preview?.counts || !Array.isArray(preview.listings)) {
+    throw new Error(
+      'The import function on this project is older than this console: it answered without product counts. Deploy it with `npx supabase functions deploy import-listings`, then read the shop again.'
+    );
+  }
+
+  return preview;
+}
+
+/**
  * Reads the shop's catalogue into source_items, creating the shop if it is new.
  *
  * Costs HTTP and nothing else on Shopify and Squarespace. New shops land at
@@ -103,41 +195,191 @@ export function syncCatalog(input: {
   return call<SyncResult>({ action: 'sync', ...input });
 }
 
-/**
- * Marks catalogue rows for import, oldest first, and returns how many.
- *
- * A patch rather than an RPC because that is what the terminal tool does, and
- * the policies behind it are the same. `can_import` on the shop is the caller's
- * warning that this would be refused.
- */
-export async function queueForImport(dealerId: string, limit: number): Promise<number> {
-  if (limit < 1) return 0;
+type SourceItemDraft = {
+  id: string;
+  source_url: string;
+  raw: Database['public']['Tables']['source_items']['Row']['raw'];
+  publish: boolean;
+  listing_id: string | null;
+  error: string | null;
+};
 
-  const { data: waiting, error: unread } = await supabase
+type Json = Database['public']['Tables']['source_items']['Row']['raw'];
+type RawSourceItem = { [key: string]: Json | undefined };
+
+function asRaw(value: Json): RawSourceItem {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as RawSourceItem)
+    : {};
+}
+
+/**
+ * Everything the shop currently has for sale, and what we have done with each.
+ *
+ * Nothing is selected but the rows an earlier run already committed to. Each
+ * watch here costs a model call and a photo download, so the screen never
+ * arrives with a bill pre-ticked — the toolbar's select-all is one click and
+ * says how many it is choosing.
+ */
+export async function importCandidates(dealerId: string): Promise<ImportCandidate[]> {
+  const { data, error } = await supabase
+    .from('source_items')
+    .select('id, source_url, raw, publish, listing_id, error')
+    .eq('dealer_id', dealerId)
+    .eq('available', true)
+    .order('first_seen_at', { ascending: false })
+    .limit(CANDIDATE_LIMIT);
+
+  if (error) throw error;
+
+  return ((data ?? []) as SourceItemDraft[]).map((row) => {
+    const raw = asRaw(row.raw);
+    const state: CandidateState = row.listing_id
+      ? 'imported'
+      : row.error
+        ? 'failed'
+        : row.publish
+          ? 'queued'
+          : 'new';
+    const photos = Array.isArray(raw.photoUrls)
+      ? raw.photoUrls.filter((url): url is string => typeof url === 'string')
+      : [];
+
+    return {
+      id: row.id,
+      sourceUrl: typeof raw.sourceUrl === 'string' ? raw.sourceUrl : row.source_url,
+      title: typeof raw.title === 'string' ? raw.title : 'Untitled watch',
+      description: typeof raw.text === 'string' ? raw.text : '',
+      priceCents: typeof raw.priceCents === 'number' ? raw.priceCents : null,
+      currency: typeof raw.currency === 'string' ? raw.currency : null,
+      photoUrls: photos,
+      state,
+      error: row.error,
+      selected: state === 'queued',
+      edited: false,
+    };
+  });
+}
+
+async function fingerprint(parts: string[]): Promise<string> {
+  const value = parts.join('\u0000');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Saves the reviewed source fields and makes the ticked rows the exact queue.
+ * Unticking leaves the watch in the catalogue, so a later read offers it again.
+ */
+export async function stageImport(
+  dealerId: string,
+  candidates: ImportCandidate[]
+): Promise<number> {
+  const choosable = candidates.filter((candidate) => candidate.state !== 'imported');
+  const wanted = choosable.filter((candidate) => candidate.selected);
+  const removedQueued = choosable.filter(
+    (candidate) => candidate.state === 'queued' && !candidate.selected
+  );
+
+  // Refresh and selection run on different clocks. Re-read availability after
+  // the refresh immediately before this call, so a watch sold while the picker
+  // was open cannot be queued from stale React state.
+  const { data: available, error: availabilityError } = await supabase
     .from('source_items')
     .select('id')
     .eq('dealer_id', dealerId)
-    .is('listing_id', null)
-    .is('error', null)
     .eq('available', true)
-    .eq('publish', false)
-    .order('first_seen_at')
-    .limit(limit);
-
-  if (unread) throw unread;
-  if (!waiting?.length) return 0;
-
-  const { data, error } = await supabase
-    .from('source_items')
-    .update({ publish: true, error: null })
     .in(
       'id',
-      waiting.map((row) => row.id)
-    )
-    .select('id');
+      wanted.map((candidate) => candidate.id)
+    );
+  if (availabilityError) throw availabilityError;
 
-  if (error) throw error;
-  return data?.length ?? 0;
+  const availableIds = new Set((available ?? []).map((row) => row.id));
+  const selected = wanted.filter((candidate) => availableIds.has(candidate.id));
+  const soldSinceSelection = wanted.filter((candidate) => !availableIds.has(candidate.id));
+
+  if (soldSinceSelection.length > 0) {
+    const { error } = await supabase
+      .from('source_items')
+      .update({ publish: false })
+      .eq('dealer_id', dealerId)
+      .in(
+        'id',
+        soldSinceSelection.map((candidate) => candidate.id)
+      );
+    if (error) throw error;
+  }
+
+  if (removedQueued.length > 0) {
+    const { error } = await supabase
+      .from('source_items')
+      .update({ publish: false })
+      .eq('dealer_id', dealerId)
+      .in(
+        'id',
+        removedQueued.map((candidate) => candidate.id)
+      );
+    if (error) throw error;
+  }
+
+  for (const candidate of selected) {
+    if (!candidate.edited) {
+      const { error } = await supabase
+        .from('source_items')
+        .update({ publish: true, error: null })
+        .eq('dealer_id', dealerId)
+        .eq('id', candidate.id);
+      if (error) throw error;
+      continue;
+    }
+
+    const { data: current, error: readError } = await supabase
+      .from('source_items')
+      .select('raw')
+      .eq('dealer_id', dealerId)
+      .eq('id', candidate.id)
+      .single();
+    if (readError) throw readError;
+
+    const raw = asRaw(current.raw);
+    const nextRaw = {
+      ...raw,
+      operatorEdited: true,
+      title: candidate.title.trim(),
+      text: candidate.description.trim(),
+      sourceUrl: candidate.sourceUrl,
+      photoUrls: candidate.photoUrls,
+      priceCents: candidate.priceCents,
+      currency: candidate.currency,
+    };
+    const textHash = await fingerprint([nextRaw.title, nextRaw.text]);
+    const contentHash = await fingerprint([
+      nextRaw.title,
+      nextRaw.text,
+      String(nextRaw.priceCents ?? ''),
+      nextRaw.currency ?? '',
+      raw.available === false ? 'out' : 'in',
+      candidate.photoUrls.join(','),
+    ]);
+
+    const { error } = await supabase
+      .from('source_items')
+      .update({
+        raw: nextRaw,
+        text_hash: textHash,
+        content_hash: contentHash,
+        publish: true,
+        error: null,
+      })
+      .eq('dealer_id', dealerId)
+      .eq('id', candidate.id);
+    if (error) throw error;
+  }
+
+  return selected.length;
 }
 
 /**

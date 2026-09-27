@@ -13,8 +13,11 @@ import edge function.
 
 ## Setup
 
-Docker comes from Colima, not Docker Desktop. Install once with
-`brew install colima`, then `colima start --cpu 4 --memory 8 --disk 30`.
+Containers run in Colima, never Docker Desktop. Install once with
+`brew install colima docker`, then `colima start --cpu 4 --memory 8 --disk 30`.
+The `docker` formula is the command-line client Colima speaks; it is not the
+Desktop app. The Supabase CLI talks to that client. Do not install Docker
+Desktop, and do not run `docker` commands by hand.
 
 1. `npm install`
 2. `npm run db:start` — starts the local Supabase stack, prints the API URL and anon key.
@@ -87,13 +90,14 @@ Both are implemented and both are off. Turning either on takes three matching ch
 and skipping one gives you `provider is not enabled` from the auth server.
 
 **Google** — create an OAuth client in Google Cloud, then set
-`[auth.external.google] enabled = true` in `supabase/config.toml`, export
-`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `..._SECRET`, and flip
-`GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
+`SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `..._SECRET`, and
+`EXPO_PUBLIC_GOOGLE_SIGN_IN=1`. `[auth.external.google]` is already enabled in
+`config.toml`. See `docs/AUTH.md`.
 
 **Apple** — needs the paid Apple Developer Program and a Services ID, plus
-`[auth.external.apple] enabled = true`. It cannot run in Expo Go at all; the button
-hides itself there because the native view is missing. Use a development build.
+`[auth.external.apple] enabled = true`. The door is always on screen. On an
+iPhone with a development build it is Apple's own button. In a browser or Expo
+Go it is ours, and the tap needs that Services ID before Apple will answer.
 
 If you ship on iOS offering Google, App Store review requires Sign in with Apple too.
 
@@ -134,8 +138,9 @@ npm run db:stop && npm run db:start
 ```
 
 Secrets are read when the function's container is built, so editing the file is not
-enough and `docker restart` will not do it either — the container keeps the environment
-it was created with. Restart the stack. Scraping falls back to plain `fetch` with no key, which handles
+enough — the container keeps the environment it was created with. Restart the stack
+with `npm run db:stop && npm run db:start`, not a container CLI. Scraping falls back to
+plain `fetch` with no key, which handles
 static HTML only; set `FIRECRAWL_API_KEY` or `JINA_API_KEY` for JavaScript-rendered
 shops. See [docs/SCRAPING.md](docs/SCRAPING.md).
 
@@ -182,6 +187,13 @@ the second costs money and only the third is visible to a buyer.
    `domain,name,email` header. Each site is read first and shown as a table you
    can cut rows from; then each shop is created unpublished with its catalogue
    read. Costs HTTP on Shopify and Squarespace.
+
+   **Listed** on that table counts product URLs in their sitemap, sold stock and
+   all — a vintage dealer's is mostly watches they sold years ago, so 970 listed
+   against 79 for sale is normal. **Inspect** on a row reads their whole feed and
+   opens every product underneath it: brand, type, price, SKU, photo count,
+   publish date, and whether it is for sale, sold, or refused with the reason.
+   It writes nothing.
 2. **Import** on a shop's row. Turns catalogue items into watches — a model call
    and a photo download each, so you type the count.
 3. **Publish** the shop. This is what puts its watches in the deck.
@@ -192,6 +204,12 @@ website, so pasting the same list again skips what is already there, and a shop'
 
 The arrow on a shop's row opens what has been imported, with photos, prices and
 the catalogue items that failed to read.
+
+Adding or refreshing a shop also reads three things off their homepage for their
+page in the app: a description in their own words, an Instagram handle, and the
+icon their site declares. Of eight real dealer sites, 7 published a description,
+7 a handle and 6 an icon. A phone number and a postal address were on 1 and 0,
+so neither is collected.
 
 Importing is refused on a shop a dealer has claimed — they manage their own
 inventory from the app. Those rows show Import disabled.

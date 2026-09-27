@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
 import { FilterButton } from '@/components/FilterButton';
@@ -8,14 +8,17 @@ import { SwipeCard } from '@/components/SwipeCard';
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useDeck, usePrimeListing } from '@/data/listings';
+import { useOpenMailDraft } from '@/data/inquiries';
+import { useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
+import { useOpenFilters } from '@/features/filters/open';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { useIsWide } from '@/lib/layout';
+import { useOpenStack } from '@/lib/openStack';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, space, type Theme } from '@/lib/theme';
+import { inset, motion, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -26,15 +29,18 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Deck() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();
+  const { data: counts } = useListingCounts();
   const swipe = useRecordSwipe(userId);
+  const contact = useOpenMailDraft(userId);
   const primeListing = usePrimeListing();
   const { data: passes = 0 } = usePassCount(userId);
   const startOver = useStartOver(userId);
   const undoPass = useUndoPass(userId);
   const isWide = useIsWide();
   const styles = useThemedStyles(deckStyles);
-  const router = useRouter();
+  const open = useOpenStack();
   const { filters, clear } = useFilters('deck');
+  const openFilters = useOpenFilters();
   const count = activeCount(filters);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
@@ -81,14 +87,14 @@ export default function Deck() {
   const actions = (
     <View style={styles.actions}>
       <UndoButton onPress={undo} />
-      <FilterButton count={count} onPress={() => router.push('/filters/deck')} />
+      <FilterButton count={count} onPress={() => openFilters('deck')} />
       <ViewToggle value={view} onChange={setView} />
     </View>
   );
 
   if (isPending) {
     return (
-      <Screen title="Graham" inTabs>
+      <Screen wordmark verified inTabs>
         <Spinner />
       </Screen>
     );
@@ -96,7 +102,7 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Graham" action={actions} inTabs>
+      <Screen wordmark verified action={actions} inTabs>
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
@@ -107,7 +113,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Graham" action={actions} inTabs>
+      <Screen wordmark verified action={actions} inTabs>
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -138,17 +144,20 @@ export default function Deck() {
     );
   }
 
+  const remaining = tally(counts, count > 0);
+
   if (view === 'grid') {
     return (
-      <Screen title="Graham" action={actions} width="grid" inTabs>
-        <DeckGrid
-          cards={cards}
-          onSwipe={judge}
-          onOpen={(card) => {
-            primeListing(card);
-            router.push(`/listing/${card.id}`);
-          }}
-        />
+      <Screen wordmark verified subtitle={remaining} action={actions} width="grid" inTabs>
+        <Animated.View key="grid" entering={FadeIn.duration(motion.base)} style={styles.view}>
+          <DeckGrid
+            cards={cards}
+            onOpen={(card) => {
+              primeListing(card);
+              open('listing/[listingId]', { listingId: card.id }, `/listing/${card.id}`);
+            }}
+          />
+        </Animated.View>
       </Screen>
     );
   }
@@ -157,24 +166,69 @@ export default function Deck() {
   const visible = cards.slice(0, 3).reverse();
 
   return (
-    <Screen title="Graham" action={actions} width="card" inTabs>
-      <View ref={stage} onLayout={measureStage} style={styles.stage}>
-        {visible.map((card, index) => (
-          <SwipeCard
-            key={card.id}
-            card={card}
-            isTop={index === visible.length - 1}
-            onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
-            onAsk={() => router.push(`/inquiry/${card.id}`)}
-            onExpandPhoto={(index) => {
-              primeListing(card);
-              router.push(`/photos/${card.id}?index=${index}`);
-            }}
-          />
-        ))}
-      </View>
+    <Screen wordmark verified subtitle={remaining} action={actions} width="card" inTabs>
+      {/* The two views trade places rather than cutting. Entering only: the
+          old view is gone the frame the state changes, so there is nothing to
+          fade out, and the new one arrives over the page rather than over a
+          corpse of the last one. */}
+      <Animated.View key="cards" entering={FadeIn.duration(motion.base)} style={styles.view}>
+        <View ref={stage} onLayout={measureStage} style={styles.stage}>
+          {visible.map((card, index) => (
+            <SwipeCard
+              key={card.id}
+              card={card}
+              isTop={index === visible.length - 1}
+              nextPhoto={index === visible.length - 1 ? cards[1]?.photos[0]?.url : undefined}
+              onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
+              asking={contact.isPending && contact.variables?.card.id === card.id}
+              onAsk={() => {
+                contact.mutate(
+                  { card, message: '' },
+                  {
+                    onError: (error) => Alert.alert('Could not open Gmail', error.message),
+                  }
+                );
+              }}
+              onExpandPhoto={(photoIndex) => {
+                primeListing(card);
+                open(
+                  'photos/[listingId]',
+                  { listingId: card.id, index: String(photoIndex) },
+                  `/photos/${card.id}?index=${photoIndex}`
+                );
+              }}
+            />
+          ))}
+        </View>
+      </Animated.View>
     </Screen>
   );
+}
+
+/**
+ * The line under the wordmark: how much of the marketplace you are looking at.
+ *
+ * Filtered, it is both numbers — "12 of 148 watches available" — because a
+ * small number on its own reads as an empty marketplace rather than a narrow
+ * filter. Unfiltered, before a swipe, the two counts are the same, so the
+ * line is the catalogue alone. A swipe drops the first number in the same
+ * moment the card leaves, and the line becomes "147 of 148". The brass count
+ * on the Filters button beside it says how many choices made a filtered
+ * first number small; naming the filters here as well wrapped to two lines
+ * for a fact already on screen.
+ *
+ * Nothing until the count lands. The old line counted the deck in hand, which
+ * capped at `DECK_LIMIT` and said "20+" — a number that was never the answer
+ * to either question.
+ */
+function tally(counts: ListingCounts | undefined, filtered: boolean) {
+  if (!counts) return undefined;
+
+  const noun = counts.total === 1 ? 'watch' : 'watches';
+  if (!filtered && counts.matched === counts.total) {
+    return `${counts.total} ${noun} available`;
+  }
+  return `${counts.matched} of ${counts.total} ${noun} available`;
 }
 
 const deckStyles = (_theme: Theme) => ({
@@ -182,6 +236,9 @@ const deckStyles = (_theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+  },
+  view: {
+    flex: 1,
   },
   stage: {
     flex: 1,

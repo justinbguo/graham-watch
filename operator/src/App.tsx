@@ -7,9 +7,12 @@ import { Dealers } from './Dealers';
 import { SignIn } from './SignIn';
 import { supabase, target } from './supabase';
 
+// Dealers first, because that is the screen an operator opens the console to
+// use: importing watches and publishing a shop both happen there. Applications
+// is a queue that is empty most days.
 const SCREENS = {
-  applications: 'Applications',
   dealers: 'Dealers',
+  applications: 'Applications',
   add: 'Add shops',
 } as const;
 
@@ -22,7 +25,7 @@ export function App() {
   // different account would otherwise show the last answer for one render, and
   // that render is the whole operator UI.
   const [access, setAccess] = useState<{ userId: string; ok: boolean } | null>(null);
-  const [screen, setScreen] = useState<Screen>('applications');
+  const [screen, setScreen] = useState<Screen>('dealers');
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {

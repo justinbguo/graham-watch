@@ -30,6 +30,9 @@ export const ERA_PRESETS: Preset[] = [
   { id: 'modern', label: '1980s+', min: 1980, max: null },
 ];
 
+/** One inclusive band. A null end is open: under $5k is `{ min: null, max }`. */
+export type Range = { min: number | null; max: number | null };
+
 export type Filters = {
   query: string;
   brands: string[];
@@ -39,11 +42,11 @@ export type Filters = {
   materials: CaseMaterial[];
   windings: Winding[];
   complications: Complication[];
-  /** Cents, to match `listings.price_cents`. The panel types dollars. */
-  priceMin: number | null;
-  priceMax: number | null;
-  size: string | null;
-  era: string | null;
+  /** Chosen price bands, in cents. The panel types dollars. */
+  prices: Range[];
+  /** Preset ids. Several means any of them. */
+  sizes: string[];
+  eras: string[];
 };
 
 export const NO_FILTERS: Filters = {
@@ -54,13 +57,10 @@ export const NO_FILTERS: Filters = {
   materials: [],
   windings: [],
   complications: [],
-  priceMin: null,
-  priceMax: null,
-  size: null,
-  era: null,
+  prices: [],
+  sizes: [],
+  eras: [],
 };
-
-const find = (presets: Preset[], id: string | null) => presets.find((p) => p.id === id) ?? null;
 
 /** Digits only: a price box that accepts "1,2OO" and silently means 12 is worse. */
 export function centsFromInput(text: string): number | null {
@@ -72,8 +72,19 @@ export function dollarsForInput(cents: number | null): string {
   return cents == null ? '' : String(Math.round(cents / 100));
 }
 
+export function sameRange(a: Range, b: Range): boolean {
+  return a.min === b.min && a.max === b.max;
+}
+
 export function isPricePreset(filters: Filters, preset: Preset): boolean {
-  return filters.priceMin === preset.min && filters.priceMax === preset.max;
+  return filters.prices.some((range) => sameRange(range, preset));
+}
+
+/** Add the band, or remove it when it is already chosen. */
+export function toggleRange(list: Range[], range: Range): Range[] {
+  return list.some((item) => sameRange(item, range))
+    ? list.filter((item) => !sameRange(item, range))
+    : [...list, range];
 }
 
 /** How many choices the user has made. Drives the badge on the filter button. */
@@ -86,10 +97,9 @@ export function activeCount(filters: Filters): number {
     filters.materials.length +
     filters.windings.length +
     filters.complications.length +
-    // A range is one choice however many ends of it are set.
-    (filters.priceMin != null || filters.priceMax != null ? 1 : 0) +
-    (filters.size ? 1 : 0) +
-    (filters.era ? 1 : 0)
+    filters.prices.length +
+    filters.sizes.length +
+    filters.eras.length
   );
 }
 
@@ -100,9 +110,29 @@ export function activeCount(filters: Filters): number {
  */
 const orSkip = <T>(values: T[]) => (values.length ? values : undefined);
 
+function rangesFor(presets: Preset[], ids: string[]): Range[] {
+  return ids.flatMap((id) => {
+    const preset = presets.find((item) => item.id === id);
+    return preset ? [{ min: preset.min, max: preset.max }] : [];
+  });
+}
+
+/**
+ * Open ends stay null inside the arrays. `undefined` would drop the element
+ * and pair a floor with the wrong ceiling.
+ */
+function bands(ranges: Range[]) {
+  if (!ranges.length) return { mins: undefined, maxs: undefined };
+  return {
+    mins: ranges.map((range) => range.min),
+    maxs: ranges.map((range) => range.max),
+  };
+}
+
 export function toRpcArgs(filters: Filters) {
-  const size = find(SIZE_PRESETS, filters.size);
-  const era = find(ERA_PRESETS, filters.era);
+  const price = bands(filters.prices);
+  const size = bands(rangesFor(SIZE_PRESETS, filters.sizes));
+  const era = bands(rangesFor(ERA_PRESETS, filters.eras));
 
   return {
     p_query: filters.query.trim() || undefined,
@@ -112,11 +142,11 @@ export function toRpcArgs(filters: Filters) {
     p_materials: orSkip(filters.materials),
     p_windings: orSkip(filters.windings),
     p_complications: orSkip(filters.complications),
-    p_price_min: filters.priceMin ?? undefined,
-    p_price_max: filters.priceMax ?? undefined,
-    p_size_min: size?.min ?? undefined,
-    p_size_max: size?.max ?? undefined,
-    p_year_min: era?.min ?? undefined,
-    p_year_max: era?.max ?? undefined,
+    p_price_mins: price.mins,
+    p_price_maxs: price.maxs,
+    p_size_mins: size.mins,
+    p_size_maxs: size.maxs,
+    p_year_mins: era.mins,
+    p_year_maxs: era.maxs,
   };
 }

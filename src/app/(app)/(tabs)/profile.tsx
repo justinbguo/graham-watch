@@ -1,5 +1,4 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router } from 'expo-router';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
@@ -12,6 +11,9 @@ import {
 } from '@/features/dealers/DealerShopCard';
 import { useDealerWorkspace } from '@/features/dealers/workspace';
 import { ProfileHeader } from '@/features/profile/ProfileHeader';
+import { SavedStrip } from '@/features/profile/SavedStrip';
+import { FollowingList } from '@/features/profile/FollowingList';
+import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -20,11 +22,14 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Profile() {
   const shop = useDealerWorkspace();
   const claimed = shop.shop;
+  const open = useOpenStack();
   const styles = useThemedStyles(profileStyles);
 
   const header = (
     <View style={styles.header}>
       <ProfileHeader />
+      <SavedStrip />
+      <FollowingList />
       {claimed ? (
         <View style={styles.section}>
           <Eyebrow>Your shop</Eyebrow>
@@ -32,10 +37,11 @@ export default function Profile() {
             shop={claimed}
             totals={shop.totals}
             onFindWatches={(sourceUrl) =>
-              router.push({
-                pathname: '/import-inventory',
-                params: { dealerId: claimed.id, sourceUrl },
-              })
+              open(
+                'import-inventory',
+                { dealerId: claimed.id, sourceUrl },
+                { pathname: '/import-inventory', params: { dealerId: claimed.id, sourceUrl } }
+              )
             }
           />
           {shop.error ? <Message text={shop.error.message} tone="error" /> : null}
@@ -54,11 +60,11 @@ export default function Profile() {
           <Eyebrow>Your application</Eyebrow>
           <ApplicationStatusCard
             application={shop.application}
-            onFinishVerifying={() => router.push('/apply')}
+            onFinishVerifying={() => open('apply', undefined, '/apply')}
           />
         </View>
       ) : (
-        <ClaimByCodeCard onStart={() => router.push('/apply')} />
+        <ClaimByCodeCard onStart={() => open('apply', undefined, '/apply')} />
       )}
     </View>
   );
@@ -66,7 +72,7 @@ export default function Profile() {
   return (
     <Screen
       title="Profile"
-      action={<SettingsButton onPress={() => router.push('/settings')} />}
+      action={<SettingsButton onPress={() => open('settings', undefined, '/settings')} />}
       width={claimed ? 'grid' : 'reading'}
       inTabs>
       <FlatList
@@ -79,7 +85,9 @@ export default function Profile() {
           <DealerInventoryRow
             item={item}
             busy={shop.isSaving}
-            onEdit={() => router.push(`/edit-listing/${item.id}`)}
+            onEdit={() =>
+              open('edit-listing/[listingId]', { listingId: item.id }, `/edit-listing/${item.id}`)
+            }
             onTogglePublished={() => shop.togglePublished(item)}
             onToggleSold={() => shop.toggleSold(item)}
           />

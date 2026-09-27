@@ -53,7 +53,7 @@ export type BatchResult = {
  * only by watches actually being published.
  */
 async function hydrate(row: SourceItemRow): Promise<SourceItem> {
-  if (row.provider !== 'squarespace') return row.raw;
+  if (row.provider !== 'squarespace' || row.raw.operatorEdited) return row.raw;
 
   try {
     return await hydrateSquarespaceItem(row.raw);

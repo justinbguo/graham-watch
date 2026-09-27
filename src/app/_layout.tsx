@@ -1,3 +1,4 @@
+import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
@@ -10,6 +11,7 @@ import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
+import { haasFonts } from '@/lib/fonts';
 import { FilterProvider } from '@/features/filters/provider';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
@@ -21,8 +23,8 @@ SplashScreen.preventAutoHideAsync();
 // screen exists. Without it that case is a white screen with no way out.
 export { RootErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
-// The type is the system face, so there is nothing to load and nothing to
-// wait for. The splash stays up for the session and profile alone.
+// Neue Haas Grotesk, including the wordmark. One load, before the splash
+// drops, so the first screen is not set in the system face.
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -43,7 +45,10 @@ export default function RootLayout() {
 function SplashScreenController() {
   const { isLoading } = useSession();
   const { ready } = useOnboardingGate();
-  if (!isLoading && ready) SplashScreen.hide();
+  // A failed download must not hold the splash forever: type falls back to
+  // the platform face and the app opens.
+  const [fontLoaded, fontError] = useFonts(haasFonts);
+  if (!isLoading && ready && (fontLoaded || fontError)) SplashScreen.hide();
   return null;
 }
 

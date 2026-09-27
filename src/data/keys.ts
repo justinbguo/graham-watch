@@ -8,6 +8,9 @@ export const keys = {
   // not a stale one.
   deck: (filters: unknown = null) => ['deck', filters] as const,
   search: (filters: unknown) => ['search', filters] as const,
+  // Two numbers about the same filter set the deck is keyed on, but a separate
+  // key: the deck is frozen while it is being swiped and these are not.
+  counts: (filters: unknown) => ['listing-counts', filters] as const,
   facets: ['facets'] as const,
   profile: (userId: string) => ['profile', userId] as const,
   saved: (userId: string) => ['saved', userId] as const,
@@ -20,4 +23,10 @@ export const keys = {
   dealerInventory: (dealerId: string) => ['dealer-inventory', dealerId] as const,
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
+  follows: (userId: string) => ['follows', userId] as const,
+  dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
+  exchange: ['exchange'] as const,
+  exchangePost: (postId: string) => ['exchange-post', postId] as const,
+  conversations: ['conversations'] as const,
+  conversation: (conversationId: string) => ['conversation', conversationId] as const,
 };

@@ -1,19 +1,108 @@
-/* An internal tool. Dense, legible, no theme to maintain. */
+/* An internal tool, in the app's clothes.
+ *
+ * Every value below is copied from src/lib/design.ts — the dark scheme, the
+ * type scale, the spacing steps, the radii. The console used to run its own
+ * near-miss palette and the system sans, which meant a shop's name looked one
+ * way here and another in the deck, and neither told you anything about the
+ * other. docs/DESIGN.md governs both now.
+ *
+ * Two deliberate departures, and no others:
+ *   - It is dark only. The app follows the system scheme; a tool nobody sees
+ *     but us does not need the second palette maintained.
+ *   - Tables are set at `label` and `caption` rather than `body`. The scale is
+ *     the app's; the density is a tool's.
+ */
+
+/* The interface face, the same six files the app loads. Referenced where they
+   already live rather than copied into this app: two copies of a licensed
+   font drift. `format('opentype')` because these are .otf. */
+@font-face {
+  font-family: 'NHaasGroteskTXPro';
+  src: url('../../assets/fonts/NHaasGroteskTXPro-55Rg.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NHaasGroteskTXPro';
+  src: url('../../assets/fonts/NHaasGroteskTXPro-65Md.otf') format('opentype');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NHaasGroteskTXPro';
+  src: url('../../assets/fonts/NHaasGroteskTXPro-75Bd.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NHaasGroteskDSPro';
+  src: url('../../assets/fonts/NHaasGroteskDSPro-55Rg.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NHaasGroteskDSPro';
+  src: url('../../assets/fonts/NHaasGroteskDSPro-65Md.otf') format('opentype');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NHaasGroteskDSPro';
+  src: url('../../assets/fonts/NHaasGroteskDSPro-75Bd.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
-  --bg: #12100f;
-  --surface: #1a1817;
-  --border: #2b2724;
-  --text: #f2ede4;
-  --muted: #9b938a;
-  --brass: #c9a227;
-  --ok: #4f8a5b;
-  --bad: #b4553f;
+  /* color.dark */
+  --background: #121110;
+  --surface: #1e1b18;
+  --surface-sunken: #0d0c0b;
+  --fill: #302c27;
+  --border: #2e2a26;
+  --text: #f3efe8;
+  --text-muted: #9a9186;
+  --text-faint: #6f675c;
+  --ink: #f3efe8;
+  --ink-muted: #9a9186;
+  --accent: #f3efe8;
+  --on-accent: #17140f;
+  --brass: #c9a468;
+  --save: #5fb68c;
+  --danger: #e0776b;
+
+  /* space */
+  --xs: 4px;
+  --sm: 8px;
+  --md: 16px;
+  --lg: 24px;
+  --xl: 32px;
+  --xxl: 48px;
+
+  /* radius. `full` is a capsule and belongs to controls only. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* HIT_TARGET, and the capsule's horizontal padding: controlMin / 2. */
+  --hit: 44px;
+  --capsule-x: 26px;
+
+  /* Text below 20px, Display at 20 and above. */
+  --face-text: 'NHaasGroteskTXPro', ui-sans-serif, system-ui, sans-serif;
+  --face-display: 'NHaasGroteskDSPro', ui-sans-serif, system-ui, sans-serif;
 
   color-scheme: dark;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--face-text);
+  /* type.body */
+  font-size: 16px;
+  line-height: 24px;
 }
 
 * {
@@ -22,66 +111,84 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--background);
   color: var(--text);
 }
 
+/* type.title, in Display: 22 is over the 20px line where the family switches. */
 h1 {
-  font-size: 1.4rem;
+  font-family: var(--face-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.4px;
   margin: 0;
 }
 
+/* type.titleSmall, which is still Text. */
 h2 {
-  font-size: 1rem;
-  margin: 0 0 0.25rem;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  margin: 0 0 var(--xs);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sm);
 }
 
+/* No margin on a paragraph; the block above it owns the gap. Two in a row do
+   need air, and several places print a line of prose under another one. */
 p {
-  margin: 0.15rem 0;
+  margin: 0;
+}
+
+p + p {
+  margin-top: var(--xs);
 }
 
 a {
   color: var(--brass);
 }
 
+/* No outline on four sides: a well inside the page is `surfaceSunken`. */
 pre {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.6rem;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: var(--sm) var(--md);
   overflow-x: auto;
-  font-size: 0.8rem;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 code {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.05rem 0.3rem;
-  font-size: 0.85em;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--xs);
+  font-size: 0.9em;
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
+/* type.label. The tool's body size inside tables and rows. */
 .small {
-  font-size: 0.82rem;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .error {
-  color: var(--bad);
-  border-left: 2px solid var(--bad);
-  padding-left: 0.6rem;
+  color: var(--danger);
+  /* A hairline on one edge is a separator, not an outline. */
+  border-left: 2px solid var(--danger);
+  padding-left: var(--sm);
 }
 
 .quote {
   border-left: 2px solid var(--border);
-  padding-left: 0.6rem;
-  color: var(--muted);
+  padding-left: var(--sm);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -91,17 +198,16 @@ code {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 1.5rem;
+  padding: var(--lg);
 }
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  padding: var(--lg);
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: var(--md);
 }
 
 .narrow {
@@ -117,8 +223,8 @@ code {
 .top {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: var(--lg);
+  padding: var(--sm) var(--lg);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   position: sticky;
@@ -127,34 +233,37 @@ code {
 }
 
 .brand {
-  font-weight: 600;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .who {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--md);
 }
 
 .body {
-  padding: 1.25rem;
-  max-width: 72rem;
+  padding: var(--xl) var(--lg);
+  /* Wide enough for the dealers table's nine columns. Narrower and the
+     description column took its room from the counts. */
+  max-width: 96rem;
   width: 100%;
+  margin: 0 auto;
 }
 
 .bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: var(--md);
+  margin-bottom: var(--md);
 }
 
 .bar h1 {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1.1rem;
+  gap: var(--sm);
 }
 
 .push {
@@ -162,23 +271,32 @@ code {
 }
 
 .legend {
-  margin-top: 1rem;
+  margin-top: var(--md);
   max-width: 44rem;
-  line-height: 1.6;
 }
 
 /* ---------------------------------------------------------------- controls */
 
+/* A filled button is `accent` with `onAccent` type, centred, in a capsule.
+   It used to be brass, which is this app's selection colour and not a fill for
+   anything you press. */
 button {
-  font: inherit;
-  color: var(--text);
-  background: var(--brass);
-  border: 1px solid var(--brass);
-  border-radius: 6px;
-  padding: 0.45rem 0.9rem;
+  font-family: var(--face-text);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 0;
+  border-radius: var(--radius-full);
+  min-height: var(--hit);
+  padding: var(--sm) var(--capsule-x);
   cursor: pointer;
-  color: #1a1817;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sm);
+  white-space: nowrap;
 }
 
 button:disabled {
@@ -186,77 +304,99 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* The button with no fill carries a `fill` instead, and type in `ink`. */
 button.ghost {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--text);
+  background: var(--fill);
+  color: var(--ink);
   font-weight: 400;
 }
 
 .tabs {
   display: flex;
-  gap: 0.35rem;
+  gap: var(--sm);
 }
 
 button.tab {
   background: transparent;
-  border-color: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
   font-weight: 400;
 }
 
+/* Selection is the accent fill and its label, the same as a chip in the app. */
 button.tab.on {
-  border-color: var(--border);
-  background: var(--bg);
-  color: var(--text);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
 }
 
 label {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--muted);
+  gap: var(--xs);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-muted);
 }
 
 input,
 textarea {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.5rem 0.65rem;
+  font-family: var(--face-text);
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--ink);
+  background: var(--fill);
+  border: 0;
+  /* A field keeps its corners: the capsule is for controls with a label. */
+  border-radius: var(--radius-md);
+  min-height: var(--hit);
+  padding: var(--sm) var(--md);
 }
 
 textarea {
   resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 22px;
 }
 
 input[type='checkbox'] {
-  width: 1rem;
-  height: 1rem;
+  width: var(--md);
+  height: var(--md);
+  min-height: 0;
   accent-color: var(--brass);
   padding: 0;
 }
 
+/* Not a field: a button with a filename beside it. Carrying `fill` as well
+   hid the button, since the button is `fill` too. */
 input[type='file'] {
-  padding: 0.35rem;
-  font-size: 0.82rem;
-  color: var(--muted);
+  background: none;
+  padding: 0;
+  font-size: 14px;
+  color: var(--text-muted);
   max-width: 18rem;
 }
 
-textarea:focus-visible {
-  outline: 2px solid var(--brass);
-  outline-offset: 1px;
+/* The one control the browser draws itself. Left native it is a grey system
+   box in a room of capsules. */
+input[type='file']::file-selector-button {
+  font-family: var(--face-text);
+  font-size: 14px;
+  font-weight: 400;
+  background: var(--fill);
+  color: var(--ink);
+  border: 0;
+  border-radius: var(--radius-full);
+  min-height: var(--hit);
+  padding: 0 var(--capsule-x);
+  margin-right: var(--sm);
+  cursor: pointer;
 }
 
 input:focus-visible,
-button:focus-visible {
+textarea:focus-visible,
+button:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--brass);
   outline-offset: 1px;
 }
@@ -274,17 +414,16 @@ button:focus-visible {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--sm);
 }
 
 .row {
   display: flex;
-  gap: 1rem;
+  gap: var(--md);
   align-items: flex-start;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: var(--radius-lg);
+  padding: var(--md);
 }
 
 .grow {
@@ -294,101 +433,146 @@ button:focus-visible {
 
 .actions {
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--sm);
+  align-items: center;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+/* A wide table scrolls inside the page. Without this the page grows and the
+   header's controls leave the window with it. */
+.scroller {
+  overflow-x: auto;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 14px;
+  line-height: 20px;
 }
 
+/* `space.sm` all round, not `md` sideways: nine columns of gutter is 160px of
+   table, and the table is what has to fit the window. */
 th,
 td {
   text-align: left;
-  padding: 0.6rem 0.75rem;
+  padding: var(--sm);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
+/* A header names a column and never wraps to do it. "In the deck" broke over
+   two lines and took the row's height with it. */
 th {
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 .num {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
+/* Data, not a control: `radius.sm`, never a capsule. */
 .badge {
   display: inline-block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--xs);
+  color: var(--text-muted);
+  background: var(--fill);
   white-space: nowrap;
 }
 
 .badge.ok {
-  color: var(--ok);
-  border-color: var(--ok);
+  color: var(--save);
 }
 
 .badge.wait {
   color: var(--brass);
-  border-color: var(--brass);
 }
 
-/* Pointed at production. Loud on purpose: the screens are identical against
-   local, and the difference is whether a real buyer's deck empties. */
+/* Pointed at production. The one place this tool spends `danger` on something
+   that is not a delete: the screens are identical against local, and the
+   difference is whether a real buyer's deck empties. */
 .badge.live {
   color: var(--text);
-  background: var(--bad);
-  border-color: var(--bad);
-  font-weight: 600;
+  background: var(--danger);
+  font-weight: 500;
 }
 
 /* ------------------------------------------------- expanding a shop's row */
 
 .bar.spaced {
-  margin: 1rem 0 0;
+  margin: var(--md) 0 0;
 }
 
-.actions {
-  flex-direction: row;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+td.actions {
+  display: table-cell;
+  width: 1%;
+  white-space: nowrap;
+}
+
+td.actions > * + * {
+  margin-left: var(--sm);
+}
+
+/* A row's own controls take `inset.compactX`, the padding the app uses for a
+   dense control, rather than the capsule's 26 each side. Three of those per
+   row were 60px of nothing but padding. */
+td.actions button {
+  padding: var(--sm) var(--md);
 }
 
 td.tick,
 th.tick {
-  width: 2.25rem;
+  width: var(--hit);
+  padding-left: var(--sm);
   padding-right: 0;
 }
 
+/* The one control on the row that opens it. A glyph gets a HIT_TARGET box of
+   empty space and colour for state, never a block behind it. It was a 0.9rem
+   triangle in a 2.25rem cell, which is a target you aim at twice. */
 button.arrow {
   background: none;
-  border: none;
-  color: var(--muted);
-  padding: 0 0.25rem;
-  font-size: 0.9rem;
-  font-weight: 400;
+  color: var(--text-muted);
+  min-height: var(--hit);
+  width: var(--hit);
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+
+button.arrow svg {
+  width: 20px;
+  height: 20px;
+  transition: transform 160ms ease-out;
+}
+
+button.arrow[aria-expanded='true'] {
+  color: var(--text);
+}
+
+button.arrow[aria-expanded='true'] svg {
+  transform: rotate(90deg);
 }
 
 tr.open > td {
   border-bottom-color: transparent;
 }
 
+/* A recess under the shop's row, not a card on top of it. It was `surface` —
+   lighter than the page — holding two darker blocks, which reads as a slab
+   with holes cut in it. One step down, and the things inside it sit on it
+   rather than in boxes of their own. */
 tr.detail-row > td {
-  padding: 0 0.75rem 1rem 2.25rem;
-  background: var(--surface);
+  padding: 0 var(--md) var(--lg) calc(var(--hit) + var(--sm));
+  background: var(--surface-sunken);
 }
 
 /* A row whose site could not be read. Still listed — a shop that vanished from
@@ -400,20 +584,16 @@ tr.dim > td {
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--md);
 }
 
 table.inner {
-  font-size: 0.85rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  background: transparent;
 }
 
 table.inner th,
 table.inner td {
-  padding: 0.45rem 0.6rem;
+  padding: var(--sm) var(--sm);
 }
 
 table.inner tr:last-child td {
@@ -421,34 +601,315 @@ table.inner tr:last-child td {
 }
 
 td.thumb {
-  width: 3.5rem;
+  width: 56px;
+}
+
+/* Imported prose, in a row of short facts. Clamped rather than truncated on
+   one line: two lines is enough to tell a watch description from a shipping
+   policy, which is what a bad model read produces. */
+td.prose {
+  min-width: 12rem;
+  max-width: 20rem;
+}
+
+td.prose span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 td.thumb img {
-  width: 3rem;
-  height: 3rem;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: block;
   background: var(--surface);
 }
 
+/* What a shop's site says about itself, while it is being added. Type on the
+   recess, not a panel inside it: nesting goes one deep. On Dealers these are
+   columns instead — there you are scanning forty shops, not reading one. */
+.profile {
+  display: flex;
+  gap: var(--md);
+  align-items: flex-start;
+  padding: var(--sm) 0;
+}
+
+/* contain, not cover: a logo cropped square is a different logo. The app's
+   rule allows exactly this exception, and only for a mark. */
+.shopmark {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+
+.shopmark.small {
+  width: 24px;
+  height: 24px;
+}
+
+/* The shop's mark beside its name, so the column reads as one thing. */
+.shopcell {
+  display: flex;
+  gap: var(--sm);
+  align-items: flex-start;
+}
+
+.shopcell .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* A column header that sorts. Looks like the header beside it, not a button. */
+button.sort {
+  background: none;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+button.sort:hover {
+  color: var(--text);
+}
+
 .problems {
-  font-size: 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
-  background: var(--bg);
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: var(--radius-md);
+  padding: var(--sm) var(--md);
+  background: var(--surface);
 }
 
 .problems summary {
   cursor: pointer;
-  color: var(--muted);
+  color: var(--text-muted);
+  min-height: var(--hit);
+  display: flex;
+  align-items: center;
 }
 
 .problems .rows.tight {
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: var(--sm);
+  margin-top: var(--sm);
   max-height: 20rem;
   overflow-y: auto;
+}
+
+/* ---------------------------------------------------------- import review */
+
+/* A run-in above a title. Sentence case; weight and colour do the separating. */
+.eyebrow {
+  color: var(--brass);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  margin-bottom: var(--xs);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: var(--lg);
+  background: rgb(0 0 0 / 60%);
+}
+
+.import-modal {
+  position: relative;
+  width: min(64rem, 100%);
+  height: min(48rem, calc(100vh - 3rem));
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+}
+
+.modal-header,
+.modal-footer,
+.review-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  padding: var(--md) var(--lg);
+}
+
+.modal-header {
+  justify-content: space-between;
+}
+
+.review-toolbar {
+  background: var(--surface-sunken);
+}
+
+.review-toolbar .search {
+  margin-left: auto;
+}
+
+/* A glyph-only control: no fill, centred in its own hit target. */
+.icon-button {
+  width: var(--hit);
+  height: var(--hit);
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.candidate-list {
+  overflow-y: auto;
+  padding: 0 var(--lg);
+}
+
+.candidate {
+  display: grid;
+  grid-template-columns: auto 5rem minmax(0, 1fr) auto;
+  gap: var(--md);
+  align-items: center;
+  min-height: 7rem;
+  padding: var(--md) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The whole cell is the target, so the tick does not need a steady hand. */
+.candidate-pick {
+  display: grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  cursor: pointer;
+}
+
+.candidate-pick input:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.candidate > img,
+.candidate-placeholder {
+  width: 5rem;
+  height: 5rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  object-fit: cover;
+}
+
+.candidate-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.candidate-copy {
+  min-width: 0;
+}
+
+.candidate-description {
+  display: -webkit-box;
+  margin-top: var(--xs);
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.candidate-actions,
+.footer-actions,
+.field-row {
+  display: flex;
+  gap: var(--sm);
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.candidate-actions {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.modal-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+}
+
+.modal-message,
+.empty-state {
+  padding: var(--lg);
+}
+
+/* The one centred block in the console: an empty state has nothing to align
+   to, and the app centres a notice inside its own panel the same way. */
+.empty-state {
+  align-self: center;
+}
+
+.editor-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--lg);
+  background: rgb(0 0 0 / 60%);
+}
+
+.editor {
+  width: min(36rem, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--md);
+  overflow-y: auto;
+  padding: var(--lg);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.editor label {
+  flex: 1;
+}
+
+.editor .footer-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .candidate {
+    grid-template-columns: auto 4rem minmax(0, 1fr);
+  }
+
+  .candidate > img,
+  .candidate-placeholder {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .candidate-actions {
+    grid-column: 3;
+    flex-direction: row;
+  }
+
+  .modal-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

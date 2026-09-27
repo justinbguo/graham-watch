@@ -1,9 +1,9 @@
 import { env } from './env';
+import { isLocalStackHost } from './localHost';
 
 const MAILPIT_PORT = 54324;
 const POLL_MS = 400;
 const WAIT_MS = 10_000;
-const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '10.0.2.2']);
 
 const CODE_LABELED = /your code:[\s\S]*?(\d{6})/i;
 const CODE_BARE = /\b(\d{6})\b/;
@@ -29,7 +29,7 @@ type MailpitMessage = {
  */
 export function isLocalInbox(): boolean {
   try {
-    return LOCAL_HOSTS.has(new URL(env.supabaseUrl).hostname);
+    return isLocalStackHost(new URL(env.supabaseUrl).hostname);
   } catch {
     return false;
   }
@@ -38,7 +38,7 @@ export function isLocalInbox(): boolean {
 function mailpitOrigin(): string | null {
   try {
     const { hostname } = new URL(env.supabaseUrl);
-    if (!LOCAL_HOSTS.has(hostname)) return null;
+    if (!isLocalStackHost(hostname)) return null;
     return `http://${hostname}:${MAILPIT_PORT}`;
   } catch {
     return null;
@@ -82,7 +82,7 @@ async function latestCode(origin: string, to: string, since: number): Promise<st
 
 /**
  * Poll until Mailpit has a 6-digit code for `to`, or give up. Callers treat
- * null as "type it yourself" — a physical phone cannot reach the Mac inbox.
+ * null as "type it yourself".
  */
 export async function waitForLatestCode(to: string, since: number): Promise<string | null> {
   const origin = mailpitOrigin();

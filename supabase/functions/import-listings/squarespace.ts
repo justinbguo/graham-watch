@@ -1,5 +1,12 @@
 import { htmlToText } from './scrape.ts';
-import { fetchJson, productKey, type Json, type SourceItem } from './source.ts';
+import {
+  fetchJson,
+  productKey,
+  type AdapterRead,
+  type ItemMeta,
+  type Json,
+  type SourceItem,
+} from './source.ts';
 
 // Squarespace serves originals at 4000px and several megabytes. A phone deck
 // never needs more than this, and we pay for every byte we copy into storage.
@@ -55,6 +62,24 @@ function photoUrls(item: Json): string[] {
   return [...new Set(urls)].map((url) => `${url}?format=${PHOTO_WIDTH}`);
 }
 
+function metaOf(item: Json, photoCount: number): ItemMeta {
+  const variant = item?.structuredContent?.variants?.[0];
+  const categories = Array.isArray(item?.categories) ? item.categories : [];
+  const stamp = (value: unknown) =>
+    typeof value === 'number' ? new Date(value).toISOString() : null;
+
+  return {
+    // Squarespace has no vendor field; the brand is in the title and the model
+    // reads it at publish time.
+    vendor: null,
+    productType: categories.filter((one: unknown) => typeof one === 'string').join(', ') || null,
+    sku: typeof variant?.sku === 'string' && variant.sku.trim() ? variant.sku.trim() : null,
+    photoCount,
+    publishedAt: stamp(item?.publishOn),
+    updatedAt: stamp(item?.updatedOn),
+  };
+}
+
 function mapItem(item: Json, base: URL): SourceItem | null {
   const title = typeof item?.title === 'string' ? item.title.trim() : '';
   if (!title) return null;
@@ -90,6 +115,7 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     photoUrls: photos,
     priceCents: price.priceCents,
     currency: price.currency,
+    meta: metaOf(item, photos.length),
   };
 }
 
@@ -118,6 +144,7 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
     // Either page saying sold is enough. A grid tile can lag the product page,
     // and neither of them ever claims a sold watch is back.
     available: collection.available && product.available,
+    meta: product.meta ?? collection.meta,
   };
 }
 
@@ -151,29 +178,47 @@ export async function fetchSquarespaceItems(
   sourceUrl: string,
   limit: number,
   minPhotos = 0
-): Promise<SourceItem[] | null> {
+): Promise<AdapterRead | null> {
   const base = new URL(sourceUrl);
-  const items: SourceItem[] = [];
+  const read: AdapterRead = { items: [], skipped: [] };
   let offset: number | null = null;
 
-  while (items.length < limit) {
+  while (read.items.length < limit) {
     const page = new URL(base.toString());
     page.searchParams.set('format', 'json');
     if (offset !== null) page.searchParams.set('offset', String(offset));
 
     const body = await fetchJson(page);
-    if (!body) return items.length ? items : null;
+    if (!body) return read.items.length ? read : null;
 
     // A product URL answers with `item`, a collection with `items`.
     const batch = Array.isArray(body.items) ? body.items : body.item ? [body.item] : null;
-    if (!batch) return items.length ? items : null;
+    if (!batch) return read.items.length ? read : null;
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
+
       // Discard thin listings before hydration, not after: each one that
       // survives costs a product page fetch.
-      if (mapped && mapped.photoUrls.length >= minPhotos) items.push(mapped);
-      if (items.length >= limit) break;
+      if (!mapped) {
+        read.skipped.push({
+          sourceUrl: typeof raw?.fullUrl === 'string' ? raw.fullUrl : base.toString(),
+          title: typeof raw?.title === 'string' ? raw.title : '',
+          reason: typeof raw?.title === 'string' && raw.title.trim() ? 'no photograph' : 'no title',
+          meta: null,
+        });
+      } else if (mapped.photoUrls.length < minPhotos) {
+        read.skipped.push({
+          sourceUrl: mapped.sourceUrl,
+          title: mapped.title,
+          reason: `${mapped.photoUrls.length} photograph(s), under the ${minPhotos} a catalogue row needs`,
+          meta: mapped.meta ?? null,
+        });
+      } else {
+        read.items.push(mapped);
+      }
+
+      if (read.items.length >= limit) break;
     }
 
     const next = body.pagination?.nextPageOffset;
@@ -183,5 +228,5 @@ export async function fetchSquarespaceItems(
 
   // A collection entry is only what the shop chose to show in a grid. The rest
   // arrives later, one watch at a time, from hydrateSquarespaceItem.
-  return items;
+  return read;
 }

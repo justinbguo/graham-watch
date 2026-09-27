@@ -87,15 +87,56 @@ console.log('\nprofiles');
 
   check(
     'a new profile has not been onboarded',
-    body[0]?.onboarded_at === null && body[0]?.favorite_brands.length === 0
+    body[0]?.onboarded_at === null &&
+      body[0]?.favorite_brands.length === 0 &&
+      body[0]?.date_of_birth === null &&
+      body[0]?.notifications_enabled === false &&
+      body[0]?.search_pain_points.length === 0
   );
 
+  const adult = '1990-05-01';
   const onboard = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
     token: buyer.token,
     method: 'PATCH',
-    body: { first_name: 'Ada', last_name: 'Byron', onboarded_at: new Date().toISOString() },
+    body: {
+      first_name: 'Ada',
+      last_name: 'Byron',
+      date_of_birth: adult,
+      account_type: 'buyer',
+      collection_size: 'two_to_three',
+      search_pain_points: ['verifying_originality', 'finding_fair_prices'],
+      notifications_enabled: true,
+      onboarded_at: new Date().toISOString(),
+    },
   });
   check('a user can finish their own onboarding', onboard.status < 300, `got ${onboard.status}`);
+
+  const { body: saved } = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, { token: buyer.token });
+  check(
+    'onboarding stores birthday, collection, pain points, and notification permission',
+    saved[0]?.date_of_birth === adult &&
+      saved[0]?.collection_size === 'two_to_three' &&
+      saved[0]?.search_pain_points?.[0] === 'verifying_originality' &&
+      saved[0]?.notifications_enabled === true
+  );
+
+  const tooYoung = `${new Date().getFullYear() - 10}-01-01`;
+  const underage = await api(`/rest/v1/profiles?id=eq.${importer.id}`, {
+    token: importer.token,
+    method: 'PATCH',
+    body: {
+      first_name: 'Kid',
+      last_name: 'Buyer',
+      date_of_birth: tooYoung,
+      account_type: 'buyer',
+      onboarded_at: new Date().toISOString(),
+    },
+  });
+  check(
+    'a user under 18 cannot finish onboarding',
+    underage.status >= 400,
+    `got ${underage.status}`
+  );
 
   // PATCH on a row RLS hides is a no-op, not an error, so read back to be sure.
   await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
@@ -1043,6 +1084,19 @@ console.log('\ninquiries');
   const unsent = await api(`/rest/v1/inquiries?id=eq.${inquiryId}&select=status`, { token: buyer.token });
   check('a buyer cannot mark their own inquiry sent', unsent.body?.[0]?.status === 'pending');
 
+  // Same reasoning for opened_at: only inquiry-draft stamps it, with the
+  // service role, and only because it handed over a composer. A buyer who
+  // could set it would pad the lead count on a shop's own dashboard.
+  await api(`/rest/v1/inquiries?id=eq.${inquiryId}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { opened_at: new Date().toISOString() },
+  });
+  const unopened = await api(`/rest/v1/inquiries?id=eq.${inquiryId}&select=opened_at`, {
+    token: buyer.token,
+  });
+  check('a buyer cannot stamp their own inquiry opened', unopened.body?.[0]?.opened_at === null);
+
   await api(`/rest/v1/inquiries?id=eq.${inquiryId}`, { token: buyer.token, method: 'DELETE' });
   const survived = await api(`/rest/v1/inquiries?id=eq.${inquiryId}`, { token: buyer.token });
   check('a buyer cannot delete an inquiry', survived.body?.length === 1);
@@ -1808,6 +1862,32 @@ console.log('\noperators');
     (await setClaim(null))?.can_import === true
   );
 
+  // can_import is a claim about writes, and a catalogue read cashes it in two
+  // RPCs that each carried their own copy of the ownership test. The flag said
+  // yes, the read wrote its rows, and the sweep two statements later said
+  // "You do not manage that shop." Empty p_seen_ids so this judges nothing.
+  const operatorSweep = await api('/rest/v1/rpc/sync_source_availability', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [] },
+  });
+  check(
+    'an operator sweeps stock on an unclaimed shop it did not add',
+    operatorSweep.status < 300,
+    `got ${operatorSweep.status} ${JSON.stringify(operatorSweep.body)}`
+  );
+
+  const operatorAdopt = await api('/rest/v1/rpc/adopt_existing_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'an operator adopts listings on an unclaimed shop it did not add',
+    operatorAdopt.status < 300,
+    `got ${operatorAdopt.status} ${JSON.stringify(operatorAdopt.body)}`
+  );
+
   // A claim is a dealer taking over their own inventory. 20260917000002 exists
   // to stop an earlier importer writing over them, and operator status must not
   // be a way back in.
@@ -1825,6 +1905,22 @@ console.log('\noperators');
     'and cannot read that shop\u2019s catalogue',
     Array.isArray(catalogue.body) && catalogue.body.length === 0,
     `${catalogue.status} ${JSON.stringify(catalogue.body)?.slice(0, 120)}`
+  );
+
+  const claimedSweep = await api('/rest/v1/rpc/sync_source_availability', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [] },
+  });
+  const claimedAdopt = await api('/rest/v1/rpc/adopt_existing_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'and cannot sweep or adopt against it',
+    claimedSweep.status >= 400 && claimedAdopt.status >= 400,
+    `sweep ${claimedSweep.status}, adopt ${claimedAdopt.status}`
   );
 
   await setClaim(claimedBy);
@@ -2039,6 +2135,117 @@ console.log('\nmoving a listing between shops');
 
   if (strangerId) {
     await fetch(`${URL}/rest/v1/dealers?id=eq.${strangerId}`, { method: 'DELETE', headers: admin });
+  }
+}
+
+console.log('\ndelete account');
+{
+  const doomed = await createUser(`doomed-${stamp}@example.com`);
+  const shop = await api('/rest/v1/dealers?select=id', {
+    token: doomed.token,
+    method: 'POST',
+    body: {
+      name: 'Doomed Shop',
+      website: `https://doomed-${stamp}.test`,
+      created_by: doomed.id,
+    },
+    prefer: 'return=representation',
+  });
+  const doomedShopId = shop.body?.[0]?.id;
+  check('a user about to leave can still add a shop', Boolean(doomedShopId), `got ${shop.status}`);
+
+  await fetch(`${URL}/rest/v1/dealers?id=eq.${doomedShopId}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ permission: 'approved', claimed_by: doomed.id }),
+  });
+
+  const watch = await api('/rest/v1/listings', {
+    token: doomed.token,
+    method: 'POST',
+    body: {
+      dealer_id: doomedShopId,
+      imported_by: doomed.id,
+      brand: 'Rolex',
+      model: 'Datejust',
+      price_cents: 5000000,
+    },
+    prefer: 'return=representation',
+  });
+  const doomedWatchId = watch.body?.[0]?.id;
+  check('that shop can carry a listing', Boolean(doomedWatchId), `got ${watch.status}`);
+
+  const signedOut = await api('/rest/v1/rpc/delete_own_account', {
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'a signed-out caller cannot delete an account',
+    signedOut.status >= 400,
+    `got ${signedOut.status}`
+  );
+
+  const deleted = await api('/rest/v1/rpc/delete_own_account', {
+    token: doomed.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'a user can delete their own account',
+    deleted.status < 300,
+    `got ${deleted.status} ${JSON.stringify(deleted.body)}`
+  );
+
+  const adminHeaders = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const profileGone = await fetch(`${URL}/rest/v1/profiles?id=eq.${doomed.id}`, {
+    headers: adminHeaders,
+  }).then((r) => r.json());
+  check(
+    'deleting an account removes the profile',
+    Array.isArray(profileGone) && profileGone.length === 0
+  );
+
+  const shopLeft = await fetch(
+    `${URL}/rest/v1/dealers?id=eq.${doomedShopId}&select=id,claimed_by,created_by`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  check(
+    'a shop survives its owner deleting their account',
+    shopLeft?.[0]?.id === doomedShopId,
+    JSON.stringify(shopLeft)
+  );
+  check('the claim is released', shopLeft?.[0]?.claimed_by === null);
+  check('the creator pointer is cleared', shopLeft?.[0]?.created_by === null);
+
+  const watchLeft = await fetch(
+    `${URL}/rest/v1/listings?id=eq.${doomedWatchId}&select=id,imported_by`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  check(
+    'listings survive the importer deleting their account',
+    watchLeft?.[0]?.id === doomedWatchId
+  );
+  check('the importer pointer is cleared', watchLeft?.[0]?.imported_by === null);
+
+  const deck = await api('/rest/v1/rpc/get_deck', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 50 },
+  });
+  check(
+    "those listings stay in other buyers' decks",
+    deck.body?.some((row) => row.id === doomedWatchId)
+  );
+
+  if (doomedShopId) {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${doomedShopId}`, {
+      method: 'DELETE',
+      headers: adminHeaders,
+    });
   }
 }
 

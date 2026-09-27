@@ -13,16 +13,35 @@ import { Button, Centered, Message, Screen } from '@/components/ui';
  * The error text is development-only. "Cannot read property 'brand' of null"
  * tells a buyer nothing, and tells them Graham is broken rather than one watch.
  */
+function leave() {
+  // Dismiss closes a sheet. Replace rebuilds at the deck when that navigator
+  // is the thing that failed. `router.back()` is not used: on a phone the
+  // router's last-resort handler throws instead of popping.
+  try {
+    if (router.canDismiss()) {
+      router.dismiss();
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  try {
+    router.replace('/');
+  } catch {
+    // Try again is the remaining control.
+  }
+}
+
 function Fallback({ error, retry, inTabs }: ErrorBoundaryProps & { inTabs: boolean }) {
   return (
     <Screen title="Something broke" inTabs={inTabs}>
       <Centered>
         <Message text={__DEV__ ? error.message : 'This screen could not be drawn.'} tone="error" />
         <Button label="Try again" onPress={retry} variant="solid" />
-        {/* A modal that crashed has replaced its own close button with this
-            screen, so without a way out the error is a dead end. At a tab root
-            there is nowhere to go back to and the tab bar is still there. */}
-        {router.canGoBack() ? <Button label="Go back" onPress={router.back} /> : null}
+        {/* The tab bar is still mounted under a tab crash, and a back control
+            there only re-enters the screen that just failed. A sheet has no
+            tab bar, so it needs its own way out. */}
+        {inTabs ? null : <Button label="Close" variant="ghost" onPress={leave} />}
       </Centered>
     </Screen>
   );
@@ -67,9 +86,9 @@ export function RootErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 const bare = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
-  title: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
-  body: { fontSize: 14, textAlign: 'center', opacity: 0.7 },
+  screen: { flex: 1, alignItems: 'flex-start', justifyContent: 'center', padding: 32, gap: 12 },
+  title: { fontSize: 20, fontWeight: '600' },
+  body: { fontSize: 14, opacity: 0.7 },
   retry: {
     marginTop: 8,
     borderWidth: StyleSheet.hairlineWidth,

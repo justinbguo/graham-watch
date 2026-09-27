@@ -4,10 +4,10 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, adapterItems, readCatalog, syncCatalog } from './catalog.ts';
-import { discover, normalizeDomain } from './discover.ts';
+import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, publishBatch } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
-import type { SourceItem } from './source.ts';
+import type { SkippedItem, SourceItem } from './source.ts';
 
 let adminClient: SupabaseClient | null = null;
 
@@ -157,11 +157,35 @@ function websiteOf(sourceUrl: string): { host: string; website: string } {
  * still left a dealer behind, and the next hour that dealer counted as one we
  * already knew.
  */
+/**
+ * Writes back what the shop's homepage says about itself.
+ *
+ * Unlike the address just below, this overwrites. All three are read off the
+ * page rather than typed by anyone, and a logo URL points into the shop's own
+ * CDN, which does not survive a redesign — leaving the stale one in place
+ * would mean Refresh could not repair the thing it exists to repair. Nothing
+ * found is left alone rather than cleared, so a site that is briefly down does
+ * not blank a dealer's page.
+ */
+async function refreshProfile(supabase: SupabaseClient, dealerId: string, profile: Profile) {
+  const patch: Record<string, string> = {};
+  if (profile.description) patch.description = profile.description;
+  if (profile.instagram) patch.instagram = profile.instagram;
+  if (profile.logoUrl) patch.logo_url = profile.logoUrl;
+
+  if (!Object.keys(patch).length) return;
+
+  const { error } = await supabase.from('dealers').update(patch).eq('id', dealerId);
+  // A shop's page is not worth failing a catalogue read over.
+  if (error) console.error('could not store dealer profile', error.message);
+}
+
 async function findDealer(
   supabase: SupabaseClient,
   userId: string,
   sourceUrl: string,
   isOperator: () => Promise<boolean>,
+  profile: Profile,
   dealerId?: string,
   name?: string,
   email?: string
@@ -183,6 +207,7 @@ async function findDealer(
     if (!owned || !(await mine(owned))) {
       throw new Error('You do not manage that dealer.');
     }
+    await refreshProfile(supabase, owned.id, profile);
     return owned.id;
   }
 
@@ -212,6 +237,7 @@ async function findDealer(
   if (name && existing.name === host) {
     await supabase.from('dealers').update({ name }).eq('id', existing.id);
   }
+  await refreshProfile(supabase, existing.id, profile);
   // Fill an address we could not find the first time without ever reading the
   // one already there — the `is null` filter is what makes this not overwrite.
   if (email) {
@@ -231,6 +257,7 @@ async function createDealer(
   supabase: SupabaseClient,
   userId: string,
   sourceUrl: string,
+  profile: Profile,
   name?: string,
   email?: string
 ): Promise<string> {
@@ -244,6 +271,9 @@ async function createDealer(
       name: name || host,
       website,
       contact_email: email ?? null,
+      description: profile.description,
+      instagram: profile.instagram,
+      logo_url: profile.logoUrl,
       created_by: userId,
       permission: 'pending',
     })
@@ -267,8 +297,16 @@ async function createDealer(
   return data.id;
 }
 
-function previewFromItems(items: SourceItem[]) {
-  return items.map((item) => ({
+/**
+ * One row per product the read saw, kept or not.
+ *
+ * Every field the shop's feed states travels, because the question this
+ * answers is "why does a shop showing 80 watches report 970 products", and no
+ * summary of it was ever the right answer. The prose is the exception: it is
+ * the bulk of the payload and there is nothing to learn from it in a table.
+ */
+function previewFromItems(items: SourceItem[], skipped: SkippedItem[]) {
+  const kept = items.map((item) => ({
     source_url: item.sourceUrl,
     external_id: item.externalId,
     title: item.title,
@@ -276,7 +314,43 @@ function previewFromItems(items: SourceItem[]) {
     currency: item.currency,
     photo_url: item.photoUrls[0] ?? null,
     photo_count: item.photoUrls.length,
+    available: item.available,
+    vendor: item.meta?.vendor ?? null,
+    product_type: item.meta?.productType ?? null,
+    sku: item.meta?.sku ?? null,
+    published_at: item.meta?.publishedAt ?? null,
+    updated_at: item.meta?.updatedAt ?? null,
+    skipped: null as string | null,
   }));
+
+  const dropped = skipped.map((item) => ({
+    source_url: item.sourceUrl,
+    external_id: null,
+    title: item.title,
+    price_cents: null,
+    currency: null,
+    photo_url: null,
+    photo_count: item.meta?.photoCount ?? 0,
+    available: false,
+    vendor: item.meta?.vendor ?? null,
+    product_type: item.meta?.productType ?? null,
+    sku: item.meta?.sku ?? null,
+    published_at: item.meta?.publishedAt ?? null,
+    updated_at: item.meta?.updatedAt ?? null,
+    skipped: item.reason,
+  }));
+
+  return [...kept, ...dropped];
+}
+
+function previewCounts(items: SourceItem[], skipped: SkippedItem[]) {
+  const forSale = items.filter((item) => item.available).length;
+  return {
+    read: items.length + skipped.length,
+    for_sale: forSale,
+    sold: items.length - forSale,
+    skipped: skipped.length,
+  };
 }
 
 function clamp(value: unknown, fallback: number, max: number): number {
@@ -289,9 +363,10 @@ function bad(message: string, status = 400) {
 }
 
 /**
- * Four actions, one function.
+ * Five actions, one function.
  *
  * `discover` turns a domain into the URL its watches live at, writing nothing.
+ * `delete-listing` removes one imported watch and its photographs.
  * `sync` reads the shop's catalogue into source_items. It costs HTTP and
  * nothing else on a platform we have an adapter for, so it can walk the whole
  * shop. `publish` drains a bounded slice of the extraction queue and reports
@@ -371,23 +446,56 @@ export default {
       const limit = clamp(body.limit, MAX_CATALOG_ITEMS, MAX_CATALOG_ITEMS);
 
       try {
+        // Sold watches are returned rather than filtered out. Hiding them is
+        // what made a shop's own numbers impossible to reconcile with ours,
+        // and the caller can filter a field it can see.
         const found = await adapterItems(sourceUrl, limit);
-        if (found) {
-          await meter(userId, sourceUrl, null, 'succeeded');
-          return Response.json({
-            provider: found.provider,
-            listings: previewFromItems(found.items.filter((item) => item.available)),
-          });
-        }
+        const { provider, items, skipped } = found ?? (await readCatalog(sourceUrl, limit));
 
-        const { provider, items } = await readCatalog(sourceUrl, limit);
         await meter(userId, sourceUrl, null, 'succeeded');
-        return Response.json({ provider, listings: previewFromItems(items) });
+        return Response.json({
+          provider,
+          counts: previewCounts(items, skipped),
+          listings: previewFromItems(items, skipped),
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Preview failed.';
         await meter(userId, sourceUrl, null, 'failed', message);
         return bad(message, 502);
       }
+    }
+
+    /**
+     * Removes one imported watch, files and all.
+     *
+     * Two identities, on purpose. The RPC runs as the caller so
+     * `require_operator` sees who is asking and the delete is refused for
+     * anyone else; the bucket cleanup runs as the service role, which is the
+     * only identity with write access to `listing-photos` — no policy grants
+     * a user session delete there, and adding one would be a second door into
+     * every dealer's gallery.
+     */
+    if (action === 'delete-listing') {
+      const listingId = typeof body.listingId === 'string' ? body.listingId : null;
+      if (!listingId) return bad('delete-listing needs a listingId.');
+
+      const { data, error } = await ctx.supabase.rpc('operator_delete_listing', {
+        p_listing_id: listingId,
+      });
+      if (error) return bad(error.message, error.code === '42501' ? 403 : 400);
+
+      const paths = (data ?? []) as string[];
+      if (paths.length > 0) {
+        // Reported, never thrown: the listing is already gone, and failing the
+        // request here would tell the operator to retry a delete that cannot
+        // happen twice. The cost of a miss is an orphaned file in a bucket.
+        const removed = await admin().storage.from('listing-photos').remove(paths);
+        if (removed.error) {
+          console.error('photo cleanup failed', listingId, removed.error.message);
+        }
+      }
+
+      return Response.json({ photos: paths.length });
     }
 
     if (action === 'publish') {
@@ -421,6 +529,11 @@ export default {
     const named = typeof body.dealerName === 'string' ? body.dealerName.trim() : undefined;
     const addressed = typeof body.dealerEmail === 'string' ? body.dealerEmail.trim() : undefined;
 
+    // Read here rather than trusted from the caller: Refresh on an existing
+    // shop never runs discovery, and that is the button this has to arrive
+    // through for the shops already imported.
+    const profile = await readProfile(websiteOf(sourceUrl).website);
+
     let dealerId: string;
     try {
       const found = await findDealer(
@@ -428,6 +541,7 @@ export default {
         userId,
         sourceUrl,
         isOperator,
+        profile,
         typeof body.dealerId === 'string' ? body.dealerId : undefined,
         named,
         addressed
@@ -440,7 +554,7 @@ export default {
         dealerId = found;
       } else {
         await assertBudget(userId, await isOperator());
-        dealerId = await createDealer(ctx.supabase, userId, sourceUrl, named, addressed);
+        dealerId = await createDealer(ctx.supabase, userId, sourceUrl, profile, named, addressed);
       }
     } catch (error) {
       return bad(error instanceof Error ? error.message : 'Bad request.');

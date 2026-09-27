@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsWide } from '@/lib/layout';
-import { inset, layout, radius, size, space, type, type Theme } from '@/lib/theme';
+import { layout, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -15,6 +15,7 @@ type Tab = {
   key: string;
   label: string;
   focused: boolean;
+  badge?: number;
   accessibilityLabel?: string;
   renderIcon: (color: string) => ReactNode;
   onPress: () => void;
@@ -27,14 +28,13 @@ const PRESS_DURATION = 90;
 
 /**
  * The navigator's own bar draws a glyph and a word in a fixed 49pt strip and
- * gives no way in between: the press, the brass selected state, and the rail's
- * layout are all beyond its options, and the last pass was already fighting it
- * with an icon height override to stop the labels clipping.
+ * gives no way in between: the press, the dark floor, the counts, and the
+ * rail's layout are all beyond its options.
  *
  * This draws the same tabs from the same screen options — the icon a screen
- * declares, its title, its accessibility label — and keeps the navigator's
- * press semantics exactly: emit `tabPress`, respect a prevented default, then
- * navigate. Nothing about where a tap goes changed.
+ * declares, its title, its badge, its accessibility label — and keeps the
+ * navigator's press semantics exactly: emit `tabPress`, respect a prevented
+ * default, then navigate. Nothing about where a tap goes changed.
  */
 export function TabBar({ state, descriptors, navigation }: TabBarProps) {
   const isWide = useIsWide();
@@ -51,8 +51,9 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
       key: route.key,
       label,
       focused,
+      badge: typeof options.tabBarBadge === 'number' ? options.tabBarBadge : undefined,
       accessibilityLabel: options.tabBarAccessibilityLabel,
-      renderIcon: (color) => options.tabBarIcon?.({ focused, color, size: size.icon }) ?? null,
+      renderIcon: (color) => options.tabBarIcon?.({ focused, color, size: size.tabIcon }) ?? null,
       onPress: () => {
         const event = navigation.emit({
           type: 'tabPress',
@@ -71,7 +72,13 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
   return isWide ? <Rail tabs={tabs} /> : <Bar tabs={tabs} />;
 }
 
-/** On a phone. The tab you are on is the brass one; nothing else marks it. */
+/**
+ * On a phone. A dark floor under a pale app, glyphs and nothing else: the tab
+ * you are on is the white one, solid where the others are outlines. The words are gone because four of them at 11pt
+ * were four things to read on every screen, and the glyphs carry it — but the
+ * word stays as each tab's accessibility label, which is what a screen reader
+ * announces and what a pointer shows on hover.
+ */
 function Bar({ tabs }: { tabs: Tab[] }) {
   const styles = useThemedStyles(barStyles);
   const insets = useSafeAreaInsets();
@@ -108,25 +115,23 @@ function BarTab({ tab }: { tab: Tab }) {
       // React Native Web does not carry `selected` across to the DOM, and a tab
       // that never reports being the current one is a tab list with no answer.
       aria-selected={tab.focused}
-      accessibilityLabel={tab.accessibilityLabel ?? tab.label}
+      accessibilityLabel={tabLabel(tab)}
       onPress={tab.onPress}
       onLongPress={tab.onLongPress}
       onPressIn={press.down}
       onPressOut={press.up}
       style={styles.tab}>
-      <Animated.View style={[styles.stack, press.style]}>
-        {tab.renderIcon(tab.focused ? theme.color.brass : theme.color.textFaint)}
-        <Text style={[styles.label, tab.focused && styles.labelActive]} numberOfLines={1}>
-          {tab.label}
-        </Text>
+      <Animated.View style={press.style}>
+        {tab.renderIcon(tab.focused ? theme.color.onBarActive : theme.color.onBar)}
+        <Badge count={tab.badge} focused={tab.focused} />
       </Animated.View>
     </Pressable>
   );
 }
 
 /**
- * On a wide window. A rail is a list, so selection is the list's own grammar —
- * a brass left rule and a quiet surface shift, the same as a chosen filter.
+ * On a wide window. The same dark strip stood on its end, so the app has one
+ * floor rather than two chromes that happen to share a palette.
  */
 function Rail({ tabs }: { tabs: Tab[] }) {
   const styles = useThemedStyles(railStyles);
@@ -160,23 +165,47 @@ function RailTab({ tab }: { tab: Tab }) {
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: tab.focused }}
-      // React Native Web does not carry `selected` across to the DOM, and a tab
-      // that never reports being the current one is a tab list with no answer.
       aria-selected={tab.focused}
-      accessibilityLabel={tab.accessibilityLabel ?? tab.label}
+      accessibilityLabel={tabLabel(tab)}
       onPress={tab.onPress}
       onLongPress={tab.onLongPress}
       onPressIn={press.down}
       onPressOut={press.up}
-      style={[styles.tab, tab.focused && styles.tabActive]}>
-      <Animated.View style={[styles.line, press.style]}>
-        {tab.renderIcon(tab.focused ? theme.color.brass : theme.color.textFaint)}
-        <Text style={[styles.label, tab.focused && styles.labelActive]} numberOfLines={1}>
-          {tab.label}
-        </Text>
+      style={styles.tab}>
+      <Animated.View style={press.style}>
+        {tab.renderIcon(tab.focused ? theme.color.onBarActive : theme.color.onBar)}
+        <Badge count={tab.badge} focused={tab.focused} />
       </Animated.View>
     </Pressable>
   );
+}
+
+/**
+ * A count rides the corner of the glyph, half on and half off it. It is spoken
+ * as part of the tab's label rather than drawn and left silent, because a
+ * number nobody reads out is a number a screen reader user never learns about.
+ *
+ * It inverts on the tab you are on, the same way the glyph does. A white pill
+ * on a white glyph is one white shape, and the bookmark loses the corner the
+ * count is sitting on; the dark pill cuts the count out of the glyph instead.
+ * A ring around the pill would say it more plainly and is an outline.
+ */
+function Badge({ count, focused }: { count?: number; focused: boolean }) {
+  const styles = useThemedStyles(focused ? badgeOnStyles : badgeStyles);
+  if (!count) return null;
+
+  return (
+    <View style={styles.badge} accessible={false}>
+      <Text style={styles.count} numberOfLines={1}>
+        {count > 99 ? '99+' : count}
+      </Text>
+    </View>
+  );
+}
+
+function tabLabel(tab: Tab) {
+  const name = tab.accessibilityLabel ?? tab.label;
+  return tab.badge ? `${name}, ${tab.badge}` : name;
 }
 
 /** A tab gives under the thumb and comes back. Scale only: nothing reflows. */
@@ -199,64 +228,63 @@ function usePress() {
 
 const barStyles = (theme: Theme) => ({
   bar: {
-    backgroundColor: theme.color.surface,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
+    backgroundColor: theme.color.bar,
   },
   row: {
     flexDirection: 'row' as const,
     height: size.tabBar,
+    alignItems: 'center' as const,
   },
   tab: {
     flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-  },
-  stack: {
-    alignItems: 'center' as const,
-    gap: space.xs,
-  },
-  label: {
-    ...type.tab,
-    color: theme.color.textFaint,
-  },
-  labelActive: {
-    color: theme.color.brass,
+    alignSelf: 'stretch' as const,
   },
 });
 
 const railStyles = (theme: Theme) => ({
   rail: {
     width: layout.rail,
-    gap: space.xs,
-    paddingRight: space.md,
-    backgroundColor: theme.color.surface,
-    borderRightWidth: 1,
-    borderRightColor: theme.color.border,
-  },
-  tab: {
-    justifyContent: 'center' as const,
-    minHeight: size.controlMin,
-    paddingHorizontal: inset.controlX,
-    borderTopRightRadius: radius.sm,
-    borderBottomRightRadius: radius.sm,
-    borderLeftWidth: size.rule,
-    borderLeftColor: 'transparent',
-  },
-  tabActive: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderLeftColor: theme.color.brass,
-  },
-  line: {
-    flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+    backgroundColor: theme.color.bar,
   },
-  label: {
-    ...type.label,
-    color: theme.color.textFaint,
-  },
-  labelActive: {
-    color: theme.color.brass,
+  tab: {
+    width: size.tabBar,
+    height: size.tabBar,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: radius.md,
   },
 });
+
+const badgeStyles = (theme: Theme) => ({
+  badge: {
+    position: 'absolute' as const,
+    // Half on the glyph's top-right corner, the way a sticker lands. Further
+    // out it stopped belonging to the glyph and started being a third item in
+    // the row.
+    top: -space.xs,
+    right: -space.xs,
+    minWidth: size.badge,
+    height: size.badge,
+    paddingHorizontal: space.xs,
+    borderRadius: size.badge / 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: theme.color.onBarActive,
+  },
+  count: {
+    ...type.badge,
+    color: theme.color.bar,
+  },
+});
+
+const badgeOnStyles = (theme: Theme) => {
+  const base = badgeStyles(theme);
+  return {
+    badge: { ...base.badge, backgroundColor: theme.color.bar },
+    count: { ...base.count, color: theme.color.onBarActive },
+  };
+};

@@ -5,6 +5,7 @@ import { signOut } from '@/lib/auth';
 import type { Database } from '@/lib/database.types';
 import { demo, isDemo } from '@/lib/demo';
 import type { Profile } from '@/lib/models';
+import { normalizeUsername } from '@/lib/username';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
 
@@ -22,12 +23,18 @@ const AVATAR_TYPES: Record<string, { ext: string; contentType: string }> = {
 export type Onboarding = {
   firstName: string;
   lastName: string;
+  /** Already claimed on slide 2. Written again here so finishing cannot drop it. */
+  username: string;
+  dateOfBirth: string;
   favoriteBrands: string[];
   /**
    * Which door they came through. Routing only — a dealer's actual powers come
    * from `dealers.claimed_by`, never from this.
    */
   accountType: Database['public']['Enums']['account_type'];
+  collectionSize: Database['public']['Enums']['collection_size'] | null;
+  searchPainPoints: Database['public']['Enums']['watch_search_pain'][];
+  notificationsEnabled: boolean;
 };
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -51,8 +58,13 @@ async function saveOnboarding(userId: string, answers: Onboarding) {
     .update({
       first_name: answers.firstName.trim(),
       last_name: answers.lastName.trim(),
+      handle: normalizeUsername(answers.username),
+      date_of_birth: answers.dateOfBirth,
       favorite_brands: answers.favoriteBrands,
       account_type: answers.accountType,
+      collection_size: answers.collectionSize,
+      search_pain_points: answers.searchPainPoints,
+      notifications_enabled: answers.notificationsEnabled,
       onboarded_at: new Date().toISOString(),
     })
     .eq('id', userId)
@@ -134,6 +146,72 @@ export function useSetAvatar(userId: string | null) {
   });
 }
 
+/**
+ * Storage refuses a delete from `storage.objects` in SQL, so the avatar cannot
+ * go with the account inside `delete_own_account`. It is removed here, while
+ * the session that owns the folder is still alive. A failure is swallowed: an
+ * orphaned file in a public bucket is better than an account nobody can close.
+ */
+async function removeAvatarFiles(userId: string) {
+  try {
+    const { data } = await supabase.storage.from(AVATAR_BUCKET).list(userId);
+    const paths = (data ?? []).map((file) => `${userId}/${file.name}`);
+    if (paths.length) await supabase.storage.from(AVATAR_BUCKET).remove(paths);
+  } catch {
+    // Nothing to tell the user. The account is about to go either way.
+  }
+}
+
+async function deleteOwnAccount(userId: string) {
+  if (isDemo) throw new Error('Demo mode has no account to delete.');
+
+  await removeAvatarFiles(userId);
+
+  const { error } = await supabase.rpc('delete_own_account');
+  if (error) throw error;
+
+  // The auth user is already gone, so a server-side sign-out would 401.
+  // Local only: drop the stored session and let the gate send them to sign-in.
+  await signOut({ scope: 'local' });
+}
+
+export function useDeleteAccount(userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => {
+      if (!userId) throw new Error('Not signed in.');
+      return deleteOwnAccount(userId);
+    },
+    onSuccess: () => queryClient.clear(),
+  });
+}
+
+/**
+ * Reserves the username on slide 2. Uniqueness is a column constraint, and
+ * other people's profiles are not readable, so a select cannot answer "taken".
+ */
+export function useClaimUsername(userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (candidate: string) => {
+      if (!userId) throw new Error('Not signed in.');
+      if (isDemo) return normalizeUsername(candidate);
+
+      const { data, error } = await supabase.rpc('claim_username', { candidate });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (handle) => {
+      if (!userId) return;
+      queryClient.setQueryData<Profile | null>(keys.profile(userId), (current) =>
+        current ? { ...current, handle } : current
+      );
+    },
+  });
+}
+
 export function useCompleteOnboarding(userId: string | null) {
   const queryClient = useQueryClient();
 
@@ -165,7 +243,8 @@ export function useOnboardingGate() {
   // id` — so no row means the account itself is gone while the token outlived
   // it. The local stack signs with a fixed secret, so a session minted before a
   // `db reset` still verifies and every write after it matches zero rows.
-  // Ending the session is the only way out: onboarding has no sign-out button.
+  // Ending the session is the only way out of a missing row. The 18+ block
+  // also signs out, because onboarded_at must stay null.
   const accountIsGone = isSignedIn && isSuccess && profile === null;
   useEffect(() => {
     if (accountIsGone) void signOut().catch(() => undefined);

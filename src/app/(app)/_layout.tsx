@@ -21,6 +21,11 @@ export default function AppLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="listing/[listingId]" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="dealer/[dealerId]" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen
+            name="conversation/[conversationId]"
+            options={{ presentation: 'fullScreenModal' }}
+          />
           <Stack.Screen name="photos/[listingId]" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="inquiry/[listingId]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-listing/[listingId]" options={{ presentation: 'modal' }} />

@@ -29,8 +29,12 @@ In:
 
 1. Auth — email one-time codes. Apple and Google are built but disabled until
    someone creates the credentials; see `GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
-2. Buy — swipe a deck of listings. Left passes, right saves. Cards on a phone,
-   a grid on a wide window.
+   First-run onboarding asks for a name, a username, an 18+ birthday,
+   collection size, favorite brands, vintage-search pain points, and one
+   notification permission. Push delivery is not wired yet.
+2. Buy — swipe a deck of listings. Left passes, right saves. Dragging up on the
+   photograph previews the next watch and returns. Cards on a phone, a grid on
+   a wide window.
 3. Search — ask the catalogue a question, filtered separately from the deck.
 4. Saved — the list of right-swipes, with the total it adds up to.
 5. Inquiry — from a saved watch, deliberately contact the dealer.
@@ -97,6 +101,18 @@ One inquiry per buyer per listing, enforced by a unique index. The row must name
 listing's own dealer, and the watch must be active, unsold, and from an approved shop —
 all four enforced by the insert policy, not just by the button being hidden.
 
+**Contact dealer** opens Gmail with the dealer's address, a subject, and a message
+already filled in — the installed app where there is one, a Gmail compose window
+otherwise, so a phone without Gmail and a browser both still reach a draft. The mail
+is genuinely from the buyer, the reply lands in their inbox, and it sits in their Sent
+folder. **Send via Graham** remains for a device with no mail app: it mails the dealer
+for them, with their address as Reply-To, and it is the only path that can confirm the
+mail actually left.
+
+That difference is recorded rather than smoothed over. `status` stays about Graham's
+own send; `opened_at` says a composer was handed over. A draft the buyer abandoned
+looks exactly like one they sent, so nothing counts `opened_at` as a delivered lead.
+
 ## 7. Import
 
 Two front doors, one pipeline. Everything runs through the `import-listings` edge
@@ -161,7 +177,11 @@ Postgres on Supabase, RLS on every table. `profiles.id` = `auth.users.id`.
 
 ```
 profiles        id, handle, avatar_url, bio, first_name, last_name,
-                favorite_brands, onboarded_at, created_at
+                date_of_birth, account_type, favorite_brands,
+                collecting_years, collection_size, hunting_for,
+                notify_new_arrivals, notify_saved_watches,
+                search_pain_points, notifications_enabled,
+                onboarded_at, created_at
 dealers         id, name, website, contact_email, permission, claimed_by,
                 created_by, created_at
 listings        id, dealer_id, imported_by, import_job_id, source_url, brand,
@@ -178,8 +198,22 @@ source_items    id, dealer_id, provider, external_id, source_url, raw,
                 first_seen_at, last_seen_at
 import_jobs     id, user_id, dealer_id, source_url, provider, status, error,
                 listings_created, created_at, finished_at
-inquiries       id, listing_id, dealer_id, buyer_id, message, status,
+inquiries       id, listing_id, dealer_id, buyer_id, message, status, opened_at,
                 created_at, sent_at
+exchange_posts  id, author_id, author_handle, author_number, intent, title,
+                price_cents, currency, body, created_at
+exchange_comments
+                id, post_id, parent_id, author_id, author_handle, author_number,
+                body, created_at
+exchange_photos id, post_id, storage_path, position
+exchange_votes  user_id, post_id, comment_id, value, created_at
+dealer_follows  user_id, dealer_id, created_at
+conversations   id, opener_id, partner_id, dealer_id, created_at,
+                last_message_at
+messages        id, conversation_id, sender_id, body, via, listing_id,
+                created_at
+conversation_reads
+                conversation_id, user_id, read_at
 dealer_claim_codes
                 id, dealer_id, requested_by, email, code_hash, salt, attempts,
                 created_at, expires_at, consumed_at
@@ -188,12 +222,16 @@ dealer_claim_codes
 `dealers.permission`: `pending | approved | revoked`. `listings.status`:
 `active | hidden`. `import_jobs.status`: `queued | running | succeeded | failed`.
 `swipes.direction`: `left | right`. `inquiries.status`: `pending | sent | failed`.
+`messages.via`: `app | email`. A conversation names exactly one other side:
+`partner_id` for a person, `dealer_id` for a shop.
 
 Access rules: a profile is readable only by its owner. Dealers are readable by anyone
 signed in, except `contact_email`, which is revoked at the column level. A listing is
 readable if its dealer is approved, or if you imported or claimed it. Swipes and
 inquiries are private to their owner, and a shop reads the inquiries for its own
-listings once claimed. `import_jobs` is readable by its owner and writable only by the
+listings once claimed. A conversation and its messages are readable by its two sides:
+the opener, the other person, and — for a thread with a shop — whoever has claimed that
+shop right now. `import_jobs` is readable by its owner and writable only by the
 service role. `dealer_claim_codes` has RLS on and no policies at all. Nobody can approve
 a dealer through the app.
 
@@ -202,8 +240,8 @@ cannot. An untested policy is an unproven one.
 
 ## 11. Client
 
-Expo SDK 57, React Native, TypeScript, Expo Router. Four tabs: Buy, Search, Saved,
-Profile. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
+Expo SDK 57, React Native, TypeScript, Expo Router. Six tabs: Buy, Search, Exchange,
+Messages, Saved, Profile. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
 Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.
@@ -218,10 +256,64 @@ types are generated from the schema, never hand-written.
   `.cursor/rules/mobile-architecture.mdc` for the rule it breaks.
 - Storage keeps orphaned photo files when a dealer's gallery shrinks. Only
   `npm run dealers -- remove` clears the bucket.
-- There is no way in the app to move a claim off an account. An operator clears
-  `claimed_by` by hand.
+- There is no way in the app to move a claim off an account without deleting it.
+  An operator can clear `claimed_by` by hand. Deleting the account also releases
+  the claim and leaves the shop listed.
+- Messages poll rather than stream, and nothing notifies anyone: no push, no email
+  when a message arrives. A person who does not open the app does not know.
+- There is no way to block or report someone, and anyone who has posted can be
+  written to.
 
-## 13. Next phase, in rough order
+## 13. Exchange
+
+A fifth tab between Search and Saved. Signed-in people post a watch they want to sell,
+buy, or trade. Others comment on that post. The comment is the public record.
+
+Graham is the board. It does not hold the money, hold the watch, or authenticate it.
+Payment and shipping stay between the two people. The author can edit or delete their
+own post. A deleted post takes its comments with it.
+
+A selling post requires a price. A buying post requires a photo. Any post may carry up
+to six photos. The description sits under the photo. The feed filters on intent. A
+comment is text alone, in the order it was written, and may answer one other comment.
+Replies are one level deep: a reply to a reply attaches to the same root, enforced by a
+trigger rather than by the client. The author's `@handle` and collector number are
+copied onto the post at insert.
+
+Every post and comment shows its author's photograph and name beside that handle.
+Profiles stay readable only by their owner, so those two fields reach the board through
+`exchange_feed`, `exchange_thread`, and `exchange_post_author` — security-definer
+functions that return a name and an avatar and nothing else about the person.
+
+Anyone signed in can vote a post or a comment up or down, once, and change or take back
+that vote. Votes go through `exchange_vote`; the client cannot write the table. Scores
+are public and can be negative; who voted is not shown. Votes do not change the order of
+the feed, which stays newest-first.
+
+## 14. Messages
+
+One thread per pair of people, and one per shop a buyer has written to. A conversation
+has two sides and no member list: `opener_id` is whoever wrote first, and the other side
+is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
+shop that claims its account later inherits the threads already addressed to it.
+
+A conversation with a person starts from their post or their comment. There is no
+directory and no search by handle.
+
+Sending an inquiry still emails the shop. A trigger also drops that message into the
+buyer's thread with the shop, marked `via = 'email'` and naming the listing. Until the
+shop is claimed, nobody can write in that thread — enforced by the insert policy, not by
+hiding a button — and the app says the reply arrives by email.
+
+The client never writes `conversations.last_message_at` or `conversation_reads`: a
+trigger bumps the first, `mark_conversation_read` writes the second. Unread is counted
+per person as messages after their read mark that they did not send.
+
+The list, a thread's header, and starting a conversation go through security-definer
+functions, because the other side's name and photograph live in `profiles`, which is
+readable only by its owner.
+
+## 15. Next phase, in rough order
 
 Ratings, once a buyer can leave one. A dealer-facing view of their own leads. Payments,
 only if the introduction model turns out not to be enough.

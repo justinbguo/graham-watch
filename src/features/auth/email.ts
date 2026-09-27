@@ -3,24 +3,34 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GOOGLE_SIGN_IN_ENABLED,
   isAppleSignInAvailable,
-  sendEmailLink,
+  sendEmailCode,
   signInWithApple,
   signInWithGoogle,
+  signInWithProvider,
   verifyEmailCode,
 } from '@/lib/auth';
 import { isLocalInbox, waitForLatestCode } from '@/lib/devInbox';
 
-export type SignInStage = 'email' | 'code';
+/** Create is the default: the screen exists for people who are not in yet. */
+export type SignInMode = 'create' | 'login';
+export type SignInStage = 'method' | 'email' | 'code';
 
 function messageOf(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ERR_REQUEST_CANCELED') {
     return '';
   }
-  return error instanceof Error ? error.message : 'Something went wrong.';
+  const text = error instanceof Error ? error.message : 'Something went wrong.';
+  // iOS reports a dead TCP connection as a fetch exception from Expo's native
+  // promise. The usual cause is the phone calling 127.0.0.1, which is itself.
+  if (/could not connect|network request failed|failed to connect/i.test(text)) {
+    return 'Could not reach the database on this Mac. Stay on the same Wi-Fi and reload the app.';
+  }
+  return text;
 }
 
 export function useSignIn() {
-  const [stage, setStage] = useState<SignInStage>('email');
+  const [mode, setMode] = useState<SignInMode>('create');
+  const [stage, setStage] = useState<SignInStage>('method');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,7 +68,7 @@ export function useSignIn() {
     void run(async () => {
       const mine = ++generation.current;
       const since = Date.now();
-      await sendEmailLink(address);
+      await sendEmailCode(address, { createAccount: mode === 'create' });
       if (mine !== generation.current) return;
       setStage('code');
       setCode('');
@@ -70,7 +80,7 @@ export function useSignIn() {
       setCode(token);
       await verifyEmailCode(address, token);
     });
-  }, [email, run]);
+  }, [email, mode, run]);
 
   const submitCode = useCallback(() => {
     const address = email.trim();
@@ -79,15 +89,29 @@ export function useSignIn() {
     void run(() => verifyEmailCode(address, token));
   }, [code, email, run]);
 
-  const backToEmail = useCallback(() => {
-    generation.current += 1;
+  const chooseEmail = useCallback(() => {
+    setError(null);
     setStage('email');
+  }, []);
+
+  /** One step back. A code in flight is abandoned, not verified late. */
+  const back = useCallback(() => {
+    generation.current += 1;
     setCode('');
     setError(null);
     setReadingInbox(false);
+    setStage((current) => (current === 'code' ? 'email' : 'method'));
+  }, []);
+
+  // The typed address survives the switch: the usual reason to flip is
+  // "that address has no account", and retyping it is the wrong answer.
+  const switchMode = useCallback(() => {
+    setError(null);
+    setMode((current) => (current === 'create' ? 'login' : 'create'));
   }, []);
 
   return {
+    mode,
     stage,
     email,
     setEmail,
@@ -98,10 +122,13 @@ export function useSignIn() {
     error,
     appleAvailable,
     googleEnabled: GOOGLE_SIGN_IN_ENABLED,
+    chooseEmail,
     sendCode,
     submitCode,
-    backToEmail,
+    back,
+    switchMode,
     signInWithApple: () => run(signInWithApple),
+    signInWithAppleWeb: () => run(() => signInWithProvider('apple')),
     signInWithGoogle: () => run(signInWithGoogle),
   };
 }

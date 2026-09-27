@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Pressable, ScrollView, Text, View, type TextInput } from 'react-native';
 
 import { Button, Field, Heading, Message, Spinner } from '@/components/ui';
 import { VOLUMES, VOLUME_LABELS } from '@/data/applications';
@@ -22,6 +23,15 @@ export function ApplicationForm({
   onDone: () => void;
 }) {
   const styles = useThemedStyles(formStyles);
+  const shopNameRef = useRef<TextInput>(null);
+  const codeRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const target = apply.step === 'verify' ? codeRef : shopNameRef;
+    if (apply.step === 'done' || apply.isLoading) return;
+    const id = setTimeout(() => target.current?.focus(), 300);
+    return () => clearTimeout(id);
+  }, [apply.step, apply.isLoading, apply.sentTo]);
 
   if (apply.isLoading) return <Spinner />;
 
@@ -57,6 +67,7 @@ export function ApplicationForm({
         {apply.sentTo ? (
           <>
             <Field
+              ref={codeRef}
               accessibilityLabel="Verification code"
               keyboardType="number-pad"
               textContentType="oneTimeCode"
@@ -108,7 +119,7 @@ export function ApplicationForm({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="always">
       <View style={styles.copy}>
         <Heading>Tell us about your shop</Heading>
         <Message text="We read this by hand. It is the whole application — no fee, and no commission on anything you sell." />
@@ -117,6 +128,7 @@ export function ApplicationForm({
       <View style={styles.field}>
         <Text style={styles.label}>Shop name</Text>
         <Field
+          ref={shopNameRef}
           value={apply.shopName}
           onChangeText={apply.setShopName}
           autoCapitalize="words"
@@ -235,7 +247,7 @@ const formStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   option: {
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
     minHeight: HIT_TARGET,
