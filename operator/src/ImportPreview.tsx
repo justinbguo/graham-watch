@@ -71,6 +71,8 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
   const selected = rows?.filter((row) => row.selected) ?? [];
   const selectable = shown.filter((row) => row.state !== 'imported');
   const allShownChosen = selectable.length > 0 && selectable.every((row) => row.selected);
+  // Everything still for sale, across every filter, not just the rows on screen.
+  const importable = rows?.filter((row) => row.state !== 'imported') ?? [];
 
   const patch = (id: string, change: Partial<ImportCandidate>) =>
     setRows((current) => (current ?? []).map((row) => (row.id === id ? { ...row, ...change } : row)));
@@ -80,6 +82,11 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
     setRows((current) =>
       (current ?? []).map((row) => (ids.has(row.id) ? { ...row, selected: wanted } : row))
     );
+  }
+
+  function importAll() {
+    if (!rows) return;
+    onImport(rows.map((row) => (row.state === 'imported' ? row : { ...row, selected: true })));
   }
 
   return (
@@ -208,6 +215,12 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
           <div className="footer-actions">
             <button className="ghost" onClick={onClose}>
               Cancel
+            </button>
+            <button
+              className={selected.length > 0 ? 'ghost' : undefined}
+              disabled={importable.length === 0}
+              onClick={importAll}>
+              Import all {importable.length || ''}
             </button>
             <button disabled={selected.length === 0} onClick={() => rows && onImport(rows)}>
               Import {selected.length || ''} watch{selected.length === 1 ? '' : 'es'}
