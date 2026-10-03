@@ -246,9 +246,7 @@ code {
 
 .body {
   padding: var(--xl) var(--lg);
-  /* Wide enough for the dealers table's nine columns. Narrower and the
-     description column took its room from the counts. */
-  max-width: 96rem;
+  max-width: 72rem;
   width: 100%;
   margin: 0 auto;
 }
@@ -629,8 +627,7 @@ td.thumb img {
 }
 
 /* What a shop's site says about itself, while it is being added. Type on the
-   recess, not a panel inside it: nesting goes one deep. On Dealers these are
-   columns instead — there you are scanning forty shops, not reading one. */
+   recess, not a panel inside it: nesting goes one deep. */
 .profile {
   display: flex;
   gap: var(--md);
@@ -665,6 +662,95 @@ td.thumb img {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+}
+
+/* ------------------------------------------------------- the dealers list */
+
+/* A list of next steps, not a report: more air per row, no header row. */
+table.shops td {
+  padding-top: var(--md);
+  padding-bottom: var(--md);
+  vertical-align: middle;
+}
+
+td.stage-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.badge.stage {
+  font-size: 14px;
+  line-height: 20px;
+  padding: 2px var(--sm);
+}
+
+/* The name opens the shop. It reads as the name, not as a button. */
+button.shop-name {
+  background: none;
+  color: var(--text);
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  line-height: 24px;
+  text-align: left;
+  white-space: normal;
+}
+
+button.shop-name:hover {
+  color: var(--brass);
+}
+
+.bar.notice {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--sm) var(--md);
+}
+
+/* ---------------------------------------------------------- one shop */
+
+.shop-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--md);
+}
+
+.shop-page h2.section {
+  margin-top: var(--lg);
+}
+
+button.back {
+  align-self: flex-start;
+}
+
+.shop-head {
+  display: flex;
+  gap: var(--md);
+  align-items: flex-start;
+  padding: var(--md) 0;
+}
+
+.shop-head .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--xs);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--md);
+}
+
+.warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--xs);
+}
+
+.about {
+  max-width: 44rem;
 }
 
 /* A column header that sorts. Looks like the header beside it, not a button. */

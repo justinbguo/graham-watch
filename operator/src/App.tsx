@@ -1,22 +1,15 @@
 import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
-import { Dealers } from './Dealers';
+import { Dealers, type JustAdded } from './Dealers';
 import { SignIn } from './SignIn';
 import { supabase, target } from './supabase';
 
 // Dealers first, because that is the screen an operator opens the console to
-// use: importing watches and publishing a shop both happen there. Applications
-// is a queue that is empty most days.
-const SCREENS = {
-  dealers: 'Dealers',
-  applications: 'Applications',
-  add: 'Add shops',
-} as const;
-
-type Screen = keyof typeof SCREENS;
+// use: importing watches and publishing a shop both happen there.
+type Screen = 'dealers' | 'add' | 'applications';
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -26,6 +19,9 @@ export function App() {
   // that render is the whole operator UI.
   const [access, setAccess] = useState<{ userId: string; ok: boolean } | null>(null);
   const [screen, setScreen] = useState<Screen>('dealers');
+  const [justAdded, setJustAdded] = useState<JustAdded | null>(null);
+  const [waiting, setWaiting] = useState(0);
+  const clearJustAdded = useCallback(() => setJustAdded(null), []);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -49,6 +45,24 @@ export function App() {
       live = false;
     };
   }, [session]);
+
+  // Applications is empty most days, so it is a tab only while a shop waits.
+  // Asked again on every screen change, which is when an answer lands.
+  const operator = access?.ok === true;
+  useEffect(() => {
+    if (!operator) return;
+    let live = true;
+    void supabase
+      .from('dealer_applications')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => {
+        if (live) setWaiting(count ?? 0);
+      });
+    return () => {
+      live = false;
+    };
+  }, [operator, screen]);
 
   if (!ready) return <main className="centered"><p className="muted">Loading…</p></main>;
   if (!session) return <SignIn />;
@@ -76,6 +90,14 @@ export function App() {
     );
   }
 
+  const tabs: [Screen, string][] = [
+    ['dealers', 'Dealers'],
+    ['add', 'Add shops'],
+    ...(waiting > 0 || screen === 'applications'
+      ? [['applications', waiting > 0 ? `Applications · ${waiting}` : 'Applications'] as [Screen, string]]
+      : []),
+  ];
+
   return (
     <div className="shell">
       <header className="top">
@@ -88,11 +110,11 @@ export function App() {
           {target.isLocal ? 'local' : 'production'}
         </span>
         <nav className="tabs">
-          {Object.entries(SCREENS).map(([key, label]) => (
+          {tabs.map(([key, label]) => (
             <button
               key={key}
               className={screen === key ? 'tab on' : 'tab'}
-              onClick={() => setScreen(key as Screen)}>
+              onClick={() => setScreen(key)}>
               {label}
             </button>
           ))}
@@ -109,11 +131,16 @@ export function App() {
         {screen === 'applications' ? (
           <Applications />
         ) : screen === 'dealers' ? (
-          <Dealers />
+          <Dealers justAdded={justAdded} onClearJustAdded={clearJustAdded} />
         ) : (
-          // Lands on Dealers after a run, because the next two steps — importing
-          // watches and publishing the shop — both live there.
-          <AddShops onAdded={() => setScreen('dealers')} />
+          // The next step after adding is choosing that shop's watches, so a
+          // run hands its shops to Dealers rather than dropping you on the list.
+          <AddShops
+            onAdded={(added) => {
+              setJustAdded(added);
+              setScreen('dealers');
+            }}
+          />
         )}
       </main>
     </div>

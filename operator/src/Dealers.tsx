@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ImportPreview } from './ImportPreview';
 import {
@@ -8,38 +8,37 @@ import {
   type ImportCandidate,
   type PublishTotals,
 } from './importer';
-import { ShopListings } from './ShopListings';
+import { ShopPage, type Profile } from './ShopPage';
+import { STEP_LABEL, countsLine, stageOf, type Step } from './stage';
 import { confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
 type Row = OperatorDealer;
 
-/**
- * What the scrape read off the shop's own site. It comes from a plain table
- * read rather than `operator_dealers`, because these three columns are granted
- * to every signed-in reader while the RPC exists for the ones that are not.
- */
-type Profile = { description: string | null; instagram: string | null; logo_url: string | null };
-
-const NEXT: Record<Permission, Permission> = {
-  pending: 'approved',
-  approved: 'revoked',
-  revoked: 'approved',
-};
+/** Shops a run on Add shops just created, and what each read found for sale. */
+export type JustAdded = { id: string; forSale: number }[];
 
 /** The shop whose catalogue is open, and what the read that opened it found. */
 type Picking = { dealer: Row; note: string | null };
 
-export function Dealers() {
+export function Dealers({
+  justAdded,
+  onClearJustAdded,
+}: {
+  justAdded: JustAdded | null;
+  onClearJustAdded: () => void;
+}) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [picking, setPicking] = useState<Picking | null>(null);
   const [query, setQuery] = useState('');
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
+  // Read once: App mounts this screen fresh when a run on Add shops hands over.
+  const handoff = useRef(justAdded);
 
   useEffect(() => {
     let live = true;
@@ -49,8 +48,7 @@ export function Dealers() {
       // from anything PostgREST could return here. See 20260915000005.
       //
       // The scraped profile comes alongside in one read for every shop, rather
-      // than a read per shop when a row is opened. It is three short columns,
-      // and they are columns on this table now.
+      // than a read per shop when one is opened. It is three short columns.
       const [{ data, error: failed }, shops] = await Promise.all([
         supabase.rpc('operator_dealers'),
         supabase.from('dealers').select('id, description, instagram, logo_url'),
@@ -59,6 +57,22 @@ export function Dealers() {
       if (!live) return;
       setError(failed?.message ?? shops.error?.message ?? null);
       setRows(data ?? []);
+
+      // One shop just added: go straight to choosing its watches. Several:
+      // the list narrows to them, and each row's button is that same step.
+      const added = handoff.current?.length === 1 ? handoff.current[0] : null;
+      handoff.current = null;
+      if (added) {
+        const dealer = data?.find((row) => row.id === added.id);
+        if (dealer) {
+          setSelected(dealer.id);
+          setPicking({
+            dealer,
+            note: `Just added, unpublished. ${added.forSale} for sale on their site.`,
+          });
+        }
+        onClearJustAdded();
+      }
       setProfiles(
         Object.fromEntries(
           (shops.data ?? []).map(({ id, description, instagram, logo_url }) => [
@@ -71,7 +85,8 @@ export function Dealers() {
     return () => {
       live = false;
     };
-  }, [tick]);
+    // onClearJustAdded is a stable callback from App, so this still runs once per reload.
+  }, [tick, onClearJustAdded]);
 
   async function run(dealer: Row, work: () => Promise<string>) {
     setBusyId(dealer.id);
@@ -100,8 +115,15 @@ export function Dealers() {
         p_permission: permission,
       });
       if (failed) throw failed;
-      return `${dealer.name} → ${permission}`;
+      return permission === 'approved'
+        ? `${dealer.name} is live.`
+        : `${dealer.name} is out of the deck.`;
     });
+  }
+
+  function step(dealer: Row, next: Step) {
+    if (next === 'pick') setPicking({ dealer, note: null });
+    else setPermission(dealer, next === 'publish' ? 'approved' : 'revoked');
   }
 
   /**
@@ -136,9 +158,7 @@ export function Dealers() {
    * imports nothing.
    *
    * The read and the picker are one action because a refresh that only printed
-   * "3 new" left the operator with a number and no way to act on it. What a
-   * refresh is for is the stock that appeared since the last one, so it ends
-   * on the screen where those can be chosen.
+   * "3 new" left the operator with a number and no way to act on it.
    */
   function refresh(dealer: Row) {
     if (!dealer.website) {
@@ -151,17 +171,57 @@ export function Dealers() {
         dealer,
         note: `Just read their site: ${result.forSale} for sale, ${result.added} we had not seen before, ${result.retired} gone.`,
       });
-      return `${dealer.name}: ${result.found} in the catalogue, ${result.forSale} for sale, ${result.added} new, ${result.retired} gone.`;
+      return `${dealer.name}: ${result.forSale} for sale, ${result.added} new, ${result.retired} gone.`;
     });
   }
 
+  const current = selected ? rows?.find((row) => row.id === selected) : undefined;
+
+  const narrowed = justAdded && justAdded.length > 1 ? new Set(justAdded.map((one) => one.id)) : null;
   const needle = query.trim().toLowerCase();
   const shown = (rows ?? []).filter(
     (dealer) =>
-      !needle ||
-      dealer.name.toLowerCase().includes(needle) ||
-      (dealer.website ?? '').toLowerCase().includes(needle)
+      (!narrowed || narrowed.has(dealer.id)) &&
+      (!needle ||
+        dealer.name.toLowerCase().includes(needle) ||
+        (dealer.website ?? '').toLowerCase().includes(needle))
   );
+
+  const status = (
+    <>
+      {error ? <p className="error">{error}</p> : null}
+      {progress ? <p className="muted small">{progress}</p> : null}
+    </>
+  );
+
+  const picker = picking ? (
+    <ImportPreview
+      dealerId={picking.dealer.id}
+      dealerName={picking.dealer.name}
+      note={picking.note}
+      onClose={() => setPicking(null)}
+      onImport={(candidates) => importSome(picking.dealer, candidates)}
+    />
+  ) : null;
+
+  if (current) {
+    return (
+      <>
+        {status}
+        <ShopPage
+          dealer={current}
+          profile={profiles[current.id]}
+          busy={busyId !== null}
+          reload={tick}
+          onBack={() => setSelected(null)}
+          onStep={(next) => step(current, next)}
+          onRefresh={() => refresh(current)}
+          onChanged={reload}
+        />
+        {picker}
+      </>
+    );
+  }
 
   return (
     <section>
@@ -177,8 +237,18 @@ export function Dealers() {
         </button>
       </header>
 
-      {error ? <p className="error">{error}</p> : null}
-      {progress ? <p className="muted small">{progress}</p> : null}
+      {narrowed ? (
+        <div className="bar notice">
+          <span className="small">
+            {narrowed.size} shops just added, unpublished. Pick watches for each, then publish.
+          </span>
+          <button className="ghost push" onClick={onClearJustAdded}>
+            Show all shops
+          </button>
+        </div>
+      ) : null}
+
+      {status}
 
       {rows === null ? (
         <p className="muted">Loading…</p>
@@ -187,234 +257,64 @@ export function Dealers() {
           No shops yet. Add some on <strong>Add shops</strong>.
         </p>
       ) : (
-        <>
-          {/* Nine columns fit a laptop; a narrow window or a zoomed page does
-              not. The table scrolls sideways inside the page rather than
-              pushing the page itself wider, which would take the header's
-              controls off screen with it. */}
-          <div className="scroller">
-          <table>
-            <thead>
-              <tr>
-                <th className="tick" />
-                <th>Shop</th>
-                <th className="num">In the deck</th>
-                <th className="num">Imported</th>
-                <th className="num">Catalogue</th>
-                <th>Description</th>
-                <th>Instagram</th>
-                <th>Status</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((dealer) => {
-                const next = NEXT[dealer.permission];
-                const expanded = open === dealer.id;
-                const held = Number(dealer.listings_held);
-                const inDeck = Number(dealer.listings_in_deck);
-                const profile = profiles[dealer.id];
+        <table className="shops">
+          <tbody>
+            {shown.map((dealer) => {
+              const stage = stageOf(dealer);
+              const profile = profiles[dealer.id];
+              const busy = busyId !== null;
 
-                return [
-                  <tr key={dealer.id} className={expanded ? 'open' : undefined}>
-                    <td className="tick">
-                      <button
-                        className="arrow"
-                        aria-expanded={expanded}
-                        aria-label={expanded ? 'Hide watches' : 'Show watches'}
-                        onClick={() => setOpen(expanded ? null : dealer.id)}>
-                        <Chevron />
-                      </button>
-                    </td>
-
-                    <td>
-                      <div className="shopcell">
-                        {/* The mark the scrape found, beside the name it belongs
-                            to. It used to appear only once a row was opened,
-                            which is the one place you already knew the shop. */}
-                        {profile?.logo_url ? (
-                          <img className="shopmark small" src={profile.logo_url} alt="" loading="lazy" />
-                        ) : null}
-                        <div className="grow">
-                          <strong>{dealer.name}</strong>
-                          {dealer.website ? (
-                            <a
-                              className="muted small"
-                              href={dealer.website}
-                              target="_blank"
-                              rel="noreferrer">
-                              {dealer.website}
-                            </a>
-                          ) : (
-                            <span className="muted small">no website</span>
-                          )}
-                          {/* Where the shop is reached, under the name it
-                              belongs to rather than in a column of its own: an
-                              address is identity, and 250px of email was the
-                              column that pushed the table off the window.
-                              send-inquiry has nowhere to send without it, so a
-                              buyer's question fails rather than goes
-                              unanswered — hence the badge, not a dash. */}
-                          {dealer.contact_email ? (
-                            <span className="muted small">{dealer.contact_email}</span>
-                          ) : (
-                            <span className="badge wait">no address — inquiries fail</span>
-                          )}
-                        </div>
+              return (
+                <tr key={dealer.id}>
+                  <td>
+                    <div className="shopcell">
+                      {profile?.logo_url ? (
+                        <img className="shopmark small" src={profile.logo_url} alt="" loading="lazy" />
+                      ) : (
+                        <span className="shopmark small" />
+                      )}
+                      <div className="grow">
+                        <button className="shop-name" onClick={() => setSelected(dealer.id)}>
+                          {dealer.name}
+                        </button>
+                        <span className="muted small">
+                          {countsLine(dealer)}
+                          {dealer.catalog_failed > 0 ? ` · ${dealer.catalog_failed} failed` : ''}
+                        </span>
+                        {/* send-inquiry has nowhere to send without one, so a
+                            buyer's question fails rather than goes unanswered. */}
+                        {dealer.contact_email ? null : (
+                          <span className="badge wait">no address — inquiries fail</span>
+                        )}
                       </div>
-                    </td>
+                    </div>
+                  </td>
 
-                    <td className="num">
-                      <strong>{inDeck}</strong>
-                      {inDeck < held ? (
-                        <>
-                          <br />
-                          <span className="muted small">{held - inDeck} not showing</span>
-                        </>
-                      ) : null}
-                    </td>
+                  <td className="stage-cell">
+                    <span className={`badge stage ${stage.tone}`}>{stage.label}</span>
+                  </td>
 
-                    <td className="num">{held}</td>
-
-                    <td className="num">
-                      {dealer.catalog_total}
-                      {dealer.catalog_queued > 0 ? (
-                        <>
-                          <br />
-                          <span className="muted small">{dealer.catalog_queued} queued</span>
-                        </>
-                      ) : null}
-                      {dealer.catalog_failed > 0 ? (
-                        <>
-                          <br />
-                          <span className="muted small">{dealer.catalog_failed} failed</span>
-                        </>
-                      ) : null}
-                    </td>
-
-                    {/* Both read off the shop's own site by the scrape, and
-                        both are what a buyer sees on the dealer's page. They
-                        are columns because the only way to know the read worked
-                        is to look, and a column can be scanned down a list of
-                        forty shops. */}
-                    <td className="small prose">
-                      {profile?.description ? (
-                        <span title={profile.description}>{profile.description}</span>
-                      ) : (
-                        <span className="muted">not read yet</span>
-                      )}
-                    </td>
-
-                    <td className="small">
-                      {profile?.instagram ? (
-                        <a
-                          href={`https://instagram.com/${profile.instagram}`}
-                          target="_blank"
-                          rel="noreferrer">
-                          @{profile.instagram}
-                        </a>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-
-                    <td>
-                      <span
-                        className={`badge ${dealer.permission === 'approved' ? 'ok' : 'wait'}`}>
-                        {dealer.permission}
-                      </span>
-                      {dealer.claimed_by ? <span className="badge">claimed</span> : null}
-                    </td>
-
-                    <td className="actions">
-                      <button
-                        className="ghost"
-                        disabled={busyId !== null || !dealer.can_import}
-                        title={
-                          dealer.can_import
-                            ? "Read the shop's site again, then show what they have"
-                            : 'The dealer manages this shop themselves'
-                        }
-                        onClick={() => refresh(dealer)}>
-                        Refresh from site
+                  <td className="actions">
+                    {stage.quiet ? (
+                      <button className="ghost" disabled={busy} onClick={() => step(dealer, stage.quiet!)}>
+                        {STEP_LABEL[stage.quiet]}
                       </button>
-                      <button
-                        className="ghost"
-                        disabled={busyId !== null || !dealer.can_import}
-                        title={
-                          dealer.can_import
-                            ? 'Choose watches from the catalogue we already hold'
-                            : 'The dealer manages this shop themselves'
-                        }
-                        onClick={() => setPicking({ dealer, note: null })}>
-                        Add watches
+                    ) : null}
+                    {stage.primary ? (
+                      <button disabled={busy} onClick={() => step(dealer, stage.primary!)}>
+                        {STEP_LABEL[stage.primary]}
                       </button>
-                      <button
-                        className={next === 'approved' ? '' : 'ghost'}
-                        disabled={busyId !== null}
-                        onClick={() => setPermission(dealer, next)}>
-                        {next === 'approved' ? 'Publish' : 'Pull back'}
-                      </button>
-                    </td>
-                  </tr>,
-
-                  expanded ? (
-                    <tr key={`${dealer.id}-detail`} className="detail-row">
-                      <td colSpan={9}>
-                        <ShopListings dealerId={dealer.id} reload={tick} onChanged={reload} />
-                      </td>
-                    </tr>
-                  ) : null,
-                ];
-              })}
-            </tbody>
-          </table>
-          </div>
-
-          <p className="muted small legend">
-            <strong>In the deck</strong> is what a buyer can see right now: the watch is
-            active, unsold, and the shop is approved. <strong>Imported</strong> is every
-            watch we hold for them. <strong>Catalogue</strong> is what their site is
-            offering. A gap between the first two means some are sold or hidden — or
-            that the shop is not approved, in which case none of them show.
-          </p>
-
-          <p className="muted small legend">
-            The three actions do different jobs. <strong>Refresh from site</strong> reads
-            their site again for stock we have not seen and then shows it — free, and it
-            imports nothing on its own. <strong>Add watches</strong> opens the same list
-            without re-reading, so you can pick from the catalogue we already hold;
-            importing is the only step that spends a model call per watch.{' '}
-            <strong>Publish</strong> and <strong>Pull back</strong> decide whether buyers
-            see the watches we have already imported.
-          </p>
-        </>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
 
-      {picking ? (
-        <ImportPreview
-          dealerId={picking.dealer.id}
-          dealerName={picking.dealer.name}
-          note={picking.note}
-          onClose={() => setPicking(null)}
-          onImport={(candidates) => importSome(picking.dealer, candidates)}
-        />
-      ) : null}
+      {picker}
     </section>
-  );
-}
-
-/**
- * `chevron-right` from Material Community Icons, the set the app draws from,
- * as a path rather than a font: the console loads no icon font, and a typed
- * triangle (▸) is a character whose size and weight come from whatever the
- * system decided. CSS turns it a quarter when the row is open.
- */
-function Chevron() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M8.59 16.58 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.42Z" />
-    </svg>
   );
 }
 

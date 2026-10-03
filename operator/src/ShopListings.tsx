@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { deleteListing, formatPrice, photoUrl } from './importer';
 import { confirmWrite, supabase, type Database } from './supabase';
@@ -7,16 +7,14 @@ type Listing = Database['public']['Functions']['operator_listings']['Returns'][n
 type Problem = Database['public']['Functions']['operator_catalog_problems']['Returns'][number];
 
 /**
- * One shop's watches, as imported. What the scrape read about the shop itself
- * — its mark, its description, its Instagram — is on the row above rather than
- * in here: those are three facts about the shop, and a column can be scanned
- * down a list of forty of them.
+ * The two halves of a shop page: the watches we imported, then what is still
+ * on their site, including the catalogue items that did not import.
  *
  * Both reads are RPCs: a pending shop's listings and catalogue rows are
  * readable only by whoever imported them, so an operator asking PostgREST for
  * them directly gets an empty list and a screen that looks broken.
  *
- * The problems list is here rather than hidden because seeding a deck from
+ * The problems list is shown rather than hidden because seeding a deck from
  * forty shops means some of them read badly, and a shop reporting ten watches
  * against a catalogue of five hundred needs to be able to say why.
  */
@@ -24,11 +22,14 @@ export function ShopListings({
   dealerId,
   reload,
   onChanged,
+  site,
 }: {
   dealerId: string;
   reload: number;
-  /** A delete changes the counts on the shop's row above, not just this list. */
+  /** A delete changes the shop's counts, not just this list. */
   onChanged: () => void;
+  /** The catalogue summary and its actions, above the problems list. */
+  site: ReactNode;
 }) {
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -86,14 +87,16 @@ export function ShopListings({
     }
   }
 
-  if (error) return <p className="error">{error}</p>;
-  if (listings === null) return <p className="muted">Loading…</p>;
-
   return (
+    <>
+    <h2>In Graham</h2>
+    {error ? <p className="error">{error}</p> : null}
     <div className="detail">
-      {listings.length === 0 ? (
+      {listings === null ? (
+        <p className="muted">Loading…</p>
+      ) : listings.length === 0 ? (
         <p className="muted">
-          No watches imported yet. Use <strong>Add watches</strong> on the row above.
+          No watches imported yet. <strong>Pick watches</strong> chooses from their catalogue.
         </p>
       ) : (
         <table className="inner">
@@ -182,6 +185,11 @@ export function ShopListings({
           </tbody>
         </table>
       )}
+    </div>
+
+    <h2 className="section">On their site</h2>
+    <div className="detail">
+      {site}
 
       {problems.length > 0 ? (
         <details className="problems">
@@ -204,5 +212,6 @@ export function ShopListings({
         </details>
       ) : null}
     </div>
+    </>
   );
 }
