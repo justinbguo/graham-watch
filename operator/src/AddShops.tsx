@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 
 import { Boundary } from './Boundary';
+import type { JustAdded } from './Dealers';
 import { parseShops, type Rejection } from './domains';
 import {
   discoverShop,
@@ -57,7 +58,13 @@ https://someshop.com/collections/watches
 # or paste a CSV with a header:
 # domain,shop name,contact email`;
 
-export function AddShops({ onAdded }: { onAdded: () => void }) {
+function justAdded(rows: Row[]): JustAdded {
+  return rows.flatMap((row) =>
+    row.added ? [{ id: row.added.dealerId, forSale: row.added.forSale }] : []
+  );
+}
+
+export function AddShops({ onAdded }: { onAdded: (added: JustAdded) => void }) {
   const [text, setText] = useState('');
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<false | 'reading' | 'adding'>(false);
@@ -197,7 +204,12 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
     }
 
     setBusy(false);
-    onAdded();
+
+    // Straight on to picking watches, unless something in the run needs
+    // reading first: a failed row or a stopped run stays on screen.
+    const added = next.filter((row) => row.state === 'added');
+    const troubled = stop.current || next.some((row) => row.state === 'failed');
+    if (added.length > 0 && !troubled) onAdded(justAdded(added));
   }
 
   const readable = rows?.filter((row) => row.state === 'found') ?? [];
@@ -284,11 +296,7 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
                 </th>
                 <th />
                 <th>Shop</th>
-                <th className="num">Listed</th>
                 <th className="num">For sale</th>
-                <th>Platform</th>
-                <th>Contact</th>
-                <th>Instagram</th>
                 <th />
               </tr>
             </thead>
@@ -306,7 +314,7 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
 
                 open === row.domain ? (
                   <tr key={`${row.domain}-detail`} className="detail-row">
-                    <td colSpan={9}>
+                    <td colSpan={5}>
                       {/* One shop's catalogue must not be able to blank the
                           list the operator is working through. */}
                       <Boundary what={`${row.domain}'s catalogue`}>
@@ -326,28 +334,14 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
               {busy === 'adding' ? 'Adding…' : `Add ${chosen.length} shop(s)`}
             </button>
             <span className="muted small">
-              Creates each shop unpublished and reads its catalogue. No watches are
-              imported and nothing reaches a buyer yet.
+              Creates each shop unpublished. No watches are imported yet.
             </span>
+            {done.length > 0 && busy === false ? (
+              <button className="ghost push" onClick={() => onAdded(justAdded(done))}>
+                Pick watches for {done.length} added
+              </button>
+            ) : null}
           </div>
-
-          <p className="muted small legend">
-            <strong>Listed</strong> counts the product URLs in their sitemap, sold stock
-            included — a vintage dealer's catalogue is mostly watches they sold years ago.
-            <strong> For sale</strong> is what <em>Inspect</em> found in stock, and it is the
-            only one of the two an import can draw from. Inspect reads their whole catalogue
-            and writes nothing.
-          </p>
-
-          {done.length > 0 ? (
-            <p className="muted small legend">
-              {done.length} shop{done.length === 1 ? '' : 's'} added, holding{' '}
-              {done.reduce((sum, row) => sum + (row.added?.found ?? 0), 0)} products between
-              them, {done.reduce((sum, row) => sum + (row.added?.forSale ?? 0), 0)} of them for
-              sale. They are on <strong>Dealers</strong>, unpublished — import watches there,
-              then publish.
-            </p>
-          ) : null}
         </>
       ) : null}
     </section>
@@ -433,78 +427,44 @@ function ShopRow({
           {found?.profile.logoUrl ? (
             <img className="shopmark small" src={found.profile.logoUrl} alt="" loading="lazy" />
           ) : null}
-          <div>
+          <div className="grow">
             <strong>{row.fromFileName ?? found?.name ?? row.domain}</strong>
-            <br />
             <span className="muted small">{row.domain}</span>
+            {/* Only what would go wrong. A healthy row is a name and a domain;
+                platform, contact and Instagram are in the opened row. */}
+            {found ? (
+              <span className="warnings">
+                {/* send-inquiry has nowhere to send without one, so a buyer's
+                    question would fail rather than go unanswered. */}
+                {!email ? <span className="badge wait">no email — inquiries fail</span> : null}
+                {found.platform === 'generic' ? (
+                  <span className="badge wait">unknown platform</span>
+                ) : null}
+                {!found.sawSitemap ? <span className="badge wait">no sitemap</span> : null}
+              </span>
+            ) : null}
           </div>
         </div>
       </td>
 
-      {/* Sitemap URLs, sold watches and all. The shop's storefront shows a
-          fraction of this, which is why the honest number is one click away. */}
-      <td className="num">
-        {found ? (
-          found.sitemapProducts || <span className="muted">?</span>
-        ) : (
-          <span className="muted">—</span>
-        )}
-      </td>
-
+      {/* For sale is what an import draws from, so it leads. It needs a full
+          walk of their feed, which is why it waits for Inspect; the sitemap
+          count is free but counts sold watches too. */}
       <td className="num">
         {counts ? (
           <>
             <strong>{counts.for_sale}</strong>
             <br />
-            <span className="muted small">{counts.sold} sold</span>
-            {counts.skipped > 0 ? (
-              <>
-                <br />
-                <span className="muted small">{counts.skipped} refused</span>
-              </>
-            ) : null}
+            <span className="muted small">
+              {counts.sold} sold{counts.skipped > 0 ? ` · ${counts.skipped} refused` : ''}
+            </span>
           </>
         ) : row.reading ? (
           <span className="muted small">reading…</span>
-        ) : (
-          <span className="muted">—</span>
-        )}
-      </td>
-
-      <td>
-        {found ? (
-          <>
-            <span className={found.platform === 'generic' ? 'badge wait' : 'badge'}>
-              {found.platform}
-            </span>
-            {!found.sawSitemap ? <span className="badge wait">no sitemap</span> : null}
-          </>
-        ) : (
-          <span className="muted">—</span>
-        )}
-      </td>
-
-      <td>
-        {email ? (
-          <span className="small">{email}</span>
         ) : found ? (
-          // send-inquiry has nowhere to send without one, so a buyer's question
-          // would fail rather than go unanswered.
-          <span className="badge wait">none found</span>
-        ) : (
-          <span className="muted">—</span>
-        )}
-      </td>
-
-      <td>
-        {found?.profile.instagram ? (
-          <a
-            className="small"
-            href={`https://instagram.com/${found.profile.instagram}`}
-            target="_blank"
-            rel="noreferrer">
-            @{found.profile.instagram}
-          </a>
+          <span className="muted small">
+            {found.sitemapProducts ? `${found.sitemapProducts} listed, sold included` : 'not read'}
+          </span>
         ) : (
           <span className="muted">—</span>
         )}
@@ -540,6 +500,7 @@ function ShopRow({
 function ShopDetail({ row, onInspect }: { row: Row; onInspect: () => void }) {
   const found = row.found;
   if (!found) return null;
+  const email = row.fromFileEmail ?? found.email;
 
   return (
     <div className="detail">
@@ -553,11 +514,17 @@ function ShopDetail({ row, onInspect }: { row: Row; onInspect: () => void }) {
           ) : (
             <p className="muted small">Their homepage says nothing about themselves.</p>
           )}
-          <p className="muted small">
-            Catalogue:{' '}
+          <p className="muted small links">
             <a href={found.catalogUrl} target="_blank" rel="noreferrer">
               {found.catalogUrl}
             </a>
+            <span>{found.platform}</span>
+            {email ? <span>{email}</span> : null}
+            {found.profile.instagram ? (
+              <a href={`https://instagram.com/${found.profile.instagram}`} target="_blank" rel="noreferrer">
+                @{found.profile.instagram}
+              </a>
+            ) : null}
           </p>
         </div>
       </div>
