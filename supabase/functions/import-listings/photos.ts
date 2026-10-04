@@ -34,7 +34,7 @@ async function copyOne(
 
   try {
     const response = await fetch(sourceUrl, {
-      headers: { 'User-Agent': 'GrahamBot/0.1 (+https://graham.app)' },
+      headers: { 'User-Agent': 'GrahamBot/0.1 (+https://graham.watch)' },
       signal: AbortSignal.timeout(TIMEOUT.photo),
     });
     if (!response.ok) return fallback;

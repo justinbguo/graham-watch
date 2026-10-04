@@ -117,7 +117,7 @@ export function htmlToText(html: string, pageUrl: string): string {
 async function plainFetch(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'GrahamBot/0.1 (+https://graham.app)',
+      'User-Agent': 'GrahamBot/0.1 (+https://graham.watch)',
       Accept: 'text/html,application/xhtml+xml',
     },
     signal: AbortSignal.timeout(TIMEOUT.source),

@@ -714,7 +714,7 @@ find it, not proof they own the shop. Claimed shops get the lead only.
 
 Locally the mail lands in Mailpit (http://127.0.0.1:54324), same inbox as sign-in
 codes. In production set `RESEND_API_KEY` and the function uses Resend instead.
-`APP_ORIGIN` defaults to `https://graham.app`; set it to the deployed web origin
+`APP_ORIGIN` defaults to `https://graham.watch`; set it to the deployed web origin
 so the footer link is real.
 
 A send that fails leaves the inquiry at `failed`. The buyer can try again — the

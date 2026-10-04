@@ -27,7 +27,7 @@ function compose(to: string, shopName: string, value: string) {
     to,
     // Nothing to reply to. A dealer answering this mail should reach a person,
     // not the address that sends codes.
-    replyTo: Deno.env.get('SUPPORT_EMAIL') ?? 'Graham <hello@graham.app>',
+    replyTo: Deno.env.get('SUPPORT_EMAIL') ?? 'Graham <hello@graham.watch>',
     subject: `Your code to list ${shopName} on Graham`,
     text: [
       `Someone applied to list ${shopName} on Graham using this address.`,

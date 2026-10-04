@@ -25,7 +25,7 @@ type Inquiry = {
 };
 
 function signInUrl(): string {
-  const origin = (Deno.env.get('APP_ORIGIN') ?? 'https://graham.app').replace(/\/$/, '');
+  const origin = (Deno.env.get('APP_ORIGIN') ?? 'https://graham.watch').replace(/\/$/, '');
   return `${origin}/sign-in`;
 }
 

@@ -66,7 +66,7 @@ export type SourceItem = {
   meta?: ItemMeta;
 };
 
-export const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
+export const USER_AGENT = 'GrahamBot/0.1 (+https://graham.watch)';
 
 /**
  * Identifies one product across the several URLs that reach it. An import

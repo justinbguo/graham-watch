@@ -13,7 +13,7 @@
 
 import { TIMEOUT } from '../_shared/timeouts.ts';
 
-const USER_AGENT = 'GrahamBot/0.1 (+https://graham.app)';
+const USER_AGENT = 'GrahamBot/0.1 (+https://graham.watch)';
 
 /**
  * Hosts that are not on the open internet.

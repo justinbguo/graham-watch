@@ -14,7 +14,7 @@ export type Email = {
  * a "pretend" local path would let a broken template ship unnoticed.
  */
 export async function send(email: Email): Promise<void> {
-  const from = Deno.env.get('INQUIRY_FROM') ?? 'Graham <inquiries@graham.app>';
+  const from = Deno.env.get('INQUIRY_FROM') ?? 'Graham <inquiries@graham.watch>';
   const apiKey = Deno.env.get('RESEND_API_KEY');
 
   if (apiKey) return sendViaResend(email, from, apiKey);
