@@ -15,7 +15,7 @@ function devServerHost(): string | null {
 
 if (!isDemo && (!url || !anonKey)) {
   throw new Error(
-    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Copy .env.example to .env and fill it in, or run `npm run demo`.'
+    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Run `npm run env -- local` after `npm run db:start`, or put the hosted pair in .env.'
   );
 }
 

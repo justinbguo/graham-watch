@@ -5,7 +5,6 @@ import { ActionBar, ActionPill } from '@/components/ActionBar';
 import { SendBar } from '@/components/SendBar';
 import { Message, Spinner } from '@/components/ui';
 import {
-  intentLabel,
   useCastExchangeVote,
   useCreateExchangeComment,
   useDeleteExchangePost,
@@ -17,11 +16,11 @@ import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { authorLine, priceLine } from './copy';
+import { authorLine } from './copy';
 import { PostHeader } from './PostHeader';
 import { PostMenu } from './PostMenu';
 import { PostPhotos } from './PostPhotos';
-import { Tag } from './Tag';
+import { PostTitle } from './PostTitle';
 import { Votes } from './Votes';
 
 /** Who a comment is addressed to, while it is being written. */
@@ -99,11 +98,7 @@ export function Thread({
               at={post.created_at}
               trailing={mine ? <PostMenu onEdit={onEdit} onDelete={confirmDelete} /> : undefined}
             />
-            <Text style={styles.title}>{post.title}</Text>
-            <View style={styles.flair}>
-              <Tag label={intentLabel(post.intent)} />
-              <Tag label={priceLine(post)} />
-            </View>
+            <PostTitle title={post.title} post={post} variant="thread" />
             <PostPhotos urls={photos.map((photo) => photo.url)} />
             <Text style={styles.body}>{post.body}</Text>
             <ActionBar>
@@ -121,9 +116,6 @@ export function Thread({
             </ActionBar>
             {remove.isPending ? <Message text="Deleting…" /> : null}
             {remove.error ? <Message text="That post did not delete." tone="error" /> : null}
-            <Text style={styles.note}>
-              A comment here is public. Deal with someone only after they have one.
-            </Text>
           </View>
         }
         ListEmptyComponent={<Message text="No comments yet." />}
@@ -228,17 +220,6 @@ const threadStyles = (theme: Theme) => ({
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
   },
-  title: {
-    ...type.title,
-    color: theme.color.text,
-  },
-  // What it is and what it costs, in capsules under the title, the way the
-  // feed states them. Beside the title they fought it for the first line.
-  flair: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.xs,
-  },
   body: {
     ...type.body,
     color: theme.color.text,
@@ -246,11 +227,6 @@ const threadStyles = (theme: Theme) => ({
   commentBody: {
     ...type.body,
     color: theme.color.text,
-  },
-  note: {
-    ...type.caption,
-    color: theme.color.textMuted,
-    marginTop: space.md,
   },
   comment: {
     gap: space.xs,

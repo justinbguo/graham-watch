@@ -51,15 +51,17 @@ nobody follows.
 - A favicon service without `fallback=false`, or a dealer mark that survives a
   failed load. A generic globe beside a shop's name is an invented mark; a miss
   draws nothing. `faviconUrl` is the one place a host is turned into a URL.
-- `contentFit="contain"` on a photo frame. A browsing frame — card, tile,
-  thumbnail, detail hero — fills with `cover`. Only the full-screen viewer keeps
-  the whole photograph, and a dealer's mark, which is a logo and not a
-  photograph.
+- `contentFit="contain"` on a card or a detail hero. Those fill with `cover`.
+  A list row is 5/7 and uses `contain`, so the case stays recognisable. The
+  full-screen viewer also keeps the whole photograph, and a dealer's mark,
+  which is a logo and not a photograph.
 - `borderWidth` on four sides of anything at all. Nothing in this app is drawn
   with an outline: a card, tile, panel, or notice is a `surface` fill, a control
   with a label is a `fill`, and a container inside a container takes
   `surfaceSunken`. A hairline on *one* edge is a separator and is fine — `border`
-  for those, `size.rule` for a chosen row's brass mark.
+  for those, `size.rule` for a chosen row's brass mark. The follow capsule is
+  the exception: a `text` stroke on the page colour, because a filled capsule
+  there read as the page's main button.
 - Any background behind an icon-only control. The glyph is the control; it gets
   a `HIT_TARGET` box of empty space and colour for state, never a block.
 - A shadow or elevation in place of the outline you just removed. Depth is the
@@ -133,9 +135,25 @@ nobody follows.
   are already in. `ViewToggle` is one button showing the destination, and the
   turn-and-fade between the two glyphs is what says a press did anything.
 - A view swap that cuts. The deck's two views enter on `FadeIn`, which also
-  covers `layout.card` giving way to `layout.grid` on a wide screen.
+  covers `layout.card` giving way to `layout.grid` on a wide screen. Community's
+  modes do the same.
+- An icon swapped on the frame its state changes. A glyph that becomes another
+  glyph goes through `GlyphTurn`, a quarter turn and a cross-fade at
+  `motion.fast`. The view toggle and the follow capsule both do.
+- A turn, rise, or step on mount. A control that mounts already on shows its
+  on state and nothing moves. Initialise the shared value from the prop, then
+  animate on change.
+- Motion that answers neither "where did that go" nor "did that take". No
+  springs, no toasts, no pulse on an idle mark. The moments that do answer are
+  listed under "What moves, and why" in `docs/DESIGN.md`; add there before
+  adding anywhere else.
+- A haptic outside `src/lib/haptics.ts`. `tick` for a threshold or a flip,
+  `impact` for a commit, and no third.
+- A sent message that waits for the server to appear. The row goes into the
+  thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
+  it.
 - More than one watch on a grid row. The photograph is on the left, `size.gridPhoto`
-  wide at 4/5, and the details are on the right. The row does not pass or save.
+  wide at 5/7, and the details are on the right. The row does not pass or save.
   That happens on the listing it opens.
 - `surfaceSunken` on something sitting directly on the page. It is darker than
   the page in the dark scheme and disappears there; it only works inside a
@@ -147,7 +165,7 @@ nobody follows.
   card is `onOverlayAccent`, and it is the only accent a photograph carries.
 - Type laid straight on a photograph. It goes in `PhotoCaption`, on `scrim`.
   Half the watches are shot on white and white type vanishes on them.
-- The year in a specification line. It belongs to the name — `formatModel`
+- The year in a specification line. It belongs to the name — `formatTitle`
   gives "Datejust, 1968", `formatSpecs` gives what the name did not say.
 - A third line on the card's plate. The plate is two lines. The name and the
   year share the first when they fit; the price and the dealer are the second.
@@ -237,7 +255,9 @@ nobody follows.
   position on screen and reports nothing for the top inside a `fullScreenModal`.
 - Give every gesture a keyboard or pointer equivalent. A mouse has no thumb.
 - Use `ChoiceRow` for selectable lists. Selection is a brass left rule and
-  quiet surface shift, never a filled pill cloud.
+  quiet surface shift, never a filled pill cloud. A form field with a handful
+  of mutually exclusive answers is one dropdown, the way the composer names
+  selling, buying, or trading — not a list of rows.
 - Render everything below a watch's price from `ListingDetails`. The deck card
   and the listing route are two frames on one block, and the frame passes in its
   own buttons.

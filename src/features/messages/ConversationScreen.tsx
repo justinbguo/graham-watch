@@ -5,6 +5,7 @@ import { FlatList, View } from 'react-native';
 import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import {
+  isPending as isSending,
   useConversation,
   useMarkConversationRead,
   useSendMessage,
@@ -65,10 +66,12 @@ export function ConversationScreen({ conversationId }: { conversationId: string 
   function submit() {
     const body = draft.trim();
     if (!body || send.isPending) return;
-    void send
-      .mutateAsync(body)
-      .then(() => setDraft(''))
-      .catch(() => {});
+    // The field clears as the bubble rises. If the write fails the words come
+    // back to the field, unless something new has been typed over them.
+    setDraft('');
+    send.mutate(body, {
+      onError: () => setDraft((current) => current || body),
+    });
   }
 
   return (
@@ -95,6 +98,9 @@ export function ConversationScreen({ conversationId }: { conversationId: string 
               mine={item.sender_id === userId}
               caption={caption(item)}
               when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
+              // The pending row is the one that rises. The server's copy of it
+              // takes its place without moving, so one send is one arrival.
+              sent={isSending(item)}
             />
           )}
         />

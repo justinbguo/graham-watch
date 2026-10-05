@@ -1,10 +1,8 @@
 import { Image } from 'expo-image';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Message, Spinner } from '@/components/ui';
 import {
-  intentLabel,
-  type ExchangeIntent,
   type ExchangePost,
   type VoteValue,
   useCastExchangeVote,
@@ -12,58 +10,41 @@ import {
 } from '@/data/exchange';
 import { ActionBar, ActionPill } from '@/components/ActionBar';
 import { MessagePerson } from '@/features/messages/MessagePerson';
-import { inset, radius, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { authorLine, commentCount, priceLine } from './copy';
-import { IntentChips } from './IntentChips';
+import { authorLine, commentCount } from './copy';
 import { PostHeader } from './PostHeader';
-import { Tag } from './Tag';
+import { PostTitle } from './PostTitle';
 import { Votes } from './Votes';
 
-export function Feed({
-  userId,
-  intent,
-  onIntent,
-  onOpen,
-}: {
-  userId: string;
-  intent: ExchangeIntent | null;
-  onIntent: (intent: ExchangeIntent | null) => void;
-  onOpen: (id: string) => void;
-}) {
+export function Feed({ userId, onOpen }: { userId: string; onOpen: (id: string) => void }) {
   const styles = useThemedStyles(feedStyles);
   const { data: posts = [], isPending, error } = useExchangeFeed();
   const vote = useCastExchangeVote();
-  const shown = intent ? posts.filter((post) => post.intent === intent) : posts;
+  // Buying is a request, so it stays at the top instead of ageing out of the
+  // feed. Newest first within the strip, same as the posts under it. A buying
+  // post is not repeated below: the strip is where it lives.
+  const buying = posts.filter((post) => post.intent === 'buy');
+  const rest = posts.filter((post) => post.intent !== 'buy');
 
   if (isPending) return <Spinner />;
   if (error) {
     return (
       <View style={styles.state}>
-        <Message text="The exchange did not load." />
+        <Message text="The community did not load." />
       </View>
     );
   }
 
   return (
     <FlatList
-      data={shown}
+      data={rest}
       keyExtractor={(post) => post.id}
-      contentContainerStyle={shown.length === 0 ? styles.empty : styles.list}
-      ListHeaderComponent={
-        <View style={styles.chips}>
-          <IntentChips value={intent} onChange={onIntent} />
-        </View>
-      }
+      contentContainerStyle={rest.length === 0 && buying.length === 0 ? styles.empty : styles.list}
+      ListHeaderComponent={buying.length ? <PinnedBuys posts={buying} onOpen={onOpen} /> : null}
       ListEmptyComponent={
-        <Message
-          text={
-            intent
-              ? `No ${intentLabel(intent).toLowerCase()} posts yet.`
-              : 'No posts yet. The first one is a public offer between two people.'
-          }
-        />
+        <Message text="No posts yet. The first one is a public offer between two people." />
       }
       renderItem={({ item }) => (
         <PostCard
@@ -74,6 +55,41 @@ export function Feed({
         />
       )}
     />
+  );
+}
+
+/**
+ * Buying posts, as a row of title cards. A horizontal list inside the feed's
+ * list warns and steals the vertical scroll, so this is a plain scroller.
+ */
+function PinnedBuys({
+  posts,
+  onOpen,
+}: {
+  posts: ExchangePost[];
+  onOpen: (id: string) => void;
+}) {
+  const styles = useThemedStyles(feedStyles);
+
+  return (
+    <ScrollView
+      horizontal
+      contentContainerStyle={styles.pinRow}
+      style={styles.pins}>
+      {posts.map((post) => (
+        <Pressable
+          key={post.id}
+          accessibilityRole="button"
+          accessibilityLabel={`${post.title}, buying`}
+          onPress={() => onOpen(post.id)}
+          style={styles.pin}>
+          <Text style={styles.pinKicker}>Buying</Text>
+          <Text style={styles.pinTitle} numberOfLines={3}>
+            {post.title}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -103,13 +119,7 @@ function PostCard({
     <View style={styles.card}>
       <PostHeader author={post.author} at={post.created_at} />
       <Pressable accessibilityRole="button" onPress={onPress} style={styles.open}>
-        <Text style={styles.title} numberOfLines={3}>
-          {post.title}
-        </Text>
-        <View style={styles.flair}>
-          <Tag label={intentLabel(post.intent)} />
-          <Tag label={priceLine(post)} />
-        </View>
+        <PostTitle title={post.title} post={post} lines={3} />
         {post.cover_url ? (
           <Image
             source={{ uri: post.cover_url }}
@@ -154,8 +164,32 @@ const feedStyles = (theme: Theme) => ({
   state: {
     paddingHorizontal: inset.screen,
   },
-  chips: {
+  // The feed is already inset. Pulling the strip back out lets the next card
+  // scroll to the screen edge while the first one stays on the gutter.
+  pins: {
+    marginHorizontal: -inset.screen,
     marginBottom: space.md,
+  },
+  pinRow: {
+    paddingHorizontal: inset.screen,
+    gap: space.sm,
+  },
+  pin: {
+    width: size.pinned,
+    minHeight: size.gridPhoto,
+    padding: space.md,
+    gap: space.xs,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surface,
+    justifyContent: 'center' as const,
+  },
+  pinKicker: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
+  pinTitle: {
+    ...type.labelStrong,
+    color: theme.color.text,
   },
   card: {
     paddingVertical: space.md,
@@ -165,17 +199,6 @@ const feedStyles = (theme: Theme) => ({
   },
   open: {
     gap: space.sm,
-  },
-  title: {
-    ...type.titleSmall,
-    color: theme.color.text,
-  },
-  // Under the title, not beside it: the two facts that decide whether the
-  // post is for you, in the order a listing states them.
-  flair: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.xs,
   },
   // Square, and as wide as the card. A 180pt letterbox made every watch a
   // thumbnail beside its own description; the photograph is the offer.

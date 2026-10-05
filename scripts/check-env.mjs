@@ -9,41 +9,13 @@
  * foreign publishable key today — REST and GoTrue both answer 200 — so the
  * symptom is not an auth error, it is an app that looks empty and healthy.
  */
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-
-const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '10.0.2.2']);
+import { APP_ENV, APP_LOCAL, LOCAL_HOSTS, localStatus, parseEnvFile } from './_env.mjs';
 
 // Expo's precedence for the files this repo uses: .env.local wins over .env.
-const ENV_FILES = ['.env', '.env.local'];
-
-function parseEnvFile(path) {
-  let raw;
-  try {
-    raw = readFileSync(path, 'utf8');
-  } catch {
-    return {};
-  }
-  const values = {};
-  for (const line of raw.split('\n')) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (!match) continue;
-    values[match[1]] = match[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return values;
-}
+const ENV_FILES = [APP_ENV, APP_LOCAL];
 
 function resolveEnv() {
   return ENV_FILES.reduce((merged, file) => ({ ...merged, ...parseEnvFile(file) }), {});
-}
-
-function parseStatus(raw) {
-  const values = {};
-  for (const line of raw.split('\n')) {
-    const match = line.match(/^([A-Z0-9_]+)="?([^"]*)"?$/);
-    if (match) values[match[1]] = match[2];
-  }
-  return values;
 }
 
 function fail(lines) {
@@ -60,7 +32,7 @@ const key = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!url || !key) {
   fail([
     'EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY is missing.',
-    'Copy .env.example to .env and fill it in, or run `npm run demo`.',
+    'Run `npm run env -- local` after `npm run db:start`, or put the hosted pair in .env.',
   ]);
 }
 
@@ -83,34 +55,26 @@ if (!LOCAL_HOSTS.has(host)) {
   process.exit(0);
 }
 
-let status;
-try {
-  status = parseStatus(
-    execFileSync('supabase', ['status', '-o', 'env'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-  );
-} catch {
+const status = localStatus();
+if (!status) {
   fail([
     `The app points at the local stack (${url}) but it is not running.`,
-    'Start it with `npm run db:start`, or delete .env.local to use hosted.',
+    'Start it with `npm run db:start`, or `npm run env -- hosted`.',
   ]);
 }
 
-const localKeys = [status.ANON_KEY, status.PUBLISHABLE_KEY].filter(Boolean);
-if (!localKeys.includes(key)) {
+if (!status.anonKeys.includes(key)) {
   fail([
     `EXPO_PUBLIC_SUPABASE_URL points at the local stack (${url}),`,
     'but EXPO_PUBLIC_SUPABASE_ANON_KEY belongs to a different project.',
     '',
     `  key in use:  ${key.slice(0, 28)}...`,
-    `  local key:   ${(status.PUBLISHABLE_KEY ?? '').slice(0, 28)}...`,
+    `  local key:   ${status.anonKey.slice(0, 28)}...`,
     '',
     'The local stack accepts the wrong key instead of rejecting it, so this',
     'shows up as an app with no data rather than an auth error.',
     '',
-    'Fix: put both lines in .env.local, from `supabase status -o env`.',
+    'Fix: `npm run env -- local` rewrites .env.local from the running stack.',
   ]);
 }
 

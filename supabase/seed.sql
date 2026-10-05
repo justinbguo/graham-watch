@@ -9,9 +9,9 @@
 --   npm run snapshot
 --
 -- The shop belongs to a seed account (seed-shop@graham.test), never to you.
--- search_listings filters `imported_by <> auth.uid()`, so inventory you
--- imported yourself is hidden from your own deck — a seed owned by the account
--- you sign in with would look like a seed that did not work.
+-- The deck filters `imported_by <> auth.uid()`, so inventory you imported
+-- yourself is hidden from your own deck — a seed owned by the account you
+-- sign in with would look like a seed that did not work. Search keeps it.
 --
 -- `storage_path` is null on every photo on purpose. It resolves against the
 -- current project's Storage, which is empty locally; null falls back to the

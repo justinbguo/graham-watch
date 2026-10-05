@@ -1308,6 +1308,7 @@ export type Database = {
           p_brands?: string[]
           p_complications?: Database["public"]["Enums"]["complication"][]
           p_dealers?: string[]
+          p_exclude_own?: boolean
           p_exclude_swiped?: boolean
           p_materials?: Database["public"]["Enums"]["case_material"][]
           p_price_maxs?: (number | null)[]
@@ -1326,7 +1327,7 @@ export type Database = {
         }[]
       }
       listing_facets: {
-        Args: never
+        Args: { p_exclude_own?: boolean }
         Returns: {
           count: number
           kind: string
@@ -1465,6 +1466,7 @@ export type Database = {
           p_brands?: string[]
           p_complications?: Database["public"]["Enums"]["complication"][]
           p_dealers?: string[]
+          p_exclude_own?: boolean
           p_exclude_swiped?: boolean
           p_favorites_first?: boolean
           p_limit?: number

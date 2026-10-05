@@ -1,7 +1,6 @@
 import { Image } from 'expo-image';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
-import { Eyebrow } from '@/components/ui';
 import { usePrimeListing, useSaved } from '@/data/listings';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
@@ -28,7 +27,7 @@ export function SavedStrip() {
 
   return (
     <View style={styles.section}>
-      <Eyebrow>Saved watches</Eyebrow>
+      <Text style={styles.heading}>Saved watches</Text>
       <FlatList
         horizontal
         data={saved}
@@ -76,6 +75,10 @@ function Watch({ card, onPress }: { card: DeckCard; onPress: () => void }) {
 const stripStyles = (theme: Theme) => ({
   section: {
     gap: stack.related,
+  },
+  heading: {
+    ...type.title,
+    color: theme.color.text,
   },
   list: {
     flexGrow: 0,

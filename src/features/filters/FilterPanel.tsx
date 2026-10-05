@@ -30,7 +30,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 
 /**
  * Every filter in one scrolling panel. Options come from `listing_facets`, so a
- * brand only appears once something in the deck is that brand — offering a
+ * brand only appears once a listing on this screen is that brand — offering a
  * filter that can only return nothing is a dead end the user has to back out of.
  *
  * Price is two number fields with presets. There is no search box here —
@@ -39,7 +39,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 export function FilterPanel({ surface }: { surface: Surface }) {
   const styles = useThemedStyles(panelStyles);
   const { filters, toggle, setPrice, togglePrice, clear } = useFilters(surface);
-  const { data: facets = [] } = useFacets();
+  const { data: facets = [] } = useFacets(surface === 'deck');
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
   const count = activeCount(filters);

@@ -1,7 +1,17 @@
 import { Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { radius, space, stack, type, type Theme } from '@/lib/theme';
+import { motion, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
+
+/**
+ * The one you just sent rises out of the composer into the thread. A reply
+ * that lands on the poll simply appears: you did not cause it, and a flight
+ * on someone else's message would look performed.
+ */
+const rise = FadeInDown.duration(motion.base).withInitialValues({
+  transform: [{ translateY: space.lg }],
+});
 
 /**
  * One message. Yours on the right in the accent, theirs on the left in the
@@ -14,16 +24,19 @@ export function Bubble({
   /** What this message was about, or how it left: "About a Rolex", "Sent by email". */
   caption,
   when,
+  sent = false,
 }: {
   body: string;
   mine: boolean;
   caption?: string | null;
   when?: string | null;
+  /** Just sent from this screen, so it arrives rather than being there. */
+  sent?: boolean;
 }) {
   const styles = useThemedStyles(bubbleStyles);
 
   return (
-    <View style={[styles.row, mine && styles.rowMine]}>
+    <Animated.View entering={sent ? rise : undefined} style={[styles.row, mine && styles.rowMine]}>
       <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
@@ -31,7 +44,7 @@ export function Bubble({
         <Text style={[styles.body, mine && styles.bodyMine]}>{body}</Text>
       </View>
       {when ? <Text style={styles.when}>{when}</Text> : null}
-    </View>
+    </Animated.View>
   );
 }
 

@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { type PropsWithChildren, type ReactNode, type Ref } from 'react';
+import { useEffect, type PropsWithChildren, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,6 +8,12 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Wordmark } from '@/components/Wordmark';
@@ -15,6 +21,7 @@ import {
   HIT_TARGET,
   inset,
   layout,
+  motion,
   radius,
   size,
   space,
@@ -49,6 +56,8 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  */
 export function Screen({
   title,
+  titleSize = 'display',
+  titleExtra,
   wordmark = false,
   subtitle,
   verified = false,
@@ -59,6 +68,10 @@ export function Screen({
   children,
 }: PropsWithChildren<{
   title?: string;
+  /** `title` is the step under `display`, for a name that shares its line with a control. */
+  titleSize?: 'display' | 'title';
+  /** A control on the title's line. Wraps under the title when the line is full. */
+  titleExtra?: ReactNode;
   /** The app's name, in place of `title`. The deck is the only screen that wears it. */
   wordmark?: boolean;
   /** A line under the title: what the screen is holding right now. */
@@ -88,9 +101,14 @@ export function Screen({
       <View style={[styles.column, { maxWidth: layout[width] }]}>
         {title || wordmark || action ? (
           <View style={styles.header}>
-            <View style={styles.heading}>
-              <View style={styles.titleRow}>
-                {wordmark ? <Wordmark fit /> : title ? <Text style={styles.title}>{title}</Text> : null}
+            <View style={[styles.heading, titleExtra ? styles.headingShare : null]}>
+              <View style={[styles.titleRow, titleExtra ? styles.titleRowWrap : null]}>
+                {wordmark ? (
+                  <Wordmark fit />
+                ) : title ? (
+                  <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
+                ) : null}
+                {titleExtra}
                 {/* Spoken, unlike most glyphs beside a word: the check is a
                     claim about the marketplace, not a picture of the word. */}
                 {verified ? (
@@ -196,6 +214,16 @@ export function Field({ ref, ...props }: TextInputProps & { ref?: Ref<TextInput>
   );
 }
 
+/**
+ * A choice settles rather than snapping. The brass rule grows in from the
+ * row's middle, and the fill and the label shift with it, `motion.fast` on
+ * the UI thread. In a list that takes one answer, the mark leaves one row as
+ * it arrives on the next, which reads as the rule moving. Each row animates
+ * its own mark because the row is also a checkbox in the filters, where
+ * several are on at once and there is nothing to travel from.
+ *
+ * Starts at rest. A row that mounts already chosen is simply chosen.
+ */
 export function ChoiceRow({
   label,
   selected,
@@ -208,18 +236,36 @@ export function ChoiceRow({
   onPress: () => void;
 }) {
   const styles = useThemedStyles(choiceStyles);
+  const { color } = useTheme();
+
+  // 0 at rest, 1 chosen.
+  const chosen = useSharedValue(selected ? 1 : 0);
+  useEffect(() => {
+    chosen.value = withTiming(selected ? 1 : 0, { duration: motion.fast });
+  }, [chosen, selected]);
+
+  const rowStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(chosen.value, [0, 1], [color.surface, color.surfaceSunken]),
+  }));
+  const ruleStyle = useAnimatedStyle(() => ({
+    opacity: chosen.value,
+    transform: [{ scaleY: chosen.value }],
+  }));
+  const labelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(chosen.value, [0, 1], [color.ink, color.brass]),
+  }));
+
   return (
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        selected && styles.selected,
-        pressed && styles.pressed,
-      ]}>
-      <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
-      {count !== undefined ? <Text style={styles.count}>{count}</Text> : null}
+      style={({ pressed }) => [styles.press, pressed && styles.pressed]}>
+      <Animated.View style={[styles.row, rowStyle]}>
+        <Animated.View pointerEvents="none" style={[styles.rule, ruleStyle]} />
+        <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+        {count !== undefined ? <Text style={styles.count}>{count}</Text> : null}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -300,6 +346,12 @@ const screenStyles = (theme: Theme) => ({
     flexShrink: 1,
     minWidth: 0,
   },
+  // The title shares the row with a control, so the heading has to be a
+  // measured width. Without one, the row is as wide as its contents and the
+  // control never wraps under the title.
+  headingShare: {
+    flex: 1,
+  },
   // The title is display size. Without this it keeps its width and pushes the
   // control — the settings cog, the filters — off the trailing edge.
   actionSlot: {
@@ -313,9 +365,18 @@ const screenStyles = (theme: Theme) => ({
     flexShrink: 1,
     minWidth: 0,
   },
+  titleRowWrap: {
+    flexWrap: 'wrap' as const,
+  },
   title: {
     ...type.display,
     color: theme.color.text,
+    maxWidth: '100%' as const,
+  },
+  titleQuiet: {
+    ...type.title,
+    color: theme.color.text,
+    maxWidth: '100%' as const,
   },
   subtitle: {
     ...type.caption,
@@ -409,33 +470,36 @@ const fieldStyles = (theme: Theme) => ({
 });
 
 const choiceStyles = (theme: Theme) => ({
+  press: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.border,
+  },
   row: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
     gap: space.md,
-    paddingHorizontal: inset.controlX,
+    // The rule's width stays reserved, so the label does not move when the
+    // rule is drawn over it.
+    paddingLeft: inset.controlX + size.rule,
+    paddingRight: inset.controlX,
     paddingVertical: inset.controlY,
     minHeight: HIT_TARGET,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-    borderLeftWidth: 2,
-    borderLeftColor: 'transparent',
-    backgroundColor: theme.color.surface,
   },
-  selected: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderLeftColor: theme.color.brass,
+  // The chosen row's brass mark, on the left edge, scaled in from the middle.
+  rule: {
+    position: 'absolute' as const,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: size.rule,
+    backgroundColor: theme.color.brass,
   },
   pressed: {
     opacity: 0.72,
   },
   label: {
     ...type.labelStrong,
-    color: theme.color.ink,
-  },
-  labelSelected: {
-    color: theme.color.brass,
   },
   count: {
     ...type.caption,

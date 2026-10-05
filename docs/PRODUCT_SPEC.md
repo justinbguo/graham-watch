@@ -41,9 +41,12 @@ In:
 6. Profile — your name, an optional picture, watches you have saved, and the
    shop you have claimed if you have one.
 7. Dealer workspace — claim a shop, edit its listings, refresh its catalogue.
+8. Community — post a watch to sell, buy, or trade, and comment on someone else's.
+9. Messages — inside Community: one thread with a person, or with a shop you asked
+   about a watch.
 
-Out, deliberately: payments and checkout, in-app messaging between users, ratings and
-reviews, moderation and reports, shipping, analytics.
+Out, deliberately: payments and checkout, ratings and reviews, moderation and
+reports, shipping, analytics.
 
 **Ratings and invented data are out, and that rule has teeth.** The dealer panel once
 showed a star rating seeded from the dealer id behind a "Sample" label, and a Source tab
@@ -70,8 +73,8 @@ them free leads is not a legal defense. So a dealer carries a `permission` colum
 only `approved` dealers appear in anyone else's deck.
 
 Importing a shop is therefore safe to do early — nothing is public until someone
-approves it. Approval happens outside the app, through `npm run dealers -- approve` or
-the Supabase dashboard.
+approves it. Approval happens outside the phone app, through the operator UI or
+`npm run dealers -- approve`.
 
 The ask is one email: Graham sends buyers straight to the dealer, no fee, no commission.
 
@@ -138,9 +141,10 @@ Scrape providers sit behind one interface so swapping is a config change, not a 
 See [SCRAPING.md](SCRAPING.md).
 
 **Reading a catalogue costs money, so the function meters it.** An account may introduce
-ten new shops an hour. Refreshing a shop you already manage is free and uncounted, which
-is what keeps the nightly sweep and a dealer's own reload unaffected. The meter is
-`import_jobs`, and the account it bills cannot write, edit, or delete its own rows.
+ten new shops an hour. An operator may introduce 200. Refreshing a shop you already
+manage is free and uncounted, which is what keeps the nightly sweep and a dealer's own
+reload unaffected. The meter is `import_jobs`, and the account it bills cannot write,
+edit, or delete its own rows.
 
 ## 8. A sold watch never enters the deck
 
@@ -176,14 +180,19 @@ puts back every pass at once. Saves are never replayed; they are already in Save
 Postgres on Supabase, RLS on every table. `profiles.id` = `auth.users.id`.
 
 ```
-profiles        id, handle, avatar_url, bio, first_name, last_name,
-                date_of_birth, account_type, favorite_brands,
+profiles        id, handle, collector_number, avatar_url, bio, first_name,
+                last_name, date_of_birth, account_type, favorite_brands,
                 collecting_years, collection_size, hunting_for,
                 notify_new_arrivals, notify_saved_watches,
                 search_pain_points, notifications_enabled,
                 onboarded_at, created_at
-dealers         id, name, website, contact_email, permission, claimed_by,
-                created_by, created_at
+dealers         id, name, website, contact_email, description, instagram,
+                logo_url, permission, claimed_by, created_by, created_at
+operators       user_id, note, added_at
+dealer_applications
+                id, user_id, website, shop_name, brands, volume, status,
+                verified_email, verified_at, dealer_id, note, reviewed_by,
+                reviewed_at, created_at
 listings        id, dealer_id, imported_by, import_job_id, source_url, brand,
                 brand_key, model, reference, year, caliber, winding,
                 case_size_mm, case_material, dial_color, style, complications,
@@ -240,16 +249,18 @@ cannot. An untested policy is an unproven one.
 
 ## 11. Client
 
-Expo SDK 57, React Native, TypeScript, Expo Router. Six tabs: Buy, Search, Exchange,
-Messages, Saved, Profile. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
+Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Search, Community,
+Saved, Profile. Messages is a view inside Community. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
 Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.
 
 ## 12. Known gaps before real users
 
-- No CI. `npm run typecheck` and `npm run test:rls` are run by hand.
-- No test coverage outside RLS. The import pipeline and the client have none.
+- CI runs typecheck, a web bundle, the operator UI, the edge functions, and
+  `test:rls` on every push. See [OPERATING.md](OPERATING.md#testing).
+- The buyer and dealer screens have no tests. The feed parsers and the operator's
+  pasted-list parser do.
 - Demo mode (`src/lib/demo.ts`) reimplements the deck's filter logic in JavaScript, so
   it can drift from `search_listings` without anything noticing.
 - The Buy tab holds far more logic than a route should; see
@@ -264,17 +275,19 @@ types are generated from the schema, never hand-written.
 - There is no way to block or report someone, and anyone who has posted can be
   written to.
 
-## 13. Exchange
+## 13. Community
 
-A fifth tab between Search and Saved. Signed-in people post a watch they want to sell,
-buy, or trade. Others comment on that post. The comment is the public record.
+The third tab, between Search and Saved. Signed-in people post a watch they want to sell,
+buy, or trade. Others comment on that post. The comment is the public record. The tab
+was named Exchange; the database tables, functions, and code keep that word.
 
 Graham is the board. It does not hold the money, hold the watch, or authenticate it.
 Payment and shipping stay between the two people. The author can edit or delete their
 own post. A deleted post takes its comments with it.
 
-A selling post requires a price. A buying post requires a photo. Any post may carry up
-to six photos. The description sits under the photo. The feed filters on intent. A
+A selling post requires a price. Every post requires a photo, up to six. The description
+sits under the photo. Buying posts are pinned above
+the feed; selling and trading stay newest-first under them. A
 comment is text alone, in the order it was written, and may answer one other comment.
 Replies are one level deep: a reply to a reply attaches to the same root, enforced by a
 trigger rather than by the client. The author's `@handle` and collector number are
@@ -292,7 +305,7 @@ the feed, which stays newest-first.
 
 ## 14. Messages
 
-One thread per pair of people, and one per shop a buyer has written to. A conversation
+Opened from the speech bubble in the Community header. One thread per pair of people, and one per shop a buyer has written to. A conversation
 has two sides and no member list: `opener_id` is whoever wrote first, and the other side
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
 shop that claims its account later inherits the threads already addressed to it.

@@ -11,6 +11,9 @@ export const keys = {
   // Two numbers about the same filter set the deck is keyed on, but a separate
   // key: the deck is frozen while it is being swiped and these are not.
   counts: (filters: unknown) => ['listing-counts', filters] as const,
+  // Same function as the deck's counts, asked the way Search is: include the
+  // caller's own imports, and do not drop watches they have already swiped.
+  searchCount: (filters: unknown) => ['listing-counts', 'search', filters] as const,
   facets: ['facets'] as const,
   profile: (userId: string) => ['profile', userId] as const,
   saved: (userId: string) => ['saved', userId] as const,
@@ -25,6 +28,7 @@ export const keys = {
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,
   dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
+  dealerPreview: (dealerId: string) => ['dealer-preview', dealerId] as const,
   exchange: ['exchange'] as const,
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
   conversations: ['conversations'] as const,

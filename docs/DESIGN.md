@@ -411,18 +411,63 @@ is still wrong — a photo is not a control.
 - Crossing the swipe commit point produces one selection tick. Committing
   produces one rigid impact. Never call haptics on every gesture frame.
 
-The swipe deck answers save and pass on the horizontal axis. The card also lifts
-straight up, and only up, when the drag starts on the photograph. That shows the
+The swipe deck answers save and pass on the horizontal axis. The card also slides
+straight down, and only down, once its own scroll is at the top. That shows the
 next watch in the gap and always returns. It is a preview, not a third answer,
 and it does not rotate. Drag is elastic, not linear: to the commit point the card
 follows the thumb exactly, past it the card returns about a third of the travel.
-The same resistance caps the lift once enough of the next photograph is visible.
+The slide follows the thumb for the card's own height, so the watch behind is
+shown whole, and resists after that. The card moves with its frame. The clip
+that rounds it does not also clip the drag, which was cutting the watch once
+it left its own rectangle.
+
 The tension is what tells you the swipe has caught before the colour does.
 
 Nothing bounces. A released card settles to rest with easing and stops. Spring
 overshoot on a declined swipe looks like the card rejected the drop. Haptics
 are supplementary: iOS can suppress them for settings, Low Power Mode, camera,
-or dictation, and the gesture must remain understandable without them.
+or dictation, and the gesture must remain understandable without them. There
+are two, in `src/lib/haptics.ts`: `tick` for a threshold crossed or a state
+flipped, `impact` for a decision committed.
+
+### What moves, and why
+
+Motion earns its place by answering one of two questions: where did that go,
+or did that take? Anything else — a spring, a toast, a pulse on an idle mark —
+competes with the watch. Each moment below answers one question and uses one
+of the four durations.
+
+- **A follow** is answered on the capsule you pressed. The plus turns into the
+  check (`GlyphTurn`: a quarter turn and a cross-fade, `motion.fast`) and the
+  word changes with it, on the frame the write starts, with one `tick`.
+  Nothing flies to Profile. Saved is a pile of watches, so a save can land on
+  it; Profile is you, and a shop flying at it would claim it is a pile of
+  shops.
+- **An undone pass** comes back in by the edge it left, at `motion.settle` —
+  the same easing a declined swipe uses to return to rest. It faded out as it
+  left, so it fades back in: the exit run backwards, ring included. A save is
+  not undone here; Saved is where that watch went.
+- **A vote** nudges the arrow the way it points and back (`space.xs`, `motion.fast`),
+  and the score steps one digit in the direction it changed, the way a
+  counter rolls. Taking the vote back nudges the other way. Only on a change:
+  a score that mounts with the feed holds still.
+- **A message you sent** rises out of the composer into the thread
+  (`space.lg`, `motion.base`) on the frame Send is pressed, because the row is
+  in the cache before the server has it. A reply that lands on the poll simply
+  appears: you did not cause it.
+- **A Community view** enters on `FadeIn` at `motion.base`, the deck's rule.
+  The moment it is for is the composer closing onto the post it just made.
+- **A chosen row** settles: the brass rule grows in from the row's middle, and
+  the fill and the label shift with it, `motion.fast`. In a list that takes
+  one answer the mark leaves one row as it arrives on the next, which reads
+  as the rule moving. Each row animates its own mark because `ChoiceRow` is
+  also a checkbox in the filters, where several are on at once.
+
+A control that mounts in its on state shows it and nothing moves. A turn, a
+rise, or a step on mount announces a change nobody made.
+
+Presses already answer: a tab scales under the thumb, a capsule dims while the
+finger is down. The unread dot stays a dot.
 
 ## Components
 
@@ -708,18 +753,31 @@ The deck and Search still filter separately. One shared set would make a search
 question wipe the queue you were halfway through, which is the thing the
 funnel on each tab exists to prevent.
 
+Search includes watches you imported. The deck does not: swiping a shop you
+just published is not shopping. The filter list follows the screen, so a dealer
+you added shows under Search's funnel and not the deck's. A shop that is still
+pending, or whose catalogue has not been imported into listings, is in neither.
+
+The number under the search field is how many watches match, counted by
+`listing_counts` with the search cut (`p_exclude_own` false, swipes kept). It
+used to be the length of the list on screen. That list stops at 50, so past
+fifty the label froze and a watch published after that never moved it. The
+list is still the 50 newest matches. Opening the tab asks again: the screen
+stays mounted, and a count from the last visit would not notice a shop
+approved somewhere else.
+
 ## Photo carousel
 
 Tap the right of a photo for the next, the left to go back. Paging never wraps: landing
 back on the first photo reads as a glitch, not as an end.
 
-Everywhere you are browsing — card, tile, thumbnail, detail hero — the
-photograph fills its frame with `cover`, edge to edge. A watch floating in a
-band of matte reads as a broken image, and the frame is the product: a full-bleed
-plate is what a catalogue prints. The full-screen viewer is the one exception and
-uses `contain` on black, because that is where a buyer inspects a bracelet and
-nothing may be cropped. Every frame a buyer browses uses 4:5, the grid row and
-the detail hero alike; the square thumbnail survives only on the dealer's own
+On a card and on the detail hero the photograph fills its frame with `cover`,
+edge to edge. A watch floating in a band of matte reads as a broken image, and
+the frame is the product: a full-bleed plate is what a catalogue prints. The
+full-screen viewer uses `contain` on black, because that is where a buyer
+inspects a bracelet and nothing may be cropped. The detail hero is 4:5. A list
+row is 5/7 and uses `contain`, so the whole photograph shows. The square
+thumbnail survives only on the dealer's own
 inventory rows, where it is wayfinding rather than the product view. Photo-heavy surfaces
 use `expo-image` so the same dealer image is cached rather than fetched on every
 return.
@@ -846,12 +904,13 @@ It is a button of its own rather than a press inside the row's press: the
 photograph and the type each open the watch, and the three sit side by side
 instead of nested.
 
-## Onboarding asks twice, and no more
+## Onboarding is seven questions, then a permission
 
-Two steps, both answerable in seconds. A name, because the dealer reads it at the top
-of the inquiry email and "a buyer on Graham" is a worse way to start a conversation
-about a five-figure watch. Then favourite brands, picked from what the catalogue
-actually holds, with the count beside each one.
+Name, username, birthday, collection size, favourite brands, pain points, then
+notifications. A name, because the dealer reads it at the top of the inquiry
+email and "a buyer on Graham" is a worse way to start a conversation about a
+five-figure watch. Brands are picked from what the catalogue actually holds,
+with the count beside each one.
 
 Brands rank the deck; they never filter it. A first-run answer is a guess, and hiding
 the catalogue behind a guess costs more than dealing it in a slightly worse order.
@@ -863,18 +922,20 @@ answer, and it has to be told apart from never having been asked.
 
 ## Profile is who you are, then the shop
 
-The Profile tab opens on the person: a square `size.thumb` photo, and to the
+The Profile tab opens on the person: a square `size.profile` photo, and to the
 right of it their name, `@handle`, "Collector #N" at `caption`, and how many
-watches they have saved. The two are aligned at the top, so the name starts on
-the photo's top edge instead of floating against its middle, and the block of
-type takes the rest of the row so a long name wraps rather than widening the
-page. Stacked, the photo and four short lines under it cost a third of the
-screen before the first watch.
+watches they have saved. The photograph is the height of those four lines.
+`size.thumb` stopped short of them and left a band of page under the picture.
+The two are aligned at the top, so the name starts on the photo's top edge
+instead of floating against its middle, and the block of type takes the rest
+of the row so a long name wraps rather than widening the page.
 
-Under that, the saved watches run in a horizontal row, newest first, under a
-"Saved watches" eyebrow. Every other block on this page names itself —
-"Following", "Your shop" — and one unlabelled strip of photographs between two
-labelled sections read as decoration rather than a section.
+Under that, the saved watches run in a horizontal row, newest first. "Saved
+watches" and "Following" are `title` in `text` — the same face and color as
+the name, which is white on the dark page — because an eyebrow there was the
+faintest type on the page, under a name it was introducing. "Your shop" stays
+an eyebrow: that block is the dealer's own tools, not a list of things they
+chose.
 Each photograph is `size.gridPhoto` wide at 5/7, the same frame as a watch in
 a list, with the name and the price under it. A tap opens the listing. Nothing
 saved draws no row, and no eyebrow either: a heading is a promise that
@@ -897,8 +958,9 @@ Deciding on a five-figure watch takes the reference and the caliber, and a card
 that made you leave to read them turned one decision into a navigation.
 
 The block under the photograph opens on "About this watch" when the dealer wrote
-one, then the description. The heading is `bodyStrong`, one step above the
-description, which stays at `label`. Everything else under the photograph is
+one, then the description. The heading is `title`, the same face as the dealer
+name under it, so the two headers on the card are one size. The description
+stays at `label`. Everything else under the photograph is
 `label`, 14pt, the description in regular and the specification values in
 semibold. The description used to be `body` over specs at `label`, which made
 the dealer's sentence the loudest thing on a card whose facts are the reason
@@ -928,15 +990,14 @@ Three gestures, one surface, and they must not fight:
 - Drag sideways and the card leaves. The pan claims the gesture once the
   horizontal travel wins, so a thumb reading the spec table never flings the
   watch away.
-- Drag up on the photograph and the card lifts inside its own frame. The watch
-  behind is the same size, so the gap shows that watch's photograph rather than
-  the buttons at the bottom of its card. Let go and the card settles back. A
-  lift is not a pass and not a save.
-- Drag up on the words and the card scrolls. That is React Native's `ScrollView`,
-  not Gesture Handler's: Gesture Handler's wraps a native gesture that takes the
-  whole touch on web, and the card then does not move at all, with or without a
-  blocking relation between the two. The axes never contend because the content
-  is taller than the card but never wider.
+- Drag down, with the card already at the top of its scroll, and the whole card
+  slides down, as far as it is tall. The next card is the same size and stacked
+  behind it, so that watch comes into view whole. Let go and the card settles
+  back. The slide is not a pass and not a save.
+- Drag up and the card scrolls. The scroll view's own pan is off: it was
+  claiming every downward drag, so the preview never ran, while left and right
+  still worked because a scroll view has nothing to do sideways. The card's pan
+  scrolls the words, and a wheel does the same on the web.
 - Tap the photograph's left or right to page it, long press to open it full
   screen, pinch to magnify it. Only the top card takes any of this.
 
@@ -1020,7 +1081,9 @@ Watches priced on request are left out of the sum and counted under it — "2 on
 because a total quietly short by two reads as the whole answer. Mixed currencies show no
 total at all rather than adding pounds to dollars. An empty list shows nothing: "$0" beside
 the word Saved reads as a price. Sold watches are left out too, since their row shows "Sold"
-where the price was and a sum no visible price explains is worse than a smaller sum.
+where the price was and a sum no visible price explains is worse than a smaller sum. The
+speech bubble sits to the right of that total, the same control Community uses, and it
+stays when the list is empty.
 
 ## Removing a saved watch is a swipe
 
@@ -1072,10 +1135,6 @@ while a watch already sitting in someone's Saved list stays there, marked "Sold"
 inquiry button gone. Deleting it instead would remove it from that list with no explanation
 and take the swipe history with it.
 
-The description is not on the card. Two lines of prose is a paragraph cut in half — long
-enough to crowd the price, short enough to tell you nothing. It reads in full on the detail
-screen or not at all.
-
 A long press on the photo opens it alone, full screen and black, with the paging intact and
 nothing else on it. Long press because tap is already spoken for by paging, and because
 wanting a closer look is a deliberate act rather than a stray thumb.
@@ -1104,15 +1163,18 @@ It all runs in Reanimated worklets on the UI thread. A magnification driven by R
 re-renders per frame, and it would drop them on the one interaction that exists to be
 looked at closely.
 
-Saving is a right swipe, and the same act as a button: **Save watch**, with a
+On the deck card the swipe is the only verdict. The card carries no buttons:
+a **Save watch** beside the gesture was a second way to do one thing, and a
+dealer inquiry is a step you take about a watch you have kept, not one still
+being judged.
+
+On the detail screen saving is the same act as a button: **Save watch**, with a
 filled `bookmark` at `size.iconSmall` beside the label. **Ask about this watch**
 carries a filled `email`, and **Pass** a filled `close`. They sit between the
-specification table and the dealer, on the card and on the detail screen alike:
-saving and asking are about the watch, and the shop under them is who you would
-be writing to. Under the dealer they were the last thing on a block that had
-already changed subject.
-Both write the same right swipe. On the card the watch leaves, the way a swipe
-does.
+specification table and the dealer: saving and asking are about the watch, and
+the shop under them is who you would be writing to. Under the dealer they were
+the last thing on a block that had already changed subject. Save writes the
+same right swipe the deck does.
 
 A watch already in Saved shows none of the three on the detail screen. Nothing
 is left to decide about a watch you have chosen, and the row in Saved already
@@ -1195,19 +1257,41 @@ at the same size as the globe. The handle is the label. The mark stays silent.
 
 The panel reads in one order: the mark and the name, the shop's own sentence
 about itself, then the two counts. Identity first, then what is true about
-them. The controls come after the facts they are about.
+them.
 
-**Follow** sits under the counts, a filled capsule with `account-plus`. Once
-followed it reads **Following** and the glyph is `account-check`. Pressing it
-again stops. The shops you follow are a list on Profile, under Following. A row
-opens that shop.
+On the shop's own page the screen title is that name, so the panel does not
+say it again. The title steps down to `type.title` so Follow can share the
+line. The name takes its own width; when the line is full the capsule wraps
+under it rather than crushing the name.
 
-**More watches** is a `ghost` button under those links, with a filled `watch`.
-It opens that shop's own page: the description, and every watch the shop still
-has for sale. Ghost rather than filled, because leaving for a whole catalogue is
-a detour from deciding on the watch above it, and a third filled capsule in one
-block makes all three read as equal. A buyer sees it. The shop's own card does
-not.
+**Three of the shop's other watches** sit under the counts, on a card and on
+the listing route. Equal tiles at the list row's 5/7, `radius.sm`, on
+`surfaceSunken`, `contain`, so a watch here is the same shape as the same
+watch in Saved. The watch being read is left out. A tile opens that listing.
+A buyer deciding whether to write to a stranger wants to know what else they
+sell, and three photographs answer that faster than a count. The strip is
+`useDealerPreview`, keyed by shop so every card from one dealer shares it.
+
+The strip's row names itself. **Inventory** is `title` in `text` on the left,
+the same face as the other section headers. **See more** stays `labelStrong`
+on the right, with a `chevron-right` at `size.iconSmall` on the word, and
+opens the shop's own page: the description, and every watch the shop still
+has for sale. The arrow is the mark that the word leaves this card. Inventory
+is not part of the button: a header that presses makes the name and the link
+the same control. It replaced a **More watches** ghost button under the
+links. The shop's own page shows neither: the list is already there.
+
+**Follow** sits on the name's line, a short capsule at `size.avatarSmall`.
+Follow and Following are one capsule in two inks. Follow is solid `text` with
+the word and glyph in `background`: white with black type on a dark page,
+near-black with paper type on a light one. It is the thing to do, so it is the
+loud one. Following turns it inside out: a `text` stroke, `text` type, and the
+page colour inside, because the act is done. The size and the stroke stay put,
+so a press swaps the ink without the capsule moving. The glyph is `account-plus` until
+you follow, then `account-check`. Pressing it again stops. On a card the
+capsule is beside the panel's name. On the shop's page it is beside the title,
+since that is the only place the name is written. The shops you follow are a
+list on Profile, under Following. A row opens that shop.
 
 ## A contact address is never spelled out on screen
 
@@ -1320,7 +1404,7 @@ exists while a thumb is down and is gone when the thumb lifts.
 
 ## The tab bar is a dark floor
 
-`TabBar` draws the six tabs; the navigator only says which routes exist, what each is
+`TabBar` draws the five tabs; the navigator only says which routes exist, what each is
 called, what count it carries, and which edge the bar sits on. Its own bar packs a glyph
 and a word into a fixed 49pt strip and exposes nothing else. A bar this permanent should
 not be a pile of overrides.
@@ -1377,11 +1461,19 @@ than a link there — no middle-click, no URL on hover. The hook that builds tho
 internal to the vendored navigator, and reaching into `expo-router/build` to get it would
 break on the next upgrade.
 
-## Exchange
+## Community
 
-The fifth tab, between Search and Saved. Two arrows (`swap-horizontal`, outline when idle).
+The third tab, between Search and Saved. Two people (`people`, outline when idle).
 A public board: a person posts a watch they are selling, buying, or trading, and anyone
 signed in can comment. The comment is the public record that they are in the deal.
+
+It was Exchange, under two arrows, with Messages as a tab of its own beside it. The
+arrows named the deal and nothing else on the board; the people are who you are among.
+Messages moved in with it because a conversation only ever starts from here or from a
+shop's watch, and a tab for the second half of an act that begins on another tab split
+one thing across the bar. The database keeps the old word: the tables are `exchange_*`
+and so are the hooks and the feature folder, because a rename there is a migration, and
+the name a user reads and the name a table has are two different things.
 
 A post opens with the person who wrote it, on one line: their photograph at
 `size.avatarSmall`, their name, `Collector #N` in a quiet capsule, and how long ago. A
@@ -1393,22 +1485,30 @@ the same empty state the profile page uses. The name and the photograph are read
 from the profile, so changing either changes every post; the handle and the collector
 number are stamped onto the row when it is written.
 
-Then the watch: the title, and under it two capsules — the intent, Selling or Buying or
-Trading, and the price. Beside the title the intent fought it for the first line and the
-price sat in a line of its own below; as a pair of flairs they are two facts read at a
-glance and the title keeps the full width. They are set at caption size, smaller than the
-intent chips at the top of the feed, so a label does not look like a filter someone left
-switched on. That capsule is `Tag`, in two tones: white type for a fact about the post,
-grey for a badge that belongs to the byline.
+Then the watch: the title, and on that same line two capsules — the intent, Selling or
+Buying or Trading, and the price. A short title has room for both; a long one takes the
+width and the capsules wrap under it. They used to own a line of their own, so "Test"
+sat above two capsules with nothing else on the row. They are set at caption size,
+smaller than a control, so a label does not read as a button. That capsule is `Tag`, in
+two tones: white type for a fact about the post, grey for a badge that belongs to the
+byline.
 
 The photograph follows, then the description: the picture is what the words are about, so
 the words follow it. It is square and as wide as the post. Up to six photos; the feed
 shows the first and three lines of the description, in `text` — a post's own words were
 the faintest type in the row, under the handles and the counts. A selling post states a
-price. A buying post may state a budget, and it must include a photo. A trade states
-neither. The body is the condition, what is included, and the terms the two people still
-have to agree. The composer asks for the photo before the description for the same
-reason.
+price. A buying post may state a budget. A trade states neither. Every post includes a
+photo: the picture is the offer, and a title with no photograph is a card with nothing
+to look at. The body is the condition, what is included, and the terms the two people
+still have to agree. The composer asks for the photo before the description for the same
+reason. The Post button stays disabled until one is attached, and the database rejects
+a save that arrives without one.
+
+The composer opens on one control, the same height and fill as a field, reading
+Selling, Buying, or Trading with a chevron. It was three `ChoiceRow`s, which spent
+the top of the form on a choice of three. Opening it shows the three inside that
+same block, split by a hairline; the one in force is brass type. A menu floating
+over the title would need a border, and nothing here is outlined.
 
 In the thread the roll pages one photograph at a time, with a chevron on a scrim disc at
 each edge and a dot per photo at the foot. It was a strip of 240×180 thumbnails, which
@@ -1457,8 +1557,13 @@ screen, so it travels with the post as the thread scrolls; a second tap on the d
 choosing, closes it. The line that holds the dots carries its own stacking order —
 without one the photograph under it paints over the open menu.
 
-A row of chips under the header filters the feed to one intent. Tap the lit chip again
-to see every post.
+Buying posts are pinned in a strip above the feed, `size.pinned` wide, on `surface`.
+The word Buying is `caption` in `textMuted` and the title is `labelStrong`, three lines
+at most. They stay newest-first and do not also appear in the list under the strip: a
+request is what the top of the board is for, and a second copy would be the same post
+twice. Selling and trading stay in the list, newest first. The strip is a plain
+horizontal scroller. A second list nested in the feed's list warns and takes the
+vertical scroll.
 
 A comment is one line and a round send button, nothing else. A comment is a reply, not a
 second offer: asking someone to name buying, selling, or trading before they could type a
@@ -1494,16 +1599,26 @@ web, which is invalid markup, and the one tap would both vote and open the threa
 title, the flairs, the photo, and the description open the post, and the person above
 them and the controls below them do not.
 
-New post, the editor, and the thread stay inside the tab. The header's trailing icons are
-the information mark and plus on the feed, and a back arrow on the other two. The back
-arrow is trailing because that slot is where a screen's header controls live.
+New post, the editor, and the thread stay inside the tab. The header's trailing icons on
+the feed are, left to right, the speech bubble, the information mark, and plus. The editor
+and the thread carry a back arrow. The arrow is trailing because that slot is where a
+screen's header controls live.
 
 ## Messages
 
-The fourth tab, between Exchange and Saved. Two things end up here: the shops you have
-asked about a watch, and the people you have written to from the exchange. They are the
-same kind of object — a thread with one other party — so they are one list, ordered by
-whichever moved last.
+A view inside Community and inside Saved, behind the speech bubble (`chat-outline`). On
+Community it sits at the left of the header's controls. On Saved it is the far right,
+after the total. Two things end up here: the shops you have asked about a watch, and
+the people you have written to from a post. They are the same kind of object — a thread
+with one other party — so they are one list, ordered by whichever moved last.
+
+The bubble wears the unread mark: the same `size.unread` brass dot a row in the list
+wears, half off the glyph's top-right corner the way the tab bar lands a count. It is a
+dot and not a number for the reason the rows are — how many are waiting does not change
+what you do — and the number goes in the spoken label as "Messages, 3 unread". The mark
+is the one thing on the feed that is not about the feed, so it stays small. Leaving the
+list is an X, not an arrow: the list is a layer on the tab that opened it, and an arrow
+would say that tab was the previous screen.
 
 There is no way to look someone up. A conversation starts from something a person put on
 the board or a watch a shop is selling, never from a search box, because a directory of
@@ -1513,8 +1628,8 @@ A row is the other party's photograph, their name, the last line said, and when.
 has no photograph, so it gets the storefront glyph the way a person with no photograph
 gets the account glyph. Unread is a dot at the end of the line rather than a count: how
 many messages are waiting does not change what you do about them, and a number on every
-row turns a list into a scoreboard. The tab's badge counts threads, not messages, for
-the same reason.
+row turns a list into a scoreboard. The mark on the header's bubble lights for a thread,
+not a message, for the same reason.
 
 In a thread, yours are on the right in the accent and theirs are on the left in the
 fill. Alignment alone fails the moment a message wraps to the width of the column, so
@@ -1545,10 +1660,17 @@ week, and a claim that moves takes them with it.
 
 ## A save flies to the Saved tab
 
-A pass leaves by the left edge. A save does not leave: the photograph carries on from where
+A pass fades as it slips one card-width to the left, both on `motion.fast`.
+The exit used to run on to the far side of the window, which put the fade
+past the edge: the card was gone before it had thinned, and the next watch
+was uncovered by a cut. One card-width keeps the dissolve on screen, and the
+next swipe still waits the same 160ms. The fade starts when the thumb lets
+go. While the finger is down the card stays solid: the ring is the decision,
+and a watch going ghostly under a thumb stops being an object.
+A save does not leave: the photograph carries on from where
 the thumb let go, shrinks, and lands on the Saved tab's bookmark, which gives one small pulse
-as it arrives. That is the only thing that says where the watch went — the tab carries no
-count and the deck never mentions the save again.
+as it arrives. The Saved tab's badge counts the list. The flight is what shows
+the photograph landing on that bookmark. The deck never mentions the save again.
 
 The card the user swiped is retired in the same frame, so the next watch is ready under a
 copy that is already on its way. Holding the deck for the length of the animation would make

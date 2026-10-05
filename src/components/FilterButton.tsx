@@ -5,8 +5,10 @@ import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
- * A funnel with a count on it. The count is the whole point: without it a user
- * who filtered on another screen has no way to tell why the deck looks short.
+ * The funnel with the nozzle, outline until a filter is on and then solid.
+ * `filter-variant` is three bars and has no spout, so it did not read as a
+ * filter. The count is the whole point: without it a user who filtered on
+ * another screen has no way to tell why the deck looks short.
  */
 export function FilterButton({ count, onPress }: { count: number; onPress: () => void }) {
   const styles = useThemedStyles(buttonStyles);
@@ -20,7 +22,7 @@ export function FilterButton({ count, onPress }: { count: number; onPress: () =>
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
       <MaterialCommunityIcons
-        name="filter-variant"
+        name={isActive ? 'filter' : 'filter-outline'}
         size={size.icon}
         color={isActive ? theme.color.brass : theme.color.text}
       />

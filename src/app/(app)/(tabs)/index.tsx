@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
@@ -8,7 +8,6 @@ import { SwipeCard } from '@/components/SwipeCard';
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useOpenMailDraft } from '@/data/inquiries';
 import { useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useOpenFilters } from '@/features/filters/open';
@@ -31,7 +30,6 @@ export default function Deck() {
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const { data: counts } = useListingCounts();
   const swipe = useRecordSwipe(userId);
-  const contact = useOpenMailDraft(userId);
   const primeListing = usePrimeListing();
   const { data: passes = 0 } = usePassCount(userId);
   const startOver = useStartOver(userId);
@@ -45,6 +43,8 @@ export default function Deck() {
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
+  // The card an undo just put back, so it can come in by the edge it left.
+  const [returning, setReturning] = useState<string | null>(null);
 
   // Where the card is on screen, which is the stage it fills. Measured here
   // rather than in the card: the card is mid-gesture and about to unmount, and
@@ -70,6 +70,7 @@ export default function Deck() {
 
     swipe.mutate({ listingId: card.id, direction });
     setLastPass(direction === 'left' ? card : null);
+    setReturning(null);
   };
 
   const judgeCard = (card: DeckCard, direction: SwipeDirection, releaseX: number) => {
@@ -80,6 +81,7 @@ export default function Deck() {
   const undo = lastPass
     ? () => {
         undoPass.mutate(lastPass);
+        setReturning(lastPass.id);
         setLastPass(null);
       }
     : undefined;
@@ -178,17 +180,9 @@ export default function Deck() {
               key={card.id}
               card={card}
               isTop={index === visible.length - 1}
+              returning={card.id === returning}
               nextPhoto={index === visible.length - 1 ? cards[1]?.photos[0]?.url : undefined}
               onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
-              asking={contact.isPending && contact.variables?.card.id === card.id}
-              onAsk={() => {
-                contact.mutate(
-                  { card, message: '' },
-                  {
-                    onError: (error) => Alert.alert('Could not open Gmail', error.message),
-                  }
-                );
-              }}
               onExpandPhoto={(photoIndex) => {
                 primeListing(card);
                 open(

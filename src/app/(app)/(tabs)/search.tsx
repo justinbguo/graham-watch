@@ -1,10 +1,12 @@
+import { useCallback } from 'react';
 import { FlatList, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 import { FilterButton } from '@/components/FilterButton';
 import { ListingRow } from '@/components/ListingRow';
 import { Field, Message, Screen, Spinner } from '@/components/ui';
 import { usePrimeListing } from '@/data/listings';
-import { useSearch } from '@/data/search';
+import { useSearch, useSearchCount } from '@/data/search';
 import { useOpenFilters } from '@/features/filters/open';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
@@ -20,7 +22,17 @@ export default function Search() {
   const primeListing = usePrimeListing();
   const { filters, setOne } = useFilters('search');
   const openFilters = useOpenFilters();
-  const { data: results = [], isPending, error } = useSearch(filters);
+  const { data: results = [], isPending, error, refetch } = useSearch(filters);
+  const { data: matched, refetch: refetchCount } = useSearchCount(filters);
+
+  // A tab stays mounted, so leaving to approve a shop and coming back would
+  // otherwise keep the number from the last visit.
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+      void refetchCount();
+    }, [refetch, refetchCount]),
+  );
 
   // The typed query is a filter like any other, but it is the one people reach
   // for first, so it stays on the screen instead of behind the funnel.
@@ -41,7 +53,7 @@ export default function Search() {
           returnKeyType="search"
         />
         <Text style={styles.count}>
-          {isPending ? ' ' : `${results.length} watch${results.length === 1 ? '' : 'es'}`}
+          {matched == null ? ' ' : `${matched} watch${matched === 1 ? '' : 'es'}`}
         </Text>
       </View>
 

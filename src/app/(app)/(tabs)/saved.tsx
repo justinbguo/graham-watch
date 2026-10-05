@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
@@ -6,6 +7,8 @@ import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { usePrimeListing, useSaved } from '@/data/listings';
 import { useUnsave } from '@/data/swipes';
+import { MessagesButton } from '@/features/messages/MessagesButton';
+import { MessagesView } from '@/features/messages/MessagesView';
 import { useOpenStack } from '@/lib/openStack';
 import { formatTitle, totalPrice } from '@/lib/format';
 import { inset, space, type, type Theme } from '@/lib/theme';
@@ -22,10 +25,32 @@ export default function Saved() {
   const primeListing = usePrimeListing();
   const open = useOpenStack();
   const styles = useThemedStyles(savedStyles);
+  const [messages, setMessages] = useState(false);
+
+  if (messages) {
+    return <MessagesView onClose={() => setMessages(false)} />;
+  }
+
+  const { total, onRequest } = totalPrice(cards);
+
+  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
+  // like a price rather than an absence. The bubble stays either way: messages
+  // are not a property of the list.
+  const action = (
+    <View style={styles.action}>
+      {cards.length ? (
+        <View style={styles.total}>
+          <Text style={styles.totalValue}>{total ?? `${cards.length} saved`}</Text>
+          {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
+        </View>
+      ) : null}
+      <MessagesButton onPress={() => setMessages(true)} />
+    </View>
+  );
 
   if (isPending) {
     return (
-      <Screen title="Saved" inTabs>
+      <Screen title="Saved" inTabs action={action}>
         <Spinner />
       </Screen>
     );
@@ -33,24 +58,13 @@ export default function Saved() {
 
   if (error) {
     return (
-      <Screen title="Saved" inTabs>
+      <Screen title="Saved" inTabs action={action}>
         <Centered>
           <Message text={error.message} tone="error" />
         </Centered>
       </Screen>
     );
   }
-
-  const { total, onRequest } = totalPrice(cards);
-
-  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
-  // like a price rather than an absence.
-  const action = cards.length ? (
-    <View style={styles.total}>
-      <Text style={styles.totalValue}>{total ?? `${cards.length} saved`}</Text>
-      {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
-    </View>
-  ) : null;
 
   return (
     <Screen title="Saved" action={action} inTabs>
@@ -94,6 +108,10 @@ export default function Saved() {
 }
 
 const savedStyles = (theme: Theme) => ({
+  action: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+  },
   total: {
     alignItems: 'flex-end' as const,
   },

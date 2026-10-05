@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-import { Button, ChoiceRow, Field, Message, Spinner } from '@/components/ui';
+import { Button, Field, Message, Spinner } from '@/components/ui';
 import {
   useExchangePost,
   useSaveExchangePost,
@@ -14,7 +14,8 @@ import {
 import { inset, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-import { BODY_PLACEHOLDER, INTENT_OPTIONS } from './copy';
+import { BODY_PLACEHOLDER } from './copy';
+import { IntentSelect } from './IntentSelect';
 
 const PHOTO_LIMIT = 6;
 
@@ -67,7 +68,7 @@ export function Composer({
   const bodyOk = body.trim().length >= 1 && body.trim().length <= 4000;
   const cents = dollarsToCents(price);
   const priceOk = intent === 'sell' ? cents != null : price.trim() === '' || cents != null;
-  const photosOk = intent !== 'buy' || photos.length > 0;
+  const photosOk = photos.length > 0;
   const ready = titleOk && bodyOk && priceOk && photosOk && !save.isPending && filled;
 
   async function addPhotos() {
@@ -119,14 +120,7 @@ export function Composer({
   return (
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-        {INTENT_OPTIONS.map((option) => (
-          <ChoiceRow
-            key={option.intent}
-            label={option.label}
-            selected={intent === option.intent}
-            onPress={() => setIntent(option.intent)}
-          />
-        ))}
+        <IntentSelect value={intent} onChange={setIntent} />
         <Field
           placeholder="What watch"
           value={title}
@@ -169,9 +163,7 @@ export function Composer({
           disabled={photos.length >= PHOTO_LIMIT}
           onPress={() => void addPhotos()}
         />
-        {intent === 'buy' && photos.length === 0 ? (
-          <Message text="A buying post needs a photo of the watch." />
-        ) : null}
+        {photos.length === 0 ? <Message text="A post needs a photo of the watch." /> : null}
         <Field
           placeholder={BODY_PLACEHOLDER[intent]}
           value={body}

@@ -18,7 +18,7 @@ export default defineConfig(({ mode, command }) => {
 
     if (missing.length > 0) {
       throw new Error(
-        `Missing ${missing.join(' and ')}. Copy .env.example to .env.local, or set them in the environment.`
+        `Missing ${missing.join(' and ')}. Run \`npm run env -- local\` from the repo root, or set them in the environment.`
       );
     }
   }

@@ -11,54 +11,40 @@ almost identical on screen, and three of them have different data.
 
 | Configuration | App talks to | Data you see | Started by |
 | --- | --- | --- | --- |
-| **Demo** | nothing | 8 watches hardcoded in `src/lib/demo.ts` | `npm run demo:web` |
-| **Local** | `127.0.0.1:54321` | a seeded shop and ten watches, plus whatever you import | `npm run web` / `ios`, with `.env.local` present |
-| **Hosted** | `hbxgxtbtefpyutyqafoi.supabase.co` | real dealers and real watches | same commands, with `.env.local` deleted |
+| **Demo** | nothing | 6 watches hardcoded in `src/lib/demo.ts` | `npm run demo:web` |
+| **Local** | `127.0.0.1:54321` | one seeded shop and 52 watches, plus whatever you import | `npm run env -- local`, then `npm run web` / `ios` |
+| **Hosted** | `hbxgxtbtefpyutyqafoi.supabase.co` | real dealers and real watches | `npm run env -- hosted`, then the same commands |
 | **EAS build** | whatever `eas env` says | depends | `eas build` |
 
-The switch is file presence, not a flag. `.env` holds the hosted pair and
-`.env.local` holds the local pair; Expo loads `.env.local` at higher precedence,
-so **the file existing is what puts you on local.** Delete it and the same
-commands ship your keystrokes to production. `npm run check:env` prints nothing
-when the pair is coherent, so silence is not confirmation of which one you are
-on — read the URL Metro prints, or run:
+One switch moves the app, the operator scripts, and the operator UI together:
 
 ```
-node -e "console.log(require('fs').existsSync('.env.local') ? 'LOCAL' : 'HOSTED')"
+npm run env              # where each of the three points right now
+npm run env -- local     # all three → the running local stack
+npm run env -- hosted    # all three → production
 ```
 
-### The app and the operator scripts point at different backends
+Metro and the operator UI read env when they start, so restart them after a
+switch. `npm run check:env` prints `app → local` or `app → hosted · <host>` on
+every start as well.
 
-This is the one that wastes an afternoon. Right now:
+The switch is file presence. `.env` holds the hosted pair for the app and
+`scripts/.env.operator.local` holds the hosted trio for the scripts; neither is
+written by the switch. `npm run env -- local` writes `.env.local` from
+`supabase status`, which Expo loads at higher precedence, and `hosted` deletes
+it. The scripts read the same file's presence. `operator/.env.local` is rewritten
+either way.
 
-- The **app** reads `.env.local` → **local**.
-- The **operator scripts** read `scripts/.env.operator.local` → **hosted**.
-
-So `npm run dealers` lists production shops that the simulator in front of you
-cannot see, and `npm run import` spends real OpenAI credit writing rows the app
-will not show. Neither prints a warning. Check with `head -1
-scripts/.env.operator.local` before running anything that writes.
-
-Do not delete the file to get back to local: `node --env-file` hard-fails on a
-missing path, so every operator command dies with `not found`. Override instead
-— an exported variable wins over `--env-file`:
-
-```
-eval "$(supabase status -o env | sed -E 's/^API_URL=/export SUPABASE_URL=/;
-  s/^ANON_KEY=/export SUPABASE_ANON_KEY=/;
-  s/^SERVICE_ROLE_KEY=/export SUPABASE_SERVICE_ROLE_KEY=/' \
-  | grep '^export SUPABASE_')"
-npm run dealers        # now reads local
-```
-
-Those exports last for the shell, so open a new terminal to go back to hosted.
-`npm run test:rls` needs none of this — it refuses to run anywhere but local,
-because it creates and deletes users.
+Two commands ignore the switch on purpose. `npm run test:rls` always runs local,
+because it creates and deletes users. `npm run snapshot` always reads hosted,
+because the seed is a copy of real inventory. To cross over for one command,
+`GRAHAM_TARGET=local` or `GRAHAM_TARGET=hosted` in front of it wins over the
+file, and an exported `SUPABASE_URL` wins over both.
 
 ## Hosted is behind local
 
 Hosted is not a mirror of your machine and nothing keeps it in step. The schema
-and the four functions are level as of this branch, so what is left is secrets.
+and the five functions are level as of this branch, so what is left is secrets.
 Check before blaming the code:
 
 ```
@@ -265,8 +251,8 @@ window and typing a uuid into another. `operator/` is a small web app for the
 same two jobs: answer applications, and publish or pull back a shop.
 
 ```
+npm run env -- local           # writes operator/.env.local from `supabase status`
 cd operator
-cp .env.example .env.local     # fill in from `supabase status`
 npm install
 npm run dev                    # http://localhost:5173
 ```
@@ -301,20 +287,16 @@ again.
 
 ### Which Graham the UI is talking to
 
-`operator/.env.local` decides, and it is not the file the scripts read.
-`npm run dealers` loads `scripts/.env.operator.local` and points at **hosted**,
-while the UI points wherever its own env file says — and a copied
-`.env.example` says local. A grant is per project, so being an operator locally
-is not being an operator on hosted.
+`operator/.env.local` decides, and `npm run env` writes it alongside the app
+and the scripts, so the three agree unless the file was edited by hand. A grant
+is per project, so being an operator locally is not being an operator on
+hosted.
 
-That mismatch has one confusing symptom: the grant command reports that the
+A mismatch has one confusing symptom: the grant command reports that the
 address can approve shops, and the UI still says it is not an operator. Two
-different databases, both telling the truth.
+different databases, both telling the truth. `npm run env` shows which is which.
 
-`npm run dealers:local` runs the same commands against the local stack.
-
-Aiming the UI at hosted means putting the hosted URL and anon key in
-`operator/.env.local`. Everything it does there is a write to production:
+Aiming the UI at hosted is `npm run env -- hosted`. Everything it does there is a write to production:
 accepting an application hands a real shop to a real dealer, and publishing puts
 real stock in real decks.
 
@@ -349,9 +331,12 @@ read fills and `Import` draws from. A shop can hold five hundred here and no
 listings at all; that is the normal state right after it is added.
 
 A gap between the first two is sold or deactivated stock — or the whole shop not
-being approved, which is what `Publish` changes. The rest of what the deck
-filters is per-viewer, because a buyer never sees what they imported themselves
-or has already swiped, so it cannot be counted per shop.
+being approved, which is what `Publish` changes. The deck also hides from you
+the watches you imported yourself, and anything you have already swiped, so
+that count cannot be read off one shop. Search does not hide your imports:
+that is where you check a shop you just published is findable. Adding a shop
+still only reads its catalogue. The watches reach Search once they are imported
+and the shop is approved.
 
 Under Catalogue, `N queued` is an import that stopped part way. The rows stay
 marked, so importing again drains exactly those. `N failed` are catalogue items
@@ -456,8 +441,8 @@ mailbox to every buyer.
 | `npx expo export --platform web` | Broken route tree, missing assets, bad imports | Logic |
 | `npm run build` in `operator/` | Type errors and a broken bundle in the operator UI | Logic |
 | `npx oxlint --deny-warnings` in `operator/` | Lint in the operator UI | The Expo app, which has no linter |
-| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the four edge functions | Logic, and whether they are deployed |
-| `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace feed parser, against payloads a real shop returned | Every other part of the pipeline |
+| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the five edge functions | Logic, and whether they are deployed |
+| `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace, Shopify, and sitemap parsers, against payloads a real shop returned | Extraction, photos, and the write path |
 | `npm run test:rls` | Every security policy, over HTTP, from a buyer's side of the wire | Anything above the database |
 
 Run `npm run typecheck` and `npm run test:rls` before every commit; both are
@@ -466,8 +451,8 @@ seconds. CI runs all of them on every push and pull request:
 | Job | Checks |
 | --- | --- |
 | `app` | `npm run typecheck`, then a web bundle |
-| `operator ui` | `npm run build` and `oxlint --deny-warnings`, in `operator/` |
-| `edge functions` | `deno check` on all four, then `deno test` over the directory |
+| `operator ui` | `npm run build`, `oxlint --deny-warnings`, and `npm test`, in `operator/` |
+| `edge functions` | `deno check` on all five, then `deno test` over the directory |
 | `database` | every migration from empty, `npm run test:rls`, generated types |
 
 The operator job installs from `operator/package-lock.json` and never runs the
@@ -489,7 +474,7 @@ on launch.
 The edge functions are not part of the Expo program, so `npm run typecheck` has
 never seen them. `deno check` is the only type check the import pipeline gets. It
 runs with `--config supabase/functions/deno.ci.json`, which exists solely to stop
-Deno walking up to the app's `package.json`; without it, checking four server
+Deno walking up to the app's `package.json`; without it, checking five server
 files resolves the whole Expo tree and any package published in the last day
 fails Deno's dependency-age policy.
 
@@ -543,7 +528,7 @@ Two interfaces worth bookmarking:
 
 ### Walking the buyer flow
 
-`npm run db:reset` leaves a shop and ten watches in the deck already — the
+`npm run db:reset` leaves one shop and 52 watches in the deck already — the
 snapshot in `supabase/seed.sql`. Nothing to import first:
 
 1. `npm run web`, sign in with any address.
@@ -553,8 +538,8 @@ snapshot in `supabase/seed.sql`. Nothing to import first:
 5. Read the mail in Mailpit. Check the Reply-To is your buyer address, not Graham's.
 
 To walk it against a shop of your own instead, add one to the local stack —
-`dealers:local` targets whatever `supabase start` is running, so it cannot
-import into production:
+`dealers:local` targets whatever `supabase start` is running whichever way the
+repo is switched, so it cannot import into production:
 
 ```
 npm run dealers:local -- add goldfingersvintage.com --limit 10 --yes
@@ -629,14 +614,14 @@ Working-as-designed, so do not debug these:
 | A watch vanishes from the deck | Sold, deactivated, or its shop was revoked. `search_listings` filters all three. |
 | No email arrives in a real inbox, locally | Everything goes to Mailpit by design. |
 | A dealer on `shop.com` cannot use `me@mail.shop.com` | The domain rule is the exact host with `www.` stripped, never a parent — otherwise anyone with a `squarespace.com` address could claim a Squarespace shop. |
-| "Continue with Apple" is missing in Expo Go | Native module Expo Go cannot load. Needs a development build. |
-| Apple and Google buttons missing everywhere | Both are written and switched off until they have credentials. |
+| Apple's own button is missing in Expo Go | The native module does not load there. The door on screen is ours, and it needs a Services ID before Apple answers. |
+| Google's door is missing | `EXPO_PUBLIC_GOOGLE_SIGN_IN` is unset. Apple's door stays on screen either way. |
 | An application shows `○` and cannot be accepted | The applicant has not proved a mailbox yet. Waiting on them. |
 | A second application is refused | One live application per account, by unique index. Answered ones free it. |
-| The operator UI says "not an operator" | The account has no `operators` row *in the project the UI is pointed at*. A grant is per project, and `npm run dealers` grants on hosted while the UI usually reads local. Use `npm run dealers:local`. A `db:reset` drops it. |
+| The operator UI says "not an operator" | The account has no `operators` row *in the project the UI is pointed at*. A grant is per project; `npm run env` shows whether the scripts and the UI agree. A `db:reset` drops it. |
 | `Could not find the table 'public.operators' in the schema cache` | You are pointed at a project that migration has not reached. The error names the project and the local command to use instead. |
 | Operator sign-in says "Invalid login credentials" | One message covers a wrong password, an unknown address, and an account with no password set. `npm run dealers -- operator <email> --password "..."` fixes all three. |
-| The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. Copy `.env.example` and fill it from `supabase status`. |
+| The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. `npm run env -- local` writes it. |
 | The deck is empty on a fresh `db:reset` | You are signed in as the account that owns the seeded shop. The deck hides listings you imported, so sign in as anybody else. |
 
 Real bugs, by contrast, look like: a write that reports success and changes
@@ -775,9 +760,9 @@ in the project root and will try to parse this one as JavaScript. The ignored fi
 gives operator scripts access without putting the service-role key in the client
 bundle.
 
-Whatever project you put in that file is the one every `dealers`, `import` and
-`sweep` command writes to. It is hosted today. Re-read the warning at the top of
-this document before running `add` or `remove`.
+That file is production. `dealers`, `import` and `sweep` write there whenever
+the repo is switched to hosted (`npm run env`). Re-read the warning at the top
+of this document before running `add` or `remove`.
 
 Nothing a dealer owns reaches another user's deck until you approve them.
 
@@ -857,16 +842,15 @@ applications.
 
 ## Known limits
 
-Only email codes are enabled. Apple and Google are written but switched off until
-they have credentials, so neither button appears. See the README for what turning
-them on takes.
+Only email codes work today. Google's door stays off until
+`EXPO_PUBLIC_GOOGLE_SIGN_IN=1`. Apple's door is always on screen; the native
+button needs a development build, and the tap needs a Services ID. See the
+README for what turning either on takes.
 
-Apple additionally cannot run in Expo Go — it needs native code Expo Go cannot load,
-which means a development build.
-
-The only automated test above the database is the Squarespace feed parser.
-`test:rls` covers every policy, the operator UI is type-checked and linted, and
-the flows in [Testing](#testing) are walked by hand. The Expo app has no linter.
+The automated tests above the database are the Squarespace, Shopify, and
+sitemap parsers, plus the operator UI's pasted-list parser. `test:rls` covers
+every policy. The buyer and dealer screens are walked by hand. The Expo app
+has no linter.
 
 Demo mode reimplements the buyer surfaces in JavaScript rather than running the
 real queries, so it can drift from the backend without anything failing. It is for

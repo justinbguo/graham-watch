@@ -3,8 +3,8 @@
 Swipe-based discovery app for vintage watches. Buyers swipe a deck and save what they
 like. Dealer inventory is imported by an operator, not by users.
 
-Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and the
-import edge function.
+Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and
+edge functions.
 
 - Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
@@ -20,8 +20,8 @@ Desktop app. The Supabase CLI talks to that client. Do not install Docker
 Desktop, and do not run `docker` commands by hand.
 
 1. `npm install`
-2. `npm run db:start` — starts the local Supabase stack, prints the API URL and anon key.
-3. `cp .env.example .env` and paste those two values in.
+2. `npm run db:start` — starts the local Supabase stack.
+3. `npm run env -- local` — points the app, the scripts, and the operator UI at that stack.
 4. `npm run db:reset` — applies migrations and seeds a snapshot of real
    inventory, so the deck has watches in it once you sign in.
 5. `npm run web` (browser) or `npm run ios` (simulator via Expo Go)
@@ -33,18 +33,21 @@ a development build (below) and run `npm run start:dev`.
 
 ## Choosing a backend
 
-`.env` holds one backend. To point at the local stack, put **both** lines in
-`.env.local`, which Expo loads at higher precedence and git ignores:
+`.env` holds the hosted backend. One command moves the app, the operator
+scripts, and the operator UI together:
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<the publishable key from `supabase status -o env`>
+npm run env              # where each points right now
+npm run env -- local     # the running local stack
+npm run env -- hosted    # production
 ```
 
-Delete the file to go back to the backend in `.env`.
+`local` writes `.env.local` from `supabase status`, which Expo loads at higher
+precedence and git ignores; `hosted` deletes it. Restart Metro after switching,
+because env is read when it starts.
 
-Keep the URL and the key together. Editing the URL alone is the trap: the local
-stack accepts a key from another project instead of rejecting it, so the app
+Do not edit `.env.local` by hand. The local stack accepts a key from another
+project instead of rejecting it, so a URL changed on its own gives an app that
 looks healthy and shows nothing. `npm run check:env` catches that pairing and
 runs automatically before `start`, `ios`, `android`, and `web`.
 
@@ -144,8 +147,8 @@ plain `fetch` with no key, which handles
 static HTML only; set `FIRECRAWL_API_KEY` or `JINA_API_KEY` for JavaScript-rendered
 shops. See [docs/SCRAPING.md](docs/SCRAPING.md).
 
-Point the scripts at a hosted project by setting `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+`npm run env -- hosted` points the scripts at production. The hosted keys stay
+in `scripts/.env.operator.local`, which the switch reads and never rewrites.
 
 ## The operator UI
 
@@ -153,8 +156,8 @@ Answering dealer applications and publishing shops runs in a web app, separate
 from the phone app and with its own dependencies:
 
 ```
-cp operator/.env.example operator/.env.local   # both values from `supabase status`
-npm run operator                               # http://localhost:5173
+npm run env -- local     # writes operator/.env.local from `supabase status`
+npm run operator         # http://localhost:5173
 ```
 
 Sign in with an email and password, both set from the terminal. There is no
@@ -168,10 +171,10 @@ That creates the account if it does not exist, sets the password if it does, and
 grants operator either way. Twelve characters minimum. With no argument it
 grants `operator@graham.local`, whose local password is `graham-operator`.
 
-Watch which backend you grant on. `npm run dealers` reads
-`scripts/.env.operator.local` and points at hosted, while a copied
-`operator/.env.example` points the UI at local — and a grant only counts in the
-project it was made in. `npm run dealers:local` grants on the local stack.
+Watch which backend you grant on. A grant only counts in the project it was
+made in, and `npm run env` moves the scripts and the UI together so they agree.
+`npm run dealers:local` grants on the local stack whichever way the repo is
+switched.
 
 An operator is a row in an `operators` table, not whoever holds
 `SUPABASE_SERVICE_ROLE_KEY` — that key bypasses row-level security on every
@@ -219,7 +222,8 @@ More in [docs/OPERATING.md](docs/OPERATING.md).
 ## Layout
 
 ```
-src/app/            routes; (app)/(tabs) holds Buy, Search, Saved, Profile
+src/app/            routes; (app)/(tabs) holds Buy, Search, Community, Saved, Profile
+src/features/       auth, onboarding, listings, dealers, exchange, messages, saved
 src/components/     SwipeCard, DeckGrid, ListingRow, shared UI primitives
 src/data/           one module per entity, TanStack Query hooks
 src/lib/            supabase client, auth, design tokens, generated types
@@ -227,7 +231,7 @@ src/providers/      session, query cache, theme
 scripts/            operator tools and RLS tests
 operator/           operator web app; own package.json, Vite not Expo
 supabase/migrations schema and RLS
-supabase/functions  import-listings edge function
+supabase/functions  import, inquiry, claim, and application edge functions
 ```
 
 ## Development build
@@ -271,6 +275,7 @@ not. Store binaries are a different path: [docs/OPERATING.md](docs/OPERATING.md)
 | `eas build:dev -p ios` | Build/install the iOS Simulator development client |
 | `npm run start:dev` | Talk to a development build already on the Simulator or device |
 | `npm run demo:web` / `demo` | Run against fixtures, no backend needed |
+| `npm run env [-- local\|hosted]` | Show or switch which backend the app, scripts, and operator UI use |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
 | `npm run db:reset` | Re-apply migrations and seed the inventory snapshot |

@@ -67,6 +67,7 @@ async function fetchDeck(limit: number, filters: Filters): Promise<DeckCard[]> {
     p_limit: limit,
     p_exclude_swiped: true,
     p_favorites_first: true,
+    p_exclude_own: true,
     ...toRpcArgs(filters),
   });
   if (error) throw error;

@@ -385,6 +385,13 @@ export const WIDE_BREAKPOINT = 900;
 export const size = {
   thumb: 72,
   /**
+   * The profile photograph. The four lines beside it — name, handle,
+   * collector number, save count, with `stack.tight` between — come to 94.
+   * 96 is the scale step that meets them, so the square and the type share
+   * a height instead of the picture stopping short.
+   */
+  profile: 96,
+  /**
    * A face beside a name. `avatar` where the name has a second line under it,
    * as in a conversation's row; `avatarSmall` in a byline, where the name,
    * the badge, and the time share one line and a larger face would set the
@@ -393,11 +400,16 @@ export const size = {
   avatar: 40,
   avatarSmall: 32,
   /**
-   * The photograph on a grid row. Portrait, 4/5, so the watch stays readable
+   * The photograph on a grid row. Portrait, 5/7, so the watch stays readable
    * beside the type. A quarter of a phone's width: at a third, three rows
    * filled the screen and a list of watches read as a stack of posters.
    */
   gridPhoto: 96,
+  /**
+   * A buying post pinned above the community feed. Two fit on a phone with
+   * the next one showing, so the row reads as a strip and not a stack.
+   */
+  pinned: 160,
   /** Glyphs. `icon` for a tab or a header control, `iconSmall` inline with text. */
   icon: 24,
   iconSmall: 16,

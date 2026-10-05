@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 
 import { TabBar } from '@/components/TabBar';
-import { useUnreadCount } from '@/features/messages/count';
 import { SaveTargetIcon } from '@/features/saved/flight';
 import { useSavedCount } from '@/features/saved/count';
 import { useIsWide } from '@/lib/layout';
@@ -22,15 +21,13 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const ICONS: Record<string, { active: IconName; idle: IconName }> = {
   index: { active: 'watch', idle: 'watch-outline' },
   search: { active: 'search', idle: 'search-outline' },
-  exchange: { active: 'swap-horizontal', idle: 'swap-horizontal-outline' },
-  messages: { active: 'chatbubble-ellipses', idle: 'chatbubble-ellipses-outline' },
+  community: { active: 'people', idle: 'people-outline' },
   profile: { active: 'person-circle', idle: 'person-circle-outline' },
 };
 
 export default function TabsLayout() {
   const isWide = useIsWide();
   const saved = useSavedCount();
-  const unread = useUnreadCount();
 
   return (
     <Tabs
@@ -50,11 +47,7 @@ export default function TabsLayout() {
       })}>
       <Tabs.Screen name="index" options={{ title: 'Buy' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
-      <Tabs.Screen name="exchange" options={{ title: 'Exchange' }} />
-      <Tabs.Screen
-        name="messages"
-        options={{ title: 'Messages', tabBarBadge: unread || undefined }}
-      />
+      <Tabs.Screen name="community" options={{ title: 'Community' }} />
       <Tabs.Screen
         name="saved"
         options={{

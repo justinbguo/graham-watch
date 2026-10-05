@@ -10,6 +10,7 @@ import { inset, space } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { DealerPanel } from './DealerPanel';
+import { FollowDealer } from './FollowDealer';
 
 export function DealerShop({ dealerId }: { dealerId: string }) {
   const styles = useThemedStyles(shopStyles);
@@ -39,7 +40,11 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
   const { dealer, listings } = data;
 
   return (
-    <Screen title={dealer.name} action={<CloseButton onPress={close} />}>
+    <Screen
+      title={dealer.name}
+      titleSize="title"
+      titleExtra={<FollowDealer dealer={dealer} />}
+      action={<CloseButton onPress={close} />}>
       <FlatList
         data={listings}
         keyExtractor={(card) => card.id}
@@ -47,7 +52,7 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.header}>
-            <DealerPanel dealer={dealer} follow />
+            <DealerPanel dealer={dealer} named={false} />
           </View>
         }
         ListEmptyComponent={<Message text="Nothing for sale right now." />}

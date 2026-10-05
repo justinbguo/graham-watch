@@ -13,9 +13,6 @@ pattern has no shared cache, refetches on every mount, and races when two screen
 want the same rows. Server data belongs in a query cache (TanStack Query) keyed
 by entity.
 
-The current screens do exactly this by hand. Migrate them before adding a fifth
-screen — the cost of the change grows with every screen added.
-
 ## Rules
 
 - One module per entity under `src/data/`, exporting typed functions. Screens

@@ -49,6 +49,7 @@
     "start:dev": "npm run check:env && expo start --dev-client",
     "postinstall": "node scripts/guard-unhandled-nav.mjs",
     "check:env": "node scripts/check-env.mjs",
+    "env": "node scripts/env.mjs",
     "typecheck": "tsc --noEmit",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
@@ -59,12 +60,12 @@
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --go --clear",
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
     "operator": "cd operator && { test -d node_modules || npm install; } && npm run dev",
-    "test:rls": "node scripts/test-rls.mjs",
-    "import": "node --env-file=scripts/.env.operator.local scripts/import.mjs",
-    "sweep": "node --env-file=scripts/.env.operator.local scripts/sweep.mjs",
-    "dealers": "node --env-file=scripts/.env.operator.local scripts/dealers.mjs",
-    "dealers:local": "node scripts/dealers.mjs",
-    "snapshot": "node --env-file=scripts/.env.operator.local scripts/snapshot.mjs"
+    "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
+    "import": "node scripts/import.mjs",
+    "sweep": "node scripts/sweep.mjs",
+    "dealers": "node scripts/dealers.mjs",
+    "dealers:local": "GRAHAM_TARGET=local node scripts/dealers.mjs",
+    "snapshot": "GRAHAM_TARGET=hosted node scripts/snapshot.mjs"
   },
   "private": true
 }

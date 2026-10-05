@@ -6,11 +6,10 @@ import { useThemedStyles } from '@/providers/theme';
 /**
  * A flair: one fact about a post or the person who wrote it, in a filled
  * capsule. What a post is — Selling, Buying, Trading — and what it costs,
- * under the title; which collector wrote it, beside their name.
+ * beside the title when they fit; which collector wrote it, beside their name.
  *
- * Filled and unpressable, at caption size. The intent chips at the top of the
- * feed are the same capsule shape, so a flair has to stay small enough not to
- * read as a filter someone left switched on.
+ * Filled and unpressable, at caption size. A flair stays smaller than a
+ * control, so a label on a post does not read as a button.
  */
 export function Tag({ label, tone = 'plain' }: { label: string; tone?: 'plain' | 'quiet' }) {
   const styles = useThemedStyles(tagStyles);

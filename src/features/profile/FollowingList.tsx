@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
 
-import { Eyebrow, Message } from '@/components/ui';
+import { Message } from '@/components/ui';
 import { useFollows } from '@/data/follows';
 import { useOpenStack } from '@/lib/openStack';
 import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
@@ -16,7 +16,7 @@ export function FollowingList() {
 
   return (
     <View style={styles.section}>
-      <Eyebrow>Following</Eyebrow>
+      <Text style={styles.heading}>Following</Text>
       {isPending ? null : follows.length === 0 ? (
         <Message text="Shops you follow show up here." />
       ) : (
@@ -50,6 +50,10 @@ export function FollowingList() {
 const listStyles = (theme: Theme) => ({
   section: {
     gap: stack.related,
+  },
+  heading: {
+    ...type.title,
+    color: theme.color.text,
   },
   row: {
     flexDirection: 'row' as const,

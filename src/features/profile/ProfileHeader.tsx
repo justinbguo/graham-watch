@@ -57,7 +57,7 @@ export function ProfileHeader() {
           disabled={setAvatar.isPending}
           onPress={pickPhoto}
           style={({ pressed }) => [styles.photoPress, pressed && styles.pressed]}>
-          <Avatar url={profile?.avatar_url ?? null} px={size.thumb} />
+          <Avatar url={profile?.avatar_url ?? null} px={size.profile} />
         </Pressable>
 
         <View style={styles.copy}>
@@ -87,8 +87,9 @@ const headerStyles = (theme: Theme) => ({
     alignItems: 'flex-start' as const,
     gap: space.md,
   },
-  // The photo is `size.thumb`, wider than a hit target already. Left to
-  // stretch it would be a press area the height of the whole block.
+  // The photo is `size.profile`, the height of the type beside it, and
+  // already wider than a hit target. Left to stretch it would be a press
+  // area the height of the whole block.
   photoPress: {
     alignSelf: 'flex-start' as const,
   },

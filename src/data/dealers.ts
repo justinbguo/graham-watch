@@ -210,6 +210,7 @@ export function useUpdateDealerListing(dealerId: string | null) {
       queryClient.invalidateQueries({ queryKey: keys.listing(listingId) });
       queryClient.invalidateQueries({ queryKey: ['deck'] });
       queryClient.invalidateQueries({ queryKey: ['search'] });
+      queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
       queryClient.invalidateQueries({ queryKey: keys.facets });
     },
   });
@@ -369,6 +370,7 @@ export function usePublishBatch(dealerId: string | null) {
       queryClient.invalidateQueries({ queryKey: keys.dealerInventory(dealerId) });
       queryClient.invalidateQueries({ queryKey: ['deck'] });
       queryClient.invalidateQueries({ queryKey: ['search'] });
+      queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
       queryClient.invalidateQueries({ queryKey: keys.facets });
     },
   });
@@ -388,6 +390,38 @@ export function useDealerReputation(dealerId: string | null) {
       return data?.[0] ?? null;
     },
     enabled: Boolean(dealerId) && !isDemo,
+  });
+}
+
+/** How many of a shop's other watches a card shows before offering the shop. */
+export const DEALER_PREVIEW = 3;
+
+/**
+ * The shop's newest watches for sale, for the strip on a card. Fetches one
+ * more than the strip shows so the watch being read can be dropped and the
+ * strip still fill. Keyed by shop, not by card: every card from one dealer
+ * shares the fetch.
+ */
+export function useDealerPreview(dealerId: string | null) {
+  return useQuery({
+    queryKey: keys.dealerPreview(dealerId ?? 'none'),
+    queryFn: async (): Promise<DeckCard[]> => {
+      if (isDemo) {
+        return demo.search({ ...NO_FILTERS, dealers: [dealerId!] }).slice(0, DEALER_PREVIEW + 1);
+      }
+
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('dealer_id', dealerId!)
+        .eq('status', 'active')
+        .is('sold_at', null)
+        .order('created_at', { ascending: false })
+        .limit(DEALER_PREVIEW + 1);
+      if (error) throw error;
+      return hydrate(data ?? []);
+    },
+    enabled: Boolean(dealerId),
   });
 }
 

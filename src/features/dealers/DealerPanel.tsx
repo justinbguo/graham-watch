@@ -3,13 +3,12 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
-import { Button } from '@/components/ui';
 import { useDealerReputation } from '@/data/dealers';
 import type { Dealer } from '@/lib/models';
-import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+import { DealerPreview } from './DealerPreview';
 import { FollowDealer } from './FollowDealer';
 
 const INSTAGRAM = require('../../../assets/instagram.png');
@@ -146,6 +145,8 @@ export function DealerPanel({
   dealer,
   browse = false,
   follow = false,
+  named = true,
+  except,
 }: {
   // The three scraped fields are optional because one caller genuinely lacks
   // them: a dealer's own shop card is built from `dealer_accounts`, which
@@ -156,17 +157,24 @@ export function DealerPanel({
   browse?: boolean;
   /** A buyer can follow the shop. The shop card cannot. */
   follow?: boolean;
+  /** The screen title is already this name. Saying it again is a second header. */
+  named?: boolean;
+  /** The listing this panel sits under, so the strip does not repeat it. */
+  except?: string;
 }) {
   const styles = useThemedStyles(panelStyles);
   const { data } = useDealerReputation(dealer.id);
-  const open = useOpenStack();
+  const showFollow = follow || browse;
 
   return (
     <View style={styles.panel}>
-      <View style={styles.heading}>
-        <DealerMark logoUrl={dealer.logo_url} />
-        <Text style={styles.name}>{dealer.name}</Text>
-      </View>
+      {named ? (
+        <View style={styles.heading}>
+          <DealerMark logoUrl={dealer.logo_url} />
+          <Text style={styles.name}>{dealer.name}</Text>
+          {showFollow ? <FollowDealer dealer={dealer} /> : null}
+        </View>
+      ) : null}
 
       {dealer.description ? <Text style={styles.about}>{dealer.description}</Text> : null}
 
@@ -177,26 +185,14 @@ export function DealerPanel({
         </View>
       ) : null}
 
-      {follow || browse ? <FollowDealer dealer={dealer} /> : null}
+      {/* What else the shop sells. The shop's own page lists everything, so it
+          shows no strip. */}
+      {browse ? <DealerPreview dealerId={dealer.id} except={except} /> : null}
 
       <View style={styles.links}>
         {dealer.website ? <Website url={dealer.website} /> : null}
         {dealer.instagram ? <Instagram handle={dealer.instagram} /> : null}
       </View>
-
-      {/* Ghost, not filled. Leaving this shop for its whole catalogue is a
-          detour from deciding on the watch above it, so it stays quieter than
-          Save and Ask. */}
-      {browse ? (
-        <Button
-          label="More watches"
-          icon="watch"
-          variant="ghost"
-          onPress={() =>
-            open('dealer/[dealerId]', { dealerId: dealer.id }, `/dealer/${dealer.id}`)
-          }
-        />
-      ) : null}
 
       <Text style={styles.note}>Inquiries reach this shop by email.</Text>
     </View>
@@ -211,6 +207,7 @@ const panelStyles = (theme: Theme) => ({
   },
   heading: {
     flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
     alignItems: 'center' as const,
     gap: space.sm,
   },
@@ -222,6 +219,8 @@ const panelStyles = (theme: Theme) => ({
   name: {
     ...type.title,
     color: theme.color.text,
+    flexShrink: 1,
+    maxWidth: '100%' as const,
   },
   // The shop's own sentence about itself, so it reads as body text rather than
   // a field: full measure, muted against the name above it.

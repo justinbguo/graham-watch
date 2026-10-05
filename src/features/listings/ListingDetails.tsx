@@ -59,7 +59,7 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
       {card.dealer ? (
         <>
           <Divider />
-          <DealerPanel dealer={card.dealer} browse />
+          <DealerPanel dealer={card.dealer} browse except={card.id} />
         </>
       ) : null}
     </View>
@@ -169,7 +169,7 @@ const detailsStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   aboutHeading: {
-    ...type.bodyStrong,
+    ...type.title,
     color: theme.color.text,
   },
   specs: {

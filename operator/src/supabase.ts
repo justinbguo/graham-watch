@@ -12,7 +12,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!url || !anonKey) {
   throw new Error(
-    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Copy operator/.env.example to operator/.env.local.'
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Run `npm run env -- local` from the repo root.'
   );
 }
 

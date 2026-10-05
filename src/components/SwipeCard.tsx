@@ -1,12 +1,12 @@
-import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
+  scrollTo,
   useAnimatedReaction,
+  useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -15,8 +15,8 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
-import { Button } from '@/components/ui';
 import { ListingDetails } from '@/features/listings/ListingDetails';
+import { impact, tick } from '@/lib/haptics';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { inset, motion, radius, shadow, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -31,9 +31,9 @@ const ROTATION_DEGREES = 10;
 /** How much of the card the photograph takes, and how tall it may ever get. */
 const PHOTO_FRACTION = 0.58;
 const PHOTO_MAX_RATIO = 1.25;
-/** How far a lift may go before it resists: enough of the next photograph to recognise it. */
-const PREVIEW_FRACTION = 0.42;
-
+// Timing, not a spring: an overshoot past centre reads as the card rejecting
+// the drop rather than settling from it.
+const SETTLE = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
 /** Finger travel in, card travel out: one to one, then elastic past the commit point. */
 function resist(travel: number, commit: number) {
   'worklet';
@@ -42,44 +42,39 @@ function resist(travel: number, commit: number) {
   return Math.sign(travel) * (commit + (distance - commit) * DRAG_RESISTANCE);
 }
 
-/** Upward travel only. A downward drag is the scroll view's, never a preview. */
-function resistUp(travel: number, limit: number) {
+function clampScroll(offset: number, content: number, view: number) {
   'worklet';
-  if (travel >= 0) return 0;
-  const distance = -travel;
-  if (limit <= 0 || distance <= limit) return travel;
-  return -(limit + (distance - limit) * DRAG_RESISTANCE);
+  const max = Math.max(0, content - view);
+  return Math.min(Math.max(offset, 0), max);
 }
 
-function thresholdHaptic() {
-  if (Platform.OS === 'web') return;
-  void Haptics.selectionAsync().catch(() => {});
-}
-
-function commitHaptic() {
-  if (Platform.OS === 'web') return;
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
+/** Downward travel only. An upward drag scrolls the card. */
+function resistDown(travel: number, limit: number) {
+  'worklet';
+  if (travel <= 0) return 0;
+  if (limit <= 0 || travel <= limit) return travel;
+  return limit + (travel - limit) * DRAG_RESISTANCE;
 }
 
 export function SwipeCard({
   card,
   onSwipe,
   onExpandPhoto,
-  onAsk,
-  asking = false,
   isTop,
   nextPhoto,
+  returning = false,
 }: {
   card: DeckCard;
   /** `releaseX` is where the card sat when the thumb let go, so a save can fly
       on from there rather than restarting at centre. */
   onSwipe: (direction: SwipeDirection, releaseX: number) => void;
   onExpandPhoto: (index: number) => void;
-  onAsk: () => void;
-  asking?: boolean;
   isTop: boolean;
   /** The photograph of the watch behind this one. Lifting the card shows it. */
   nextPhoto?: string;
+  /** An undone pass. The card comes back in by the edge it left, rather than
+      appearing on top of the pile as if it had never gone. */
+  returning?: boolean;
 }) {
   const styles = useThemedStyles(cardStyles);
   const { save, danger } = useTheme().color;
@@ -92,33 +87,106 @@ export function SwipeCard({
   const photoHeight = frame.height
     ? Math.min(frame.height * PHOTO_FRACTION, frame.width * PHOTO_MAX_RATIO)
     : null;
+  // The card leaves the window, not just its own column, so this one is a
+  // viewport question.
+  const { width: windowWidth } = useWindowDimensions();
+  const offScreen = windowWidth * 1.5;
+
   // Raw finger travel, and the resisted distance the card actually moves.
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
-  const cardX = useSharedValue(0);
+  // A returning card starts where a pass ends, and settles in the way a
+  // declined swipe does. The ring and the fade come back with it: the exit
+  // run backwards.
+  const cardX = useSharedValue(returning ? -offScreen : 0);
+  // Solid while a thumb is down. The ring says the decision; fading the watch
+  // under the finger would make an object in the hand into a ghost. The
+  // dissolve starts when the card is let go, on the same clock as the travel,
+  // so the two read as one leaving.
+  const cardOpacity = useSharedValue(returning ? 0 : 1);
+  useEffect(() => {
+    if (!returning) return;
+    cardX.value = withTiming(0, SETTLE);
+    cardOpacity.value = withTiming(1, SETTLE);
+  }, [cardOpacity, cardX, returning]);
   const lift = useSharedValue(0);
   const thresholdFired = useSharedValue(false);
   const previewFired = useSharedValue(false);
   const scrollY = useSharedValue(0);
   const touchX = useSharedValue(0);
   const touchY = useSharedValue(0);
-  const mode = useSharedValue<'undecided' | 'swipe' | 'peek'>('undecided');
+  const mode = useSharedValue<'undecided' | 'swipe' | 'peek' | 'scroll'>('undecided');
+  // The scroll view does not scroll itself. Its pan was claiming every
+  // downward drag, so the card never got the one that reveals the next watch.
+  // Left and right were unaffected: a scroll view has nothing to do sideways.
+  const scroller = useAnimatedRef<Animated.ScrollView>();
+  const contentHeight = useSharedValue(0);
+  const portHeight = useSharedValue(0);
+  const web = Platform.OS === 'web';
+  // The wheel listener needs the scroll view to have mounted.
+  const [portReady, setPortReady] = useState(false);
   // Measured rather than taken from `Dimensions`: the card is capped on a wide
   // window, and a browser resize has to move the commit point with it. A
   // module-scope snapshot is read once at import and then never updates.
   const cardWidth = useSharedValue(0);
   const cardHeight = useSharedValue(0);
-  const photoTop = useSharedValue(0);
   const canPreview = useSharedValue(Boolean(nextPhoto));
   useEffect(() => {
     canPreview.value = Boolean(nextPhoto);
   }, [canPreview, nextPhoto]);
-  // The card leaves the window, not just its own column, so this one is a
-  // viewport question.
-  const { width: windowWidth } = useWindowDimensions();
-  const offScreen = windowWidth * 1.5;
 
-  const settle = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
+  const applyWebScroll = useCallback(
+    (offset: number) => {
+      const node = scroller.current as {
+        scrollTo?: (options: { y: number; animated: boolean }) => void;
+        getScrollableNode?: () => { scrollTop: number };
+        scrollTop?: number;
+      } | null;
+      if (!node) return;
+      if (node.scrollTo) {
+        node.scrollTo({ y: offset, animated: false });
+        return;
+      }
+      const element = node.getScrollableNode?.() ?? node;
+      if (typeof element.scrollTop === 'number') element.scrollTop = offset;
+    },
+    [scroller]
+  );
+
+  // The scroll view ignores the wheel while scrolling is off, so the page
+  // would scroll instead. This listener keeps the wheel on the card.
+  useEffect(() => {
+    if (!web || !portReady) return;
+    const node = scroller.current as {
+      getScrollableNode?: () => HTMLElement;
+      addEventListener?: HTMLElement['addEventListener'];
+    } | null;
+    const element = node?.getScrollableNode?.() ?? (node as unknown as HTMLElement | null);
+    if (!element?.addEventListener) return;
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const view = portHeight.value > 0 ? portHeight.value : cardHeight.value;
+      const next = clampScroll(scrollY.value + event.deltaY, contentHeight.value, view);
+      scrollY.value = next;
+      element.scrollTop = next;
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, [web, portReady, scroller, portHeight, cardHeight, contentHeight, scrollY]);
+
+  // Reanimated's scrollTo is a no-op on web, and calling it warns every frame.
+  function place(offset: number) {
+    'worklet';
+    const view = portHeight.value > 0 ? portHeight.value : cardHeight.value;
+    const next = clampScroll(offset, contentHeight.value, view);
+    scrollY.value = next;
+    if (web) {
+      scheduleOnRN(applyWebScroll, next);
+      return;
+    }
+    scrollTo(scroller, 0, next, false);
+  }
 
   const pan = Gesture.Pan()
     .enabled(isTop)
@@ -148,7 +216,7 @@ export function SwipeCard({
       if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
 
       // Horizontal still wins. A diagonal thumb reading the spec table must
-      // not fling the watch, and it must not lift it either.
+      // not fling the watch, and it must not slide it either.
       if (Math.abs(dx) > Math.abs(dy)) {
         mode.value = 'swipe';
         lift.value = 0;
@@ -158,18 +226,19 @@ export function SwipeCard({
         return;
       }
 
-      // The photograph does not scroll. An upward drag there lifts the card
-      // so the next watch can show in the gap. The words underneath still scroll.
-      const onPhoto = scrollY.value <= 1 && touchY.value < photoTop.value;
-      if (canPreview.value && dy < 0 && onPhoto) {
+      // At the top of the scroll a downward drag has nowhere to go, so the
+      // card slides down until the watch behind fills the frame.
+      if (canPreview.value && dy > 0 && scrollY.value <= 1) {
         mode.value = 'peek';
         dragY.value = dy;
-        lift.value = -resistUp(dy, cardHeight.value * PREVIEW_FRACTION);
+        lift.value = resistDown(dy, cardHeight.value);
         state.activate();
         return;
       }
 
-      state.fail();
+      mode.value = 'scroll';
+      place(scrollY.value - dy);
+      state.activate();
     })
     .onTouchesUp((_event, state) => {
       if (mode.value === 'undecided') state.fail();
@@ -182,7 +251,11 @@ export function SwipeCard({
       }
       if (mode.value === 'peek') {
         dragY.value += event.changeY;
-        lift.value = -resistUp(dragY.value, cardHeight.value * PREVIEW_FRACTION);
+        lift.value = resistDown(dragY.value, cardHeight.value);
+        return;
+      }
+      if (mode.value === 'scroll') {
+        place(scrollY.value - event.changeY);
       }
     })
     .onEnd((event) => {
@@ -196,7 +269,7 @@ export function SwipeCard({
       if (committed) {
         const direction: SwipeDirection =
           (dragX.value || event.velocityX) > 0 ? 'right' : 'left';
-        scheduleOnRN(commitHaptic);
+        scheduleOnRN(impact);
 
         // A save hands the card straight to the flight overlay, which picks it
         // up where the thumb left it and carries it to the Saved tab. Flinging
@@ -207,23 +280,26 @@ export function SwipeCard({
           return;
         }
 
-        cardX.value = withTiming(
-          -offScreen,
-          { duration: motion.fast, easing: Easing.out(Easing.cubic) },
-          () => scheduleOnRN(onSwipe, 'left', cardX.value)
+        // One card-width, not off the window. The old exit ran to 1.5 screens
+        // inside motion.fast, which put the fade past the edge: the card was
+        // gone before it had thinned. Stopping at its own width keeps the
+        // dissolve on screen, and the next swipe waits the same 160ms it did.
+        const leave = { duration: motion.fast, easing: Easing.out(Easing.cubic) };
+        const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
+        cardX.value = withTiming(-distance, leave, () =>
+          scheduleOnRN(onSwipe, 'left', cardX.value)
         );
+        cardOpacity.value = withTiming(0, leave);
         return;
       }
 
-      // Timing, not a spring: an overshoot past centre reads as the card
-      // rejecting the drop rather than settling from it.
       dragX.value = 0;
-      cardX.value = withTiming(0, settle);
+      cardX.value = withTiming(0, SETTLE);
     })
     .onFinalize(() => {
       if (mode.value !== 'peek') return;
       dragY.value = 0;
-      lift.value = withTiming(0, settle);
+      lift.value = withTiming(0, SETTLE);
     });
 
   useAnimatedReaction(
@@ -234,7 +310,7 @@ export function SwipeCard({
     (crossed) => {
       if (!crossed) return;
       thresholdFired.value = true;
-      scheduleOnRN(thresholdHaptic);
+      scheduleOnRN(tick);
     }
   );
 
@@ -243,18 +319,20 @@ export function SwipeCard({
     (crossed) => {
       if (!crossed) return;
       previewFired.value = true;
-      scheduleOnRN(thresholdHaptic);
+      scheduleOnRN(tick);
     }
   );
 
-  const cardStyle = useAnimatedStyle(() => {
+  // Both axes sit on the frame, outside the shell. The shell clips to the
+  // rounded rectangle, and a transform inside it was cutting the card once
+  // the drag carried it past its own edge.
+  const swipeStyle = useAnimatedStyle(() => {
     const width = cardWidth.value;
     return {
-      borderBottomLeftRadius: interpolate(lift.value, [0, space.md], [radius.lg, 0], 'clamp'),
-      borderBottomRightRadius: interpolate(lift.value, [0, space.md], [radius.lg, 0], 'clamp'),
+      opacity: cardOpacity.value,
       transform: [
         { translateX: cardX.value },
-        { translateY: -lift.value },
+        { translateY: lift.value },
         {
           rotate: width
             ? `${interpolate(cardX.value, [-width, width], [-ROTATION_DEGREES, ROTATION_DEGREES])}deg`
@@ -263,11 +341,6 @@ export function SwipeCard({
       ],
     };
   });
-
-  const peekStyle = useAnimatedStyle(() => ({
-    height: lift.value <= 0 ? 0 : lift.value + space.sm,
-    opacity: lift.value <= 0 ? 0 : 1,
-  }));
 
   // A ring around the whole card: green to save, red to pass. It reaches full
   // strength exactly at the commit point, so the edge going solid is the card
@@ -288,48 +361,37 @@ export function SwipeCard({
 
   return (
     <GestureDetector gesture={pan}>
-      <View
+      <Animated.View
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           cardWidth.value = width;
           cardHeight.value = height;
-          const nextPhotoHeight = Math.min(height * PHOTO_FRACTION, width * PHOTO_MAX_RATIO);
-          photoTop.value = nextPhotoHeight;
           setFrame((current) =>
             current.width === width && current.height === height ? current : { width, height }
           );
         }}
-        style={styles.frame}>
+        style={[styles.frame, swipeStyle]}>
         <View style={styles.shell}>
-        {nextPhoto && photoHeight ? (
-          <Animated.View pointerEvents="none" style={[styles.peek, peekStyle]}>
-            {/* The card behind is the same size, so lifting this one would show
-                its buttons. The strip is that watch's photograph, clipped to the gap. */}
-            <Image
-              source={{ uri: nextPhoto }}
-              style={{ width: '100%', height: photoHeight }}
-              contentFit="cover"
-              accessible={false}
-            />
-          </Animated.View>
-        ) : null}
-        <Animated.View style={[styles.card, cardStyle]}>
-        {/* React Native's ScrollView, not Gesture Handler's. Gesture Handler's
-            wraps a native gesture that takes the whole touch on web and the
-            card then never moves at all — with or without a blocking relation
-            between the two. A plain scroll view leaves the pointer to the pan,
-            and the two axes never contend: the content is taller than the card
-            but never wider. */}
-        {/* No indicator. The card is an object in the hand, and a bar down its
-            right edge draws a second line beside the photograph — the app
-            hides web scrollbars for the same reason. The cut-off description
-            at the bottom edge is what says the card continues. */}
-        <ScrollView
-          scrollEnabled={isTop}
+        {/* The card behind is the same size and already painted under this one.
+            This one moves out of the way whole, as far as it is tall. */}
+        <View style={styles.card}>
+        {/* Scrolling is off on the view itself. Its pan was taking every
+            downward drag, and left and right only worked because a scroll
+            view has nothing to do sideways. The card's pan scrolls the words
+            now, and reveals the next watch when there is nowhere left to
+            scroll. No indicator: a bar down the right edge draws a second
+            line beside the photograph. */}
+        <Animated.ScrollView
+          ref={scroller}
+          scrollEnabled={false}
           showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={(event) => {
-            scrollY.value = event.nativeEvent.contentOffset.y;
+          style={styles.scroller}
+          onContentSizeChange={(_width, height) => {
+            contentHeight.value = height;
+          }}
+          onLayout={(event) => {
+            portHeight.value = event.nativeEvent.layout.height;
+            setPortReady(true);
           }}
           contentContainerStyle={styles.content}>
           <View style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
@@ -338,42 +400,23 @@ export function SwipeCard({
           </View>
 
           <View style={styles.body}>
-            {/* Save is the right swipe, started from the button instead of the
-                thumb. A sold watch never enters the deck, so the inquiry is
-                always worth offering. */}
-            <ListingDetails
-              card={card}
-              actions={
-                <>
-                  <Button
-                    label="Save watch"
-                    icon="bookmark"
-                    onPress={() => onSwipe('right', 0)}
-                  />
-                  <Button
-                    label="Ask about this watch"
-                    icon="email"
-                    loading={asking}
-                    onPress={onAsk}
-                  />
-                </>
-              }
-            />
+            {/* No buttons on the card. The swipe is the verdict, and the
+                inquiry waits on the listing route a saved watch opens. */}
+            <ListingDetails card={card} />
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
 
         <Animated.View pointerEvents="none" style={[styles.ring, ringStyle]} />
-        </Animated.View>
         </View>
-      </View>
+        </View>
+      </Animated.View>
     </GestureDetector>
   );
 }
 
 const cardStyles = (theme: Theme) => ({
-  // The frame holds the shadow. The shell clips the lift. Putting the shadow
-  // on the clipping view would cut it off, and the card would slide up over
-  // the header if nothing clipped it.
+  // The frame holds the shadow and the movement. The shell only rounds the
+  // card. Clipping the movement cut the watch once the drag left the rectangle.
   frame: {
     ...StyleSheet.absoluteFill,
     borderRadius: radius.lg,
@@ -390,15 +433,8 @@ const cardStyles = (theme: Theme) => ({
     borderRadius: radius.lg,
     overflow: 'hidden' as const,
   },
-  peek: {
-    position: 'absolute' as const,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden' as const,
-    borderBottomLeftRadius: radius.lg,
-    borderBottomRightRadius: radius.lg,
-    backgroundColor: theme.color.raised,
+  scroller: {
+    flex: 1,
   },
   content: {
     paddingBottom: inset.card,

@@ -12,10 +12,9 @@
 import { config, serviceKey } from './_supabase.mjs';
 
 // These tests create users, approve shops, and delete what they made. Against
-// the hosted project that is a write to real data, and `config()` silently
-// prefers SUPABASE_URL from the environment — so one exported variable, or
-// `--env-file=scripts/.env.operator.local` copied from another script, is
-// enough to point them at production.
+// the hosted project that is a write to real data. `npm run test:rls` pins
+// GRAHAM_TARGET=local, but an exported SUPABASE_URL still wins over it, so the
+// address is checked here as well.
 if (!config().isLocal) {
   console.error(
     `\n  Refusing to run: ${config().url} is not the local stack.\n\n` +
@@ -324,6 +323,57 @@ console.log('\nafter approval');
 
   const importerDeck = await api('/rest/v1/rpc/get_deck', { token: importer.token, method: 'POST', body: { p_limit: 50 } });
   check('the deck never shows you your own import', !importerDeck.body?.some((row) => row.id === listingId));
+
+  const buyerSearch = await api('/rest/v1/rpc/search_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 50, p_exclude_own: false, p_query: 'Speedmaster' },
+  });
+  check('search includes an approved shop', buyerSearch.body?.some((row) => row.id === listingId));
+
+  const importerHidden = await api('/rest/v1/rpc/search_listings', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_limit: 50, p_query: 'Speedmaster' },
+  });
+  check(
+    'search hides your own import unless asked not to',
+    !importerHidden.body?.some((row) => row.id === listingId)
+  );
+
+  const importerSearch = await api('/rest/v1/rpc/search_listings', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_limit: 50, p_exclude_own: false, p_query: 'Speedmaster' },
+  });
+  check(
+    'search includes a shop you imported',
+    importerSearch.body?.some((row) => row.id === listingId)
+  );
+
+  const importerFacets = await api('/rest/v1/rpc/listing_facets', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_exclude_own: false },
+  });
+  check(
+    'search filters include a dealer you imported',
+    importerFacets.body?.some((row) => row.kind === 'dealer' && row.value === dealerId)
+  );
+
+  const importerCount = await api('/rest/v1/rpc/listing_counts', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_exclude_own: false, p_query: 'Speedmaster' },
+  });
+  const importerDefaultCount = await api('/rest/v1/rpc/listing_counts', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: 'Speedmaster' },
+  });
+  const counted = Number(importerCount.body?.[0]?.matched ?? 0);
+  const omitted = Number(importerDefaultCount.body?.[0]?.matched ?? 0);
+  check('search count includes a shop you imported', counted > omitted);
 
   // Favourites rank the deck. If they ever start filtering it, this listing —
   // whose brand the buyer did not pick — disappears and the check fails.

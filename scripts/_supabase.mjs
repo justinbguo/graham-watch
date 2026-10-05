@@ -1,43 +1,19 @@
 /**
  * Shared plumbing for the operator scripts.
  *
- * Reads SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY from the
- * environment when they are set, so the same scripts point at a hosted project.
- * Otherwise it falls back to whatever `supabase start` is running locally.
+ * Which project they talk to is decided in this order:
+ *
+ * 1. SUPABASE_URL / SUPABASE_ANON_KEY exported in the shell.
+ * 2. The repo switch (`npm run env`): `.env.local` present → the running local
+ *    stack; absent → the hosted trio in scripts/.env.operator.local.
+ *    GRAHAM_TARGET=local|hosted overrides the file for one command.
  */
 
-import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { relative } from 'node:path';
+
+import { OPERATOR_HOSTED, isLocalUrl, localStatus, parseEnvFile, target } from './_env.mjs';
 
 let cached;
-
-// The same test the operator UI makes (operator/src/supabase.ts). "Local" is a
-// property of the address, not of how the address was found: seed.sql documents
-// exporting SUPABASE_URL to aim these scripts at the local stack, and reading
-// that as production would label it wrong and gate it for nothing.
-const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
-
-function isLocalUrl(url) {
-  try {
-    return LOCAL_HOSTS.has(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
-
-function localStatus() {
-  const output = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  return Object.fromEntries(
-    output
-      .split('\n')
-      .filter((line) => line.includes('='))
-      .map((line) => {
-        const [key, ...rest] = line.split('=');
-        return [key.trim(), rest.join('=').trim().replace(/^"|"$/g, '')];
-      })
-  );
-}
 
 export function config() {
   if (cached) return cached;
@@ -52,20 +28,29 @@ export function config() {
     return cached;
   }
 
-  let status;
-  try {
-    status = localStatus();
-  } catch {
-    throw new Error(
-      'No Supabase found. Run `npm run db:start`, or set SUPABASE_URL and SUPABASE_ANON_KEY to target a hosted project.'
-    );
+  if (target() === 'local') {
+    const status = localStatus();
+    if (!status) {
+      throw new Error(
+        'The repo is switched to local but the stack is not running. `npm run db:start`, or `npm run env -- hosted`.'
+      );
+    }
+    cached = { url: status.url, anonKey: status.anonKey, serviceKey: status.serviceKey, isLocal: true };
+    return cached;
   }
 
+  const hosted = parseEnvFile(OPERATOR_HOSTED);
+  if (!hosted.SUPABASE_URL || !hosted.SUPABASE_ANON_KEY) {
+    throw new Error(
+      `The repo is switched to hosted but ${OPERATOR_HOSTED} is missing SUPABASE_URL or SUPABASE_ANON_KEY. Copy scripts/.env.operator.example there, or \`npm run env -- local\`.`
+    );
+  }
   cached = {
-    url: status.API_URL,
-    anonKey: status.ANON_KEY,
-    serviceKey: status.SERVICE_ROLE_KEY,
-    isLocal: isLocalUrl(status.API_URL),
+    url: hosted.SUPABASE_URL,
+    anonKey: hosted.SUPABASE_ANON_KEY,
+    serviceKey: hosted.SUPABASE_SERVICE_ROLE_KEY,
+    // "Local" is a property of the address, not of which file named it.
+    isLocal: isLocalUrl(hosted.SUPABASE_URL),
   };
   return cached;
 }
@@ -73,10 +58,9 @@ export function config() {
 /**
  * A one-line answer to "which project is about to change?".
  *
- * `npm run dealers` loads scripts/.env.operator.local, which holds hosted keys,
- * so every operator command writes to production unless it is overridden. The
- * bare URL was not enough — a project ref reads as noise above a list of shops,
- * and the word missing from it was the one that matters.
+ * With the repo switched to hosted, every operator command writes to
+ * production. The bare URL was not enough — a project ref reads as noise above
+ * a list of shops, and the word missing from it was the one that matters.
  */
 export function describeTarget() {
   const { url, isLocal } = config();
@@ -121,9 +105,8 @@ export async function request(path, { token, method = 'GET', body, prefer } = {}
 /**
  * PostgREST reports an absent table or function as a 404 against its schema
  * cache, which reads like a broken script. It almost always means this project
- * has not had a migration applied — and since `npm run dealers` loads
- * scripts/.env.operator.local, the project being asked is usually hosted while
- * the one holding the migration is local. Say which is which.
+ * has not had a migration applied — usually hosted, while the one holding the
+ * migration is local. Say which is which.
  */
 const SCHEMA_CACHE_MISS = new Set(['PGRST202', 'PGRST205']);
 
@@ -134,18 +117,10 @@ function whichProject() {
     return `  ${url} has not had that migration applied. Run: npm run db:reset`;
   }
 
-  const line = `  ${url} has not had that migration applied.`;
-
-  // `node -e` and the REPL have no entry script. This runs while reporting
-  // somebody else's error, so it must never be the thing that throws.
-  const entry = process.argv[1];
-  if (!entry) return line;
-
-  const within = relative(process.cwd(), entry);
-  const script = within.startsWith('..') ? entry : within;
-  const args = process.argv.slice(2).join(' ');
-
-  return [line, `  For the local stack instead: node ${script}${args ? ` ${args}` : ''}`].join('\n');
+  return [
+    `  ${url} has not had that migration applied.`,
+    '  For the local stack instead: npm run env -- local',
+  ].join('\n');
 }
 
 export function serviceKey() {

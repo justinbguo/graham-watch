@@ -145,8 +145,24 @@ export function useConversation(conversationId: string | null) {
   });
 }
 
+/** Marks a message the server has not confirmed yet. Never a real row's id. */
+export const PENDING_ID = 'pending:';
+
+export function isPending(message: Message) {
+  return message.id.startsWith(PENDING_ID);
+}
+
+type Thread = { header: ConversationHeader | null; messages: Message[] };
+
+/**
+ * The bubble is in the thread the moment Send is pressed. A message that
+ * waited on the round trip to appear made every send feel like a slow one.
+ * The pending row is replaced by the server's when the refetch lands, and
+ * taken out again if the write fails.
+ */
 export function useSendMessage(conversationId: string, userId: string) {
   const queryClient = useQueryClient();
+  const queryKey = keys.conversation(conversationId);
   return useMutation({
     mutationFn: async (body: string) => {
       if (isDemo) throw new Error('Messages need a signed-in account.');
@@ -157,8 +173,29 @@ export function useSendMessage(conversationId: string, userId: string) {
       });
       if (error) throw error;
     },
+    onMutate: async (body) => {
+      // A poll landing mid-send would overwrite the pending row with a list
+      // that does not have it yet.
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Thread>(queryKey);
+      const pending: Message = {
+        id: `${PENDING_ID}${Date.now()}`,
+        sender_id: userId,
+        body: body.trim(),
+        via: 'app',
+        listing: null,
+        created_at: new Date().toISOString(),
+      };
+      queryClient.setQueryData<Thread>(queryKey, (thread) =>
+        thread ? { ...thread, messages: [...thread.messages, pending] } : thread
+      );
+      return { previous };
+    },
+    onError: (_error, _body, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+      void queryClient.invalidateQueries({ queryKey });
       void queryClient.invalidateQueries({ queryKey: keys.conversations });
     },
   });
