@@ -60,7 +60,7 @@ export function ShopListings({
   async function remove(listing: Listing) {
     const name = [listing.brand, listing.model].filter(Boolean).join(' ') || 'this watch';
     const losses = [
-      listing.saved_count > 0 ? `${listing.saved_count} buyer save(s)` : '',
+      listing.saved_count > 0 ? `${listing.saved_count} on wishlists` : '',
       listing.inquiry_count > 0 ? `${listing.inquiry_count} inquiry(s)` : '',
     ].filter(Boolean);
 
@@ -162,7 +162,7 @@ export function ShopListings({
                     {listing.saved_count > 0 ? (
                       <>
                         <br />
-                        <span className="muted small">{listing.saved_count} saved</span>
+                        <span className="muted small">{listing.saved_count} on wishlists</span>
                       </>
                     ) : null}
                   </td>

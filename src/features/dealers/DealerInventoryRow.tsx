@@ -16,7 +16,7 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
  *
  * Removing is `status = 'hidden'`, never a delete. A deleted row takes its
  * photos, every save pointing at it, and the record that a buyer asked about it,
- * so the watch would vanish out of someone's Saved list with no explanation.
+ * so the watch would vanish off someone's wishlist with no explanation.
  * Removal is reversible from the same button.
  */
 export function DealerInventoryRow({

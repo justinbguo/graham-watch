@@ -36,13 +36,15 @@ In:
    photograph previews the next watch and returns. Cards on a phone, a grid on
    a wide window.
 3. Search — ask the catalogue a question, filtered separately from the deck.
-4. Saved — the list of right-swipes, with the total it adds up to.
-5. Inquiry — from a saved watch, deliberately contact the dealer.
-6. Profile — your name, an optional picture, watches you have saved, and the
-   shop you have claimed if you have one.
+4. Wishlist — the list of right-swipes, with the total it adds up to.
+5. Inquiry — from a watch on the wishlist, deliberately contact the dealer.
+6. Profile — your name, an optional picture, the posts you have written,
+   watches on your wishlist, and the shop you have claimed if you have one.
 7. Dealer workspace — claim a shop, edit its listings, refresh its catalogue.
-8. Community — post a watch to sell, buy, or trade, and comment on someone else's.
-9. Messages — inside Community: one thread with a person, or with a shop you asked
+8. Community — post a watch to sell, buy, or trade, or a random post (a find, a
+   question, a watch to show), and comment on someone else's. A row under the
+   title filters the feed to one kind, or All.
+9. Messages — a tab: one thread with a person, or with a shop you asked
    about a watch.
 
 Out, deliberately: payments and checkout, ratings and reviews, moderation and
@@ -95,22 +97,27 @@ to read any shop's contact address, which is exactly what the column grants exis
 
 ## 6. Inquiries
 
-A right swipe only saves. Sending an inquiry is a separate, deliberate act from the
-Saved tab, so every inquiry means the buyer actually wants an introduction. Dealers
-would otherwise get an email for every idle swipe, which turns a free lead source into
-spam.
+A right swipe only saves. Writing to the dealer is a separate, deliberate act, so a
+dealer never gets a message for an idle swipe.
+
+From the wishlist, **Message** opens the buyer's thread with that shop. One shop is one
+thread. The message names the watch, so a second watch from the same shop is another
+message in the same thread, not a second conversation. A shop that has not claimed
+its account cannot be written to in the app. From that thread, **Email the shop**
+is the way the message leaves.
 
 One inquiry per buyer per listing, enforced by a unique index. The row must name the
 listing's own dealer, and the watch must be active, unsold, and from an approved shop —
 all four enforced by the insert policy, not just by the button being hidden.
 
-**Contact dealer** opens Gmail with the dealer's address, a subject, and a message
-already filled in — the installed app where there is one, a Gmail compose window
-otherwise, so a phone without Gmail and a browser both still reach a draft. The mail
-is genuinely from the buyer, the reply lands in their inbox, and it sits in their Sent
-folder. **Send via Graham** remains for a device with no mail app: it mails the dealer
-for them, with their address as Reply-To, and it is the only path that can confirm the
-mail actually left.
+**Ask about this watch**, on a listing that is not on the wishlist yet, and **Email the shop**,
+on a thread the shop cannot read, both open Gmail with the dealer's address, a
+subject, and a message already filled in — the installed app where there is one, a
+Gmail compose window otherwise, so a phone without Gmail and a browser both still
+reach a draft. The mail is genuinely from the buyer, the reply lands in their inbox,
+and it sits in their Sent folder. **Send via Graham** remains for a device with no
+mail app: it mails the dealer for them, with their address as Reply-To, and it is
+the only path that can confirm the mail actually left.
 
 That difference is recorded rather than smoothed over. `status` stays about Graham's
 own send; `opened_at` says a composer was handed over. A draft the buyer abandoned
@@ -163,17 +170,17 @@ alone — the read stops at a limit, so absence means we did not get that far.
 
 `sold_at` is its own column, not a `status`. `status` is what we chose to publish;
 `sold_at` is what the market did, and it carries the date. Keeping them apart is what
-lets a sold watch stay readable in someone's Saved list, marked "Sold", with the inquiry
+lets a sold watch stay readable on someone's wishlist, marked "Sold", with the inquiry
 button gone.
 
 ## 9. Deck behavior
 
 The deck serves listings from approved dealers that the user has not swiped and did not
 import, newest first, ranked by the brands chosen at sign-up. Swipes are append-only,
-unique on `(actor_id, listing_id)`. Saved is the set of right-swipes — no second table.
+unique on `(actor_id, listing_id)`. The wishlist is the set of right-swipes — no second table.
 
 A pass is reversible two ways: the undo arrow takes back the last one, and "start over"
-puts back every pass at once. Saves are never replayed; they are already in Saved.
+puts back every pass at once. Wishlist watches are never replayed; they are already on the wishlist.
 
 ## 10. Data model
 
@@ -249,8 +256,9 @@ cannot. An untested policy is an unproven one.
 
 ## 11. Client
 
-Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Search, Community,
-Saved, Profile. Messages is a view inside Community. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
+Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Community, Messages,
+Wishlist, Profile. Search stays inside the tabs and opens from the bar under the deck's
+count. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
 Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.
@@ -277,7 +285,7 @@ types are generated from the schema, never hand-written.
 
 ## 13. Community
 
-The third tab, between Search and Saved. Signed-in people post a watch they want to sell,
+The third tab, between Search and Wishlist. Signed-in people post a watch they want to sell,
 buy, or trade. Others comment on that post. The comment is the public record. The tab
 was named Exchange; the database tables, functions, and code keep that word.
 
@@ -293,10 +301,19 @@ Replies are one level deep: a reply to a reply attaches to the same root, enforc
 trigger rather than by the client. The author's `@handle` and collector number are
 copied onto the post at insert.
 
-Every post and comment shows its author's photograph and name beside that handle.
-Profiles stay readable only by their owner, so those two fields reach the board through
-`exchange_feed`, `exchange_thread`, and `exchange_post_author` — security-definer
-functions that return a name and an avatar and nothing else about the person.
+Every post and comment shows its author's photograph and `@handle`. The given
+name is the title of their profile, not the byline. A reply starts with that
+`@handle` in the text, and the writer can delete it.
+Tapping that line opens the person. The screen title is the name. Under it are
+the photograph, the username, the collector number, and the posts they have
+written. Profiles stay readable only by their owner, so the page is
+built from the author the board already returned and from `exchange_posts`,
+which anyone signed in can read. It is not the Profile tab. The wishlist, a
+claimed shop, and settings stay there. Your own posts are listed on the Profile
+tab as well, and a tap opens the thread here. The name and photograph reach the board
+through `exchange_feed`, `exchange_thread`, and `exchange_post_author` —
+security-definer functions that return a name and an avatar and nothing else
+about the person.
 
 Anyone signed in can vote a post or a comment up or down, once, and change or take back
 that vote. Votes go through `exchange_vote`; the client cannot write the table. Scores
@@ -305,13 +322,17 @@ the feed, which stays newest-first.
 
 ## 14. Messages
 
-Opened from the speech bubble in the Community header. One thread per pair of people, and one per shop a buyer has written to. A conversation
+The Messages tab, between Community and Wishlist. One thread per pair of people, and one per shop a buyer has written to. A conversation
 has two sides and no member list: `opener_id` is whoever wrote first, and the other side
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
 shop that claims its account later inherits the threads already addressed to it.
 
-A conversation with a person starts from their post or their comment. There is no
-directory and no search by handle.
+A conversation with a person starts from their post or their comment. A
+conversation with a shop starts from Message beside Follow, on the shop's
+page and on a listing's dealer panel, or from Message on a saved watch. There
+is no directory and no search by handle. The shop button calls
+`conversation_with_dealer`, which opens the same thread `dealer_conversation`
+already keeps, one per shop.
 
 Sending an inquiry still emails the shop. A trigger also drops that message into the
 buyer's thread with the shop, marked `via = 'email'` and naming the listing. Until the

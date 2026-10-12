@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Gesture } from 'react-native-gesture-handler';
+import { type RefObject, useState } from 'react';
+import { Gesture, type GestureType } from 'react-native-gesture-handler';
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -30,15 +30,22 @@ type Box = { width: number; height: number };
  * it the photograph actually covers, which is the frame under `cover` and less
  * than the frame under `contain`. Panning is bounded by the content, so the
  * photograph's own edge never comes inside the window.
+ *
+ * `alongside` is a gesture on an ancestor that the pinch runs with rather
+ * than against: the deck card's swipe. Without it whichever activates first
+ * cancels the other, and the first finger nearly always moves before the
+ * second lands, so the swipe won and the pinch never started.
  */
 export function usePinchZoom({
   frame,
   content,
   hold = false,
+  alongside,
 }: {
   frame: Box;
   content?: Box;
   hold?: boolean;
+  alongside?: RefObject<GestureType | undefined>;
 }) {
   const scale = useSharedValue(1);
   const offsetX = useSharedValue(0);
@@ -102,7 +109,9 @@ export function usePinchZoom({
     };
   };
 
-  const pinch = Gesture.Pinch()
+  const pinch = Gesture.Pinch();
+  if (alongside) pinch.simultaneousWithExternalGesture(alongside);
+  pinch
     .onStart((event) => {
       begin(event.focalX, event.focalY);
       scheduleOnRN(setZoomed, true);

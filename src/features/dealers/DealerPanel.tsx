@@ -3,13 +3,16 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { useDealerReputation } from '@/data/dealers';
 import type { Dealer } from '@/lib/models';
-import { HIT_TARGET, motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 import { DealerPreview } from './DealerPreview';
 import { FollowDealer } from './FollowDealer';
+import { MessageDealer } from './MessageDealer';
+import { dealerPicture } from './picture';
 
 const INSTAGRAM = require('../../../assets/instagram.png');
 
@@ -36,29 +39,19 @@ function tenure(joinedAt: string): string {
  * in the path of every card and told them which dealer a buyer was reading.
  * The importer now reads the icon the shop declares in its own HTML and stores
  * the URL, so the only host involved is the dealer's. Six dealer sites in eight
- * declare one; the rest show no mark, which is what `logo_url` being null means.
+ * declare one; the rest get `dealerPicture`, the same face every shop without
+ * an icon shares.
  *
  * `contain`, not `cover`: a logo cropped to a square is a different logo, and
  * letterboxing one is only a margin.
  *
- * Silent to a screen reader, and gone on a failed load rather than an empty
- * frame — most of what it could say is the name already read out next to it.
+ * Silent to a screen reader — most of what it could say is the name already
+ * read out next to it. A failed load shows the same default picture as no
+ * icon at all.
  */
 function DealerMark({ logoUrl }: { logoUrl: string | null | undefined }) {
-  const styles = useThemedStyles(panelStyles);
-  const [failed, setFailed] = useState(false);
-
-  if (!logoUrl || failed) return null;
-
   return (
-    <Image
-      source={{ uri: logoUrl }}
-      style={styles.mark}
-      contentFit="contain"
-      transition={motion.fast}
-      onError={() => setFailed(true)}
-      accessible={false}
-    />
+    <Avatar url={logoUrl ?? null} px={size.icon} fit="contain" fallback={dealerPicture} />
   );
 }
 
@@ -165,14 +158,38 @@ export function DealerPanel({
   const styles = useThemedStyles(panelStyles);
   const { data } = useDealerReputation(dealer.id);
   const showFollow = follow || browse;
+  // Follow shares the name's line while it fits. A long name pushes it to a
+  // row of its own, where a short capsule at the left reads as an orphan, so
+  // there it takes the row. Measured, not guessed: whether it wraps depends
+  // on the name and the card's width. A new width re-asks the question.
+  const [headingWidth, setHeadingWidth] = useState(0);
+  const [followRow, setFollowRow] = useState(false);
 
   return (
     <View style={styles.panel}>
       {named ? (
-        <View style={styles.heading}>
+        <View
+          style={styles.heading}
+          onLayout={(event) => {
+            const width = event.nativeEvent.layout.width;
+            if (width === headingWidth) return;
+            setHeadingWidth(width);
+            setFollowRow(false);
+          }}>
           <DealerMark logoUrl={dealer.logo_url} />
           <Text style={styles.name}>{dealer.name}</Text>
-          {showFollow ? <FollowDealer dealer={dealer} /> : null}
+          {showFollow ? (
+            <View
+              style={[styles.actions, followRow && styles.followRow]}
+              onLayout={(event) => {
+                if (!followRow && event.nativeEvent.layout.y > size.avatarSmall / 2) {
+                  setFollowRow(true);
+                }
+              }}>
+              <FollowDealer dealer={dealer} />
+              <MessageDealer dealer={dealer} listingId={except} />
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -211,22 +228,28 @@ const panelStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.sm,
   },
-  mark: {
-    width: size.icon,
-    height: size.icon,
-    borderRadius: radius.sm,
-  },
   name: {
     ...type.title,
     color: theme.color.text,
     flexShrink: 1,
     maxWidth: '100%' as const,
   },
-  // The shop's own sentence about itself, so it reads as body text rather than
-  // a field: full measure, muted against the name above it.
+  followRow: {
+    width: '100%' as const,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+  },
+  actions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+  },
+  // The same face, size, and ink as the watch's description above it. Both
+  // are the dealer's own words, and in two styles they read as two authors.
   about: {
-    ...type.body,
-    color: theme.color.textMuted,
+    ...type.label,
+    color: theme.color.text,
   },
   stats: {
     flexDirection: 'row' as const,

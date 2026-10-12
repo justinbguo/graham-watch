@@ -47,14 +47,10 @@ export const color = {
     onAccent: '#FBF9F5',
     brass: '#7E5F33',
     save: '#2E6B4F',
+    /** A price chip. Not `save`: that green means a watch was kept. */
+    money: '#1A7344',
+    onMoney: '#F4FBF7',
     danger: '#9A2B20',
-    /**
-     * The verified badge, and nothing else. The only cool colour in a warm
-     * palette, and deliberately the platform's blue rather than a tuned one: a
-     * check in any other colour is a check somebody drew, and the point of
-     * this mark is that it looks like the one every other app uses.
-     */
-    verified: '#0B74DE',
     overlay: 'rgba(23, 20, 15, 0.45)',
     /** On a scrim over a photograph, which is dark in both schemes. */
     onOverlay: '#FFFFFF',
@@ -69,6 +65,18 @@ export const color = {
     bar: '#17140F',
     onBar: 'rgba(255, 255, 255, 0.55)',
     onBarActive: '#FFFFFF',
+    /**
+     * A count on a tab. Red, the colour every phone uses for "waiting for
+     * you", and on the bar, which is dark in both schemes, so the same in
+     * both. Not `danger`: that is muted for type, and white on it is grey.
+     */
+    badge: '#D93025',
+    onBadge: '#FFFFFF',
+    /**
+     * The dot on a saved watch nobody has written about. Brighter than
+     * `badge`: nothing is set on it, so it does not have to hold white type.
+     */
+    notice: '#FF4B3E',
     /** The swipe card, which floats on `shadow.card` instead of stepping. */
     raised: '#FFFFFF',
   },
@@ -87,8 +95,10 @@ export const color = {
     accent: '#F3EFE8',
     onAccent: '#17140F',
     brass: '#C9A468',
-    verified: '#57A8FF',
     save: '#5FB68C',
+    /** Lifted off the charcoal so the chip still reads as green. */
+    money: '#1E7A4A',
+    onMoney: '#F4FBF7',
     danger: '#E0776B',
     overlay: 'rgba(0, 0, 0, 0.6)',
     onOverlay: '#FFFFFF',
@@ -99,6 +109,9 @@ export const color = {
     bar: '#0A0908',
     onBar: 'rgba(255, 255, 255, 0.55)',
     onBarActive: '#FFFFFF',
+    badge: '#D93025',
+    onBadge: '#FFFFFF',
+    notice: '#FF4B3E',
     // A shadow is nothing against a near-black page, so in the dark the card
     // floats the only way it can: a tone above `surface`.
     raised: '#262320',
@@ -344,7 +357,7 @@ export const motion = {
   // A released gesture returns to rest. No spring: overshoot on a card the user
   // just declined to swipe reads as a bug, not as physics.
   settle: 220,
-  // A saved card crossing the screen into the Saved tab. Long enough for the
+  // A saved card crossing the screen into the Wishlist tab. Long enough for the
   // eye to follow where the watch went, short enough that the next swipe is
   // never waiting on it.
   flight: 320,
@@ -399,12 +412,25 @@ export const size = {
    */
   avatar: 40,
   avatarSmall: 32,
+  /** A community byline. One line of `body` type; the face is a step taller than it. */
+  avatarByline: 32,
+  /**
+   * Community's intent chips, and Message on a wishlist row. One step under
+   * `HIT_TARGET`. Follow itself is the `body` line, not this.
+   */
+  follow: 32,
   /**
    * The photograph on a grid row. Portrait, 5/7, so the watch stays readable
    * beside the type. A quarter of a phone's width: at a third, three rows
    * filled the screen and a list of watches read as a stack of posters.
    */
   gridPhoto: 96,
+  /**
+   * The same frame on the home grid and the wishlist. Shorter, so a scan of
+   * the deck or a saved list is a list. A shop keeps `gridPhoto`. Search is a
+   * wall of photographs, not a row.
+   */
+  gridScan: 72,
   /**
    * A buying post pinned above the community feed. Two fit on a phone with
    * the next one showing, so the row reads as a strip and not a stack.
@@ -419,7 +445,7 @@ export const size = {
   tabIcon: 28,
   /** A count on a tab. Two digits fit; three would not, and never happen. */
   badge: 18,
-  /** The dot on a conversation nobody has read yet. A mark, not a count. */
+  /** A waiting dot. An unread conversation, and a saved watch with no message yet. */
   unread: 8,
   /** One photo's bar at the top of a carousel. */
   segment: 3,

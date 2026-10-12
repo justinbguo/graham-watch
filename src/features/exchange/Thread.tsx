@@ -16,26 +16,34 @@ import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { authorLine } from './copy';
-import { PostHeader } from './PostHeader';
+import { atHandle } from './copy';
+import { PostHeader, PostLead } from './PostHeader';
 import { PostMenu } from './PostMenu';
 import { PostPhotos } from './PostPhotos';
 import { PostTitle } from './PostTitle';
 import { Votes } from './Votes';
 
 /** Who a comment is addressed to, while it is being written. */
-type ReplyTarget = { id: string; name: string };
+type ReplyTarget = { id: string; handle: string | null };
+
+/** `@handle ` at the front of a draft. A trailing space so the next word is theirs. */
+function mention(handle: string | null) {
+  const at = atHandle(handle);
+  return at ? `${at} ` : '';
+}
 
 export function Thread({
   userId,
   postId,
   onEdit,
   onDeleted,
+  onOpenAuthor,
 }: {
   userId: string;
   postId: string;
   onEdit: () => void;
   onDeleted: () => void;
+  onOpenAuthor: (author: ExchangeComment['author']) => void;
 }) {
   const styles = useThemedStyles(threadStyles);
   const lift = useKeyboardLift(true);
@@ -53,6 +61,17 @@ export function Thread({
   const post = data.post;
   const photos = data.photos;
   const mine = post.author_id === userId;
+
+  function reply(item: ExchangeComment) {
+    const next = mention(item.author.handle);
+    const previous = mention(replyTo?.handle ?? null);
+    setDraft((current) => {
+      const rest = previous && current.startsWith(previous) ? current.slice(previous.length) : current;
+      if (!next || rest.startsWith(next)) return rest;
+      return `${next}${rest}`;
+    });
+    setReplyTo({ id: item.id, handle: item.author.handle });
+  }
 
   function send() {
     const body = draft.trim();
@@ -93,12 +112,15 @@ export function Thread({
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.post}>
-            <PostHeader
-              author={data.author}
-              at={post.created_at}
-              trailing={mine ? <PostMenu onEdit={onEdit} onDelete={confirmDelete} /> : undefined}
-            />
-            <PostTitle title={post.title} post={post} variant="thread" />
+            <PostLead>
+              <PostHeader
+                author={data.author}
+                at={post.created_at}
+                onPress={() => onOpenAuthor(data.author)}
+                trailing={mine ? <PostMenu onEdit={onEdit} onDelete={confirmDelete} /> : undefined}
+              />
+              <PostTitle title={post.title} post={post} />
+            </PostLead>
             <PostPhotos urls={photos.map((photo) => photo.url)} />
             <Text style={styles.body}>{post.body}</Text>
             <ActionBar>
@@ -110,7 +132,7 @@ export function Thread({
               {mine ? null : (
                 <MessagePerson
                   userId={data.author.id}
-                  name={authorLine(data.author.handle, data.author.number)}
+                  name={atHandle(data.author.handle) ?? 'this person'}
                 />
               )}
             </ActionBar>
@@ -124,24 +146,22 @@ export function Thread({
             comment={item}
             mine={item.author.id === userId}
             onVote={(value) => vote.mutate({ postId, commentId: item.id, value })}
-            onReply={() =>
-              setReplyTo({
-                id: item.id,
-                name: authorLine(item.author.handle, item.author.number),
-              })
-            }
+            onOpenAuthor={() => onOpenAuthor(item.author)}
+            onReply={() => reply(item)}
           />
         )}
       />
       <SendBar
-        placeholder={replyTo ? `Reply to ${replyTo.name}` : 'Write a comment'}
+        placeholder={replyTo ? `Reply to ${atHandle(replyTo.handle) ?? 'them'}` : 'Write a comment'}
         value={draft}
         onChangeText={setDraft}
         onSend={send}
         busy={comment.isPending}
         note={
           <>
-            {replyTo ? <ReplyingTo name={replyTo.name} onCancel={() => setReplyTo(null)} /> : null}
+            {replyTo ? (
+              <ReplyingTo name={atHandle(replyTo.handle) ?? 'them'} onCancel={() => setReplyTo(null)} />
+            ) : null}
             {comment.error ? <Message text="That comment did not post." tone="error" /> : null}
           </>
         }
@@ -160,18 +180,20 @@ function Comment({
   mine,
   onVote,
   onReply,
+  onOpenAuthor,
 }: {
   comment: ExchangeComment;
   mine: boolean;
   onVote: (value: 1 | 0 | -1) => void;
   onReply: () => void;
+  onOpenAuthor: () => void;
 }) {
   const styles = useThemedStyles(threadStyles);
-  const name = authorLine(comment.author.handle, comment.author.number);
+  const name = atHandle(comment.author.handle) ?? 'this person';
 
   return (
     <View style={[styles.comment, comment.parent_id ? styles.reply : null]}>
-      <PostHeader author={comment.author} at={comment.created_at} />
+      <PostHeader author={comment.author} at={comment.created_at} onPress={onOpenAuthor} />
       <Text style={styles.commentBody}>{comment.body}</Text>
       <ActionBar>
         <Votes score={comment.vote_count} mine={comment.my_vote} onVote={onVote} />
@@ -215,7 +237,7 @@ const threadStyles = (theme: Theme) => ({
     gap: space.md,
   },
   post: {
-    gap: space.sm,
+    gap: space.md,
     paddingBottom: space.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
@@ -229,12 +251,12 @@ const threadStyles = (theme: Theme) => ({
     color: theme.color.text,
   },
   comment: {
-    gap: space.xs,
+    gap: space.sm,
     paddingTop: space.md,
   },
   // An answer starts where the name it answers starts: one avatar in.
   reply: {
-    paddingLeft: size.avatarSmall + space.sm,
+    paddingLeft: size.avatarByline + space.sm,
   },
   replyLabel: {
     ...type.control,

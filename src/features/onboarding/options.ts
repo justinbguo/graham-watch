@@ -1,4 +1,4 @@
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database';
 
 export type CollectionSize = Database['public']['Enums']['collection_size'];
 export type WatchSearchPain = Database['public']['Enums']['watch_search_pain'];

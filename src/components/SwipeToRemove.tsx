@@ -13,7 +13,7 @@ const THRESHOLD = 40;
 
 /**
  * Swipe a row left and a destructive button appears behind it. The gesture is
- * the one every list on the phone already uses, which is why the Saved list no
+ * the one every list on the phone already uses, which is why the wishlist no
  * longer carries a line telling anyone how to remove a watch.
  *
  * The reveal only offers the action: the tap is what removes. A swipe that
@@ -26,7 +26,7 @@ const THRESHOLD = 40;
  * inside a list, and closing the open row when another one opens.
  *
  * A swipe is not a gesture a screen reader can make, so this is never the only
- * way to remove something. On Saved, opening the watch gives the same action
+ * way to remove something. On the wishlist, opening the watch gives the same action
  * as a button on the listing screen.
  */
 export function SwipeToRemove({

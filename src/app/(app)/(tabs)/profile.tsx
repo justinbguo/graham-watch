@@ -1,4 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { router } from 'expo-router';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
@@ -13,6 +14,7 @@ import { useDealerWorkspace } from '@/features/dealers/workspace';
 import { ProfileHeader } from '@/features/profile/ProfileHeader';
 import { SavedStrip } from '@/features/profile/SavedStrip';
 import { FollowingList } from '@/features/profile/FollowingList';
+import { Posts } from '@/features/profile/Posts';
 import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -28,6 +30,7 @@ export default function Profile() {
   const header = (
     <View style={styles.header}>
       <ProfileHeader />
+      <Posts onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })} />
       <SavedStrip />
       <FollowingList />
       {claimed ? (
@@ -78,7 +81,8 @@ export default function Profile() {
       <FlatList
         data={shop.inventory}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
         ListHeaderComponent={header}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
@@ -122,12 +126,21 @@ function SettingsButton({ onPress }: { onPress: () => void }) {
 
 const profileStyles = (theme: Theme) => ({
   list: {
+    flexGrow: 1,
+    // The header leaves `space.lg` under every title. The person is the page,
+    // so the photograph sits `space.md` under "Profile". The margin is on the
+    // list, not its content: the header is the list's sibling, and a margin
+    // inside the scroll view cannot climb into it.
+    marginTop: space.md - space.lg,
+  },
+  listContent: {
     paddingHorizontal: inset.screen,
     paddingBottom: inset.screen,
     flexGrow: 1,
   },
   header: {
-    gap: stack.section,
+    // One person, so the blocks are groups on a page, not separate pages.
+    gap: stack.group,
   },
   section: {
     gap: stack.related,

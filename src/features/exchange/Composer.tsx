@@ -14,7 +14,7 @@ import {
 import { inset, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-import { BODY_PLACEHOLDER } from './copy';
+import { BODY_PLACEHOLDER, hasPrice } from './copy';
 import { IntentSelect } from './IntentSelect';
 
 const PHOTO_LIMIT = 6;
@@ -101,7 +101,7 @@ export function Composer({
         intent,
         title,
         body,
-        priceCents: intent === 'trade' ? null : cents,
+        priceCents: hasPrice(intent) ? cents : null,
         photos,
         removedPaths: removed,
       });
@@ -129,7 +129,7 @@ export function Composer({
           autoCorrect
           maxLength={80}
         />
-        {intent === 'trade' ? null : (
+        {!hasPrice(intent) ? null : (
           <Field
             placeholder={intent === 'buy' ? 'Budget, if you have one' : 'Price'}
             value={price}
@@ -159,7 +159,7 @@ export function Composer({
         </ScrollView>
         <Button
           label={photos.length === 0 ? 'Add photos' : 'Add another photo'}
-          icon="image"
+          icon="image-outline"
           disabled={photos.length >= PHOTO_LIMIT}
           onPress={() => void addPhotos()}
         />

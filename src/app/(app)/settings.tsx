@@ -77,7 +77,7 @@ export default function SettingsScreen() {
           onPress={() => {
             const title = 'Delete account?';
             const message =
-              'This removes your profile, saved watches, and inquiries. A shop you claimed stays listed and becomes unclaimed.';
+              'This removes your profile, wishlist, and inquiries. A shop you claimed stays listed and becomes unclaimed.';
             const confirm = () => remove.mutate();
             // Alert.alert on web is a single OK box; a mouse has no system sheet.
             if (Platform.OS === 'web') {

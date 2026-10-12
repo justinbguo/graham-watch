@@ -2,11 +2,12 @@ import { Pressable, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import type { ConversationSummary } from '@/data/messages';
+import { dealerPicture } from '@/features/dealers/picture';
 import { formatRelativeTime } from '@/lib/format';
 import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { PARTY_GLYPH, partyName } from './party';
+import { partyName } from './party';
 
 /**
  * One thread in the list: who it is with, the last thing said, and when.
@@ -37,8 +38,10 @@ export function ConversationRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <Avatar
-        url={who.kind === 'person' ? who.avatar_url : null}
-        glyph={PARTY_GLYPH[who.kind]}
+        url={who.kind === 'person' ? who.avatar_url : who.logoUrl}
+        glyph={who.kind === 'person' ? 'account-outline' : undefined}
+        fallback={who.kind === 'dealer' ? dealerPicture : undefined}
+        fit={who.kind === 'dealer' ? 'contain' : 'cover'}
       />
       <View style={styles.copy}>
         <View style={styles.line}>

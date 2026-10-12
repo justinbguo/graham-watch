@@ -34,6 +34,88 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_reads: {
+        Row: {
+          conversation_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          dealer_id: string | null
+          id: string
+          last_message_at: string
+          opener_id: string
+          partner_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          last_message_at?: string
+          opener_id: string
+          partner_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          last_message_at?: string
+          opener_id?: string
+          partner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_opener_id_fkey"
+            columns: ["opener_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dealer_applications: {
         Row: {
           brands: string[]
@@ -171,140 +253,6 @@ export type Database = {
           },
         ]
       }
-      conversation_reads: {
-        Row: {
-          conversation_id: string
-          read_at: string
-          user_id: string
-        }
-        Insert: {
-          conversation_id: string
-          read_at?: string
-          user_id: string
-        }
-        Update: {
-          conversation_id?: string
-          read_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_reads_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_reads_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversations: {
-        Row: {
-          created_at: string
-          dealer_id: string | null
-          id: string
-          last_message_at: string
-          opener_id: string
-          partner_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          dealer_id?: string | null
-          id?: string
-          last_message_at?: string
-          opener_id: string
-          partner_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          dealer_id?: string | null
-          id?: string
-          last_message_at?: string
-          opener_id?: string
-          partner_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversations_dealer_id_fkey"
-            columns: ["dealer_id"]
-            isOneToOne: false
-            referencedRelation: "dealers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversations_opener_id_fkey"
-            columns: ["opener_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversations_partner_id_fkey"
-            columns: ["partner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      messages: {
-        Row: {
-          body: string
-          conversation_id: string
-          created_at: string
-          id: string
-          listing_id: string | null
-          sender_id: string
-          via: string
-        }
-        Insert: {
-          body: string
-          conversation_id: string
-          created_at?: string
-          id?: string
-          listing_id?: string | null
-          sender_id: string
-          via?: string
-        }
-        Update: {
-          body?: string
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          listing_id?: string | null
-          sender_id?: string
-          via?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       dealer_follows: {
         Row: {
           created_at: string
@@ -409,7 +357,7 @@ export type Database = {
         Insert: {
           author_handle?: string | null
           author_id: string
-          author_number?: number
+          author_number: number
           body: string
           created_at?: string
           id?: string
@@ -479,6 +427,53 @@ export type Database = {
           },
         ]
       }
+      exchange_posts: {
+        Row: {
+          author_handle: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at: string
+          currency: string
+          id: string
+          intent: Database["public"]["Enums"]["exchange_intent"]
+          price_cents: number | null
+          title: string
+        }
+        Insert: {
+          author_handle?: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at?: string
+          currency?: string
+          id?: string
+          intent: Database["public"]["Enums"]["exchange_intent"]
+          price_cents?: number | null
+          title: string
+        }
+        Update: {
+          author_handle?: string | null
+          author_id?: string
+          author_number?: number
+          body?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          intent?: Database["public"]["Enums"]["exchange_intent"]
+          price_cents?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_votes: {
         Row: {
           comment_id: string | null
@@ -519,53 +514,6 @@ export type Database = {
           {
             foreignKeyName: "exchange_votes_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      exchange_posts: {
-        Row: {
-          author_handle: string | null
-          author_id: string
-          author_number: number
-          body: string
-          created_at: string
-          currency: string
-          id: string
-          intent: Database["public"]["Enums"]["exchange_intent"]
-          price_cents: number | null
-          title: string
-        }
-        Insert: {
-          author_handle?: string | null
-          author_id: string
-          author_number?: number
-          body: string
-          created_at?: string
-          currency?: string
-          id?: string
-          intent: Database["public"]["Enums"]["exchange_intent"]
-          price_cents?: number | null
-          title: string
-        }
-        Update: {
-          author_handle?: string | null
-          author_id?: string
-          author_number?: number
-          body?: string
-          created_at?: string
-          currency?: string
-          id?: string
-          intent?: Database["public"]["Enums"]["exchange_intent"]
-          price_cents?: number | null
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "exchange_posts_author_id_fkey"
-            columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -825,6 +773,58 @@ export type Database = {
           {
             foreignKeyName: "listings_imported_by_fkey"
             columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          listing_id: string | null
+          sender_id: string
+          via: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          sender_id: string
+          via?: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          sender_id?: string
+          via?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1096,6 +1096,54 @@ export type Database = {
       }
       claim_username: { Args: { candidate: string }; Returns: string }
       controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
+      conversation_about_listing: {
+        Args: { p_listing_id: string }
+        Returns: string
+      }
+      conversation_header: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          by_email: boolean
+          dealer_id: string
+          dealer_logo_url: string
+          dealer_name: string
+          id: string
+          person_avatar_url: string
+          person_handle: string
+          person_id: string
+          person_name: string
+          person_number: number
+          writable: boolean
+        }[]
+      }
+      conversation_list: {
+        Args: never
+        Returns: {
+          by_email: boolean
+          dealer_id: string
+          dealer_logo_url: string
+          dealer_name: string
+          id: string
+          last_at: string
+          last_body: string
+          last_mine: boolean
+          person_avatar_url: string
+          person_handle: string
+          person_id: string
+          person_name: string
+          person_number: number
+          unread: number
+        }[]
+      }
+      conversation_with_dealer: {
+        Args: { p_dealer_id: string }
+        Returns: string
+      }
+      conversation_with_person: { Args: { p_user_id: string }; Returns: string }
+      conversation_writable: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
       dealer_accounts: {
         Args: never
         Returns: {
@@ -1107,6 +1155,10 @@ export type Database = {
         }[]
       }
       dealer_claim_host: { Args: { p_website: string }; Returns: string }
+      dealer_conversation: {
+        Args: { p_buyer_id: string; p_dealer_id: string }
+        Returns: string
+      }
       dealer_reputation: {
         Args: { p_dealer_id: string }
         Returns: {
@@ -1137,83 +1189,34 @@ export type Database = {
         Returns: undefined
       }
       delete_own_account: { Args: never; Returns: undefined }
-      conversation_header: {
-        Args: { p_conversation_id: string }
-        Returns: {
-          by_email: boolean
-          dealer_id: string | null
-          dealer_name: string | null
-          id: string
-          person_avatar_url: string | null
-          person_handle: string | null
-          person_id: string | null
-          person_name: string | null
-          person_number: number | null
-          writable: boolean
-        }[]
-      }
-      conversation_list: {
-        Args: never
-        Returns: {
-          by_email: boolean
-          dealer_id: string | null
-          dealer_name: string | null
-          id: string
-          last_at: string | null
-          last_body: string | null
-          last_mine: boolean | null
-          person_avatar_url: string | null
-          person_handle: string | null
-          person_id: string | null
-          person_name: string | null
-          person_number: number | null
-          unread: number
-        }[]
-      }
-      conversation_with_person: {
-        Args: { p_user_id: string }
-        Returns: string
-      }
-      conversation_writable: {
-        Args: { p_conversation_id: string }
-        Returns: boolean
-      }
-      in_conversation: {
-        Args: { p_conversation_id: string }
-        Returns: boolean
-      }
-      mark_conversation_read: {
-        Args: { p_conversation_id: string }
-        Returns: undefined
-      }
       exchange_feed: {
         Args: never
         Returns: {
-          author_avatar_url: string | null
-          author_handle: string | null
+          author_avatar_url: string
+          author_handle: string
           author_id: string
-          author_name: string | null
+          author_name: string
           author_number: number
           body: string
           comment_count: number
+          cover_path: string
           created_at: string
           currency: string
           id: string
           intent: Database["public"]["Enums"]["exchange_intent"]
           my_vote: number
-          price_cents: number | null
+          price_cents: number
           title: string
           vote_count: number
-          cover_path: string | null
         }[]
       }
       exchange_post_author: {
         Args: { p_post_id: string }
         Returns: {
-          author_avatar_url: string | null
-          author_handle: string | null
+          author_avatar_url: string
+          author_handle: string
           author_id: string
-          author_name: string | null
+          author_name: string
           author_number: number
           my_vote: number
           vote_count: number
@@ -1222,37 +1225,22 @@ export type Database = {
       exchange_thread: {
         Args: { p_post_id: string }
         Returns: {
-          author_avatar_url: string | null
-          author_handle: string | null
+          author_avatar_url: string
+          author_handle: string
           author_id: string
-          author_name: string | null
+          author_name: string
           author_number: number
           body: string
           created_at: string
           id: string
           my_vote: number
-          parent_id: string | null
+          parent_id: string
           vote_count: number
         }[]
       }
       exchange_vote: {
-        Args: {
-          p_comment_id: string | null
-          p_post_id: string | null
-          p_value: number
-        }
+        Args: { p_comment_id: string; p_post_id: string; p_value: number }
         Returns: undefined
-      }
-      save_exchange_post: {
-        Args: {
-          p_body?: string
-          p_intent?: Database["public"]["Enums"]["exchange_intent"]
-          p_photo_paths?: string[]
-          p_post_id?: string | null
-          p_price_cents?: number | null
-          p_title?: string
-        }
-        Returns: string
       }
       get_deck: {
         Args: { p_limit?: number }
@@ -1293,6 +1281,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      in_conversation: { Args: { p_conversation_id: string }; Returns: boolean }
       is_operator: { Args: never; Returns: boolean }
       keep_edit: {
         Args: {
@@ -1311,15 +1300,15 @@ export type Database = {
           p_exclude_own?: boolean
           p_exclude_swiped?: boolean
           p_materials?: Database["public"]["Enums"]["case_material"][]
-          p_price_maxs?: (number | null)[]
-          p_price_mins?: (number | null)[]
+          p_price_maxs?: number[]
+          p_price_mins?: number[]
           p_query?: string
-          p_size_maxs?: (number | null)[]
-          p_size_mins?: (number | null)[]
+          p_size_maxs?: number[]
+          p_size_mins?: number[]
           p_styles?: Database["public"]["Enums"]["watch_style"][]
           p_windings?: Database["public"]["Enums"]["winding"][]
-          p_year_maxs?: (number | null)[]
-          p_year_mins?: (number | null)[]
+          p_year_maxs?: number[]
+          p_year_mins?: number[]
         }
         Returns: {
           matched: number
@@ -1345,6 +1334,10 @@ export type Database = {
           name: string
           website: string
         }[]
+      }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
       }
       my_dealer_application: {
         Args: never
@@ -1461,6 +1454,17 @@ export type Database = {
         Returns: number
       }
       require_operator: { Args: never; Returns: undefined }
+      save_exchange_post: {
+        Args: {
+          p_body?: string
+          p_intent?: Database["public"]["Enums"]["exchange_intent"]
+          p_photo_paths?: string[]
+          p_post_id?: string
+          p_price_cents?: number
+          p_title?: string
+        }
+        Returns: string
+      }
       search_listings: {
         Args: {
           p_brands?: string[]
@@ -1472,16 +1476,16 @@ export type Database = {
           p_limit?: number
           p_materials?: Database["public"]["Enums"]["case_material"][]
           p_offset?: number
-          p_price_maxs?: (number | null)[]
-          p_price_mins?: (number | null)[]
+          p_price_maxs?: number[]
+          p_price_mins?: number[]
           p_query?: string
-          p_size_maxs?: (number | null)[]
-          p_size_mins?: (number | null)[]
+          p_size_maxs?: number[]
+          p_size_mins?: number[]
           p_sort?: string
           p_styles?: Database["public"]["Enums"]["watch_style"][]
           p_windings?: Database["public"]["Enums"]["winding"][]
-          p_year_maxs?: (number | null)[]
-          p_year_mins?: (number | null)[]
+          p_year_maxs?: number[]
+          p_year_mins?: number[]
         }
         Returns: {
           availability_checked_at: string | null
@@ -1617,7 +1621,7 @@ export type Database = {
         | "brown"
         | "cream"
         | "other"
-      exchange_intent: "sell" | "buy" | "trade"
+      exchange_intent: "sell" | "buy" | "trade" | "random"
       import_status: "queued" | "running" | "succeeded" | "failed"
       inquiry_status: "pending" | "sent" | "failed"
       listing_status: "active" | "hidden"
@@ -1826,7 +1830,6 @@ export const Constants = {
         "skeleton",
       ],
       dealer_permission: ["pending", "approved", "revoked"],
-      exchange_intent: ["sell", "buy", "trade"],
       dial_color: [
         "black",
         "white",
@@ -1841,6 +1844,7 @@ export const Constants = {
         "cream",
         "other",
       ],
+      exchange_intent: ["sell", "buy", "trade", "random"],
       import_status: ["queued", "running", "succeeded", "failed"],
       inquiry_status: ["pending", "sent", "failed"],
       listing_status: ["active", "hidden"],

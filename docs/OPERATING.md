@@ -43,9 +43,9 @@ file, and an exported `SUPABASE_URL` wins over both.
 
 ## Hosted is behind local
 
-Hosted is not a mirror of your machine and nothing keeps it in step. The schema
-and the five functions are level as of this branch, so what is left is secrets.
-Check before blaming the code:
+Hosted is not a mirror of your machine and nothing keeps it in step. The five
+functions are level as of this branch; the schema is one migration behind, and
+secrets are missing. Check before blaming the code:
 
 ```
 npx supabase migration list      # local vs remote, side by side
@@ -57,6 +57,7 @@ What is still missing on hosted, and what it looks like if you test there:
 
 | Not on hosted | Symptom if you try it there |
 | --- | --- |
+| Migration `20261012000001_exchange_random` | Posting a Random post fails with `invalid input value for enum exchange_intent: "random"` |
 | `RESEND_API_KEY` / `SMTP_HOST` | **No mail sends at all** — claim codes, application codes, inquiries |
 | `SCRAPE_PROVIDER` / `JINA_API_KEY` | Imports fall back to plain `fetch`, so JavaScript-rendered shops read as empty |
 
@@ -102,6 +103,13 @@ colima start
 npm run db:start
 npm run ios        # or npm run web
 ```
+
+The `docker` command remembers which socket to use. A leftover Docker Desktop
+install leaves that set to `desktop-linux`, which looks for
+`~/.docker/run/docker.sock` and fails with `no such file or directory` even
+while Colima is running. Colima's socket is `~/.colima/default/docker.sock`.
+Once, run `docker context use colima`. That choice survives reboots.
+`colima start` does not change it.
 
 Shutting down is the reverse. `colima stop` returns about 8GB of RAM. To rebuild
 the stack after changing `supabase/functions/.env`, use `npm run db:stop &&
@@ -182,9 +190,10 @@ Expo Go cannot receive remote notifications there.
 ### The buyer path
 
 Deck of one watch at a time (`(tabs)/index`) → swipe right saves, left passes →
-Saved tab → a listing → **Ask about this watch**. The inquiry is the only thing
-that emails a dealer, and it is a separate deliberate act, never a side effect
-of saving.
+Wishlist tab → **Message** under the price. That opens the thread with the shop
+about that watch. A shop that has not claimed its account shows **Email the
+shop** instead of a composer, and that email is the inquiry. Writing is a
+separate deliberate act, never a side effect of saving.
 
 Search is the same catalogue as a list with filters. Both read `search_listings`,
 which only returns watches that are active, unsold, and belong to an approved
@@ -482,6 +491,11 @@ The types job regenerates `database.types.ts` and fails if it differs from the
 committed file. A migration merged without `npm run db:types` means TypeScript is
 lying about your columns, and nothing else notices.
 
+So the generated file is never edited by hand. Where Postgres allows more than
+the generator can read — a null inside a price band, a null function argument, a
+column a trigger fills — the correction goes in `src/lib/database.ts`, which
+wraps the generated type. App code imports `Database` from there.
+
 The Supabase CLI version is pinned exactly in `package.json`, and CI pins the same
 number in `.github/workflows/ci.yml`. Bump both together.
 
@@ -534,7 +548,8 @@ snapshot in `supabase/seed.sql`. Nothing to import first:
 1. `npm run web`, sign in with any address.
 2. Onboarding asks for a name — the inquiry email opens with it, so it is not optional.
 3. Swipe the deck. Right saves, left passes.
-4. Saved tab → a watch → **Ask about this watch**.
+4. Wishlist tab → **Message** under the price. The seed shop has not claimed, so
+   the thread offers **Email the shop**. That is the inquiry.
 5. Read the mail in Mailpit. Check the Reply-To is your buyer address, not Graham's.
 
 To walk it against a shop of your own instead, add one to the local stack —
@@ -651,9 +666,10 @@ A buyer swipes right to save. Sending an inquiry is a separate, deliberate act, 
 it is the only thing that reaches a dealer. Both routes open with the buyer's name,
 which is why onboarding asks for one.
 
-**Contact dealer** and **Ask about this watch** call `inquiry-draft` and hand the
-draft to Gmail, through `src/lib/mail.ts`. Four addresses for the same draft, and
-the first that opens wins:
+**Email the shop** and **Ask about this watch** call `inquiry-draft` and hand the
+draft to Gmail, through `src/lib/mail.ts`. A claimed shop is written to in the
+thread instead, and that message never leaves as mail. Four addresses for the
+same draft, and the first that opens wins:
 
 | Where | What opens |
 | --- | --- |

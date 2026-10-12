@@ -38,6 +38,10 @@ pointed at that local stack, it reads the code from Mailpit and verifies it so
 sign-in never leaves the screen. A hosted project never does this — the gate is
 the Supabase URL host, not whether Metro is in development mode.
 
+The browser will not call Mailpit itself: a different port is a different site,
+and Mailpit does not grant the page permission to read it. On web, the page
+asks Metro (`/__dev-inbox`), and Metro reads Mailpit. The phone skips that hop.
+
 `127.0.0.1` on a phone is the phone, so the client copies the LAN address Metro
 used to deliver the bundle (`src/lib/localHost.ts`). Phone and Mac have to be
 on the same Wi-Fi. The code still does not go to a real inbox.
@@ -153,7 +157,7 @@ than removing one.
 **Two sign-ins become two accounts.** Supabase links identities when the email
 matches and the provider verified it. A phone has no email to match on, so
 signing in with Google in March and a phone number in April produces two users,
-two Saved lists, and two swipe histories, with nothing on screen explaining it.
+two wishlists, and two swipe histories, with nothing on screen explaining it.
 
 If it is ever revisited: use **Twilio Verify**, not plain Twilio SMS. Verify is
 built for one-time codes and is exempt from US A2P 10DLC registration. Locally

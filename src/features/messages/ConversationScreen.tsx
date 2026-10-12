@@ -1,9 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { Alert, FlatList, Text, View } from 'react-native';
 
+import { ActionPill } from '@/components/ActionBar';
 import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { useOpenMailDraft } from '@/data/inquiries';
+import { keys } from '@/data/keys';
+import { useListing } from '@/data/listings';
 import {
   isPending as isSending,
   useConversation,
@@ -11,9 +16,9 @@ import {
   useSendMessage,
   type Message as ChatMessage,
 } from '@/data/messages';
+import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
-import { formatRelativeTime } from '@/lib/format';
-import { inset, space, type Theme } from '@/lib/theme';
+import { inset, space, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -23,15 +28,30 @@ import { partyLine, partyName } from './party';
 /** A run of messages from one person inside this many minutes shows one time. */
 const RUN = 60 * 60 * 1000;
 
-export function ConversationScreen({ conversationId }: { conversationId: string }) {
+export function ConversationScreen({
+  conversationId,
+  listingId = null,
+}: {
+  conversationId: string;
+  /** Set when this visit is a reply to one watch. The sent message names it. */
+  listingId?: string | null;
+}) {
   const { userId } = useSession();
+  const queryClient = useQueryClient();
   const styles = useThemedStyles(screenStyles);
   const lift = useKeyboardLift();
   const list = useRef<FlatList<ChatMessage>>(null);
   const [draft, setDraft] = useState('');
 
   const { data, isPending, error } = useConversation(conversationId);
-  const send = useSendMessage(conversationId, userId ?? '');
+  const { data: listing } = useListing(listingId ?? '');
+  const about = listing ? formatTitle(listing) : null;
+  const send = useSendMessage(
+    conversationId,
+    userId ?? '',
+    listingId ? { listingId, title: about } : null,
+  );
+  const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
   const close = () => router.back();
 
@@ -106,21 +126,50 @@ export function ConversationScreen({ conversationId }: { conversationId: string 
         />
         {header.writable ? (
           <SendBar
-            placeholder="Write a message"
+            placeholder={about ? 'Write about this watch' : 'Write a message'}
             value={draft}
             onChangeText={setDraft}
             onSend={submit}
             busy={send.isPending}
-            note={send.error ? <Message text="That message did not send." tone="error" /> : null}
+            note={
+              about || send.error ? (
+                <View style={styles.note}>
+                  {about ? <Text style={styles.about}>About {about}</Text> : null}
+                  {send.error ? <Message text="That message did not send." tone="error" /> : null}
+                </View>
+              ) : null
+            }
           />
         ) : (
           // A shop with no account here cannot be written to in the app. The
-          // thread is still the record of what was asked, and the answer is
-          // coming to the address the inquiry was sent from.
+          // thread is still the record of what was asked. Email is how the
+          // message leaves, and the inquiry lands in this same thread.
           <View style={styles.closed}>
+            {about ? <Text style={styles.about}>About {about}</Text> : null}
             <Message
               text={`${partyName(who)} has not claimed their shop on Graham. Their reply comes to your email.`}
             />
+            {listing ? (
+              <ActionPill
+                icon="email-outline"
+                label={`Email ${partyName(who)}`}
+                text="Email the shop"
+                busy={mail.isPending}
+                onPress={() =>
+                  mail.mutate(
+                    { card: listing, message: '' },
+                    {
+                      onSuccess: () => {
+                        void queryClient.invalidateQueries({
+                          queryKey: keys.conversation(conversationId),
+                        });
+                      },
+                      onError: (error) => Alert.alert('Could not open Gmail', error.message),
+                    },
+                  )
+                }
+              />
+            ) : null}
           </View>
         )}
       </View>
@@ -152,10 +201,18 @@ const screenStyles = (theme: Theme) => ({
     flexGrow: 1,
     justifyContent: 'flex-end' as const,
   },
+  note: {
+    gap: space.xs,
+  },
+  about: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
   closed: {
     paddingHorizontal: inset.screen,
     paddingTop: space.md,
     paddingBottom: space.lg,
+    gap: space.sm,
     borderTopWidth: 1,
     borderTopColor: theme.color.border,
   },

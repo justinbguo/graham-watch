@@ -1,13 +1,16 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Image } from 'expo-image';
 import { Pressable, Text } from 'react-native';
 
 import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+const MARK = require('../../assets/filter.svg');
+
 /**
- * The funnel with the nozzle, outline until a filter is on and then solid.
- * `filter-variant` is three bars and has no spout, so it did not read as a
- * filter. The count is the whole point: without it a user who filtered on
+ * Three centred bars, long to short, from `assets/filter.svg`. One drawing: `text`
+ * until a filter is on, then `brass`, same as any other active control. The
+ * file's stroke is black, so `tintColor` is what keeps it visible on a dark
+ * page. The count is the whole point: without it a user who filtered on
  * another screen has no way to tell why the deck looks short.
  */
 export function FilterButton({ count, onPress }: { count: number; onPress: () => void }) {
@@ -21,10 +24,12 @@ export function FilterButton({ count, onPress }: { count: number; onPress: () =>
       accessibilityLabel={count ? `Filters, ${count} active` : 'Filters'}
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-      <MaterialCommunityIcons
-        name={isActive ? 'filter' : 'filter-outline'}
-        size={size.icon}
-        color={isActive ? theme.color.brass : theme.color.text}
+      <Image
+        source={MARK}
+        style={styles.mark}
+        contentFit="contain"
+        tintColor={isActive ? theme.color.brass : theme.color.text}
+        accessible={false}
       />
       {isActive ? <Text style={styles.count}>{count}</Text> : null}
     </Pressable>
@@ -39,6 +44,10 @@ const buttonStyles = (theme: Theme) => ({
     gap: space.xs,
     minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
+  },
+  mark: {
+    width: size.icon,
+    height: size.icon,
   },
   pressed: {
     opacity: 0.72,

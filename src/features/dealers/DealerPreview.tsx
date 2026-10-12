@@ -108,7 +108,7 @@ const previewStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   // Equal tiles at the list row's 5/7, so a watch here is the same shape as
-  // the same watch in Saved or search.
+  // the same watch on the wishlist or in search.
   tile: {
     flex: 1,
     aspectRatio: 5 / 7,

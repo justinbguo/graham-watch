@@ -16,7 +16,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Wordmark } from '@/components/Wordmark';
 import {
   HIT_TARGET,
   inset,
@@ -53,14 +52,19 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  *   bottom again.
  * - `inSheet` — a sheet is presented below the status bar, so a top inset
  *   inside one is a dead band under nothing.
+ *
+ * `back` is the arrow at the top left, on its own row above the title, where
+ * iOS and the onboarding slides put it. The trailing slot is for controls that
+ * act on the screen; leaving it is not one of those.
  */
 export function Screen({
   title,
   titleSize = 'display',
   titleExtra,
-  wordmark = false,
   subtitle,
-  verified = false,
+  back,
+  leading,
+  subhead,
   action,
   width = 'reading',
   inTabs = false,
@@ -72,12 +76,18 @@ export function Screen({
   titleSize?: 'display' | 'title';
   /** A control on the title's line. Wraps under the title when the line is full. */
   titleExtra?: ReactNode;
-  /** The app's name, in place of `title`. The deck is the only screen that wears it. */
-  wordmark?: boolean;
   /** A line under the title: what the screen is holding right now. */
   subtitle?: string;
-  /** The blue check after the title. The app's own name only. */
-  verified?: boolean;
+  /** Return to where you came from. `label` is spoken; it names the place. */
+  back?: { label: string; onPress: () => void };
+  /** A control at the start of the title's line. Search's close. */
+  leading?: ReactNode;
+  /**
+   * A row that belongs to the title, drawn under it. The title's own bottom
+   * padding would put a page of air between them, and a negative margin would
+   * paint this row over the header, where the header keeps the taps.
+   */
+  subhead?: ReactNode;
   action?: ReactNode;
   width?: LayoutWidth;
   inTabs?: boolean;
@@ -99,30 +109,34 @@ export function Screen({
         },
       ]}>
       <View style={[styles.column, { maxWidth: layout[width] }]}>
-        {title || wordmark || action ? (
-          <View style={styles.header}>
-            <View style={[styles.heading, titleExtra ? styles.headingShare : null]}>
-              <View style={[styles.titleRow, titleExtra ? styles.titleRowWrap : null]}>
-                {wordmark ? (
-                  <Wordmark fit />
-                ) : title ? (
-                  <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
-                ) : null}
-                {titleExtra}
-                {/* Spoken, unlike most glyphs beside a word: the check is a
-                    claim about the marketplace, not a picture of the word. */}
-                {verified ? (
-                  <MaterialCommunityIcons
-                    name="check-decagram"
-                    size={size.icon}
-                    color={theme.color.verified}
-                    accessibilityLabel="Verified"
-                  />
-                ) : null}
+        {back ? (
+          <View style={styles.backRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={back.label}
+              hitSlop={space.sm}
+              onPress={back.onPress}
+              style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+              <MaterialCommunityIcons name="arrow-left" size={size.icon} color={theme.color.text} />
+            </Pressable>
+          </View>
+        ) : null}
+        {title || action || leading || subhead ? (
+          <View style={subhead ? styles.headed : undefined}>
+            <View style={[styles.header, subhead ? styles.headerFlush : null]}>
+              {leading ? <View style={styles.leading}>{leading}</View> : null}
+              <View style={[styles.heading, titleExtra || leading ? styles.headingShare : null]}>
+                <View style={[styles.titleRow, titleExtra ? styles.titleRowWrap : null]}>
+                  {title ? (
+                    <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
+                  ) : null}
+                  {titleExtra}
+                </View>
+                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
               </View>
-              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+              {action ? <View style={styles.actionSlot}>{action}</View> : null}
             </View>
-            {action ? <View style={styles.actionSlot}>{action}</View> : null}
+            {subhead}
           </View>
         ) : null}
         {children}
@@ -303,7 +317,14 @@ export function Spinner() {
   );
 }
 
-export function CloseButton({ onPress }: { onPress: () => void }) {
+export function CloseButton({
+  onPress,
+  edge = 'end',
+}: {
+  onPress: () => void;
+  /** `start` puts the glyph on the left gutter. Search leaves that way. */
+  edge?: 'start' | 'end';
+}) {
   const styles = useThemedStyles(closeStyles);
   const theme = useTheme();
 
@@ -313,7 +334,7 @@ export function CloseButton({ onPress }: { onPress: () => void }) {
       accessibilityLabel="Close"
       hitSlop={space.sm}
       onPress={onPress}
-      style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.close, edge === 'start' && styles.closeStart, pressed && styles.pressed]}>
       <MaterialCommunityIcons name="close" size={size.icon} color={theme.color.text} />
     </Pressable>
   );
@@ -332,6 +353,28 @@ const screenStyles = (theme: Theme) => ({
     alignSelf: 'center' as const,
     paddingTop: space.md,
   },
+  backRow: {
+    paddingHorizontal: inset.screen,
+  },
+  // The glyph's left edge sits on the gutter, under nothing and over the title.
+  back: {
+    width: HIT_TARGET,
+    height: HIT_TARGET,
+    alignItems: 'flex-start' as const,
+    justifyContent: 'center' as const,
+  },
+  leading: {
+    flexShrink: 0,
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+  // The title and its subhead are one group. `space.sm` between them, and the
+  // page gap, `space.lg`, after the group rather than between its parts.
+  headed: {
+    gap: space.sm,
+    paddingBottom: space.lg,
+  },
   header: {
     flexDirection: 'row' as const,
     // On the title's line, not the block's centre: a subtitle under the title
@@ -341,6 +384,9 @@ const screenStyles = (theme: Theme) => ({
     gap: space.md,
     paddingHorizontal: inset.screen,
     paddingBottom: space.lg,
+  },
+  headerFlush: {
+    paddingBottom: 0,
   },
   heading: {
     flexShrink: 1,
@@ -543,6 +589,12 @@ const closeStyles = (_theme: Theme) => ({
     minHeight: HIT_TARGET,
     alignItems: 'flex-end' as const,
     justifyContent: 'center' as const,
+  },
+  closeStart: {
+    alignItems: 'flex-start' as const,
+    // The spare hit area sits past the glyph. Pull it back so the title
+    // does not start a full target away from the X.
+    marginRight: -(HIT_TARGET - size.icon),
   },
   pressed: {
     opacity: 0.72,

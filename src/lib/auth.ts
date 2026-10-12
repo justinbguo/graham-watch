@@ -123,6 +123,9 @@ export async function signInWithProvider(provider: keyof typeof PROVIDER_LABEL) 
     throw error;
   }
   if (!data.url) throw new Error('Supabase did not return an OAuth URL.');
+  // `skipBrowserRedirect` builds the URL locally, so "provider is not enabled"
+  // only appears once the browser opens it. Ask first, or web shows raw JSON.
+  await assertProviderReady(data.url, provider);
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type === 'success') {
@@ -132,6 +135,18 @@ export async function signInWithProvider(provider: keyof typeof PROVIDER_LABEL) 
 
 export function signInWithGoogle() {
   return signInWithProvider('google');
+}
+
+async function assertProviderReady(url: string, provider: keyof typeof PROVIDER_LABEL) {
+  const response = await fetch(url, { redirect: 'manual' });
+  if (response.status < 400) return;
+
+  const body = (await response.json().catch(() => null)) as { msg?: string } | null;
+  const message = body?.msg ?? '';
+  if (/not enabled/i.test(message)) {
+    throw new Error(`${PROVIDER_LABEL[provider]} sign-in is not set up yet. Use email instead.`);
+  }
+  throw new Error(message || `${PROVIDER_LABEL[provider]} sign-in failed.`);
 }
 
 export async function signOut(options?: { scope?: 'global' | 'local' | 'others' }) {

@@ -40,7 +40,7 @@ export function PostMenu({
         <View style={styles.menu}>
           <Item
             label="Edit"
-            icon="pencil"
+            icon="pencil-outline"
             onPress={() => {
               setOpen(false);
               onEdit();
@@ -48,7 +48,7 @@ export function PostMenu({
           />
           <Item
             label="Delete"
-            icon="delete"
+            icon="delete-outline"
             tone="danger"
             onPress={() => {
               setOpen(false);

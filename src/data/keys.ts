@@ -31,6 +31,9 @@ export const keys = {
   dealerPreview: (dealerId: string) => ['dealer-preview', dealerId] as const,
   exchange: ['exchange'] as const,
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
+  collectorPosts: (userId: string) => ['collector-posts', userId] as const,
   conversations: ['conversations'] as const,
+  /** Listing ids the buyer has already named in a message. */
+  discussed: ['discussed-listings'] as const,
   conversation: (conversationId: string) => ['conversation', conversationId] as const,
 };

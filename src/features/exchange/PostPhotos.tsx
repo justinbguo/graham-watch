@@ -96,7 +96,7 @@ const photoStyles = (theme: Theme) => ({
   frame: {
     width: '100%' as const,
     aspectRatio: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     overflow: 'hidden' as const,
     backgroundColor: theme.color.surfaceSunken,
   },

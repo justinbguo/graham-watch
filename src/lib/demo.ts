@@ -1,4 +1,5 @@
-import { toRpcArgs, type Filters } from '@/features/filters/types';
+import { matchesListing } from '@/features/filters/match';
+import type { Filters } from '@/features/filters/types';
 
 import type {
   CaseMaterial,
@@ -208,45 +209,10 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
   dealer: DEALER,
 }));
 
-// Swipes live for the life of the process, so the deck and Saved stay in sync
+// Swipes live for the life of the process, so the deck and the wishlist stay in sync
 // while you use the app. A reload starts over, which is what you want in a demo.
 const swiped = new Map<string, SwipeDirection>();
 const followed = new Set<string>();
-
-/** A value matches when it sits in any chosen band. No bands means no filter. */
-function inSomeBand(
-  value: number | null,
-  mins: (number | null)[] | undefined,
-  maxs: (number | null)[] | undefined
-): boolean {
-  if (!mins || !maxs) return true;
-  if (value == null) return false;
-  return mins.some((lo, index) => {
-    const hi = maxs[index];
-    if (lo != null && value < lo) return false;
-    if (hi != null && value > hi) return false;
-    return true;
-  });
-}
-
-/** Mirrors search_listings closely enough that filters behave the same offline. */
-function matches(card: DeckCard, filters: Filters): boolean {
-  const f = toRpcArgs(filters);
-  const text = `${card.brand} ${card.model ?? ''} ${card.reference ?? ''}`.toLowerCase();
-
-  if (f.p_query && !text.includes(f.p_query.toLowerCase())) return false;
-  if (f.p_brands && !f.p_brands.includes(card.brand_key ?? '')) return false;
-  if (f.p_dealers && !f.p_dealers.includes(card.dealer_id)) return false;
-  if (f.p_styles && (!card.style || !f.p_styles.includes(card.style))) return false;
-  if (f.p_materials && (!card.case_material || !f.p_materials.includes(card.case_material))) return false;
-  if (f.p_windings && (!card.winding || !f.p_windings.includes(card.winding))) return false;
-  if (f.p_complications && !f.p_complications.every((c) => card.complications.includes(c))) return false;
-  if (!inSomeBand(card.price_cents, f.p_price_mins, f.p_price_maxs)) return false;
-  if (!inSomeBand(card.case_size_mm, f.p_size_mins, f.p_size_maxs)) return false;
-  if (!inSomeBand(card.year, f.p_year_mins, f.p_year_maxs)) return false;
-
-  return true;
-}
 
 /**
  * The mail draft the `inquiry-draft` function would return, composed offline.
@@ -288,12 +254,12 @@ export function demoMailDraft(card: DeckCard, message: string) {
 
 export const demo = {
   deck: (filters?: Filters) =>
-    CARDS.filter((card) => !swiped.has(card.id) && (!filters || matches(card, filters))),
+    CARDS.filter((card) => !swiped.has(card.id) && (!filters || matchesListing(card, filters))),
 
-  search: (filters: Filters) => CARDS.filter((card) => matches(card, filters)),
+  search: (filters: Filters) => CARDS.filter((card) => matchesListing(card, filters)),
 
   counts: (filters: Filters) => ({
-    matched: CARDS.filter((card) => !swiped.has(card.id) && matches(card, filters)).length,
+    matched: CARDS.filter((card) => !swiped.has(card.id) && matchesListing(card, filters)).length,
     total: CARDS.length,
   }),
 

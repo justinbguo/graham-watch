@@ -10,7 +10,7 @@ import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * Saved watches in a row. The profile page is already a vertical list for the
+ * Wishlist watches in a row. The profile page is already a vertical list for the
  * shop, so this one scrolls sideways. A list that can run past the screen
  * stays virtualized.
  */
@@ -27,7 +27,7 @@ export function SavedStrip() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.heading}>Saved watches</Text>
+      <Text style={styles.heading}>Wishlist</Text>
       <FlatList
         horizontal
         data={saved}

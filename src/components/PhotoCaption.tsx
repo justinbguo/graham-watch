@@ -18,12 +18,16 @@ import { useThemedStyles } from '@/providers/theme';
  * second line. When the year would wrap, it leaves the name and joins them, so
  * a long name does not grow a third line over the watch.
  *
- * One weight throughout, and one colour with one exception: the dealer's name
- * is `onOverlayAccent`, the same tan as the roll's current bar. On a
- * photograph a change of tone is a change the eye must attribute either to the
- * type or to the picture behind it, so there is exactly one, and it falls on
- * the one word here that names a party rather than the watch. Not `brass`,
- * which is mixed for paper and goes to mud over a dark scrim.
+ * Capitals, and one colour with one exception: the dealer's name is
+ * `onOverlayAccent`, the same tan as the roll's current bar. On a photograph a
+ * change of tone is a change the eye must attribute either to the type or to
+ * the picture behind it, so there is exactly one, and it falls on the one word
+ * here that names a party rather than the watch. Not `brass`, which is mixed
+ * for paper and goes to mud over a dark scrim.
+ *
+ * The price leans. This face ships no italic, and `fontStyle` on the roman
+ * file does nothing on iOS, so the price is sheared. The rest of the line
+ * stays upright.
  *
  * The year keeps `titleSmall` on whichever line it lands on. The price stays
  * `bodyStrong`. Moving the year down does not shrink it, and it does not
@@ -69,21 +73,23 @@ export function PhotoCaption({ card }: { card: DeckCard }) {
         <Text style={styles.name} numberOfLines={1}>
           {split ? name : title}
         </Text>
-        <Text style={styles.terms} numberOfLines={1}>
+        <View style={styles.terms}>
           {split ? (
             <>
               <Text style={styles.year}>{card.year}</Text>
-              {'  ·  '}
+              <Text style={styles.dot}>{'·'}</Text>
             </>
           ) : null}
-          {formatPrice(card)}
+          <Text style={styles.price}>{formatPrice(card)}</Text>
           {dealer ? (
             <>
-              {'  ·  '}
-              <Text style={styles.dealer}>{dealer}</Text>
+              <Text style={styles.dot}>{'·'}</Text>
+              <Text style={styles.dealer} numberOfLines={1}>
+                {dealer}
+              </Text>
             </>
           ) : null}
-        </Text>
+        </View>
       </View>
     </View>
   );
@@ -95,6 +101,16 @@ export function PhotoCaption({ card }: { card: DeckCard }) {
  * Native Web has never heard of that prop and takes the CSS name instead. The
  * cast is the price of a prop the web renderer does not type.
  */
+/**
+ * The plate is the one place type is set in capitals. The face's own tracking
+ * is negative and capitals at that tracking touch, so this is zero rather
+ * than that negative.
+ */
+const caps = {
+  textTransform: 'uppercase' as const,
+  letterSpacing: 0,
+};
+
 const gradient = Platform.select<ViewStyle>({
   web: { backgroundImage: scrim } as ViewStyle,
   default: { experimental_backgroundImage: scrim },
@@ -114,6 +130,7 @@ const captionStyles = (theme: Theme) => ({
   },
   name: {
     ...type.titleSmall,
+    ...caps,
     // Set solid. The lines stacked on a photograph want to read as one block;
     // the token's leading is for type with paper around it.
     lineHeight: type.titleSmall.fontSize + 3,
@@ -132,29 +149,50 @@ const captionStyles = (theme: Theme) => ({
     left: 0,
     top: 0,
   },
+  // The price keeps the size it had on its own line; the dealer joins it
+  // there rather than the price coming down to a label. Separate texts, so
+  // the price can lean without taking the dealer with it, and so a long
+  // dealer ellipsizes instead of pushing the price off the card.
   terms: {
-    // The price keeps the size it had on its own line; the dealer joins it
-    // there rather than the price coming down to a label.
+    flexDirection: 'row' as const,
+    alignItems: 'baseline' as const,
+    paddingTop: space.xs,
+  },
+  year: {
+    ...type.titleSmall,
+    ...caps,
+    lineHeight: type.bodyStrong.fontSize + 3,
+    color: theme.color.onOverlay,
+    textShadowColor: theme.color.overlay,
+    textShadowRadius: 12,
+  },
+  dot: {
     ...type.bodyStrong,
     lineHeight: type.bodyStrong.fontSize + 3,
     color: theme.color.onOverlay,
-    // The price and the dealer share a line, so the gap between them is the
-    // only thing dividing them. A middot with air is a divider; a comma is a
-    // list.
-    paddingTop: space.xs,
+    paddingHorizontal: space.xs,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,
   },
-  // The year, once it has left the name. Same size as the line it came from,
-  // locked to this line's leading so the plate does not grow by a point.
-  year: {
-    ...type.titleSmall,
+  price: {
+    ...type.bodyStrong,
+    ...caps,
     lineHeight: type.bodyStrong.fontSize + 3,
     color: theme.color.onOverlay,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,
+    // Ten degrees is about an italic's slant. The shear pulls the last
+    // digit past the box it was measured in, so the box is a step wider.
+    transform: [{ skewX: '-10deg' }],
+    paddingRight: space.xs,
   },
   dealer: {
+    ...type.bodyStrong,
+    ...caps,
+    lineHeight: type.bodyStrong.fontSize + 3,
     color: theme.color.onOverlayAccent,
+    textShadowColor: theme.color.overlay,
+    textShadowRadius: 12,
+    flexShrink: 1,
   },
 });

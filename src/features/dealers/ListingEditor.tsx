@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Field, Message } from '@/components/ui';
 import { useUpdateDealerListing, type ListingEdits } from '@/data/dealers';
-import { Constants } from '@/lib/database.types';
+import { Constants } from '@/lib/database';
 import { humanize } from '@/lib/format';
 import type {
   CaseMaterial,

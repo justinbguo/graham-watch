@@ -3,7 +3,7 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-import type { Database } from './database.types';
+import type { Database } from './database';
 import { env } from './env';
 import { secureStorage } from './secureStorage';
 

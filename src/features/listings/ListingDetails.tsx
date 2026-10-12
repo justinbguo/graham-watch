@@ -26,7 +26,7 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
 
   return (
     <View style={styles.details}>
-      {/* Only ever reached from Saved: the deck cannot serve a sold watch. It
+      {/* Only ever reached from the wishlist: the deck cannot serve a sold watch. It
           says what the dealer would have said, before an email gets written. */}
       {card.sold_at ? (
         <View style={styles.sold}>

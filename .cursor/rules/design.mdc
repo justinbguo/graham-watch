@@ -32,15 +32,24 @@ nobody follows.
   it serves Roman.
 - `textTransform: 'uppercase'`, or a string literal written in caps. Copy we
   write is sentence case; only proper nouns take a capital. The wordmark is
-  the one exception, and its letters are written `GRAHAM`. Dealer data
+  written `GRAHAM`. The card's plate is the other exception, capitals with the
+  price sheared, because this face has no italic. Dealer data elsewhere
   (brand, model, reference) is printed as imported and never re-cased.
 - A glyph from outside `MaterialCommunityIcons`, or a hand-picked size for one.
-  Brand marks named below are the exception.
-  Outline when idle, solid when active, `size.icon` or `size.iconSmall`.
+  Brand marks named below are the exception, and so are the commissioned
+  drawings: `assets/filter.svg` at `size.icon`, tinted `text` or `brass`;
+  `assets/message.svg` and `assets/comment.svg` at `size.iconSmall`, tinted
+  to the control they sit on; `assets/watch.svg` at `size.tabIcon` on the Buy
+  tab, tinted to the bar's glyph colour.
+  Always the outline cut, `size.icon` or `size.iconSmall`. A selected control
+  changes colour. It does not swap to a filled glyph.
 - An icon-only control without an `accessibilityLabel` naming what it does.
-- `save` or `danger` colour used for anything but saving and passing.
-- `verified` on anything but the blue check after the app's own name. A check
-  on a dealer is a promise about a shop we imported and did not vet.
+- `save` or `danger` colour used for anything but saving and passing. A price is
+  `money`, because a price in `save` looks like a watch you kept.
+- A check after a name, except a dealer in a list of dealers. That mark is
+  `check-decagram-outline` at `size.iconSmall` in `brass`, spoken with the name as
+  verified. The deck's title wears none, and so does a person. A check on a
+  watch row is still a promise the row did not make.
 - A header count assembled from rows already in hand. `listing_counts` counts
   in the database with the deck's predicate; the deck is one pile deep and its
   length is not a total.
@@ -80,8 +89,7 @@ nobody follows.
   looks right until the day a palette lifts a container above its page.
 - A destructive action that happens on the swipe itself. A row swipe reveals
   the button; the tap is what does it. Nothing in the app undoes a removal.
-  The revealed button is the same size as the row's Contact dealer control:
-  `inset.compactX` by `inset.compactY`, a capsule.
+  The revealed button is a capsule at `inset.compactX` by `inset.compactY`.
 - A row inside `SwipeToRemove` whose press handlers skip `useSwipeGuard`. The
   end of a drag fires a click on web, and that click opens the row.
 - A line of text teaching a gesture. If the gesture needs the sentence, use the
@@ -97,14 +105,14 @@ nobody follows.
   and the doors. The doors name the mode: `Create account with` or `Log in
   with`. No heading does. A header holds a word, a count, and controls; the
   word is already the name. `Screen` has no slot for a mark.
-- The app's name set as a screen title in `display`, or written `Graham`. It is
-  `Wordmark`: the letters `GRAHAM` in `type.wordmark`. Sign-in and the deck
-  title are the two places it appears.
+- The deck's name in capitals, or larger than the other headers. The title is
+  `Graham` in `type.display`, the same size as Search and Profile. Sign-in is
+  the one `Wordmark`: the letters `GRAHAM` in `type.wordmark`.
 - A second line of header type laid under `Screen`'s title. That is its
   `subtitle`, which keeps the header's controls on the title's line.
 - A glyph beside a word that stands for the word rather than naming the same
-  thing literally. Outside the tab bar and the specification table, a glyph
-  belongs to a control.
+  thing literally. Outside the tab bar, the specification table, and the brass
+  check after a dealer in a list, a glyph belongs to a control.
 - A second type size under a card's photograph, or muted type there. The
   description and the specification values are both `label` on `text`; weight
   is the only difference between them.
@@ -112,13 +120,12 @@ nobody follows.
   full strength — `text` and `labelStrong` — and the word lives in the row's
   `accessibilityLabel` as "Year: 1972". A fact that cannot stand without its
   word is written as one: `has()` prints "Box" and "No papers", never "Yes".
-- A word under a tab glyph, or a tab glyph that is not `Ionicons` at
-  `size.tabIcon`. The bar has no labels, so its glyphs carry a heavier stroke
-  than the `MaterialCommunityIcons` used everywhere else.
+- A word under a tab glyph, or a tab glyph that is not `MaterialCommunityIcons`
+  outline at `size.tabIcon`, except Buy (`assets/watch.svg` at that size) and
+  Profile (the photograph). The current tab does not fill its glyph in.
 - Scheme colours in the tab bar. It is dark under a pale app in both schemes:
   `bar`, `onBar`, `onBarActive`, and nothing else. `brass` is selection on the
-  page, not on the floor: the current tab is white and solid against glyphs at
-  55% white, which is two signals without a third colour.
+  page, not on the floor: the current tab is white against glyphs at 55% white.
 - A tab's count drawn anywhere but half on the glyph's top-right corner, or
   drawn in one colour for both states. It is `space.xs` out on each side, and
   it inverts on the tab you are on — `bar` numerals on `onBarActive` idle, the
@@ -126,11 +133,17 @@ nobody follows.
   separate them is an outline.
 - A count fetched inside `TabBar`. A screen declares it with `tabBarBadge`
   from a feature hook, and the badge folds into the tab's spoken label.
+- A Community tag in a size of its own. The price chip and the intent tag are
+  one shape — `caption`, `space.sm` on the sides, flush above and below — and
+  only the fill differs.
+- A filter row that scrolls sideways. Community's All-and-intents row splits
+  its width equally so every choice is on screen.
 - A ring, outline, or second fill a shade away to show state. Selection is
-  `brass`: as a fill with a `background` label, or as the glyph colour. The one
-  ring in the app is the swipe commit on `SwipeCard`, which is a gesture in
-  flight, not a state, and it is drawn on the card's frame so it survives the
-  scroll underneath it.
+  `brass`: as a fill with a `background` label, or as the glyph colour. Two
+  strokes are allowed. The swipe commit on `SwipeCard` is a gesture in flight,
+  drawn on the card's frame so it survives the scroll underneath it. The
+  Profile tab's photograph, when that tab is on, is a `size.rule` stroke in
+  the bar colour, because a photo has no outline glyph.
 - A second control in the view switch, or a glyph in it that names the view you
   are already in. `ViewToggle` is one button showing the destination, and the
   turn-and-fade between the two glyphs is what says a press did anything.
@@ -152,9 +165,11 @@ nobody follows.
 - A sent message that waits for the server to appear. The row goes into the
   thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
   it.
-- More than one watch on a grid row. The photograph is on the left, `size.gridPhoto`
-  wide at 5/7, and the details are on the right. The row does not pass or save.
-  That happens on the listing it opens.
+- More than one watch on a grid row, except Search. The home grid, the wishlist,
+  and a shop put the photograph on the left, `size.gridPhoto` wide at 5/7 (the
+  home grid and the wishlist use `gridScan`), and the details on the right. The
+  row does not pass or save. That happens on the listing it opens. Search is a
+  wall of square photographs, three across, described in `docs/DESIGN.md`.
 - `surfaceSunken` on something sitting directly on the page. It is darker than
   the page in the dark scheme and disappears there; it only works inside a
   container.
@@ -228,7 +243,7 @@ nobody follows.
 - A hardcoded number for a notch, Dynamic Island, or home indicator. Insets
   come from `react-native-safe-area-context`.
 - A guess at where a navigator put something. The save flight measures the
-  Saved bookmark with `measureInWindow` rather than dividing the window by the
+  Wishlist bookmark with `measureInWindow` rather than dividing the window by the
   tab count, and degrades to no animation until that measurement arrives.
 - A `tabBar*` styling option in the tabs layout. The bar is `TabBar`; the
   layout declares routes, titles, icons, counts, and `tabBarPosition`, and

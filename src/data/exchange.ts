@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database';
 import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
 
-export type ExchangeIntent = 'sell' | 'buy' | 'trade';
+export type ExchangeIntent = Database['public']['Enums']['exchange_intent'];
 
 export type ExchangePhoto = {
   path: string;
@@ -107,10 +107,73 @@ const INTENT_LABEL: Record<ExchangeIntent, string> = {
   sell: 'Selling',
   buy: 'Buying',
   trade: 'Trading',
+  random: 'Random',
 };
 
 export function intentLabel(intent: ExchangeIntent) {
   return INTENT_LABEL[intent];
+}
+
+/** One of a collector's posts, without the vote row. The profile is a list of offers. */
+export type CollectorPost = {
+  id: string;
+  intent: ExchangeIntent;
+  title: string;
+  price_cents: number | null;
+  currency: string;
+  body: string;
+  cover_url: string | null;
+};
+
+/**
+ * The posts one person has written. The board can already read every post, so
+ * this is that list filtered to them. Their name and photograph come from the
+ * post that was tapped: `profiles` is still readable only by its owner.
+ */
+export function useCollectorPosts(userId: string | null) {
+  return useQuery({
+    queryKey: keys.collectorPosts(userId ?? 'none'),
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<CollectorPost[]> => {
+      if (isDemo || !userId) return [];
+      const posts = await supabase
+        .from('exchange_posts')
+        .select('id, intent, title, price_cents, currency, body, created_at')
+        .eq('author_id', userId)
+        .order('created_at', { ascending: false });
+      if (posts.error) throw posts.error;
+      const rows = posts.data ?? [];
+      if (rows.length === 0) return [];
+
+      const photos = await supabase
+        .from('exchange_photos')
+        .select('post_id, storage_path, position')
+        .in(
+          'post_id',
+          rows.map((row) => row.id)
+        )
+        .order('position');
+      if (photos.error) throw photos.error;
+
+      const cover = new Map<string, string>();
+      for (const photo of photos.data ?? []) {
+        if (!cover.has(photo.post_id)) cover.set(photo.post_id, photo.storage_path);
+      }
+
+      return rows.map((row) => {
+        const path = cover.get(row.id);
+        return {
+          id: row.id,
+          intent: row.intent,
+          title: row.title,
+          price_cents: row.price_cents,
+          currency: row.currency,
+          body: row.body,
+          cover_url: path ? exchangePhotoUrl(path) : null,
+        };
+      });
+    },
+  });
 }
 
 export function useExchangeFeed() {
@@ -248,6 +311,7 @@ export function useSaveExchangePost(userId: string) {
     },
     onSuccess: (id) => {
       void queryClient.invalidateQueries({ queryKey: keys.exchange });
+      void queryClient.invalidateQueries({ queryKey: ['collector-posts'] });
       if (id) void queryClient.invalidateQueries({ queryKey: keys.exchangePost(id) });
     },
   });
@@ -264,6 +328,7 @@ export function useDeleteExchangePost() {
     },
     onSuccess: (_data, input) => {
       void queryClient.invalidateQueries({ queryKey: keys.exchange });
+      void queryClient.invalidateQueries({ queryKey: ['collector-posts'] });
       void queryClient.removeQueries({ queryKey: keys.exchangePost(input.postId) });
     },
   });

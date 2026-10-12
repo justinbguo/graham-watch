@@ -222,7 +222,7 @@ More in [docs/OPERATING.md](docs/OPERATING.md).
 ## Layout
 
 ```
-src/app/            routes; (app)/(tabs) holds Buy, Search, Community, Saved, Profile
+src/app/            routes; (app)/(tabs) holds Buy, Community, Messages, Wishlist, Profile, Search
 src/features/       auth, onboarding, listings, dealers, exchange, messages, saved
 src/components/     SwipeCard, DeckGrid, ListingRow, shared UI primitives
 src/data/           one module per entity, TanStack Query hooks

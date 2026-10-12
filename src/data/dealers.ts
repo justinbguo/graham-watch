@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { NO_FILTERS } from '@/features/filters/types';
 import { demo, isDemo } from '@/lib/demo';
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database';
 import type { DeckCard, Listing } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
@@ -429,6 +429,7 @@ export function useDealerPreview(dealerId: string | null) {
 export function useDealerShop(dealerId: string) {
   return useQuery({
     queryKey: keys.dealerShop(dealerId),
+    enabled: Boolean(dealerId),
     queryFn: async () => {
       if (isDemo) {
         const listings = demo.search({ ...NO_FILTERS, dealers: [dealerId] });

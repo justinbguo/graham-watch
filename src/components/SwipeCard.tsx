@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -27,6 +27,13 @@ const FLING_VELOCITY = 800;
 const DRAG_RESISTANCE = 0.34;
 /** A quarter of the card's own width commits the swipe. */
 const COMMIT_FRACTION = 0.25;
+/**
+ * Where a pass has faded out, in fractions of the card's width. The drag
+ * resists past the commit point, so a thumb only carries the card to about
+ * half its width. A fade measured out to a full width would finish in a
+ * distance the finger never reaches.
+ */
+const FADE_FRACTION = 0.55;
 const ROTATION_DEGREES = 10;
 /** How much of the card the photograph takes, and how tall it may ever get. */
 const PHOTO_FRACTION = 0.58;
@@ -96,26 +103,21 @@ export function SwipeCard({
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   // A returning card starts where a pass ends, and settles in the way a
-  // declined swipe does. The ring and the fade come back with it: the exit
-  // run backwards.
+  // declined swipe does. Opacity is derived from cardX, so the fade comes
+  // back with it.
   const cardX = useSharedValue(returning ? -offScreen : 0);
-  // Solid while a thumb is down. The ring says the decision; fading the watch
-  // under the finger would make an object in the hand into a ghost. The
-  // dissolve starts when the card is let go, on the same clock as the travel,
-  // so the two read as one leaving.
-  const cardOpacity = useSharedValue(returning ? 0 : 1);
   useEffect(() => {
-    if (!returning) return;
-    cardX.value = withTiming(0, SETTLE);
-    cardOpacity.value = withTiming(1, SETTLE);
-  }, [cardOpacity, cardX, returning]);
+    if (returning) cardX.value = withTiming(0, SETTLE);
+  }, [cardX, returning]);
   const lift = useSharedValue(0);
   const thresholdFired = useSharedValue(false);
   const previewFired = useSharedValue(false);
   const scrollY = useSharedValue(0);
   const touchX = useSharedValue(0);
   const touchY = useSharedValue(0);
-  const mode = useSharedValue<'undecided' | 'swipe' | 'peek' | 'scroll'>('undecided');
+  const mode = useSharedValue<'undecided' | 'swipe' | 'peek' | 'scroll' | 'pinch'>('undecided');
+  // The photograph's pinch runs alongside this pan instead of losing to it.
+  const panRef = useRef<GestureType | undefined>(undefined);
   // The scroll view does not scroll itself. Its pan was claiming every
   // downward drag, so the card never got the one that reveals the next watch.
   // Left and right were unaffected: a scroll view has nothing to do sideways.
@@ -189,9 +191,25 @@ export function SwipeCard({
   }
 
   const pan = Gesture.Pan()
+    .withRef(panRef)
     .enabled(isTop)
     .manualActivation(true)
-    .onTouchesDown((event) => {
+    .onTouchesDown((event, state) => {
+      // Two fingers on the card is a pinch on the photograph, not a drag. The
+      // first finger has usually moved before the second lands, so this has
+      // to undo a swipe or a scroll already under way: the card goes back to
+      // centre and the pan stands down.
+      if (event.numberOfTouches > 1) {
+        const wasActive = mode.value !== 'undecided' && mode.value !== 'pinch';
+        mode.value = 'pinch';
+        dragX.value = 0;
+        dragY.value = 0;
+        cardX.value = withTiming(0, SETTLE);
+        lift.value = withTiming(0, SETTLE);
+        if (wasActive) state.end();
+        else state.fail();
+        return;
+      }
       const touch = event.allTouches[0];
       if (!touch) return;
       touchX.value = touch.x;
@@ -201,13 +219,6 @@ export function SwipeCard({
       previewFired.value = false;
     })
     .onTouchesMove((event, state) => {
-      // Two fingers on the card is a pinch on the photograph, not a drag. Left
-      // to this gesture, the first of the two would have swiped the watch away
-      // while the other was still zooming in on the dial.
-      if (event.numberOfTouches > 1 && mode.value === 'undecided') {
-        state.fail();
-        return;
-      }
       if (mode.value !== 'undecided') return;
       const touch = event.allTouches[0];
       if (!touch) return;
@@ -272,7 +283,7 @@ export function SwipeCard({
         scheduleOnRN(impact);
 
         // A save hands the card straight to the flight overlay, which picks it
-        // up where the thumb left it and carries it to the Saved tab. Flinging
+        // up where the thumb left it and carries it to the Wishlist tab. Flinging
         // it off the right edge first would put two cards on screen for one
         // save, travelling in different directions.
         if (direction === 'right') {
@@ -280,16 +291,14 @@ export function SwipeCard({
           return;
         }
 
-        // One card-width, not off the window. The old exit ran to 1.5 screens
-        // inside motion.fast, which put the fade past the edge: the card was
-        // gone before it had thinned. Stopping at its own width keeps the
-        // dissolve on screen, and the next swipe waits the same 160ms it did.
+        // One card-width, not off the window. Travelling on to 1.5 screens
+        // put the last of the fade past the edge. The opacity follows cardX,
+        // so this finish is the drag's fade carried to its end.
         const leave = { duration: motion.fast, easing: Easing.out(Easing.cubic) };
         const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
         cardX.value = withTiming(-distance, leave, () =>
           scheduleOnRN(onSwipe, 'left', cardX.value)
         );
-        cardOpacity.value = withTiming(0, leave);
         return;
       }
 
@@ -328,8 +337,16 @@ export function SwipeCard({
   // the drag carried it past its own edge.
   const swipeStyle = useAnimatedStyle(() => {
     const width = cardWidth.value;
+    // Solid until the pass has caught, then thinning as the card travels its
+    // own width. A rightward drag stays solid: that card is about to be a
+    // photograph flying to the wishlist, and fading it first would pop back to full
+    // when the flight took over.
+    const commit = width * COMMIT_FRACTION;
+    const gone = width > 0 ? width * FADE_FRACTION : 1;
+    const opacity =
+      cardX.value >= 0 ? 1 : interpolate(cardX.value, [-gone, -commit], [0, 1], 'clamp');
     return {
-      opacity: cardOpacity.value,
+      opacity,
       transform: [
         { translateX: cardX.value },
         { translateY: lift.value },
@@ -395,7 +412,12 @@ export function SwipeCard({
           }}
           contentContainerStyle={styles.content}>
           <View style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
-            <PhotoCarousel photos={card.photos} active={isTop} onExpand={onExpandPhoto} />
+            <PhotoCarousel
+              photos={card.photos}
+              active={isTop}
+              onExpand={onExpandPhoto}
+              alongside={panRef}
+            />
             <PhotoCaption card={card} />
           </View>
 

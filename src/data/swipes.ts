@@ -45,7 +45,7 @@ async function countPasses(actorId: string): Promise<number> {
 }
 
 /**
- * Only the passes. A right swipe is a decision the user can still see in Saved,
+ * Only the passes. A right swipe is a decision the user can still see on the wishlist,
  * and deleting those rows would empty that list without saying so.
  */
 async function deletePasses(actorId: string) {
@@ -125,7 +125,7 @@ export function useRecordSwipe(actorId: string | null) {
 
 /**
  * A pass is the only swipe with nothing to show for it — a save is still sitting
- * in Saved, waiting to be undone there. The row is deleted rather than flipped,
+ * on the wishlist, waiting to be undone there. The row is deleted rather than flipped,
  * so the watch is genuinely unjudged and returns to any freshly fetched deck.
  */
 export function useUndoPass(actorId: string | null) {

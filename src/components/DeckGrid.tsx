@@ -6,7 +6,7 @@ import type { DeckCard } from '@/lib/models';
 import { space } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-const GAP = space.lg;
+const GAP = space.sm;
 /** One watch per row, so up and down move to the next watch. */
 const COLUMNS = 1;
 
@@ -63,7 +63,8 @@ export function DeckGrid({
       renderItem={({ item, index }) => (
         <ListingRow
           card={item}
-          selected={index === selectedIndex}
+          scan
+          selected={Platform.OS === 'web' && index === selectedIndex}
           onPress={() => {
             setSelected(index);
             onOpen(item);
@@ -76,7 +77,8 @@ export function DeckGrid({
 
 const gridStyles = () => ({
   content: {
-    padding: GAP,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
     gap: GAP,
   },
 });

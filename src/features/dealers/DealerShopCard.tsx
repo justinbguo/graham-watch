@@ -69,7 +69,7 @@ export function DealerShopCard({
         <View style={styles.rule} />
         <View style={styles.stats}>
           <Stat value={totals.live} label="Live listings" />
-          <Stat value={totals.saves} label="Saves" />
+          <Stat value={totals.saves} label="Wishlists" />
           <Stat value={totals.inquiries} label="Inquiries" />
         </View>
       </View>

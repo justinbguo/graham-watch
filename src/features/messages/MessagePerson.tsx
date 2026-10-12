@@ -16,7 +16,7 @@ export function MessagePerson({ userId, name }: { userId: string; name: string }
 
   return (
     <ActionPill
-      icon="message-outline"
+      mark={require('../../../assets/message.svg')}
       label={`Message ${name}`}
       busy={start.isPending}
       onPress={() =>

@@ -173,6 +173,17 @@ additional_redirect_urls = [
   "graham://**",
   "exp://localhost:*",
   "exp://localhost:*/**",
+  # Web dev. `makeRedirectUri` returns the page origin (`http://localhost:<port>`).
+  # `127.0.0.1` is allowed without an entry; `localhost` is not, and a refused
+  # redirect is replaced with site_url (`graham://`), which a browser cannot open.
+  "http://localhost:*",
+  "http://localhost:*/**",
+  # Hosted web. The page origin is the redirect, and a missing entry is
+  # replaced with site_url (`graham://`), which a browser cannot open.
+  "https://graham-watch.vercel.app",
+  "https://graham-watch.vercel.app/**",
+  "https://graham-watch-justins-projects-7504da6b.vercel.app",
+  "https://graham-watch-justins-projects-7504da6b.vercel.app/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

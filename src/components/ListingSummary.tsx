@@ -15,45 +15,65 @@ import { useThemedStyles } from '@/providers/theme';
  */
 export function ListingSummary({
   card,
-  titleInset = 0,
+  dense = false,
+  compact = false,
+  note,
+  notedAt,
+  prompt = false,
 }: {
   card: DeckCard;
+  /** The home grid. Less padding, so the row is only as tall as a short photo. */
+  dense?: boolean;
   /**
-   * Room kept clear at the end of the title, for a control in the row's
-   * corner. The title is the line with slack — it wraps to two anyway — and
-   * the price and the dealer have to stay whole on one.
+   * The wishlist. The name a step smaller and no spec line: a watch you
+   * already saved is recognised by its name and price, and the reference is
+   * one tap away on the listing.
    */
-  titleInset?: number;
+  compact?: boolean;
+  /** Between the name and the price. A last message, or the prompt to write one. */
+  note?: string;
+  /** The day that message was sent, at the top right of the name. */
+  notedAt?: string;
+  /** The note is the prompt, not a message someone already sent. */
+  prompt?: boolean;
 }) {
   const styles = useThemedStyles(summaryStyles);
-
-  return (
-    <View style={styles.summary}>
-      <Text style={[styles.title, titleInset > 0 && { paddingRight: titleInset }]} numberOfLines={2}>
+  const title = (
+    <View style={styles.titleLine}>
+      <Text style={[compact ? styles.titleCompact : styles.title, styles.titleFlex]} numberOfLines={2}>
         {formatTitle(card)}
       </Text>
-      <Text style={styles.meta} numberOfLines={1}>
-        {formatSpecs(card)}
+      {notedAt ? <Text style={styles.when}>{notedAt}</Text> : null}
+    </View>
+  );
+  const terms = (
+    <Text style={[styles.terms, (dense || compact) && styles.termsDense]} numberOfLines={1}>
+      <Text style={card.sold_at ? styles.sold : styles.price}>
+        {card.sold_at ? 'Sold' : formatPrice(card)}
       </Text>
+      {card.dealer ? (
+        <>
+          {' · '}
+          <Text style={styles.dealer}>{card.dealer.name}</Text>
+        </>
+      ) : null}
+    </Text>
+  );
 
-      {/* One line, as on the card: the price and the dealer divided by a
-          middot. Stacked, they were a third and fourth line in a row that is
-          only as tall as its photograph. One space either side of the middot,
-          not the card's two — this line has a glyph at the end of it and the
-          dealer's name was arriving truncated by five pixels. */}
-      <Text style={styles.terms} numberOfLines={1}>
-        {/* Sold replaces the price rather than sitting beside it. A number next
-            to "Sold" reads as what it is going for, not what it went for. */}
-        <Text style={card.sold_at ? styles.sold : styles.price}>
-          {card.sold_at ? 'Sold' : formatPrice(card)}
+  return (
+    <View style={compact ? styles.summaryCompact : dense ? styles.summaryDense : styles.summary}>
+      {title}
+      {compact ? null : (
+        <Text style={styles.meta} numberOfLines={1}>
+          {formatSpecs(card)}
         </Text>
-        {card.dealer ? (
-          <>
-            {' · '}
-            <Text style={styles.dealer}>{card.dealer.name}</Text>
-          </>
-        ) : null}
-      </Text>
+      )}
+      {note ? (
+        <Text style={prompt ? styles.prompt : styles.note} numberOfLines={2}>
+          {note}
+        </Text>
+      ) : null}
+      {terms}
     </View>
   );
 }
@@ -63,8 +83,48 @@ const summaryStyles = (theme: Theme) => ({
     padding: space.md,
     gap: space.xs,
   },
+  // Vertical stays `sm`, so the row is still only as tall as the photo.
+  // The left is `md`: at `sm` the name sat on the photograph.
+  summaryDense: {
+    paddingVertical: space.sm,
+    paddingRight: space.sm,
+    paddingLeft: space.md,
+    gap: space.xs,
+  },
+  // The row's own padding holds the vertical air. Only the gap to the photo.
+  summaryCompact: {
+    paddingLeft: space.md,
+    paddingRight: space.sm,
+    gap: space.xs,
+  },
   title: {
     ...type.titleSmall,
+    color: theme.color.text,
+  },
+  titleCompact: {
+    ...type.labelStrong,
+    color: theme.color.text,
+  },
+  titleLine: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: space.sm,
+  },
+  titleFlex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  when: {
+    ...type.caption,
+    color: theme.color.textMuted,
+    flexShrink: 0,
+  },
+  note: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
+  prompt: {
+    ...type.caption,
     color: theme.color.text,
   },
   meta: {
@@ -76,6 +136,9 @@ const summaryStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
     paddingTop: space.sm,
   },
+  termsDense: {
+    paddingTop: space.xs,
+  },
   price: {
     ...type.priceSmall,
     color: theme.color.text,
@@ -84,10 +147,10 @@ const summaryStyles = (theme: Theme) => ({
     ...type.priceSmall,
     color: theme.color.textFaint,
   },
-  // Brass type, not an outlined badge: a badge is a control, and a dealer's
-  // name is not something you press.
+  // Medium is this face's semibold: there is no 600 cut. Brass, not a badge.
+  // A dealer's name is not something you press.
   dealer: {
-    ...type.caption,
+    ...type.control,
     color: theme.color.brass,
   },
 });

@@ -16,13 +16,16 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  *
  * The answer is on the capsule you pressed: the plus turns into the check and
  * the word changes with it, on the frame the write starts. Nothing flies to
- * Profile. Saved is a pile of watches, so a save can land on it; Profile is
+ * Profile. The wishlist is a pile of watches, so a save can land on it; Profile is
  * you, and a shop flying at it would claim it is a pile of shops.
  */
 export function FollowDealer({
   dealer,
+  block = false,
 }: {
   dealer: { id: string; name: string; logo_url?: string | null };
+  /** On a row of its own: the row's width, at the same height. */
+  block?: boolean;
 }) {
   const { userId } = useSession();
   const theme = useTheme();
@@ -39,7 +42,7 @@ export function FollowDealer({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: following }}
-      hitSlop={(HIT_TARGET - size.avatarSmall) / 2}
+      hitSlop={(HIT_TARGET - type.body.lineHeight) / 2}
       onPress={() => {
         tick();
         toggle.mutate({
@@ -51,13 +54,14 @@ export function FollowDealer({
       }}
       style={({ pressed }) => [
         styles.button,
+        block && styles.block,
         !following && styles.solid,
         pressed && styles.pressed,
       ]}>
       <GlyphTurn
         on={following}
-        from="account-plus"
-        to="account-check"
+        from="account-plus-outline"
+        to="account-check-outline"
         size={size.iconSmall}
         color={following ? theme.color.text : theme.color.background}
       />
@@ -72,13 +76,21 @@ const followStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     alignSelf: 'flex-start' as const,
     gap: space.xs,
-    height: size.avatarSmall,
+    // The name beside it is `body`. The line is a little taller than the
+    // letters, which is the height the capsule should be.
+    height: type.body.lineHeight,
     // Half the height, or the rounded end covers the word and iOS clips it.
-    paddingHorizontal: size.avatarSmall / 2,
+    paddingHorizontal: type.body.lineHeight / 2,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: theme.color.text,
     backgroundColor: theme.color.background,
+  },
+  // Full width when it has a row of its own, at the same height. A
+  // `controlMin` bar was the heaviest thing on the card.
+  block: {
+    alignSelf: 'stretch' as const,
+    justifyContent: 'center' as const,
   },
   solid: {
     backgroundColor: theme.color.text,
@@ -87,7 +99,7 @@ const followStyles = (theme: Theme) => ({
     opacity: 0.72,
   },
   label: {
-    ...type.labelStrong,
+    ...type.control,
     color: theme.color.text,
   },
   solidLabel: {

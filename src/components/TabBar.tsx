@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import type { Tabs } from 'expo-router';
 import type { ComponentProps, ReactNode } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,8 +39,12 @@ const PRESS_DURATION = 90;
 export function TabBar({ state, descriptors, navigation }: TabBarProps) {
   const isWide = useIsWide();
 
-  const tabs: Tab[] = state.routes.map((route, index) => {
+  const tabs: Tab[] = state.routes.flatMap((route, index) => {
     const { options } = descriptors[route.key];
+    // `href: null` keeps a route in this navigator without a seat on the bar.
+    // Expo Router implements that as `display: 'none'` on the item, and this
+    // bar draws the items itself, so it has to honour that.
+    if (hiddenTab(options.tabBarItemStyle)) return [];
     const focused = state.index === index;
     const label =
       typeof options.tabBarLabel === 'string'
@@ -123,7 +127,7 @@ function BarTab({ tab }: { tab: Tab }) {
       style={styles.tab}>
       <Animated.View style={press.style}>
         {tab.renderIcon(tab.focused ? theme.color.onBarActive : theme.color.onBar)}
-        <Badge count={tab.badge} focused={tab.focused} />
+        <Badge count={tab.badge} />
       </Animated.View>
     </Pressable>
   );
@@ -174,7 +178,7 @@ function RailTab({ tab }: { tab: Tab }) {
       style={styles.tab}>
       <Animated.View style={press.style}>
         {tab.renderIcon(tab.focused ? theme.color.onBarActive : theme.color.onBar)}
-        <Badge count={tab.badge} focused={tab.focused} />
+        <Badge count={tab.badge} />
       </Animated.View>
     </Pressable>
   );
@@ -185,13 +189,13 @@ function RailTab({ tab }: { tab: Tab }) {
  * as part of the tab's label rather than drawn and left silent, because a
  * number nobody reads out is a number a screen reader user never learns about.
  *
- * It inverts on the tab you are on, the same way the glyph does. A white pill
- * on a white glyph is one white shape, and the bookmark loses the corner the
- * count is sitting on; the dark pill cuts the count out of the glyph instead.
- * A ring around the pill would say it more plainly and is an outline.
+ * Red with a white count, on every tab and whether or not it is the one you
+ * are on. It used to be white and invert to dark on the current tab, because
+ * a white pill on a white glyph is one shape. Red stands off both the idle
+ * and the active glyph, so it no longer has to change.
  */
-function Badge({ count, focused }: { count?: number; focused: boolean }) {
-  const styles = useThemedStyles(focused ? badgeOnStyles : badgeStyles);
+function Badge({ count }: { count?: number }) {
+  const styles = useThemedStyles(badgeStyles);
   if (!count) return null;
 
   return (
@@ -201,6 +205,10 @@ function Badge({ count, focused }: { count?: number; focused: boolean }) {
       </Text>
     </View>
   );
+}
+
+function hiddenTab(style: StyleProp<ViewStyle> | undefined) {
+  return StyleSheet.flatten(style)?.display === 'none';
 }
 
 function tabLabel(tab: Tab) {
@@ -273,18 +281,10 @@ const badgeStyles = (theme: Theme) => ({
     borderRadius: size.badge / 2,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    backgroundColor: theme.color.onBarActive,
+    backgroundColor: theme.color.badge,
   },
   count: {
     ...type.badge,
-    color: theme.color.bar,
+    color: theme.color.onBadge,
   },
 });
-
-const badgeOnStyles = (theme: Theme) => {
-  const base = badgeStyles(theme);
-  return {
-    badge: { ...base.badge, backgroundColor: theme.color.bar },
-    count: { ...base.count, color: theme.color.onBarActive },
-  };
-};

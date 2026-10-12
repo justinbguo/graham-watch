@@ -24,7 +24,7 @@ export function ProfileHeader() {
   const styles = useThemedStyles(headerStyles);
 
   const name = fullName(profile) ?? 'Collector';
-  const savedLabel = `${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`;
+  const savedLabel = `${saved.length} ${saved.length === 1 ? 'watch' : 'watches'} on your wishlist`;
   const photoLabel = profile?.avatar_url ? 'Change profile picture' : 'Add a profile picture';
   const errorText = pickError ?? setAvatar.error?.message;
 
@@ -78,7 +78,6 @@ export function ProfileHeader() {
 const headerStyles = (theme: Theme) => ({
   block: {
     gap: stack.related,
-    paddingVertical: space.md,
   },
   // The face and who you are, side by side. Aligned at the top, so the name
   // starts on the photo's top edge rather than floating against its middle.

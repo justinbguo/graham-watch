@@ -1,10 +1,12 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ChoiceRow, Field } from '@/components/ui';
+import { useDealerShop } from '@/data/dealers';
 import { useFacets } from '@/data/search';
 import { HIT_TARGET, inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+import { facetsOf } from './facets';
 import { useFilters, type Surface } from './provider';
 import { humanize } from '@/lib/format';
 
@@ -32,14 +34,17 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
  * Every filter in one scrolling panel. Options come from `listing_facets`, so a
  * brand only appears once a listing on this screen is that brand — offering a
  * filter that can only return nothing is a dead end the user has to back out of.
+ * A shop counts from the watches it already loaded, for the same reason.
  *
  * Price is two number fields with presets. There is no search box here —
  * typing a brand name is a question, and questions belong on the search tab.
  */
-export function FilterPanel({ surface }: { surface: Surface }) {
+export function FilterPanel({ surface, dealerId }: { surface: Surface; dealerId?: string }) {
   const styles = useThemedStyles(panelStyles);
-  const { filters, toggle, setPrice, togglePrice, clear } = useFilters(surface);
-  const { data: facets = [] } = useFacets(surface === 'deck');
+  const { filters, toggle, setPrice, togglePrice, clear } = useFilters(surface, dealerId);
+  const { data: catalogue = [] } = useFacets(surface === 'deck', surface !== 'shop');
+  const shop = useDealerShop(surface === 'shop' ? (dealerId ?? '') : '');
+  const facets = surface === 'shop' ? facetsOf(shop.data?.listings ?? []) : catalogue;
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
   const count = activeCount(filters);

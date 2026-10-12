@@ -12,7 +12,7 @@ import { keys } from './keys';
  * owner sees the buyer.
  */
 export type ConversationWith =
-  | { kind: 'dealer'; dealerId: string; name: string; byEmail: boolean }
+  | { kind: 'dealer'; dealerId: string; name: string; logoUrl: string | null; byEmail: boolean }
   | {
       kind: 'person';
       userId: string | null;
@@ -50,6 +50,7 @@ export type Message = {
 type PartyColumns = {
   dealer_id: string | null;
   dealer_name: string | null;
+  dealer_logo_url: string | null;
   person_id: string | null;
   person_name: string | null;
   person_handle: string | null;
@@ -64,6 +65,7 @@ function party(row: PartyColumns): ConversationWith {
       kind: 'dealer',
       dealerId: row.dealer_id,
       name: row.dealer_name ?? 'This shop',
+      logoUrl: row.dealer_logo_url,
       byEmail: row.by_email,
     };
   }
@@ -160,7 +162,12 @@ type Thread = { header: ConversationHeader | null; messages: Message[] };
  * The pending row is replaced by the server's when the refetch lands, and
  * taken out again if the write fails.
  */
-export function useSendMessage(conversationId: string, userId: string) {
+export function useSendMessage(
+  conversationId: string,
+  userId: string,
+  /** Set when this visit is a reply to one watch. Later messages in the visit name it too. */
+  about?: { listingId: string; title: string | null } | null,
+) {
   const queryClient = useQueryClient();
   const queryKey = keys.conversation(conversationId);
   return useMutation({
@@ -170,6 +177,7 @@ export function useSendMessage(conversationId: string, userId: string) {
         conversation_id: conversationId,
         sender_id: userId,
         body: body.trim(),
+        ...(about ? { listing_id: about.listingId } : {}),
       });
       if (error) throw error;
     },
@@ -183,7 +191,7 @@ export function useSendMessage(conversationId: string, userId: string) {
         sender_id: userId,
         body: body.trim(),
         via: 'app',
-        listing: null,
+        listing: about?.title ?? null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<Thread>(queryKey, (thread) =>
@@ -197,6 +205,61 @@ export function useSendMessage(conversationId: string, userId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey });
       void queryClient.invalidateQueries({ queryKey: keys.conversations });
+      void queryClient.invalidateQueries({ queryKey: keys.discussed });
+    },
+  });
+}
+
+/**
+ * Opens the buyer's thread with the shop selling this watch, or finds the one
+ * that already exists. One shop is one thread. The watch is named on the
+ * message, not by opening a second conversation.
+ */
+export function useMessageAboutListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (listingId: string): Promise<string> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { data, error } = await supabase.rpc('conversation_about_listing', {
+        p_listing_id: listingId,
+      });
+      if (error) throw error;
+      if (!data) throw new Error('Could not open that conversation.');
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
+/** The newest message that names a saved watch, for the line on its wishlist row. */
+export type ListingThread = { body: string; at: string };
+
+/**
+ * The latest message about each watch this buyer has written about. A message
+ * names its listing, so the wishlist can show that line and tell a first
+ * message from a thread that already exists. One shop is still one thread.
+ */
+export function useListingThreads(userId: string | null) {
+  return useQuery({
+    queryKey: keys.discussed,
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<Record<string, ListingThread>> => {
+      if (isDemo || !userId) return {};
+      const { data, error } = await supabase
+        .from('messages')
+        .select('listing_id, body, created_at')
+        .not('listing_id', 'is', null)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const latest: Record<string, ListingThread> = {};
+      for (const row of data ?? []) {
+        if (!row.listing_id || latest[row.listing_id]) continue;
+        latest[row.listing_id] = { body: row.body, at: row.created_at };
+      }
+      return latest;
     },
   });
 }
@@ -216,6 +279,28 @@ export function useMessagePerson() {
       if (error) throw error;
       if (!data) throw new Error('Could not open that conversation.');
       return data;
+    },
+  });
+}
+
+/**
+ * Opens the buyer's thread with this shop, or finds the one that already
+ * exists. One shop is one thread, the same one a saved watch opens.
+ */
+export function useMessageDealer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dealerId: string): Promise<string> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { data, error } = await supabase.rpc('conversation_with_dealer', {
+        p_dealer_id: dealerId,
+      });
+      if (error) throw error;
+      if (!data) throw new Error('Could not open that conversation.');
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
     },
   });
 }

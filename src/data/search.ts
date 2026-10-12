@@ -72,10 +72,11 @@ export function useSearchCount(filters: Filters) {
  * The deck passes `excludeOwn`, because it will not show a watch this account
  * imported and a filter for one would be a dead end. Search does not.
  */
-export function useFacets(excludeOwn = true) {
+export function useFacets(excludeOwn = true, enabled = true) {
   return useQuery({
     queryKey: [...keys.facets, excludeOwn],
     queryFn: () => fetchFacets(excludeOwn),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }

@@ -9,12 +9,12 @@ import { useRecordSwipe } from '@/data/swipes';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * The frame a watch gets when there is no card to scroll: opened from Saved, a
+ * The frame a watch gets when there is no card to scroll: opened from the wishlist, a
  * search result, or a grid tile. The deck reads the same content inside the
  * card itself, so everything below the price comes from `ListingDetails`.
  */
@@ -58,15 +58,17 @@ export default function ListingScreen() {
   }
 
   return (
-    <Screen action={<CloseButton onPress={() => router.back()} />}>
-      <ScrollView contentContainerStyle={styles.body}>
-        {/* Above the photograph, and the price on the right of the name. The
-            card wears both over the image; a page has a column to head. */}
-        <View style={styles.headline}>
-          <Text style={styles.model}>{formatTitle(card)}</Text>
+    <Screen>
+      {/* Outside the scroll, on the close button's line. A name that leaves
+          with the photograph is gone by the time you reach the caliber. */}
+      <View style={styles.headline}>
+        <Text style={styles.model}>{formatTitle(card)}</Text>
+        <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(card)}</Text>
+          <CloseButton onPress={() => router.back()} />
         </View>
-
+      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <View style={styles.photo}>
           <PhotoCarousel
             photos={card.photos}
@@ -83,15 +85,15 @@ export default function ListingScreen() {
 
         <ListingDetails
           card={card}
-          // A watch already in Saved has nothing left to decide here. The row in
-          // Saved carries Contact dealer and slides left to remove, so repeating
-          // both on the page put a verdict in front of a watch already chosen.
+          // A watch already on the wishlist has nothing left to decide here. The row
+          // carries Message and slides left to remove, so repeating both
+          // on the page put a verdict in front of a watch already chosen.
           actions={
             isSaved ? null : (
               <>
                 <Button
-                  label="Save watch"
-                  icon="bookmark"
+                  label="Add to wishlist"
+                  icon="bookmark-outline"
                   variant="outline"
                   loading={save.isPending && save.variables?.direction === 'right'}
                   onPress={() => save.mutate({ listingId: card.id, direction: 'right' })}
@@ -118,7 +120,7 @@ export default function ListingScreen() {
                 {fromSearch || card.sold_at ? null : (
                   <Button
                     label="Ask about this watch"
-                    icon="email"
+                    icon="email-outline"
                     loading={contact.isPending}
                     onPress={() =>
                       contact.mutate(
@@ -140,6 +142,9 @@ export default function ListingScreen() {
 }
 
 const detailStyles = (theme: Theme) => ({
+  scroll: {
+    flex: 1,
+  },
   body: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxl,
@@ -150,22 +155,32 @@ const detailStyles = (theme: Theme) => ({
     borderRadius: radius.lg,
     overflow: 'hidden' as const,
   },
-  // The price shares the name's first baseline. Centring a 18pt number against
-  // a 30pt name that wraps to two lines leaves it floating between them.
+  // One line with the close control. The name takes the leftover width and
+  // wraps; the price and the X stay on that line.
   headline: {
     flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
     gap: space.md,
+    paddingHorizontal: inset.screen,
+    paddingBottom: space.lg,
+    backgroundColor: theme.color.background,
   },
   model: {
-    ...type.display,
+    ...type.title,
     color: theme.color.text,
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
+  },
+  priceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    flexShrink: 0,
   },
   price: {
     ...type.price,
     color: theme.color.text,
-    flexShrink: 0,
+    // The X sits at the end of a 44pt target, so 20 points of that target
+    // fall between the price and the glyph. Cancel them, then leave space.sm.
+    marginRight: space.sm - (HIT_TARGET - size.icon),
   },
 });

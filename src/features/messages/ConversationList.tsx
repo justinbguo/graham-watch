@@ -10,8 +10,7 @@ import { ConversationRow } from './ConversationRow';
 
 /**
  * Every thread you are in, newest movement first. The body only: the
- * Community screen owns the header, because this list is one of its views and
- * the back arrow has to sit where that screen keeps its controls.
+ * Messages tab owns the header.
  */
 export function ConversationList({ userId }: { userId: string }) {
   const styles = useThemedStyles(listStyles);

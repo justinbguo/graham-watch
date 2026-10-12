@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { Alert, FlatList, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { Alert, SectionList, Text, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
 import { SwipeToRemove } from '@/components/SwipeToRemove';
 import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useOpenMailDraft } from '@/data/inquiries';
 import { usePrimeListing, useSaved } from '@/data/listings';
+import { useListingThreads, useMessageAboutListing } from '@/data/messages';
 import { useUnsave } from '@/data/swipes';
-import { MessagesButton } from '@/features/messages/MessagesButton';
-import { MessagesView } from '@/features/messages/MessagesView';
 import { useOpenStack } from '@/lib/openStack';
-import { formatTitle, totalPrice } from '@/lib/format';
+import { formatMessageDay, formatTitle, totalPrice } from '@/lib/format';
+import type { DeckCard } from '@/lib/models';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -20,37 +20,43 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Saved() {
   const { userId } = useSession();
   const { data: cards = [], isPending, error } = useSaved(userId);
+  const threads = useListingThreads(userId);
   const unsave = useUnsave(userId);
-  const contact = useOpenMailDraft(userId);
+  const message = useMessageAboutListing();
   const primeListing = usePrimeListing();
   const open = useOpenStack();
   const styles = useThemedStyles(savedStyles);
-  const [messages, setMessages] = useState(false);
-
-  if (messages) {
-    return <MessagesView onClose={() => setMessages(false)} />;
-  }
-
-  const { total, onRequest } = totalPrice(cards);
-
-  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
-  // like a price rather than an absence. The bubble stays either way: messages
-  // are not a property of the list.
-  const action = (
-    <View style={styles.action}>
-      {cards.length ? (
-        <View style={styles.total}>
-          <Text style={styles.totalValue}>{total ?? `${cards.length} saved`}</Text>
-          {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
-        </View>
-      ) : null}
-      <MessagesButton onPress={() => setMessages(true)} />
-    </View>
+  const refetchThreads = threads.refetch;
+  // The thread is a screen on top of this one. Coming back is the moment a
+  // watch you just wrote about should move into the group at the top.
+  useFocusEffect(
+    useCallback(() => {
+      void refetchThreads();
+    }, [refetchThreads]),
   );
 
-  if (isPending) {
+  const { total, onRequest } = totalPrice(cards);
+  const spoken = threads.data ?? {};
+  const inConversation = cards.filter((card) => spoken[card.id]);
+  const rest = cards.filter((card) => !spoken[card.id]);
+  const sections: { key: string; data: DeckCard[] }[] = [];
+  if (inConversation.length) sections.push({ key: 'talking', data: inConversation });
+  if (rest.length) sections.push({ key: 'rest', data: rest });
+
+  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
+  // like a price rather than an absence.
+  const action = cards.length ? (
+    <View style={styles.total}>
+      <Text style={styles.totalValue}>
+        {total ?? `${cards.length} watch${cards.length === 1 ? '' : 'es'}`}
+      </Text>
+      {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
+    </View>
+  ) : undefined;
+
+  if (isPending || threads.isPending) {
     return (
-      <Screen title="Saved" inTabs action={action}>
+      <Screen title="Wishlist" inTabs action={action}>
         <Spinner />
       </Screen>
     );
@@ -58,7 +64,7 @@ export default function Saved() {
 
   if (error) {
     return (
-      <Screen title="Saved" inTabs action={action}>
+      <Screen title="Wishlist" inTabs action={action}>
         <Centered>
           <Message text={error.message} tone="error" />
         </Centered>
@@ -66,39 +72,60 @@ export default function Saved() {
     );
   }
 
+  const writeAbout = (item: DeckCard) => {
+    message.mutate(item.id, {
+      onSuccess: (conversationId) =>
+        open(
+          'conversation/[conversationId]',
+          { conversationId, listingId: item.id },
+          `/conversation/${conversationId}?listingId=${item.id}`,
+        ),
+      onError: (error) => Alert.alert('Could not open that message', error.message),
+    });
+  };
+
   return (
-    <Screen title="Saved" action={action} inTabs>
-      <FlatList
-        data={cards}
+    <Screen title="Wishlist" action={action} inTabs>
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled
         contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderSectionHeader={({ section }) => (
+          <Text style={[styles.section, section.key === 'rest' && inConversation.length > 0 && styles.sectionNext]}>
+            {section.key === 'talking' ? 'Pending' : 'Saved'}
+          </Text>
+        )}
         renderItem={({ item }) => (
           <SwipeToRemove
-            accessibilityLabel={`Remove ${formatTitle(item)} from Saved`}
+            accessibilityLabel={`Remove ${formatTitle(item)} from wishlist`}
             onRemove={() => unsave.mutate(item.id)}>
             <ListingRow
               card={item}
-              actionIcon="email"
-              actionLabel="Contact dealer"
-              actionPending={contact.isPending && contact.variables?.card.id === item.id}
+              compact
+              note={
+                spoken[item.id]?.body ??
+                (!item.sold_at && item.dealer ? 'Tap to inquire about the watch' : undefined)
+              }
+              notedAt={spoken[item.id] ? formatMessageDay(spoken[item.id].at) : undefined}
+              prompt={!spoken[item.id]}
+              inConversation={Boolean(spoken[item.id])}
+              attention={!spoken[item.id] && !item.sold_at && Boolean(item.dealer)}
+              messagePending={message.isPending && message.variables === item.id}
               onPress={() => {
                 primeListing(item);
                 open('listing/[listingId]', { listingId: item.id }, `/listing/${item.id}`);
               }}
-              onAction={() => {
-                contact.mutate(
-                  { card: item, message: '' },
-                  {
-                    onError: (error) => Alert.alert('Could not open Gmail', error.message),
-                  }
-                );
-              }}
+              onMessage={
+                (!item.sold_at && item.dealer) || spoken[item.id] ? () => writeAbout(item) : undefined
+              }
             />
           </SwipeToRemove>
         )}
         ListEmptyComponent={
           <Centered>
-            <Heading>Nothing saved yet</Heading>
+            <Heading>Your wishlist is empty</Heading>
             <Message text="Swipe right on the deck and it lands here." />
           </Centered>
         }
@@ -108,10 +135,6 @@ export default function Saved() {
 }
 
 const savedStyles = (theme: Theme) => ({
-  action: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-  },
   total: {
     alignItems: 'flex-end' as const,
   },
@@ -126,7 +149,22 @@ const savedStyles = (theme: Theme) => ({
   list: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxxl,
-    gap: space.lg,
     flexGrow: 1,
+  },
+  // A hairline, not a gap: the rows have no card, so the line is the edge.
+  separator: {
+    height: 1,
+    backgroundColor: theme.color.border,
+  },
+  // Same face as Profile's Wishlist and Following. Opaque, because the header
+  // sticks and the rows scroll under it.
+  section: {
+    ...type.title,
+    color: theme.color.text,
+    backgroundColor: theme.color.background,
+    paddingBottom: space.xs,
+  },
+  sectionNext: {
+    paddingTop: space.lg,
   },
 });

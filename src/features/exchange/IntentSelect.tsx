@@ -9,8 +9,8 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 import { INTENT_OPTIONS } from './copy';
 
 /**
- * Selling, buying, or trading, as one field. Three rows spent the top of the
- * form on a choice of three. It opens in place: a menu floating over the
+ * Selling, buying, trading, or random, as one field. A row each spent the top
+ * of the form on one small choice. It opens in place: a menu floating over the
  * title would need a border, and this app does not outline a control.
  */
 export function IntentSelect({

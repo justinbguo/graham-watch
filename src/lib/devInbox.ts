@@ -1,7 +1,12 @@
+import { Platform } from 'react-native';
+
 import { env } from './env';
 import { isLocalStackHost } from './localHost';
 
 const MAILPIT_PORT = 54324;
+// Metro answers this path by reading Mailpit. Kept in sync with
+// scripts/dev-inbox-proxy.cjs.
+const DEV_INBOX_PREFIX = '/__dev-inbox';
 const POLL_MS = 400;
 const WAIT_MS = 10_000;
 
@@ -39,6 +44,11 @@ function mailpitOrigin(): string | null {
   try {
     const { hostname } = new URL(env.supabaseUrl);
     if (!isLocalStackHost(hostname)) return null;
+    // Chrome treats Mailpit's port as another site and discards the response.
+    // The page asks Metro, which is on this Mac and can read the inbox.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return `${window.location.origin}${DEV_INBOX_PREFIX}`;
+    }
     return `http://${hostname}:${MAILPIT_PORT}`;
   } catch {
     return null;

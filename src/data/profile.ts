@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { signOut } from '@/lib/auth';
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database';
 import { demo, isDemo } from '@/lib/demo';
 import type { Profile } from '@/lib/models';
 import { normalizeUsername } from '@/lib/username';
@@ -107,12 +107,12 @@ async function saveAvatar(userId: string, file: { uri: string; mimeType: string 
   });
   if (uploadError) throw uploadError;
 
-  // Same path on every change, so bust the CDN the public URL would otherwise
-  // keep serving the previous file from.
-  const publicUrl = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+  // The path, not the host. The host this session used may be the Colima VM,
+  // which the next session cannot open. The cache buster is the query: the
+  // file name does not change, so a public URL would keep the previous bytes.
   const { error } = await supabase
     .from('profiles')
-    .update({ avatar_url: `${publicUrl}?v=${Date.now()}` })
+    .update({ avatar_url: `${path}?v=${Date.now()}` })
     .eq('id', userId);
   if (error) throw error;
 }

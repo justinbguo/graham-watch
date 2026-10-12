@@ -4,58 +4,44 @@ import { intentLabel, type ExchangePost } from '@/data/exchange';
 import { space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { priceLine } from './copy';
+import { hasPrice, priceLine } from './copy';
 import { Tag } from './Tag';
 
 /**
- * The watch, and the two facts that say whether the post is for you. They
- * share the title's line when the title is short, and wrap under it when
- * the title takes the width. A line of their own under one word spent a
- * row on two capsules.
+ * The watch, then what it costs, each on its own line. The price used to sit
+ * at the right of the name, so a long name wrapped beside the chip and the
+ * two read as one line. A sale's chip is the price. A request with a budget
+ * is "Up to". A trade, a random post, or a request with none names the intent.
  */
 export function PostTitle({
   title,
   post,
-  lines,
-  variant = 'card',
 }: {
   title: string;
   post: Pick<ExchangePost, 'intent' | 'price_cents' | 'currency'>;
-  lines?: number;
-  variant?: 'card' | 'thread';
 }) {
   const styles = useThemedStyles(titleStyles);
+  const priced = hasPrice(post.intent) && post.price_cents != null;
 
   return (
-    <View style={styles.row}>
-      <Text
-        style={variant === 'thread' ? styles.thread : styles.card}
-        numberOfLines={lines}>
-        {title}
-      </Text>
-      <Tag label={intentLabel(post.intent)} />
-      <Tag label={priceLine(post)} />
+    <View style={styles.block}>
+      <Text style={styles.title}>{title}</Text>
+      {priced ? (
+        <Tag label={priceLine(post)} tone="money" />
+      ) : (
+        <Tag label={intentLabel(post.intent)} />
+      )}
     </View>
   );
 }
 
 const titleStyles = (theme: Theme) => ({
-  row: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    alignItems: 'center' as const,
+  block: {
+    alignItems: 'flex-start' as const,
     gap: space.sm,
   },
-  card: {
-    ...type.titleSmall,
+  title: {
+    ...type.bodyStrong,
     color: theme.color.text,
-    flexShrink: 1,
-    maxWidth: '100%' as const,
-  },
-  thread: {
-    ...type.title,
-    color: theme.color.text,
-    flexShrink: 1,
-    maxWidth: '100%' as const,
   },
 });

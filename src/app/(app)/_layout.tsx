@@ -16,7 +16,7 @@ export default function AppLayout() {
   return (
     <FilterProvider>
       {/* Outside the Stack: a saved card flies over the tab bar on its way to
-          the Saved tab, so the overlay has to sit above every screen. */}
+          the Wishlist tab, so the overlay has to sit above every screen. */}
       <SaveFlightProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />

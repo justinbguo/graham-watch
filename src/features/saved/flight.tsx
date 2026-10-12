@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import {
   createContext,
@@ -27,7 +27,7 @@ import { motion, radius, size, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * A saved watch travels to the Saved tab instead of leaving the screen. A right
+ * A saved watch travels to the Wishlist tab instead of leaving the screen. A right
  * swipe files the watch somewhere the user can go and find it, and the flight
  * is the only thing that says where in the moment; the count on the tab is
  * what says it afterwards.
@@ -43,7 +43,7 @@ export type Rect = { x: number; y: number; width: number; height: number };
 type Flight = { id: number; from: Rect; to: Rect; photo?: string };
 
 type SaveFlightState = {
-  /** The Saved tab reports where it sits. Without it there is nowhere to fly. */
+  /** The Wishlist tab reports where it sits. Without it there is nowhere to fly. */
   registerTarget: (rect: Rect) => void;
   launch: (origin: { from: Rect; photo?: string }) => void;
   /** Bumped as each card lands, so the tab can answer for itself. */
@@ -178,12 +178,12 @@ function FlyingCard({
 }
 
 /**
- * The Saved tab's bookmark, which also reports where it is and takes the
+ * The Wishlist tab's bookmark, which also reports where it is and takes the
  * landing. Measured rather than worked out from the tab count: the bar is the
  * navigator's to lay out, it moves to the left rail on a wide window, and its
  * height differs per device.
  */
-export function SaveTargetIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
+export function SaveTargetIcon({ color }: { color: ColorValue }) {
   const { registerTarget, arrivals } = useSaveFlight();
   const frame = useRef<View>(null);
   const pulse = useSharedValue(0);
@@ -219,11 +219,7 @@ export function SaveTargetIcon({ color, focused }: { color: ColorValue; focused:
 
   return (
     <Animated.View ref={frame} collapsable={false} onLayout={measure} style={pulseStyle}>
-      <Ionicons
-        name={focused ? 'bookmark' : 'bookmark-outline'}
-        size={size.tabIcon}
-        color={color}
-      />
+      <MaterialCommunityIcons name="bookmark-outline" size={size.tabIcon} color={color} />
     </Animated.View>
   );
 }

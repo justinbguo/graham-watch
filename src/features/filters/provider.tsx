@@ -3,12 +3,13 @@ import { createContext, useCallback, useContext, useMemo, useState, type PropsWi
 import { NO_FILTERS, toggleRange, type Filters, type Preset } from './types';
 
 /**
- * The deck and the search tab filter independently. They are different jobs:
- * the deck is a queue you are working through, search is a question you are
- * asking. Narrowing search to "chronographs under $15k" should not silently
- * throw away the pile you were halfway through swiping.
+ * The deck, search, and each shop filter independently. They are different
+ * jobs: the deck is a queue you are working through, search is a question you
+ * are asking, and a shop is one inventory. Narrowing search to "chronographs
+ * under $15k" should not throw away the pile you were halfway through, and
+ * narrowing one shop should not follow you into the next.
  */
-export type Surface = 'deck' | 'search';
+export type Surface = 'deck' | 'search' | 'shop';
 
 type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'complications' | 'sizes' | 'eras';
 
@@ -23,61 +24,86 @@ export type FilterApi = {
   clear: () => void;
 };
 
+type CatalogSurface = 'deck' | 'search';
+
 type Store = {
-  bySurface: Record<Surface, Filters>;
-  update: (surface: Surface, next: (current: Filters) => Filters) => void;
+  deck: Filters;
+  search: Filters;
+  /** One set per shop, so Goldfinger's choices do not empty the next shop. */
+  shops: Record<string, Filters>;
+  update: (surface: CatalogSurface, next: (current: Filters) => Filters) => void;
+  updateShop: (dealerId: string, next: (current: Filters) => Filters) => void;
 };
 
 const Context = createContext<Store | null>(null);
 
 export function FilterProvider({ children }: PropsWithChildren) {
-  const [bySurface, setBySurface] = useState<Record<Surface, Filters>>({
-    deck: NO_FILTERS,
-    search: NO_FILTERS,
-  });
+  const [deck, setDeck] = useState<Filters>(NO_FILTERS);
+  const [search, setSearch] = useState<Filters>(NO_FILTERS);
+  const [shops, setShops] = useState<Record<string, Filters>>({});
 
   const update = useCallback<Store['update']>((surface, next) => {
-    setBySurface((current) => ({ ...current, [surface]: next(current[surface]) }));
+    const set = surface === 'deck' ? setDeck : setSearch;
+    set((current) => next(current));
   }, []);
 
-  const value = useMemo<Store>(() => ({ bySurface, update }), [bySurface, update]);
+  const updateShop = useCallback<Store['updateShop']>((dealerId, next) => {
+    setShops((current) => ({
+      ...current,
+      [dealerId]: next(current[dealerId] ?? NO_FILTERS),
+    }));
+  }, []);
+
+  const value = useMemo<Store>(
+    () => ({ deck, search, shops, update, updateShop }),
+    [deck, search, shops, update, updateShop],
+  );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
-export function useFilters(surface: Surface): FilterApi {
+export function useFilters(surface: Surface, dealerId?: string): FilterApi {
   const store = useContext(Context);
   if (!store) throw new Error('useFilters must be used inside FilterProvider.');
 
-  const { bySurface, update } = store;
+  const { update, updateShop } = store;
+  const filters =
+    surface === 'shop' ? (store.shops[dealerId ?? ''] ?? NO_FILTERS) : store[surface];
 
-  return useMemo(
-    () => ({
-      filters: bySurface[surface],
+  return useMemo(() => {
+    const apply = (next: (current: Filters) => Filters) => {
+      if (surface === 'shop') {
+        if (dealerId) updateShop(dealerId, next);
+        return;
+      }
+      update(surface, next);
+    };
+
+    return {
+      filters,
       toggle: (key, item) =>
-        update(surface, (current) => {
+        apply((current) => {
           const list = current[key] as (typeof item)[];
           return {
             ...current,
             [key]: list.includes(item) ? list.filter((v) => v !== item) : [...list, item],
           };
         }),
-      setOne: (key, next) => update(surface, (current) => ({ ...current, [key]: next })),
+      setOne: (key, next) => apply((current) => ({ ...current, [key]: next })),
       // The boxes are one range. Typing replaces every selected price band
       // with that range; clearing both ends clears price.
       setPrice: (min, max) =>
-        update(surface, (current) => ({
+        apply((current) => ({
           ...current,
           prices: min == null && max == null ? [] : [{ min, max }],
         })),
       togglePrice: (preset) =>
-        update(surface, (current) => ({
+        apply((current) => ({
           ...current,
           prices: toggleRange(current.prices, { min: preset.min, max: preset.max }),
         })),
-      replace: (next) => update(surface, () => next),
-      clear: () => update(surface, () => NO_FILTERS),
-    }),
-    [bySurface, surface, update]
-  );
+      replace: (next) => apply(() => next),
+      clear: () => apply(() => NO_FILTERS),
+    };
+  }, [dealerId, filters, surface, update, updateShop]);
 }

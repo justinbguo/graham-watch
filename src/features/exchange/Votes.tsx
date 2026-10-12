@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { PILL_HIT_SLOP } from '@/components/ActionBar';
 import type { VoteValue } from '@/data/exchange';
 import { motion, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -50,7 +51,7 @@ export function Votes({
         direction={1}
         mine={mine}
         score={score}
-        color={mine === 1 ? theme.color.brass : theme.color.textMuted}
+        color={mine === 1 ? theme.color.brass : theme.color.ink}
         onVote={onVote}
       />
       <Score score={score} on={mine !== 0} />
@@ -58,7 +59,7 @@ export function Votes({
         direction={-1}
         mine={mine}
         score={score}
-        color={mine === -1 ? theme.color.brass : theme.color.textMuted}
+        color={mine === -1 ? theme.color.brass : theme.color.ink}
         onVote={onVote}
       />
     </View>
@@ -84,7 +85,7 @@ function Arrow({
   const styles = useThemedStyles(voteStyles);
   const chosen = mine === direction;
   const word = direction === 1 ? 'Upvote' : 'Downvote';
-  const glyph = direction === 1 ? UP[chosen ? 'on' : 'off'] : DOWN[chosen ? 'on' : 'off'];
+  const glyph = direction === 1 ? 'arrow-up-thin' : 'arrow-down-thin';
 
   const nudge = useSharedValue(0);
   const nudgeStyle = useAnimatedStyle(() => ({
@@ -100,7 +101,7 @@ function Arrow({
           ? `Take back your ${word.toLowerCase()}. Score ${score}`
           : `${word}. Score ${score}`
       }
-      hitSlop={space.sm}
+      hitSlop={PILL_HIT_SLOP}
       onPress={() => {
         // Up is negative on screen. Taking the vote back goes the other way.
         const toward = chosen ? direction : -direction;
@@ -112,7 +113,7 @@ function Arrow({
       }}
       style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}>
       <Animated.View style={nudgeStyle}>
-        <MaterialCommunityIcons name={glyph} size={size.icon} color={color} />
+        <MaterialCommunityIcons name={glyph} size={size.iconSmall} color={color} />
       </Animated.View>
     </Pressable>
   );
@@ -147,10 +148,6 @@ function Score({ score, on }: { score: number; on: boolean }) {
   );
 }
 
-/** Solid when it is your vote, outlined when it is not. */
-const UP = { on: 'arrow-up-bold', off: 'arrow-up-bold-outline' } as const;
-const DOWN = { on: 'arrow-down-bold', off: 'arrow-down-bold-outline' } as const;
-
 const voteStyles = (theme: Theme) => ({
   row: {
     flexDirection: 'row' as const,
@@ -171,12 +168,12 @@ const voteStyles = (theme: Theme) => ({
   // changes under a press. Clipped, so the number steps in from inside the
   // capsule rather than from over the arrows.
   scoreWell: {
-    minWidth: space.xl,
+    minWidth: space.lg,
     overflow: 'hidden' as const,
   },
   score: {
-    ...type.bodyStrong,
-    color: theme.color.textMuted,
+    ...type.control,
+    color: theme.color.ink,
     textAlign: 'center' as const,
   },
   scoreOn: {

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database';
 import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';

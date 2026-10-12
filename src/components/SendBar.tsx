@@ -56,7 +56,7 @@ export function SendBar({
           disabled={!sendable}
           onPress={onSend}
           style={({ pressed }) => [styles.send, !sendable && styles.off, pressed && styles.pressed]}>
-          <MaterialCommunityIcons name="send" size={size.iconSmall} color={theme.color.onAccent} />
+          <MaterialCommunityIcons name="send-outline" size={size.iconSmall} color={theme.color.onAccent} />
         </Pressable>
       </View>
     </View>

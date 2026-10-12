@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { type RefObject, useEffect, useState } from 'react';
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,12 +38,15 @@ export function PhotoCarousel({
   variant = 'card',
   initialIndex = 0,
   onExpand,
+  alongside,
 }: {
   photos: DeckPhoto[];
   active: boolean;
   variant?: 'card' | 'viewer';
   initialIndex?: number;
   onExpand?: (index: number) => void;
+  /** The card's swipe, which the pinch has to run with. See `usePinchZoom`. */
+  alongside?: RefObject<GestureType | undefined>;
 }) {
   const styles = useThemedStyles(carouselStyles);
   // A card sits inside a screen that already handled the notch; the viewer fills
@@ -105,6 +108,7 @@ export function PhotoCarousel({
     frame,
     content: isViewer ? { width: shownWidth, height: shownHeight } : frame,
     hold: isViewer,
+    alongside,
   });
 
   if (!current) {

@@ -21,8 +21,3 @@ export function partyLine(who: ConversationWith): string | null {
   const handle = who.name && who.handle ? `@${who.handle}` : null;
   return [handle, collector].filter(Boolean).join(' · ') || null;
 }
-
-export const PARTY_GLYPH = {
-  dealer: 'storefront-outline',
-  person: 'account-outline',
-} as const;

@@ -73,6 +73,22 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/**
+ * The day a message was sent, in the words a person uses: Today, Yesterday,
+ * or the weekday. After a week the weekday would be ambiguous, so it names
+ * the date instead.
+ */
+export function formatMessageDay(iso: string, now = new Date()): string {
+  const then = new Date(iso);
+  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const days = Math.round((day(now) - day(then)) / 86_400_000);
+
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return then.toLocaleDateString('en-US', { weekday: 'long' });
+  return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 /** Forum timestamps: "2h ago", then a date once a week has passed. */
 export function formatRelativeTime(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime();

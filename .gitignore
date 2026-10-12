@@ -48,3 +48,4 @@ deno.lock
 # local env
 .env
 .supabase-db-password
+.vercel
