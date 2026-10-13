@@ -53,7 +53,7 @@ const sourceStyles = (theme: Theme) => ({
     minHeight: HIT_TARGET,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     backgroundColor: theme.color.surfaceSunken,
   },
   pressed: {

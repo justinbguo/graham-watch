@@ -1,27 +1,19 @@
 /**
  * Shared plumbing for the operator scripts.
  *
- * Reads SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY from the
- * environment when they are set, so the same scripts point at a hosted project.
- * Otherwise it falls back to whatever `supabase start` is running locally.
+ * Which project they talk to is decided in this order:
+ *
+ * 1. SUPABASE_URL / SUPABASE_ANON_KEY exported in the shell.
+ * 2. The repo switch (`npm run env`): `.env.local` present → the running local
+ *    stack; absent → the hosted trio in scripts/.env.operator.local.
+ *    GRAHAM_TARGET=local|hosted overrides the file for one command.
  */
 
-import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+
+import { OPERATOR_HOSTED, isLocalUrl, localStatus, parseEnvFile, target } from './_env.mjs';
 
 let cached;
-
-function localStatus() {
-  const output = execSync('supabase status -o env', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  return Object.fromEntries(
-    output
-      .split('\n')
-      .filter((line) => line.includes('='))
-      .map((line) => {
-        const [key, ...rest] = line.split('=');
-        return [key.trim(), rest.join('=').trim().replace(/^"|"$/g, '')];
-      })
-  );
-}
 
 export function config() {
   if (cached) return cached;
@@ -31,27 +23,55 @@ export function config() {
       url: process.env.SUPABASE_URL,
       anonKey: process.env.SUPABASE_ANON_KEY,
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      isLocal: false,
+      isLocal: isLocalUrl(process.env.SUPABASE_URL),
     };
     return cached;
   }
 
-  let status;
-  try {
-    status = localStatus();
-  } catch {
-    throw new Error(
-      'No Supabase found. Run `npm run db:start`, or set SUPABASE_URL and SUPABASE_ANON_KEY to target a hosted project.'
-    );
+  if (target() === 'local') {
+    const status = localStatus();
+    if (!status) {
+      throw new Error(
+        'The repo is switched to local but the stack is not running. `npm run db:start`, or `npm run env -- hosted`.'
+      );
+    }
+    cached = { url: status.url, anonKey: status.anonKey, serviceKey: status.serviceKey, isLocal: true };
+    return cached;
   }
 
+  const hosted = parseEnvFile(OPERATOR_HOSTED);
+  if (!hosted.SUPABASE_URL || !hosted.SUPABASE_ANON_KEY) {
+    throw new Error(
+      `The repo is switched to hosted but ${OPERATOR_HOSTED} is missing SUPABASE_URL or SUPABASE_ANON_KEY. Copy scripts/.env.operator.example there, or \`npm run env -- local\`.`
+    );
+  }
   cached = {
-    url: status.API_URL,
-    anonKey: status.ANON_KEY,
-    serviceKey: status.SERVICE_ROLE_KEY,
-    isLocal: true,
+    url: hosted.SUPABASE_URL,
+    anonKey: hosted.SUPABASE_ANON_KEY,
+    serviceKey: hosted.SUPABASE_SERVICE_ROLE_KEY,
+    // "Local" is a property of the address, not of which file named it.
+    isLocal: isLocalUrl(hosted.SUPABASE_URL),
   };
   return cached;
+}
+
+/**
+ * A one-line answer to "which project is about to change?".
+ *
+ * With the repo switched to hosted, every operator command writes to
+ * production. The bare URL was not enough — a project ref reads as noise above
+ * a list of shops, and the word missing from it was the one that matters.
+ */
+export function describeTarget() {
+  const { url, isLocal } = config();
+  if (isLocal) return 'local';
+
+  try {
+    return `PRODUCTION · ${new URL(url).hostname}`;
+  } catch {
+    // This line only ever labels somebody else's output; never let it throw.
+    return `PRODUCTION · ${url}`;
+  }
 }
 
 export async function request(path, { token, method = 'GET', body, prefer } = {}) {
@@ -74,7 +94,33 @@ export async function request(path, { token, method = 'GET', body, prefer } = {}
   } catch {
     parsed = text;
   }
+
+  if (response.status === 404 && SCHEMA_CACHE_MISS.has(parsed?.code)) {
+    parsed.message = `${parsed.message}\n${whichProject()}`;
+  }
+
   return { status: response.status, ok: response.ok, body: parsed };
+}
+
+/**
+ * PostgREST reports an absent table or function as a 404 against its schema
+ * cache, which reads like a broken script. It almost always means this project
+ * has not had a migration applied — usually hosted, while the one holding the
+ * migration is local. Say which is which.
+ */
+const SCHEMA_CACHE_MISS = new Set(['PGRST202', 'PGRST205']);
+
+function whichProject() {
+  const { url, isLocal } = config();
+
+  if (isLocal) {
+    return `  ${url} has not had that migration applied. Run: npm run db:reset`;
+  }
+
+  return [
+    `  ${url} has not had that migration applied.`,
+    '  For the local stack instead: npm run env -- local',
+  ].join('\n');
 }
 
 export function serviceKey() {
@@ -88,12 +134,23 @@ export function serviceKey() {
 /**
  * Imports are attributed to a real user, because the edge function runs as one
  * and `listings.imported_by` points at a profile. Locally we create that
- * operator on demand; against a hosted project you supply the credentials.
+ * operator on demand. Hosted projects derive a strong operator password from
+ * the service key unless an explicit password is supplied.
  */
 export async function signInOperator() {
-  const { url, anonKey, isLocal } = config();
+  const { url, anonKey, isLocal, serviceKey } = config();
   const email = process.env.GRAHAM_OPERATOR_EMAIL ?? 'operator@graham.local';
-  const password = process.env.GRAHAM_OPERATOR_PASSWORD ?? 'graham-operator';
+  const password =
+    process.env.GRAHAM_OPERATOR_PASSWORD ??
+    (isLocal
+      ? 'graham-operator'
+      : serviceKey
+        ? createHash('sha256').update(serviceKey).digest('hex')
+        : '');
+
+  if (!password) {
+    throw new Error('GRAHAM_OPERATOR_PASSWORD or SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
 
   const signIn = async () => {
     const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
@@ -106,12 +163,12 @@ export async function signInOperator() {
 
   let session = await signIn();
 
-  if (!session.access_token && isLocal && config().serviceKey) {
+  if (!session.access_token && serviceKey) {
     await fetch(`${url}/auth/v1/admin/users`, {
       method: 'POST',
       headers: {
-        apikey: config().serviceKey,
-        Authorization: `Bearer ${config().serviceKey}`,
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email, password, email_confirm: true }),

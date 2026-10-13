@@ -60,7 +60,7 @@ export function RequestThread({
             {request.body ? <Text style={styles.body}>{request.body}</Text> : null}
             <Button
               label={lookingLabel}
-              variant={request.lookingByMe ? 'secondary' : 'primary'}
+              variant={request.lookingByMe ? 'ghost' : 'solid'}
               loading={lookingBusy}
               onPress={onToggleLooking}
             />

@@ -1,6 +1,6 @@
 ---
 description: Design system rules for any UI work
-globs: src/app/**/*.tsx,src/components/**/*.tsx,src/lib/theme.ts,src/lib/design.ts,src/providers/theme.tsx
+globs: src/app/**/*.tsx,src/components/**/*.tsx,src/features/**/*.tsx,src/lib/theme.ts,src/lib/design.ts,src/providers/theme.tsx
 alwaysApply: false
 ---
 
@@ -16,34 +16,275 @@ nobody follows.
   gap in a component. Everything comes from `src/lib/design.ts`.
 - `StyleSheet.create` at module scope with colours in it. Colours change when the
   scheme flips, so styles come from `useThemedStyles(factory)`.
-- A third font family, or a system font beside EB Garamond and Inter.
+- Centred type on a page. Headings, paragraphs, empty states, and the wordmark
+  start at the left padding. A button's label and icons are centred in the
+  capsule. A glyph-only control stays centred in its hit target, and a
+  segment's label stays centred in its segment. The content column is still
+  centred in a wide window.
+- A font family, `fontWeight`, or a second `useFonts` call in a component. The
+  interface is Neue Haas Grotesk, through `type`. `face.text` below 20pt,
+  `face.display` at 20 and above, in regular, medium, and bold. The file is
+  the weight. One `useFonts` call, in `_layout`, loads those six files. The
+  wordmark is Display bold, the same cut as a screen title.
+- A cut outside `face` — no thin, light, black, or italic, and no `fontWeight`
+  written in a component. A weight on one of these files synthesises a fake
+  bold on Android. iOS is the exception inside `cut`: it needs the weight or
+  it serves Roman.
 - `textTransform: 'uppercase'`, or a string literal written in caps. Copy we
-  write is sentence case; only proper nouns take a capital. Dealer data
+  write is sentence case; only proper nouns take a capital. The wordmark is
+  written `GRAHAM`. The card's plate is the other exception, capitals with the
+  price sheared, because this face has no italic. Dealer data elsewhere
   (brand, model, reference) is printed as imported and never re-cased.
-- An icon from outside `MaterialCommunityIcons`.
-- `save` or `danger` colour used for anything but saving and passing.
+- A glyph from outside `MaterialCommunityIcons`, or a hand-picked size for one.
+  Brand marks named below are the exception, and so are the commissioned
+  drawings: `assets/filter.svg` at `size.icon`, tinted `text` or `brass`;
+  `assets/message.svg` and `assets/comment.svg` at `size.iconSmall`, tinted
+  to the control they sit on; `assets/watch.svg` at `size.tabIcon` on the Buy
+  tab, tinted to the bar's glyph colour.
+  Always the outline cut, `size.icon` or `size.iconSmall`. A selected control
+  changes colour. It does not swap to a filled glyph.
+- An icon-only control without an `accessibilityLabel` naming what it does.
+- `save` or `danger` colour used for anything but saving and passing. A price is
+  `money`, because a price in `save` looks like a watch you kept.
+- A check after a name, except a dealer in a list of dealers. That mark is
+  `check-decagram-outline` at `size.iconSmall` in `brass`, spoken with the name as
+  verified. The deck's title wears none, and so does a person. A check on a
+  watch row is still a promise the row did not make.
+- A header count assembled from rows already in hand. `listing_counts` counts
+  in the database with the deck's predicate; the deck is one pile deep and its
+  length is not a total.
+- A capsule on anything you do not press. `radius.full` is for a control with a
+  label — a button, a chip, a segment, a door on sign-in. Thumbnails take `sm`,
+  fields and tiles `md`, the swipe card `lg`. A round photograph is a control
+  that is not one.
+- A favicon service without `fallback=false`, or a dealer mark that survives a
+  failed load. A generic globe beside a shop's name is an invented mark; a miss
+  draws nothing. `faviconUrl` is the one place a host is turned into a URL.
+- `contentFit="contain"` on a card or a detail hero. Those fill with `cover`.
+  A list row is 5/7 and uses `contain`, so the case stays recognisable. The
+  full-screen viewer also keeps the whole photograph, and a dealer's mark,
+  which is a logo and not a photograph.
+- `borderWidth` on four sides of anything at all. Nothing in this app is drawn
+  with an outline: a card, tile, panel, or notice is a `surface` fill, a control
+  with a label is a `fill`, and a container inside a container takes
+  `surfaceSunken`. A hairline on *one* edge is a separator and is fine — `border`
+  for those, `size.rule` for a chosen row's brass mark. The follow capsule is
+  the exception: a `text` stroke on the page colour, because a filled capsule
+  there read as the page's main button.
+- Any background behind an icon-only control. The glyph is the control; it gets
+  a `HIT_TARGET` box of empty space and colour for state, never a block.
+- A shadow or elevation in place of the outline you just removed. Depth is the
+  colour step between `background`, `surface`, `fill`, and `surfaceSunken`.
+  The lone exception is the swipe card: `raised` plus `shadow.card`, because
+  white on warm white has no step left and a card in the hand is an object.
+  A second caller for `shadow` is a design change, not a style choice.
+- `raised` on anything but the swipe card. It is the tone of an object on the
+  page. A button is `accent`, not `raised`.
+- A card photograph narrower than the card. The height cap does not change
+  the width. The plate is the full width, and `cover` centres the watch.
+- A third palette. Sign-in ran green as an experiment and does not any more;
+  one scheme, keyed off the system, and every screen follows it.
+- `text` on type that sits on a `surface` or a `fill`. That is `ink`, and
+  `inkMuted` under it. The two are equal in both schemes, so the wrong one
+  looks right until the day a palette lifts a container above its page.
+- A destructive action that happens on the swipe itself. A row swipe reveals
+  the button; the tap is what does it. Nothing in the app undoes a removal.
+  The revealed button is a capsule at `inset.compactX` by `inset.compactY`.
+- A row inside `SwipeToRemove` whose press handlers skip `useSwipeGuard`. The
+  end of a drag fires a click on web, and that click opens the row.
+- A line of text teaching a gesture. If the gesture needs the sentence, use the
+  gesture the phone already taught.
+- A number on a photograph to say how many there are. The roll is bars along
+  the top edge, on `scrimTop`, and the count goes in the paging controls'
+  `accessibilityValue`.
+- The launcher mark in the app, or a tagline anywhere but under the wordmark
+  on sign-in. Guests land on the deck with **Log in** in the header action
+  slot; after `GUEST_SWIPE_BUDGET` judgments the sign-in sheet opens itself.
+  The sheet is the wordmark, one `body`/`textMuted` sentence, and the doors —
+  never a second headline or a card around the doors. The doors name the mode:
+  `Create account with` or `Log in with`. No heading does. A header holds a
+  word, a count, and controls; the word is already the name. `Screen` has no
+  slot for a mark.
+- The deck's name in capitals, or larger than the other headers. The title is
+  `Graham` in `type.display`, the same size as Search and Profile. Sign-in is
+  the one `Wordmark`: the letters `GRAHAM` in `type.wordmark`.
+- A second line of header type laid under `Screen`'s title. That is its
+  `subtitle`, which keeps the header's controls on the title's line.
+- A glyph beside a word that stands for the word rather than naming the same
+  thing literally. Outside the tab bar and the brass check after a dealer in
+  a list, a glyph belongs to a control.
+- A second type size under a card's photograph, or muted type there. The
+  description and the specification labels are both `label` on `text`. A
+  specification value and a group heading are `labelStrong`. Weight is the
+  only difference.
+- A glyph in the specification table. A row is the label, at `size.specLabel`,
+  and the value. Reference, condition, and box and papers stay when empty and
+  read "Not stated". Case joins size and metal. Movement joins winding and
+  caliber. The year stays in the name.
+- A word under a tab glyph, or a tab glyph that is not `MaterialCommunityIcons`
+  outline at `size.tabIcon`, except Buy (`assets/watch.svg` at that size) and
+  Profile (the photograph). The current tab does not fill its glyph in.
+- Scheme colours in the tab bar. It is dark under a pale app in both schemes:
+  `bar`, `onBar`, `onBarActive`, and nothing else. `brass` is selection on the
+  page, not on the floor: the current tab is white against glyphs at 55% white.
+- A tab's count drawn anywhere but half on the glyph's top-right corner, or
+  drawn in one colour for both states. It is `space.xs` out on each side, and
+  it inverts on the tab you are on — `bar` numerals on `onBarActive` idle, the
+  reverse active — because white on a white glyph is one shape, and a ring to
+  separate them is an outline.
+- A count fetched inside `TabBar`. A screen declares it with `tabBarBadge`
+  from a feature hook, and the badge folds into the tab's spoken label.
+- A Community tag in a size of its own. The price chip and the intent tag are
+  one shape — `caption`, `space.sm` on the sides, flush above and below — and
+  only the fill differs.
+- A filter row that scrolls sideways. Community's All-and-intents row splits
+  its width equally so every choice is on screen.
+- A ring, outline, or second fill a shade away to show state. Selection is
+  `brass`: as a fill with a `background` label, or as the glyph colour. Two
+  strokes are allowed. The swipe commit on `SwipeCard` is a gesture in flight,
+  drawn on the card's frame so it survives the scroll underneath it. The
+  Profile tab's photograph, when that tab is on, is a `size.rule` stroke in
+  the bar colour, because a photo has no outline glyph.
+- A second control in the view switch, or a glyph in it that names the view you
+  are already in. `ViewToggle` is one button showing the destination, and the
+  turn-and-fade between the two glyphs is what says a press did anything.
+- A view swap that cuts. The deck's two views enter on `FadeIn`, which also
+  covers `layout.card` giving way to `layout.grid` on a wide screen. Community's
+  modes do the same.
+- An icon swapped on the frame its state changes. A glyph that becomes another
+  glyph goes through `GlyphTurn`, a quarter turn and a cross-fade at
+  `motion.fast`. The view toggle and the follow capsule both do.
+- A turn, rise, or step on mount. A control that mounts already on shows its
+  on state and nothing moves. Initialise the shared value from the prop, then
+  animate on change.
+- Motion that answers neither "where did that go" nor "did that take". No
+  springs, no toasts, no pulse on an idle mark. The moments that do answer are
+  listed under "What moves, and why" in `docs/DESIGN.md`; add there before
+  adding anywhere else.
+- A haptic outside `src/lib/haptics.ts`. `tick` for a threshold or a flip,
+  `impact` for a commit, and no third.
+- A sent message that waits for the server to appear. The row goes into the
+  thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
+  it.
+- More than one watch on a grid row, except Search and the wide home grid.
+  Above the breakpoint the home grid is `layout.gridColumns` tiles
+  (`ListingTile`): square photograph alone on the page (`contain`,
+  `radius.md`), name / specs / price+dealer under it — no `surface` wrapping
+  the block, no badge or heart on the photo. Below the breakpoint, and on the
+  wishlist and a shop, `ListingRow` puts the photograph on the left
+  (`gridScan` on the phone home grid and wishlist, `gridPhoto` in a shop) and
+  the details on the right. The row or tile does not pass or save — that
+  happens on the listing it opens. Search is a wall of square photographs,
+  three across, described in `docs/DESIGN.md`.
+- `surfaceSunken` on something sitting directly on the page. It is darker than
+  the page in the dark scheme and disappears there; it only works inside a
+  container.
+- A badge around data. A box around a name makes it look like a control, so a
+  dealer's name on a card is type and colour, not a box.
+- `brass` on a photograph. It is mixed for a warm page and muddies over a
+  scrim; the tan that marks the roll's current bar and the dealer's name on a
+  card is `onOverlayAccent`, and it is the only accent a photograph carries.
+- Type laid straight on a photograph. It goes in `PhotoCaption`, on `scrim`.
+  Half the watches are shot on white and white type vanishes on them.
+- The year in a specification line. It belongs to the name — `formatTitle`
+  gives "Datejust, 1968", `formatSpecs` gives what the name did not say.
+- A third line on the card's plate. The plate is two lines. The name and the
+  year share the first when they fit; the price and the dealer are the second.
+  When the year would wrap, it leaves the name and joins that second line. The
+  year stays `titleSmall`. The price stays `bodyStrong`. The name ellipsizes
+  rather than taking a second line of its own.
+- A capsule padded by less than half its height. The rounded end covers the
+  label, and iOS clips it. Horizontal padding is `size.controlMin / 2`.
+- A step count on an onboarding slide. The heading is the question. The
+  footer stays at the bottom, and above the keyboard while it is open.
+- An onboarding field that waits for a tap before the keyboard opens. The
+  first field is focused when the slide settles, and the footer does not
+  dismiss the keyboard.
+- A birthday typed into three boxes, or set with a slider. It is three wheels
+  (month, day, year) that snap to one value. A thumb cannot sit on one year.
+- A ghost Back on an onboarding slide, or an arrow on the heading's line.
+  Back is an arrow on its own row above the heading, at the left, with no fill.
+  The first slide and the age-blocked slide have no arrow.
+- **Skip for now** on an onboarding question. Continue stays off until a row
+  is chosen.
+- A `ChoiceRow` label in the regular cut. It is `labelStrong`, the medium cut.
+- A filled field for a name or a username on onboarding. That answer is a
+  line at `type.title`, with no fill. The shop claim stays `Field`. The
+  username's @ is drawn beside the line, not typed, on the same baseline, with
+  `space.md` before the letters. The collector line under
+  it is `body` in `textMuted`.
+- An onboarding slide that starts flush under the notch inset. The question
+  sits `space.xl` lower. The footer stays at the bottom.
+- `lineHeight` on a single-line field, or `inset.controlY` as its vertical
+  padding. Take the face and size from `type.body`. `paddingBottom` is
+  `space.xs` and the top padding is 0, so the letters sit in the middle of
+  `size.controlMin`. A multiline field keeps `type.body` and `inset.controlY`.
+- A filled button that is not `accent` with `onAccent` type, centred. That
+  pair is the inverse of the page: near-black on a light page, light on a
+  dark one. `ghost` is the button with no fill. `solid` is the same pair.
+- A redrawn Instagram mark beside a shop's handle. The mark is the white
+  glyph in `assets/instagram.png`, tinted to `text`, at `size.icon`. The
+  handle is the label, in `body`. The site beside it uses `web` at the same
+  size, and the domain is the label. Both rows are at least `HIT_TARGET` tall.
+- A recolored Google G, or a glyph in its place. The door is ours and follows
+  `accent`. The mark is `assets/google-g.png`, the four-color G, at
+  `size.providerMark`. Apple's native button is black on a light page and
+  white on a dark one, so it contrasts the same way. The email door uses
+  `email-outline` in `onAccent`.
+- An elliptical arc in a bundled SVG. expo-image's iOS decoder distorts packed
+  arc flags, and the failure shows up on one platform only.
 - `Dimensions.get('window')` at module scope. It never updates on a browser
   resize. Use `useWindowDimensions` for the viewport, `onLayout` for an element.
 - A screen, card, or text column with no maximum width. Widths come from
   `layout`; `Screen` applies one by default.
 - `Platform.OS` used to ask how much room there is. That is a width question,
   so branch on width. Reserve `Platform.OS` for capability.
-- `showsVerticalScrollIndicator={false}` to quiet a scrollbar. Web scrollbars
-  are already styled down in `applyScrollbarStyle`; hiding one per scroll view
-  removes the reader's only sense of how much is left.
+- `showsVerticalScrollIndicator={false}` on any scroll view but the swipe
+  card's and the birthday wheels. Web bars are already gone document-wide in
+  `hideScrollbars`, so the prop only reaches the native indicator, which
+  elsewhere is transient and the platform's. The card is a held object and its
+  right edge is beside the photograph. A bar on a wheel sits between the
+  columns.
+- A colour or width token for a scrollbar. There is no bar to size.
+- A hardcoded number for a notch, Dynamic Island, or home indicator. Insets
+  come from `react-native-safe-area-context`.
+- A guess at where a navigator put something. The save flight measures the
+  Wishlist bookmark with `measureInWindow` rather than dividing the window by the
+  tab count, and degrades to no animation until that measurement arrives.
+- A `tabBar*` styling option in the tabs layout. The bar is `TabBar`; the
+  layout declares routes, titles, icons, counts, and `tabBarPosition`, and
+  nothing about how any of it looks.
+- A custom bar that changes where a tab goes. Emit `tabPress`, respect a
+  prevented default, then navigate — the navigator's own order.
 
 ## Always
 
 - Spread a style from `type` rather than setting size, family, or tracking by hand.
 - Use `space`, `inset`, `stack`, and `radius`. Page gutter (`inset.screen`)
-  never pads a field or chip. Sheets use `stack.group`, pages use
+  never pads a field or compact option. Sheets use `stack.group`, pages use
   `stack.section`. If the design needs a value that is not in the scale, change
   the scale deliberately and write down why.
 - Check both schemes. Dark mode is a warm charcoal, not an inversion.
 - Keep tappable areas at `HIT_TARGET` or give them `hitSlop`, on every platform.
 - Check a narrow phone and a wide browser window. Resize the window: layout
   that reads a stale size looks right until it moves.
+- Pass `inTabs` to `Screen` from a screen inside `(tabs)`, and only from there.
+  A bottom tab bar owns the bottom inset; a wide left rail does not.
+- Pass `inSheet` to `Screen` from a route presented as `modal`, and only from
+  there. The sheet's card already starts below the status bar.
+- Pad safe-area insets from `useSafeAreaInsets`. `SafeAreaView` reads its own
+  position on screen and reports nothing for the top inside a `fullScreenModal`.
 - Give every gesture a keyboard or pointer equivalent. A mouse has no thumb.
+- Use `ChoiceRow` for selectable lists. Selection is a brass left rule and
+  quiet surface shift, never a filled pill cloud. A form field with a handful
+  of mutually exclusive answers is one dropdown, the way the composer names
+  selling, buying, or trading — not a list of rows.
+- Render everything below a watch's price from `ListingDetails`. The deck card
+  and the listing route are two frames on one block, and the frame passes in its
+  own buttons.
+- Scroll inside a swipe card with React Native's `ScrollView`. Gesture
+  Handler's takes the whole touch on web and the card stops moving. Keep
+  `activeOffsetX` and `failOffsetY` on the pan so the two axes stay separate.
 
 ## When the rules do not cover it
 

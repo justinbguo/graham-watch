@@ -96,7 +96,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
-[inbucket]
+[local_smtp]
 enabled = true
 # Port to use for the email testing server web interface.
 port = 54324
@@ -155,16 +155,38 @@ site_url = "graham://"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# Expo Go hands back an `exp://<host>:<port>/--/...` redirect, and the port is
-# whichever one Metro picked that day. A URL missing from this list is rejected
-# by Auth with "requested path is invalid", which reads on screen as the OAuth
-# sheet closing with nothing happening. The wildcards cover the dev machine only;
-# a real build redirects to `graham://`.
+# Where Auth may send someone after a magic link or an OAuth callback. Anything
+# not matched here silently falls back to site_url, which on screen is the
+# browser sheet closing with no error and no session.
+#
+# Applied only when the auth container is created. Starting a container left
+# over from an older config keeps the old list. Stop the stack, then start it.
+#
+# Measured against this GoTrue, not assumed:
+#   - 127.0.0.1 is allowed on any port and path without being listed, so the
+#     simulator needs no entry. `localhost` is not — it needs the two below.
+#   - Matching is glob with `.` and `/` as separators, so `*` stops at a slash
+#     and every host:port entry needs a `/**` twin for the `/--/...` path Expo Go
+#     appends.
+#   - A LAN address is refused however it is written, exact or wildcard. Google
+#     sign-in from a physical device therefore cannot reach this local stack;
+#     use the simulator, or point the phone at a hosted project.
 additional_redirect_urls = [
   "graham://",
-  "graham://*",
-  "exp://127.0.0.1:*",
+  "graham://**",
   "exp://localhost:*",
+  "exp://localhost:*/**",
+  # Web dev. `makeRedirectUri` returns the page origin (`http://localhost:<port>`).
+  # `127.0.0.1` is allowed without an entry; `localhost` is not, and a refused
+  # redirect is replaced with site_url (`graham://`), which a browser cannot open.
+  "http://localhost:*",
+  "http://localhost:*/**",
+  # Hosted web. The page origin is the redirect, and a missing entry is
+  # replaced with site_url (`graham://`), which a browser cannot open.
+  "https://graham-watch.vercel.app",
+  "https://graham-watch.vercel.app/**",
+  "https://graham-watch-justins-projects-7504da6b.vercel.app",
+  "https://graham-watch-justins-projects-7504da6b.vercel.app/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -228,7 +250,12 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+#
+# On is load-bearing, not hygiene. With it off, GoTrue stamps email_confirmed_at
+# the instant anyone posts to /auth/v1/signup, so a stranger could sign up as
+# info@someshop.com — an address the shop prints on its own contact page — and
+# claim that shop. Measured against this stack before it was turned on.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -253,6 +280,15 @@ otp_expiry = 3600
 [auth.email.template.magic_link]
 subject = "Your Graham sign-in code"
 content_path = "./supabase/templates/magic_link.html"
+
+# With enable_confirmations on, a brand new address gets this template instead
+# of magic_link — signInWithOtp creates the user, and the first mail is a signup
+# confirmation. Leaving it stock sends a link-only email to exactly the people
+# who have never used the app, and the code screen waits for a code that never
+# arrives.
+[auth.email.template.confirmation]
+subject = "Your Graham sign-in code"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -352,7 +388,10 @@ email_optional = false
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
-redirect_uri = ""
+# Google's console accepts `localhost` and often refuses a raw `127.0.0.1` URI.
+# The default callback is the latter, so name the former or every sign-in dies
+# with redirect_uri_mismatch before a Google account is even chosen.
+redirect_uri = "http://localhost:54321/auth/v1/callback"
 url = ""
 skip_nonce_check = true
 
@@ -408,7 +447,7 @@ deno_version = 2
 # secret_key = "env(SECRET_VALUE)"
 
 [analytics]
-# Vector bind-mounts the host Docker socket, which Colima's VM cannot pass
+# Vector bind-mounts the host container socket, which Colima's VM cannot pass
 # through. This only disables the Logs tab in Studio.
 enabled = false
 port = 54327

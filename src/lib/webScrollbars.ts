@@ -1,48 +1,39 @@
 import { Platform } from 'react-native';
 
-import { radius, size, type Theme } from '@/lib/design';
-
 const STYLE_ID = 'graham-scrollbars';
 
+const CSS = `
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
 /**
- * React Native Web hands every scroll view the browser's default scrollbar. On
- * Windows and Linux that is a permanent grey trough wide enough to read as a
- * column of chrome beside the photographs, and there is no style prop for it —
- * real CSS is the only lever.
+ * React Native Web hands every scroll view the browser's default scrollbar,
+ * and there is no style prop for it — real CSS is the only lever.
  *
- * Thin, no track, and a thumb in `borderStrong` so it registers as an edge
- * rather than a control. It stays `size.scrollbar` wide instead of shrinking to
- * a hairline, because a mouse has to be able to grab it and `hitSlop` is a
- * native-only idea.
+ * It is gone. A styled thin thumb was still a grey column standing beside the
+ * photographs on Windows and Linux, permanently, on every scroll view in the
+ * app including the ones inside a card. Scrolling still works by wheel, drag,
+ * keyboard, and trackpad; only the drawing is removed.
+ *
+ * What is lost: the bar was the one hint that a region had more below it, and
+ * the one way to drag to a position with a mouse. The card carries its own
+ * hint — content cut off at its bottom edge — and no surface here is long
+ * enough to need dragging.
+ *
+ * No theme: hidden has no colour, so this runs once and never repaints.
  */
-export function applyScrollbarStyle(theme: Theme) {
+export function hideScrollbars() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById(STYLE_ID)) return;
 
-  const css = `
-    * {
-      scrollbar-width: thin;
-      scrollbar-color: ${theme.color.borderStrong} transparent;
-    }
-    ::-webkit-scrollbar {
-      width: ${size.scrollbar}px;
-      height: ${size.scrollbar}px;
-    }
-    ::-webkit-scrollbar-track,
-    ::-webkit-scrollbar-corner {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background-color: ${theme.color.borderStrong};
-      border-radius: ${radius.pill}px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background-color: ${theme.color.textFaint};
-    }
-  `;
-
-  const existing = document.getElementById(STYLE_ID);
-  const element = existing ?? document.createElement('style');
+  const element = document.createElement('style');
   element.id = STYLE_ID;
-  element.textContent = css;
-  if (!existing) document.head.appendChild(element);
+  element.textContent = CSS;
+  document.head.appendChild(element);
 }

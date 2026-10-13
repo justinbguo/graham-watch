@@ -1,56 +1,61 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { FlatList, Platform, View } from 'react-native';
 
-import { ListingSummary } from '@/components/ListingSummary';
-import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { layout, radius, space, type, type Theme } from '@/lib/theme';
+import { ListingRow } from '@/components/ListingRow';
+import { ListingTile } from '@/components/ListingTile';
+import { useIsWide } from '@/lib/layout';
+import type { DeckCard } from '@/lib/models';
+import { layout, space } from '@/lib/theme';
+import { isTypingTarget } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 
-const MIN_TILE_WIDTH = 280;
-const GAP = space.lg;
+const GAP = space.md;
+const COLUMNS = layout.gridColumns;
 
 /**
- * The scanning half of the deck: many watches at once instead of one. Judging a
- * watch stays a swipe, so a tap reads rather than decides — it opens the detail
- * screen. On web the keyboard can triage without leaving the grid.
+ * The scanning half of the deck. On a wide window it is a tile grid —
+ * photograph above the copy, `layout.gridColumns` across — so the page fills
+ * with watches. On a phone it stays one row each. A tap opens the listing.
+ *
+ * On web the arrows move the selection (left/right within a row, up/down by a
+ * row). Enter opens. Pass and save live on the listing, and on the card view's
+ * left/right keys.
  */
 export function DeckGrid({
   cards,
-  onSwipe,
   onOpen,
+  active = true,
 }: {
   cards: DeckCard[];
-  onSwipe: (card: DeckCard, direction: SwipeDirection) => void;
   onOpen: (card: DeckCard) => void;
+  /** False while a sheet covers the deck, so keys do not steer underneath it. */
+  active?: boolean;
 }) {
+  const wide = useIsWide();
   const styles = useThemedStyles(gridStyles);
-  const { width } = useWindowDimensions();
-  // The grid is capped by its Screen column, so count columns against that
-  // ceiling. Measuring the raw window would deal a tenth column into a
-  // container that only has room for six.
-  const available = Math.min(width, layout.grid);
-  const columns = Math.max(2, Math.floor((available - GAP) / (MIN_TILE_WIDTH + GAP)));
-
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
+  const columns = wide ? COLUMNS : 1;
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || !active) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target)) return;
+
+      const card = cards[selectedIndex];
       const move = (delta: number) => {
         event.preventDefault();
         setSelected((current) => Math.max(0, Math.min(cards.length - 1, current + delta)));
       };
-      const act = (direction: SwipeDirection) => {
-        const card = cards[selectedIndex];
-        if (card) onSwipe(card, direction);
-      };
 
       switch (event.key) {
         case 'Enter': {
-          const card = cards[selectedIndex];
-          return card && onOpen(card);
+          if (!card) return;
+          event.preventDefault();
+          onOpen(card);
+          return;
         }
         case 'ArrowRight':
           return move(1);
@@ -60,101 +65,70 @@ export function DeckGrid({
           return move(columns);
         case 'ArrowUp':
           return move(-columns);
-        case 's':
-          return act('right');
-        case 'x':
-          return act('left');
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [cards, columns, selectedIndex, onSwipe, onOpen]);
+  }, [active, cards, columns, selectedIndex, onOpen]);
+
+  if (!wide) {
+    return (
+      <FlatList
+        data={cards}
+        keyExtractor={(card) => card.id}
+        contentContainerStyle={styles.content}
+        renderItem={({ item, index }) => (
+          <ListingRow
+            card={item}
+            scan
+            selected={Platform.OS === 'web' && index === selectedIndex}
+            onPress={() => {
+              setSelected(index);
+              onOpen(item);
+            }}
+          />
+        )}
+      />
+    );
+  }
 
   return (
     <FlatList
-      // FlatList cannot change numColumns in place, so remount on resize.
-      key={columns}
       data={cards}
       keyExtractor={(card) => card.id}
-      numColumns={columns}
+      numColumns={COLUMNS}
       columnWrapperStyle={styles.row}
       contentContainerStyle={styles.content}
       renderItem={({ item, index }) => (
-        <Tile
-          card={item}
-          isSelected={index === selectedIndex}
-          onOpen={() => {
-            setSelected(index);
-            onOpen(item);
-          }}
-        />
+        <View style={styles.cell}>
+          <ListingTile
+            card={item}
+            selected={Platform.OS === 'web' && index === selectedIndex}
+            onPress={() => {
+              setSelected(index);
+              onOpen(item);
+            }}
+          />
+        </View>
       )}
     />
   );
 }
 
-function Tile({
-  card,
-  isSelected,
-  onOpen,
-}: {
-  card: DeckCard;
-  isSelected: boolean;
-  onOpen: () => void;
-}) {
-  const styles = useThemedStyles(gridStyles);
-  const photo = card.photos[0]?.url;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${card.brand} ${card.model ?? ''}`.trim()}
-      style={[styles.tile, isSelected && styles.tileSelected]}
-      onPress={onOpen}>
-      {photo ? (
-        <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
-      ) : (
-        <View style={[styles.photo, styles.photoEmpty]}>
-          <Text style={styles.photoEmptyLabel}>No photograph</Text>
-        </View>
-      )}
-
-      <ListingSummary card={card} variant="tile" />
-    </Pressable>
-  );
-}
-
-const gridStyles = (theme: Theme) => ({
+const gridStyles = () => ({
   content: {
-    padding: GAP,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
     gap: GAP,
   },
   row: {
     gap: GAP,
   },
-  tile: {
+  cell: {
     flex: 1,
-    backgroundColor: theme.color.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    overflow: 'hidden' as const,
-  },
-  tileSelected: {
-    borderColor: theme.color.brass,
-  },
-  photo: {
-    width: '100%' as const,
-    aspectRatio: 4 / 5,
-    backgroundColor: theme.color.surfaceSunken,
-  },
-  photoEmpty: {
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  photoEmptyLabel: {
-    ...type.caption,
-    color: theme.color.textFaint,
+    // FlatList still lays out a short last row. Cap each cell so four equal
+    // tiles stay the same width when the row is incomplete.
+    maxWidth: `${100 / COLUMNS}%` as const,
   },
 });

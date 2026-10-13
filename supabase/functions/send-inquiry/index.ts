@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
-import { send } from './mailer.ts';
+import { price, watchName, watchSubject, type MailListing } from '../_shared/listing-mail.ts';
+import { send } from '../_shared/mailer.ts';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -20,45 +21,45 @@ type Inquiry = {
   message: string | null;
   status: string;
   dealer_id: string;
-  listings: {
-    brand: string | null;
-    model: string | null;
-    reference: string | null;
-    year: number | null;
-    price_cents: number | null;
-    currency: string | null;
-    source_url: string;
-  } | null;
+  listings: MailListing | null;
 };
 
-function price(cents: number | null, currency: string | null): string {
-  if (cents === null) return 'price on request';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency ?? 'USD',
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
+function signInUrl(): string {
+  const origin = (Deno.env.get('APP_ORIGIN') ?? 'https://graham.watch').replace(/\/$/, '');
+  return `${origin}/sign-in`;
 }
 
 function compose(
   inquiry: Inquiry,
   dealerEmail: string,
   buyerEmail: string,
-  buyerName: string | null
+  buyerName: string | null,
+  claimed: boolean
 ) {
   const listing = inquiry.listings!;
-  const watch = [listing.brand, listing.model].filter(Boolean).join(' ') || 'a watch';
+  const watch = watchName(listing);
   const details = [
     listing.reference ? `Reference ${listing.reference}` : null,
-    listing.year ? `${listing.year}` : null,
     price(listing.price_cents, listing.currency),
   ].filter(Boolean);
+
+  // Discovery only. Ownership still requires signing in as this address and
+  // tapping Claim on Profile — a link in forwarded mail must not take the shop.
+  const claimFooter = claimed
+    ? []
+    : [
+        '',
+        'This watch is listed on Graham. Sign in with this address to claim the shop and update listings:',
+        signInUrl(),
+      ];
 
   return {
     to: dealerEmail,
     // The dealer answers the buyer, not us. Graham is out of the way after this.
     replyTo: buyerEmail,
-    subject: `Inquiry: ${watch}`,
+    // Same line the buyer's own mail app puts there, so a dealer who gets both
+    // sees one thread about one watch rather than two about "an Omega".
+    subject: `Inquiry: ${watchSubject(listing)}`,
     text: [
       `${buyerName ?? 'A buyer'} on Graham is interested in your ${watch}.`,
       '',
@@ -68,6 +69,7 @@ function compose(
       inquiry.message ? `They wrote:\n\n"${inquiry.message}"\n` : 'They did not leave a message.',
       '',
       `Reply to this email to reach ${buyerName ?? 'them'} directly at ${buyerEmail}.`,
+      ...claimFooter,
       '',
       '— Graham',
     ].join('\n'),
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
 
   const { data: dealer } = await service
     .from('dealers')
-    .select('contact_email')
+    .select('contact_email, claimed_by')
     .eq('id', inquiry.dealer_id)
     .maybeSingle();
 
@@ -156,18 +158,57 @@ Deno.serve(async (req) => {
     return json({ error: 'Add an email to your profile before contacting a dealer.' }, 422);
   }
 
-  try {
-    await send(compose(inquiry, dealer.contact_email, user.email, buyerName));
-  } catch (error) {
-    await service.from('inquiries').update({ status: 'failed' }).eq('id', inquiry.id);
-    console.error('send-inquiry failed', error);
+  // Claimed before the mail goes out, not after it comes back.
+  //
+  // Marking it afterwards read as the honest order — only report a send that
+  // happened — but the write was never checked, so a lost update left the row
+  // `pending` under a response that said `sent`. `recordIntent` hands a buyer
+  // any row that is not `sent` back to retry, and the guard above lets a
+  // `pending` row through, so the next tap mailed the dealer the same inquiry
+  // again. An email cannot be recalled; a status can be corrected.
+  //
+  // `neq` makes the claim the lock as well: two invocations for one inquiry
+  // cannot both win it, so neither can both send.
+  const claimed = await service
+    .from('inquiries')
+    .update({ status: 'sent', sent_at: new Date().toISOString() })
+    .eq('id', inquiry.id)
+    .neq('status', 'sent')
+    .select('id')
+    .maybeSingle();
+
+  if (claimed.error) {
+    console.error('send-inquiry could not claim the inquiry', inquiry.id, claimed.error.message);
     return json({ error: 'Could not reach the dealer. Try again shortly.' }, 502);
   }
 
-  await service
-    .from('inquiries')
-    .update({ status: 'sent', sent_at: new Date().toISOString() })
-    .eq('id', inquiry.id);
+  // Another invocation claimed it between the read above and here.
+  if (!claimed.data) return json({ status: 'sent' });
+
+  try {
+    await send(
+      compose(
+        inquiry,
+        dealer.contact_email,
+        user.email,
+        buyerName,
+        dealer.claimed_by != null
+      )
+    );
+  } catch (error) {
+    // Hand the row back so the buyer can try again. If this write is the thing
+    // that is broken the row stays `sent` and the inquiry is stranded, which is
+    // the failure to prefer: it needs a person, not a second email.
+    const released = await service
+      .from('inquiries')
+      .update({ status: 'failed', sent_at: null })
+      .eq('id', inquiry.id);
+    if (released.error) {
+      console.error('send-inquiry stranded an inquiry', inquiry.id, released.error.message);
+    }
+    console.error('send-inquiry failed', error);
+    return json({ error: 'Could not reach the dealer. Try again shortly.' }, 502);
+  }
 
   return json({ status: 'sent' });
 });

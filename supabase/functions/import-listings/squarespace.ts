@@ -1,14 +1,16 @@
-import { mapPool } from './pool.ts';
 import { htmlToText } from './scrape.ts';
-import { fetchJson, type Json, type SourceItem } from './source.ts';
+import {
+  fetchJson,
+  productKey,
+  type AdapterRead,
+  type ItemMeta,
+  type Json,
+  type SourceItem,
+} from './source.ts';
 
 // Squarespace serves originals at 4000px and several megabytes. A phone deck
 // never needs more than this, and we pay for every byte we copy into storage.
 const PHOTO_WIDTH = '1500w';
-
-// Product pages are fetched one per listing. Four at a time is brisk for us and
-// unremarkable traffic for the dealer.
-const HYDRATE_CONCURRENCY = 4;
 
 function toCents(money: Json): number | null {
   const value = Number(money?.value);
@@ -18,12 +20,64 @@ function toCents(money: Json): number | null {
   return Math.round(value * 100);
 }
 
+/**
+ * The price Squarespace actually renders. Most shops repeat it at product
+ * level; Goldfinger leaves that at 0.00 and puts the real amount on its only
+ * variant, so stopping at the first field turns $19,950 into "Price on request".
+ */
+export function squarespacePrice(item: Json): {
+  priceCents: number | null;
+  currency: string | null;
+} {
+  const variants: Json[] = Array.isArray(item?.structuredContent?.variants)
+    ? item.structuredContent.variants
+    : [];
+  const available = variants.find(
+    (variant) => variant?.unlimited === true || Number(variant?.qtyInStock) > 0
+  );
+
+  const containers = [item?.structuredContent, available, ...variants, item];
+  for (const container of containers) {
+    const money =
+      container?.onSale === true && toCents(container?.salePriceMoney) !== null
+        ? container.salePriceMoney
+        : container?.priceMoney;
+    const priceCents = toCents(money);
+    if (priceCents !== null) {
+      return {
+        priceCents,
+        currency: typeof money?.currency === 'string' ? money.currency : null,
+      };
+    }
+  }
+
+  return { priceCents: null, currency: null };
+}
+
 function photoUrls(item: Json): string[] {
   const gallery = Array.isArray(item?.items) ? item.items : [];
   const urls = [item?.assetUrl, ...gallery.map((entry: Json) => entry?.assetUrl)].filter(
     (url: unknown): url is string => typeof url === 'string' && url.startsWith('http')
   );
   return [...new Set(urls)].map((url) => `${url}?format=${PHOTO_WIDTH}`);
+}
+
+function metaOf(item: Json, photoCount: number): ItemMeta {
+  const variant = item?.structuredContent?.variants?.[0];
+  const categories = Array.isArray(item?.categories) ? item.categories : [];
+  const stamp = (value: unknown) =>
+    typeof value === 'number' ? new Date(value).toISOString() : null;
+
+  return {
+    // Squarespace has no vendor field; the brand is in the title and the model
+    // reads it at publish time.
+    vendor: null,
+    productType: categories.filter((one: unknown) => typeof one === 'string').join(', ') || null,
+    sku: typeof variant?.sku === 'string' && variant.sku.trim() ? variant.sku.trim() : null,
+    photoCount,
+    publishedAt: stamp(item?.publishOn),
+    updatedAt: stamp(item?.updatedOn),
+  };
 }
 
 function mapItem(item: Json, base: URL): SourceItem | null {
@@ -40,15 +94,16 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     // Keep the collection URL; a bad product path is not worth losing the item.
   }
 
-  const money = item?.structuredContent?.priceMoney;
-
   // One watch is one variant with one in stock. Sold drops it to zero, which is
   // the only place a Squarespace shop admits the watch is gone.
   const variants: Json[] = Array.isArray(item?.structuredContent?.variants)
     ? item.structuredContent.variants
     : [];
+  const price = squarespacePrice(item);
 
   return {
+    // Squarespace's own item id survives a slug rename; fullUrl does not.
+    externalId: item?.id ? `squarespace:${item.id}` : productKey(sourceUrl),
     available:
       variants.length === 0 ||
       variants.some(
@@ -58,8 +113,9 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     text: htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl),
     sourceUrl,
     photoUrls: photos,
-    priceCents: toCents(money),
-    currency: typeof money?.currency === 'string' ? money.currency : null,
+    priceCents: price.priceCents,
+    currency: price.currency,
+    meta: metaOf(item, photos.length),
   };
 }
 
@@ -73,6 +129,8 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
   if (!product) return collection;
 
   return {
+    // The collection's id is what the catalogue was stored under.
+    externalId: collection.externalId,
     title: product.title || collection.title,
     text: product.text.length >= collection.text.length ? product.text : collection.text,
     // The collection's own link is the canonical one we dedupe on.
@@ -86,18 +144,25 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
     // Either page saying sold is enough. A grid tile can lag the product page,
     // and neither of them ever claims a sold watch is back.
     available: collection.available && product.available,
+    meta: product.meta ?? collection.meta,
   };
 }
 
-async function hydrate(items: SourceItem[]): Promise<SourceItem[]> {
-  return mapPool(items, HYDRATE_CONCURRENCY, async (item) => {
-    const url = new URL(item.sourceUrl);
-    url.searchParams.set('format', 'json');
+/**
+ * Fills in what the grid tile left out, by reading the product page itself.
+ *
+ * This is one HTTP request per watch, so it runs when a watch is about to be
+ * published rather than when the catalogue is read. Hydrating a 300-watch shop
+ * up front is 300 requests inside one invocation, which is what used to make a
+ * large shop impossible to import at all.
+ */
+export async function hydrateSquarespaceItem(item: SourceItem): Promise<SourceItem> {
+  const url = new URL(item.sourceUrl);
+  url.searchParams.set('format', 'json');
 
-    const body = await fetchJson(url);
-    const product = body?.item ? mapItem(body.item, url) : null;
-    return merge(item, product);
-  });
+  const body = await fetchJson(url);
+  const product = body?.item ? mapItem(body.item, url) : null;
+  return merge(item, product);
 }
 
 /**
@@ -113,31 +178,47 @@ export async function fetchSquarespaceItems(
   sourceUrl: string,
   limit: number,
   minPhotos = 0
-): Promise<SourceItem[] | null> {
+): Promise<AdapterRead | null> {
   const base = new URL(sourceUrl);
-  const items: SourceItem[] = [];
+  const read: AdapterRead = { items: [], skipped: [] };
   let offset: number | null = null;
-  let isCollection = false;
 
-  while (items.length < limit) {
+  while (read.items.length < limit) {
     const page = new URL(base.toString());
     page.searchParams.set('format', 'json');
     if (offset !== null) page.searchParams.set('offset', String(offset));
 
     const body = await fetchJson(page);
-    if (!body) return items.length ? items : null;
+    if (!body) return read.items.length ? read : null;
 
     // A product URL answers with `item`, a collection with `items`.
     const batch = Array.isArray(body.items) ? body.items : body.item ? [body.item] : null;
-    if (!batch) return items.length ? items : null;
-    isCollection ||= Array.isArray(body.items);
+    if (!batch) return read.items.length ? read : null;
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
+
       // Discard thin listings before hydration, not after: each one that
       // survives costs a product page fetch.
-      if (mapped && mapped.photoUrls.length >= minPhotos) items.push(mapped);
-      if (items.length >= limit) break;
+      if (!mapped) {
+        read.skipped.push({
+          sourceUrl: typeof raw?.fullUrl === 'string' ? raw.fullUrl : base.toString(),
+          title: typeof raw?.title === 'string' ? raw.title : '',
+          reason: typeof raw?.title === 'string' && raw.title.trim() ? 'no photograph' : 'no title',
+          meta: null,
+        });
+      } else if (mapped.photoUrls.length < minPhotos) {
+        read.skipped.push({
+          sourceUrl: mapped.sourceUrl,
+          title: mapped.title,
+          reason: `${mapped.photoUrls.length} photograph(s), under the ${minPhotos} a catalogue row needs`,
+          meta: mapped.meta ?? null,
+        });
+      } else {
+        read.items.push(mapped);
+      }
+
+      if (read.items.length >= limit) break;
     }
 
     const next = body.pagination?.nextPageOffset;
@@ -145,6 +226,7 @@ export async function fetchSquarespaceItems(
     offset = next;
   }
 
-  // A product URL was already the detail page; there is nothing deeper to read.
-  return isCollection ? hydrate(items) : items;
+  // A collection entry is only what the shop chose to show in a grid. The rest
+  // arrives later, one watch at a time, from hydrateSquarespaceItem.
+  return read;
 }

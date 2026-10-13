@@ -7,5 +7,8 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "supabase/functions"]
+  // `operator` and `studio` are their own TypeScript projects. Compiled from
+  // here, their path aliases and DOM types do not exist and every file fails.
+  // Each has its own build, which type checks it.
+  "exclude": ["node_modules", "supabase/functions", "operator", "studio"]
 }

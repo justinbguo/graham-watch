@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable } from 'react-native';
 
-import { HIT_TARGET, inset, radius, size, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -23,24 +23,19 @@ export function UndoButton({ onPress }: { onPress?: () => void }) {
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name="undo-variant"
-        size={size.tabIcon}
+        size={size.icon}
         color={onPress ? theme.color.text : theme.color.textFaint}
       />
     </Pressable>
   );
 }
 
-// Same pill recipe as FilterButton and the ViewToggle options. Worth pulling
-// into one component once the control tokens settle.
 const buttonStyles = (theme: Theme) => ({
   button: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    paddingHorizontal: inset.chipX,
-    paddingVertical: inset.chipY,
+    minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
-    borderRadius: radius.pill,
-    backgroundColor: theme.color.surfaceSunken,
   },
   pressed: {
     opacity: 0.72,

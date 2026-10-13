@@ -34,13 +34,276 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_reads: {
+        Row: {
+          conversation_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          dealer_id: string | null
+          id: string
+          last_message_at: string
+          opener_id: string
+          partner_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          last_message_at?: string
+          opener_id: string
+          partner_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          last_message_at?: string
+          opener_id?: string
+          partner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_opener_id_fkey"
+            columns: ["opener_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_applications: {
+        Row: {
+          brands: string[]
+          created_at: string
+          dealer_id: string | null
+          id: string
+          note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shop_name: string
+          status: Database["public"]["Enums"]["application_status"]
+          user_id: string
+          verified_at: string | null
+          verified_email: string | null
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }
+        Insert: {
+          brands?: string[]
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shop_name: string
+          status?: Database["public"]["Enums"]["application_status"]
+          user_id: string
+          verified_at?: string | null
+          verified_email?: string | null
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }
+        Update: {
+          brands?: string[]
+          created_at?: string
+          dealer_id?: string | null
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shop_name?: string
+          status?: Database["public"]["Enums"]["application_status"]
+          user_id?: string
+          verified_at?: string | null
+          verified_email?: string | null
+          volume?: Database["public"]["Enums"]["listing_volume"]
+          website?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_applications_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_applications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_claim_codes: {
+        Row: {
+          application_id: string | null
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          dealer_id: string | null
+          email: string
+          expires_at: string
+          id: string
+          requested_by: string
+          salt: string
+        }
+        Insert: {
+          application_id?: string | null
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          dealer_id?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          requested_by: string
+          salt?: string
+        }
+        Update: {
+          application_id?: string | null
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          dealer_id?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          requested_by?: string
+          salt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_claim_codes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_claim_codes_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_claim_codes_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_follows: {
+        Row: {
+          created_at: string
+          dealer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dealer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dealer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_follows_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dealers: {
         Row: {
           claimed_by: string | null
           contact_email: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
+          description: string | null
           id: string
+          instagram: string | null
+          last_sync_added: number | null
+          last_sync_changed: number | null
+          last_sync_complete: boolean | null
+          last_sync_error: string | null
+          last_sync_found: number | null
+          last_sync_relisted: number | null
+          last_sync_retired: number | null
+          last_synced_at: string | null
+          logo_url: string | null
           name: string
           permission: Database["public"]["Enums"]["dealer_permission"]
           website: string | null
@@ -49,8 +312,19 @@ export type Database = {
           claimed_by?: string | null
           contact_email?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
+          description?: string | null
           id?: string
+          instagram?: string | null
+          last_sync_added?: number | null
+          last_sync_changed?: number | null
+          last_sync_complete?: boolean | null
+          last_sync_error?: string | null
+          last_sync_found?: number | null
+          last_sync_relisted?: number | null
+          last_sync_retired?: number | null
+          last_synced_at?: string | null
+          logo_url?: string | null
           name: string
           permission?: Database["public"]["Enums"]["dealer_permission"]
           website?: string | null
@@ -59,8 +333,19 @@ export type Database = {
           claimed_by?: string | null
           contact_email?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          description?: string | null
           id?: string
+          instagram?: string | null
+          last_sync_added?: number | null
+          last_sync_changed?: number | null
+          last_sync_complete?: boolean | null
+          last_sync_error?: string | null
+          last_sync_found?: number | null
+          last_sync_relisted?: number | null
+          last_sync_retired?: number | null
+          last_synced_at?: string | null
+          logo_url?: string | null
           name?: string
           permission?: Database["public"]["Enums"]["dealer_permission"]
           website?: string | null
@@ -76,6 +361,183 @@ export type Database = {
           {
             foreignKeyName: "dealers_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_comments: {
+        Row: {
+          author_handle: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          post_id: string
+        }
+        Insert: {
+          author_handle?: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          post_id: string
+        }
+        Update: {
+          author_handle?: string | null
+          author_id?: string
+          author_number?: number
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exchange_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exchange_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_photos: {
+        Row: {
+          id: string
+          position: number
+          post_id: string
+          storage_path: string
+        }
+        Insert: {
+          id?: string
+          position: number
+          post_id: string
+          storage_path: string
+        }
+        Update: {
+          id?: string
+          position?: number
+          post_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_photos_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_posts: {
+        Row: {
+          author_handle: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at: string
+          currency: string
+          id: string
+          intent: Database["public"]["Enums"]["exchange_intent"]
+          price_cents: number | null
+          title: string
+        }
+        Insert: {
+          author_handle?: string | null
+          author_id: string
+          author_number: number
+          body: string
+          created_at?: string
+          currency?: string
+          id?: string
+          intent: Database["public"]["Enums"]["exchange_intent"]
+          price_cents?: number | null
+          title: string
+        }
+        Update: {
+          author_handle?: string | null
+          author_id?: string
+          author_number?: number
+          body?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          intent?: Database["public"]["Enums"]["exchange_intent"]
+          price_cents?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_votes: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          post_id: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          post_id?: string | null
+          user_id: string
+          value?: number
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          post_id?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_votes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exchange_votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exchange_votes_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -144,6 +606,7 @@ export type Database = {
           id: string
           listing_id: string
           message: string | null
+          opened_at: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["inquiry_status"]
         }
@@ -154,6 +617,7 @@ export type Database = {
           id?: string
           listing_id: string
           message?: string | null
+          opened_at?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["inquiry_status"]
         }
@@ -164,6 +628,7 @@ export type Database = {
           id?: string
           listing_id?: string
           message?: string | null
+          opened_at?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["inquiry_status"]
         }
@@ -238,15 +703,17 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
           import_job_id: string | null
-          imported_by: string
+          imported_by: string | null
           model: string | null
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -267,15 +734,17 @@ export type Database = {
           dealer_id: string
           description?: string | null
           dial_color?: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields?: string[]
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
           import_job_id?: string | null
-          imported_by: string
+          imported_by?: string | null
           model?: string | null
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
+          sold_source?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -296,15 +765,17 @@ export type Database = {
           dealer_id?: string
           description?: string | null
           dial_color?: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields?: string[]
           has_box?: boolean | null
           has_papers?: boolean | null
           id?: string
           import_job_id?: string | null
-          imported_by?: string
+          imported_by?: string | null
           model?: string | null
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
+          sold_source?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -335,41 +806,237 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          listing_id: string | null
+          sender_id: string
+          via: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          sender_id: string
+          via?: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          sender_id?: string
+          via?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operators: {
+        Row: {
+          added_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operators_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"] | null
           avatar_url: string | null
           bio: string | null
+          collecting_years:
+            | Database["public"]["Enums"]["collecting_years"]
+            | null
+          collection_size: Database["public"]["Enums"]["collection_size"] | null
+          collector_number: number
           created_at: string
+          date_of_birth: string | null
           favorite_brands: string[]
           first_name: string | null
           handle: string | null
+          hunting_for: Database["public"]["Enums"]["watch_hunt"][]
           id: string
           last_name: string | null
+          notifications_enabled: boolean
+          notify_new_arrivals: boolean
+          notify_saved_watches: boolean
           onboarded_at: string | null
+          search_pain_points: Database["public"]["Enums"]["watch_search_pain"][]
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           avatar_url?: string | null
           bio?: string | null
+          collecting_years?:
+            | Database["public"]["Enums"]["collecting_years"]
+            | null
+          collection_size?:
+            | Database["public"]["Enums"]["collection_size"]
+            | null
+          collector_number?: number
           created_at?: string
+          date_of_birth?: string | null
           favorite_brands?: string[]
           first_name?: string | null
           handle?: string | null
+          hunting_for?: Database["public"]["Enums"]["watch_hunt"][]
           id: string
           last_name?: string | null
+          notifications_enabled?: boolean
+          notify_new_arrivals?: boolean
+          notify_saved_watches?: boolean
           onboarded_at?: string | null
+          search_pain_points?: Database["public"]["Enums"]["watch_search_pain"][]
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
           avatar_url?: string | null
           bio?: string | null
+          collecting_years?:
+            | Database["public"]["Enums"]["collecting_years"]
+            | null
+          collection_size?:
+            | Database["public"]["Enums"]["collection_size"]
+            | null
+          collector_number?: number
           created_at?: string
+          date_of_birth?: string | null
           favorite_brands?: string[]
           first_name?: string | null
           handle?: string | null
+          hunting_for?: Database["public"]["Enums"]["watch_hunt"][]
           id?: string
           last_name?: string | null
+          notifications_enabled?: boolean
+          notify_new_arrivals?: boolean
+          notify_saved_watches?: boolean
           onboarded_at?: string | null
+          search_pain_points?: Database["public"]["Enums"]["watch_search_pain"][]
         }
         Relationships: []
+      }
+      source_items: {
+        Row: {
+          applied_hash: string | null
+          available: boolean
+          content_hash: string
+          dealer_id: string
+          error: string | null
+          external_id: string
+          extracted: Json | null
+          extracted_hash: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          listing_id: string | null
+          photos_hash: string | null
+          provider: string
+          publish: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }
+        Insert: {
+          applied_hash?: string | null
+          available?: boolean
+          content_hash: string
+          dealer_id: string
+          error?: string | null
+          external_id: string
+          extracted?: Json | null
+          extracted_hash?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          listing_id?: string | null
+          photos_hash?: string | null
+          provider: string
+          publish?: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }
+        Update: {
+          applied_hash?: string | null
+          available?: boolean
+          content_hash?: string
+          dealer_id?: string
+          error?: string | null
+          external_id?: string
+          extracted?: Json | null
+          extracted_hash?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          listing_id?: string | null
+          photos_hash?: string | null
+          provider?: string
+          publish?: boolean
+          raw?: Json
+          source_url?: string
+          text_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_items_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       swipes: {
         Row: {
@@ -415,6 +1082,119 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adopt_existing_listings: {
+        Args: { p_dealer_id: string }
+        Returns: number
+      }
+      apply_source_item: { Args: { p_source_item_id: string }; Returns: string }
+      approve_dealer_application: {
+        Args: {
+          p_application_id: string
+          p_created_by?: string
+          p_permission?: Database["public"]["Enums"]["dealer_permission"]
+        }
+        Returns: string
+      }
+      brand_key: { Args: { p_brand: string }; Returns: string }
+      can_claim_with_email: {
+        Args: { p_dealer_id: string; p_email: string }
+        Returns: boolean
+      }
+      can_verify_application: {
+        Args: { p_application_id: string; p_email: string }
+        Returns: boolean
+      }
+      claim_code_digest: {
+        Args: { p_code: string; p_salt: string }
+        Returns: string
+      }
+      claim_code_limits: {
+        Args: never
+        Returns: {
+          max_attempts: number
+          max_live: number
+          ttl: string
+        }[]
+      }
+      claim_dealer: { Args: { p_dealer_id: string }; Returns: string }
+      claim_dealer_with_code: {
+        Args: { p_code: string; p_dealer_id: string }
+        Returns: string
+      }
+      claim_username: { Args: { candidate: string }; Returns: string }
+      controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
+      conversation_about_listing: {
+        Args: { p_listing_id: string }
+        Returns: string
+      }
+      conversation_header: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          by_email: boolean
+          dealer_id: string
+          dealer_logo_url: string
+          dealer_name: string
+          id: string
+          person_avatar_url: string
+          person_handle: string
+          person_id: string
+          person_name: string
+          person_number: number
+          writable: boolean
+        }[]
+      }
+      conversation_list: {
+        Args: never
+        Returns: {
+          by_email: boolean
+          dealer_id: string
+          dealer_logo_url: string
+          dealer_name: string
+          id: string
+          last_at: string
+          last_body: string
+          last_mine: boolean
+          person_avatar_url: string
+          person_handle: string
+          person_id: string
+          person_name: string
+          person_number: number
+          unread: number
+        }[]
+      }
+      conversation_with_dealer: {
+        Args: { p_dealer_id: string }
+        Returns: string
+      }
+      conversation_with_person: { Args: { p_user_id: string }; Returns: string }
+      conversation_writable: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      dealer_accounts: {
+        Args: never
+        Returns: {
+          claimed: boolean
+          id: string
+          name: string
+          permission: Database["public"]["Enums"]["dealer_permission"]
+          website: string
+        }[]
+      }
+      dealer_claim_host: { Args: { p_website: string }; Returns: string }
+      dealer_conversation: {
+        Args: { p_buyer_id: string; p_dealer_id: string }
+        Returns: string
+      }
+      dealer_reputation: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          joined_at: string
+          last_refreshed_at: string
+          listings_live: number
+          watches_sold: number
+        }[]
+      }
       dealer_stats: {
         Args: { p_dealer_id: string }
         Returns: {
@@ -426,6 +1206,68 @@ export type Database = {
           price_cents: number
           saves: number
         }[]
+      }
+      decline_dealer_application: {
+        Args: {
+          p_application_id: string
+          p_note: string
+          p_reviewed_by?: string
+        }
+        Returns: undefined
+      }
+      delete_own_account: { Args: never; Returns: undefined }
+      exchange_feed: {
+        Args: never
+        Returns: {
+          author_avatar_url: string
+          author_handle: string
+          author_id: string
+          author_name: string
+          author_number: number
+          body: string
+          comment_count: number
+          cover_path: string
+          created_at: string
+          currency: string
+          id: string
+          intent: Database["public"]["Enums"]["exchange_intent"]
+          my_vote: number
+          price_cents: number
+          title: string
+          vote_count: number
+        }[]
+      }
+      exchange_post_author: {
+        Args: { p_post_id: string }
+        Returns: {
+          author_avatar_url: string
+          author_handle: string
+          author_id: string
+          author_name: string
+          author_number: number
+          my_vote: number
+          vote_count: number
+        }[]
+      }
+      exchange_thread: {
+        Args: { p_post_id: string }
+        Returns: {
+          author_avatar_url: string
+          author_handle: string
+          author_id: string
+          author_name: string
+          author_number: number
+          body: string
+          created_at: string
+          id: string
+          my_vote: number
+          parent_id: string
+          vote_count: number
+        }[]
+      }
+      exchange_vote: {
+        Args: { p_comment_id: string; p_post_id: string; p_value: number }
+        Returns: undefined
       }
       get_deck: {
         Args: { p_limit?: number }
@@ -443,15 +1285,17 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
           import_job_id: string | null
-          imported_by: string
+          imported_by: string | null
           model: string | null
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -465,8 +1309,42 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      in_conversation: { Args: { p_conversation_id: string }; Returns: boolean }
+      is_operator: { Args: never; Returns: boolean }
+      keep_edit: {
+        Args: {
+          p_column: string
+          p_current: unknown
+          p_edited: string[]
+          p_incoming: unknown
+        }
+        Returns: unknown
+      }
+      listing_counts: {
+        Args: {
+          p_brands?: string[]
+          p_complications?: Database["public"]["Enums"]["complication"][]
+          p_dealers?: string[]
+          p_exclude_own?: boolean
+          p_exclude_swiped?: boolean
+          p_materials?: Database["public"]["Enums"]["case_material"][]
+          p_price_maxs?: number[]
+          p_price_mins?: number[]
+          p_query?: string
+          p_size_maxs?: number[]
+          p_size_mins?: number[]
+          p_styles?: Database["public"]["Enums"]["watch_style"][]
+          p_windings?: Database["public"]["Enums"]["winding"][]
+          p_year_maxs?: number[]
+          p_year_mins?: number[]
+        }
+        Returns: {
+          matched: number
+          total: number
+        }[]
+      }
       listing_facets: {
-        Args: never
+        Args: { p_exclude_own?: boolean }
         Returns: {
           count: number
           kind: string
@@ -474,26 +1352,189 @@ export type Database = {
           value: string
         }[]
       }
+      lookup_claimable_dealer: {
+        Args: { p_website: string }
+        Returns: {
+          claim_host: string
+          claimed: boolean
+          contact_hint: string
+          id: string
+          name: string
+          website: string
+        }[]
+      }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
+      my_dealer_application: {
+        Args: never
+        Returns: {
+          brands: string[]
+          claim_host: string
+          created_at: string
+          dealer_id: string
+          id: string
+          note: string
+          reviewed_at: string
+          shop_name: string
+          status: Database["public"]["Enums"]["application_status"]
+          verified_at: string
+          verified_email: string
+          volume: Database["public"]["Enums"]["listing_volume"]
+          website: string
+        }[]
+      }
+      operator_catalog_problems: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          error: string
+          id: string
+          last_seen_at: string
+          queued: boolean
+          source_url: string
+          title: string
+        }[]
+      }
+      operator_dealers: {
+        Args: never
+        Returns: {
+          can_import: boolean
+          catalog_failed: number
+          catalog_queued: number
+          catalog_total: number
+          claimed_by: string
+          contact_email: string
+          created_at: string
+          id: string
+          last_sync_added: number
+          last_sync_changed: number
+          last_sync_complete: boolean
+          last_sync_error: string
+          last_sync_found: number
+          last_sync_relisted: number
+          last_sync_retired: number
+          last_synced_at: string
+          listings_held: number
+          listings_in_deck: number
+          name: string
+          permission: Database["public"]["Enums"]["dealer_permission"]
+          website: string
+        }[]
+      }
+      operator_delete_listing: {
+        Args: { p_listing_id: string }
+        Returns: string[]
+      }
+      operator_listings: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          brand: string
+          case_size_mm: number
+          condition: string
+          created_at: string
+          currency: string
+          description: string
+          id: string
+          inquiry_count: number
+          model: string
+          photo_count: number
+          price_cents: number
+          reference: string
+          saved_count: number
+          sold_at: string
+          source_url: string
+          status: Database["public"]["Enums"]["listing_status"]
+          thumb_path: string
+          year: number
+        }[]
+      }
+      pending_source_item_count: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          failed: number
+          pending: number
+        }[]
+      }
+      pending_source_items: {
+        Args: { p_dealer_id: string; p_limit?: number }
+        Returns: {
+          applied_hash: string | null
+          available: boolean
+          content_hash: string
+          dealer_id: string
+          error: string | null
+          external_id: string
+          extracted: Json | null
+          extracted_hash: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          listing_id: string | null
+          photos_hash: string | null
+          provider: string
+          publish: boolean
+          raw: Json
+          source_url: string
+          text_hash: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "source_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      record_dealer_sync: {
+        Args: {
+          p_added?: number
+          p_changed?: number
+          p_complete: boolean
+          p_dealer_id: string
+          p_error?: string
+          p_found?: number
+          p_relisted?: number
+          p_retired?: number
+        }
+        Returns: undefined
+      }
+      replace_listing_photos: {
+        Args: { p_listing_id: string; p_photos: Json }
+        Returns: number
+      }
+      require_operator: { Args: never; Returns: undefined }
+      save_exchange_post: {
+        Args: {
+          p_body?: string
+          p_intent?: Database["public"]["Enums"]["exchange_intent"]
+          p_photo_paths?: string[]
+          p_post_id?: string
+          p_price_cents?: number
+          p_title?: string
+        }
+        Returns: string
+      }
       search_listings: {
         Args: {
           p_brands?: string[]
           p_complications?: Database["public"]["Enums"]["complication"][]
           p_dealers?: string[]
+          p_exclude_own?: boolean
           p_exclude_swiped?: boolean
           p_favorites_first?: boolean
           p_limit?: number
           p_materials?: Database["public"]["Enums"]["case_material"][]
           p_offset?: number
-          p_price_max?: number
-          p_price_min?: number
+          p_price_maxs?: number[]
+          p_price_mins?: number[]
           p_query?: string
-          p_size_max?: number
-          p_size_min?: number
+          p_size_maxs?: number[]
+          p_size_mins?: number[]
           p_sort?: string
           p_styles?: Database["public"]["Enums"]["watch_style"][]
           p_windings?: Database["public"]["Enums"]["winding"][]
-          p_year_max?: number
-          p_year_min?: number
+          p_year_maxs?: number[]
+          p_year_mins?: number[]
         }
         Returns: {
           availability_checked_at: string | null
@@ -509,15 +1550,17 @@ export type Database = {
           dealer_id: string
           description: string | null
           dial_color: Database["public"]["Enums"]["dial_color"] | null
+          edited_fields: string[]
           has_box: boolean | null
           has_papers: boolean | null
           id: string
           import_job_id: string | null
-          imported_by: string
+          imported_by: string | null
           model: string | null
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -531,8 +1574,49 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_dealer_permission: {
+        Args: {
+          p_dealer_id: string
+          p_permission: Database["public"]["Enums"]["dealer_permission"]
+        }
+        Returns: Database["public"]["Enums"]["dealer_permission"]
+      }
+      store_application_claim_code: {
+        Args: {
+          p_application_id: string
+          p_code: string
+          p_email: string
+          p_requested_by: string
+        }
+        Returns: string
+      }
+      store_dealer_claim_code: {
+        Args: {
+          p_code: string
+          p_dealer_id: string
+          p_email: string
+          p_requested_by: string
+        }
+        Returns: string
+      }
+      sync_source_availability: {
+        Args: {
+          p_dealer_id: string
+          p_read_complete: boolean
+          p_seen_ids: string[]
+        }
+        Returns: Json
+      }
+      synced_listing_columns: { Args: never; Returns: string[] }
+      url_path: { Args: { p_url: string }; Returns: string }
+      verify_application_email: {
+        Args: { p_application_id: string; p_code: string }
+        Returns: string
+      }
     }
     Enums: {
+      account_type: "buyer" | "dealer"
+      application_status: "pending" | "approved" | "declined"
       case_material:
         | "steel"
         | "yellow_gold"
@@ -544,6 +1628,23 @@ export type Database = {
         | "bronze"
         | "silver"
         | "other"
+      collecting_years:
+        | "not_yet"
+        | "under_a_year"
+        | "one_to_five"
+        | "five_to_ten"
+        | "over_ten"
+      collection_size:
+        | "none"
+        | "one_to_three"
+        | "four_to_ten"
+        | "eleven_plus"
+        | "one"
+        | "two_to_three"
+        | "four_to_six"
+        | "seven_to_ten"
+        | "eleven_to_twenty"
+        | "twenty_one_plus"
       complication:
         | "chronograph"
         | "date"
@@ -574,10 +1675,21 @@ export type Database = {
         | "brown"
         | "cream"
         | "other"
+      exchange_intent: "sell" | "buy" | "trade" | "random"
       import_status: "queued" | "running" | "succeeded" | "failed"
       inquiry_status: "pending" | "sent" | "failed"
       listing_status: "active" | "hidden"
+      listing_volume: "under_10" | "10_to_50" | "50_to_200" | "over_200"
       swipe_direction: "left" | "right"
+      watch_hunt: "dress" | "sports" | "tool" | "anything"
+      watch_search_pain:
+        | "trusting_sellers"
+        | "verifying_originality"
+        | "judging_condition"
+        | "finding_fair_prices"
+        | "finding_specific_watches"
+        | "understanding_service_history"
+        | "buying_online"
       watch_style:
         | "dress"
         | "diver"
@@ -606,12 +1718,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -635,11 +1747,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -660,11 +1772,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -685,11 +1797,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -702,11 +1814,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -721,6 +1833,8 @@ export const Constants = {
   },
   public: {
     Enums: {
+      account_type: ["buyer", "dealer"],
+      application_status: ["pending", "approved", "declined"],
       case_material: [
         "steel",
         "yellow_gold",
@@ -732,6 +1846,25 @@ export const Constants = {
         "bronze",
         "silver",
         "other",
+      ],
+      collecting_years: [
+        "not_yet",
+        "under_a_year",
+        "one_to_five",
+        "five_to_ten",
+        "over_ten",
+      ],
+      collection_size: [
+        "none",
+        "one_to_three",
+        "four_to_ten",
+        "eleven_plus",
+        "one",
+        "two_to_three",
+        "four_to_six",
+        "seven_to_ten",
+        "eleven_to_twenty",
+        "twenty_one_plus",
       ],
       complication: [
         "chronograph",
@@ -765,10 +1898,22 @@ export const Constants = {
         "cream",
         "other",
       ],
+      exchange_intent: ["sell", "buy", "trade", "random"],
       import_status: ["queued", "running", "succeeded", "failed"],
       inquiry_status: ["pending", "sent", "failed"],
       listing_status: ["active", "hidden"],
+      listing_volume: ["under_10", "10_to_50", "50_to_200", "over_200"],
       swipe_direction: ["left", "right"],
+      watch_hunt: ["dress", "sports", "tool", "anything"],
+      watch_search_pain: [
+        "trusting_sellers",
+        "verifying_originality",
+        "judging_condition",
+        "finding_fair_prices",
+        "finding_specific_watches",
+        "understanding_service_history",
+        "buying_online",
+      ],
       watch_style: [
         "dress",
         "diver",

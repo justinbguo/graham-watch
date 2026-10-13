@@ -15,16 +15,21 @@ async function fetchSearch(filters: Filters, limit: number): Promise<DeckCard[]>
 
   const { data, error } = await supabase.rpc('search_listings', {
     p_limit: limit,
+    // The deck hides watches this account imported. Search is where you check
+    // a shop you just published is actually findable, so it keeps them.
+    p_exclude_own: false,
     ...toRpcArgs(filters),
   });
   if (error) throw error;
   return hydrate(data ?? []);
 }
 
-async function fetchFacets(): Promise<Facet[]> {
+async function fetchFacets(excludeOwn: boolean): Promise<Facet[]> {
   if (isDemo) return [];
 
-  const { data, error } = await supabase.rpc('listing_facets');
+  const { data, error } = await supabase.rpc('listing_facets', {
+    p_exclude_own: excludeOwn,
+  });
   if (error) throw error;
   return (data ?? []) as Facet[];
 }
@@ -38,11 +43,40 @@ export function useSearch(filters: Filters, limit = 50) {
   });
 }
 
-/** The filter options worth showing: only what some visible listing actually is. */
-export function useFacets() {
+/**
+ * How many watches match, not how many this page is showing. The list stops
+ * at 50, so its length freezes there and a newly published watch never moves
+ * the number.
+ */
+export function useSearchCount(filters: Filters) {
   return useQuery({
-    queryKey: keys.facets,
-    queryFn: fetchFacets,
+    queryKey: keys.searchCount(filters),
+    placeholderData: (previous) => previous,
+    queryFn: async () => {
+      if (isDemo) return demo.search(filters).length;
+
+      const { data, error } = await supabase.rpc('listing_counts', {
+        p_exclude_swiped: false,
+        p_exclude_own: false,
+        ...toRpcArgs(filters),
+      });
+      if (error) throw error;
+      return Number(data?.[0]?.matched ?? 0);
+    },
+  });
+}
+
+/**
+ * The filter options worth showing: only what some visible listing actually is.
+ *
+ * The deck passes `excludeOwn`, because it will not show a watch this account
+ * imported and a filter for one would be a dead end. Search does not.
+ */
+export function useFacets(excludeOwn = true, enabled = true) {
+  return useQuery({
+    queryKey: [...keys.facets, excludeOwn],
+    queryFn: () => fetchFacets(excludeOwn),
     staleTime: 5 * 60_000,
+    enabled,
   });
 }

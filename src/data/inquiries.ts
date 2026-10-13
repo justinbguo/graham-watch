@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { DeckCard } from '@/lib/models';
-import { isDemo } from '@/lib/demo';
+import { demoMailDraft, isDemo } from '@/lib/demo';
+import { openMailDraft, type MailDraft } from '@/lib/mail';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
@@ -48,6 +49,47 @@ async function recordIntent(card: DeckCard, buyerId: string, message: string) {
   if (!existing) throw error;
   if (existing.status === 'sent') throw new Error('You already contacted this dealer.');
   return existing;
+}
+
+/**
+ * Opens Gmail on a filled-in draft.
+ *
+ * The dealer's address is not readable from the app — `contact_email` is
+ * revoked from `authenticated` at the column level — so the draft is fetched
+ * per inquiry rather than composed here.
+ */
+export function useOpenMailDraft(buyerId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ card, message }: { card: DeckCard; message: string }) => {
+      if (!buyerId) throw new Error('Not signed in.');
+
+      const draft = isDemo ? demoMailDraft(card, message) : await fetchDraft(card, buyerId, message);
+
+      await openMailDraft(draft);
+      return draft;
+    },
+    onSuccess: () => {
+      if (buyerId) queryClient.invalidateQueries({ queryKey: keys.inquiries(buyerId) });
+    },
+  });
+}
+
+async function fetchDraft(card: DeckCard, buyerId: string, message: string): Promise<MailDraft> {
+  // Written before the draft is asked for, so the message the buyer typed is on
+  // the row the function composes from.
+  const inquiry = await recordIntent(card, buyerId, message);
+
+  const drafted = await supabase.functions.invoke('inquiry-draft', {
+    body: { inquiryId: inquiry.id },
+  });
+
+  if (drafted.error) {
+    const reason = await readError(drafted.error);
+    throw new Error(reason ?? 'Could not prepare an email for this dealer.');
+  }
+  return drafted.data as MailDraft;
 }
 
 export function useSendInquiry(buyerId: string | null) {

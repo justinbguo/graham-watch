@@ -36,6 +36,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Deno resolves the edge functions against the root package.json, so a lockfile
+# written here captures the whole Expo dependency graph and says nothing about
+# the functions. CI type-checks them with --no-lock instead.
+deno.lock
+
 # generated native folders
 /ios
 /android
@@ -43,3 +48,4 @@ yarn-error.*
 # local env
 .env
 .supabase-db-password
+.vercel

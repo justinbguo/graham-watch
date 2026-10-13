@@ -1,127 +1,186 @@
-import { Pressable, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { router } from 'expo-router';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
-import { Button, Eyebrow, Message, Screen } from '@/components/ui';
-import { useSaved } from '@/data/listings';
-import { fullName, useProfile } from '@/data/profile';
-import { useFacets } from '@/data/search';
-import { signOut } from '@/lib/auth';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
+import { GuestGate } from '@/features/auth/GuestGate';
+import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
+import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
+import {
+  ClaimByCodeCard,
+  ClaimDealerCard,
+  DealerShopCard,
+} from '@/features/dealers/DealerShopCard';
+import { useDealerWorkspace } from '@/features/dealers/workspace';
+import { ProfileHeader } from '@/features/profile/ProfileHeader';
+import { SavedStrip } from '@/features/profile/SavedStrip';
+import { FollowingList } from '@/features/profile/FollowingList';
+import { Posts } from '@/features/profile/Posts';
+import { useOpenStack } from '@/lib/openStack';
+import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
-import { useThemeContext, useThemedStyles, type ThemePreference } from '@/providers/theme';
+import { useTheme, useThemedStyles } from '@/providers/theme';
 
-const APPEARANCE: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
+export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function Profile() {
-  const { session, userId } = useSession();
-  const { data: saved = [] } = useSaved(userId);
-  const { data: profile } = useProfile(userId);
-  const { data: facets = [] } = useFacets();
-  const { preference, setPreference } = useThemeContext();
+  const { isSignedIn } = useSession();
+  const shop = useDealerWorkspace();
+
+  if (!isSignedIn) {
+    return (
+      <GuestGate
+        title="Profile"
+        message="Sign in to set up your collector profile and claim a shop."
+      />
+    );
+  }
+  const claimed = shop.shop;
+  const open = useOpenStack();
   const styles = useThemedStyles(profileStyles);
 
-  const name = fullName(profile);
-  // favorite_brands stores brand_key; the facets carry the name a human wrote.
-  const favorites = (profile?.favorite_brands ?? []).map(
-    (key) => facets.find((facet) => facet.kind === 'brand' && facet.value === key)?.label ?? key
+  const header = (
+    <View style={styles.header}>
+      <ProfileHeader />
+      <Posts onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })} />
+      <SavedStrip />
+      <FollowingList />
+      {claimed ? (
+        <View style={styles.section}>
+          <Eyebrow>Your shop</Eyebrow>
+          <DealerShopCard
+            shop={claimed}
+            totals={shop.totals}
+            onFindWatches={(sourceUrl) =>
+              open(
+                'import-inventory',
+                { dealerId: claimed.id, sourceUrl },
+                { pathname: '/import-inventory', params: { dealerId: claimed.id, sourceUrl } }
+              )
+            }
+          />
+          {shop.error ? <Message text={shop.error.message} tone="error" /> : null}
+          <View style={styles.listHeading}>
+            <Text style={styles.listTitle}>Listings</Text>
+            <Button label="Reload" variant="ghost" onPress={() => shop.reload()} />
+          </View>
+        </View>
+      ) : shop.claimable ? (
+        <View style={styles.section}>
+          <Eyebrow>Your shop</Eyebrow>
+          <ClaimDealerCard dealer={shop.claimable} />
+        </View>
+      ) : shop.application ? (
+        <View style={styles.section}>
+          <Eyebrow>Your application</Eyebrow>
+          <ApplicationStatusCard
+            application={shop.application}
+            onFinishVerifying={() => open('apply', undefined, '/apply')}
+          />
+        </View>
+      ) : (
+        <ClaimByCodeCard onStart={() => open('apply', undefined, '/apply')} />
+      )}
+    </View>
   );
 
   return (
-    <Screen title="Profile">
-      <View style={styles.body}>
-        <View style={styles.identity}>
-          <Eyebrow>Signed in as</Eyebrow>
-          <Text style={styles.email}>{name ?? session?.user.email ?? 'Signed in'}</Text>
-          {name ? <Message text={session?.user.email ?? ''} /> : null}
-          <Message text={`${saved.length} watch${saved.length === 1 ? '' : 'es'} saved`} />
-        </View>
-
-        {favorites.length ? (
-          <View style={styles.section}>
-            <Eyebrow>Brands you follow</Eyebrow>
-            <Text style={styles.favorites}>{favorites.join(' · ')}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <Eyebrow>Appearance</Eyebrow>
-          <View style={styles.segmented}>
-            {APPEARANCE.map((option) => {
-              const isActive = preference === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isActive }}
-                  onPress={() => setPreference(option.value)}
-                  style={[styles.segment, isActive && styles.segmentActive]}>
-                  <Text style={[styles.segmentLabel, isActive && styles.segmentLabelActive]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Button label="Sign out" variant="secondary" onPress={() => signOut()} />
-        </View>
-      </View>
+    <Screen
+      title="Profile"
+      action={<SettingsButton onPress={() => open('settings', undefined, '/settings')} />}
+      width={claimed ? 'grid' : 'reading'}
+      inTabs>
+      <FlatList
+        data={shop.inventory}
+        keyExtractor={(item) => item.id}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={header}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => (
+          <DealerInventoryRow
+            item={item}
+            busy={shop.isSaving}
+            onEdit={() =>
+              open('edit-listing/[listingId]', { listingId: item.id }, `/edit-listing/${item.id}`)
+            }
+            onTogglePublished={() => shop.togglePublished(item)}
+            onToggleSold={() => shop.toggleSold(item)}
+          />
+        )}
+        ListEmptyComponent={
+          claimed && !shop.isLoading ? (
+            <View style={styles.empty}>
+              <Heading>No listings yet</Heading>
+              <Message text="Add a product or catalogue URL above." />
+            </View>
+          ) : null
+        }
+      />
     </Screen>
   );
 }
 
+function SettingsButton({ onPress }: { onPress: () => void }) {
+  const styles = useThemedStyles(profileStyles);
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Open settings"
+      onPress={onPress}
+      style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
+      <MaterialCommunityIcons name="cog-outline" size={size.icon} color={theme.color.text} />
+    </Pressable>
+  );
+}
+
 const profileStyles = (theme: Theme) => ({
-  body: {
-    flex: 1,
+  list: {
+    flexGrow: 1,
+    // The header leaves `space.lg` under every title. The person is the page,
+    // so the photograph sits `space.md` under "Profile". The margin is on the
+    // list, not its content: the header is the list's sibling, and a margin
+    // inside the scroll view cannot climb into it.
+    marginTop: space.md - space.lg,
+  },
+  listContent: {
     paddingHorizontal: inset.screen,
-    gap: stack.section,
+    paddingBottom: inset.screen,
+    flexGrow: 1,
   },
-  identity: {
-    gap: stack.tight,
-  },
-  email: {
-    ...type.title,
-    color: theme.color.text,
+  header: {
+    // One person, so the blocks are groups on a page, not separate pages.
+    gap: stack.group,
   },
   section: {
     gap: stack.related,
   },
-  favorites: {
-    ...type.body,
-    color: theme.color.textMuted,
-  },
-  segmented: {
+  listHeading: {
     flexDirection: 'row' as const,
-    backgroundColor: theme.color.surfaceSunken,
-    borderRadius: radius.md,
-    padding: space.xs,
-    gap: space.xs,
-  },
-  segment: {
-    flex: 1,
     alignItems: 'center' as const,
-    paddingVertical: space.md,
-    borderRadius: radius.sm,
+    justifyContent: 'space-between' as const,
   },
-  segmentActive: {
-    backgroundColor: theme.color.surface,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
-  segmentLabel: {
-    ...type.label,
-    color: theme.color.textMuted,
-  },
-  segmentLabelActive: {
+  listTitle: {
+    ...type.title,
     color: theme.color.text,
   },
-  footer: {
-    marginTop: 'auto' as const,
-    paddingBottom: inset.screen,
+  separator: {
+    height: 1,
+    backgroundColor: theme.color.border,
+  },
+  empty: {
+    paddingVertical: space.xxl,
+    gap: stack.related,
+  },
+  settingsButton: {
+    minWidth: HIT_TARGET,
+    minHeight: HIT_TARGET,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'center' as const,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

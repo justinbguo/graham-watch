@@ -9,16 +9,24 @@
  *   npm run dealers -- approve <id|host>  publish their listings
  *   npm run dealers -- revoke  <id|host>  pull them back
  *
+ *   npm run dealers -- applications       shops asking to be listed
+ *   npm run dealers -- accept  <app-id>   turn one into a shop they own
+ *   npm run dealers -- decline <app-id>   say no, with --note
+ *   npm run dealers -- operator [email]   let an account approve shops,
+ *                                         with --password to set one
+ *
  * Approval is deliberately impossible from the app: RLS blocks a user from
  * approving a dealer they created, so nobody can publish a shop's inventory by
  * importing it. That makes approving an operator action, and this is the tool.
+ *
+ * `accept` and `approve` are different gates. Accepting hands a shop to the
+ * dealer who applied for it; approving is what puts listings in the deck.
  */
 
 import { createInterface } from 'node:readline/promises';
 
-import { formatPrice, preview, runImport } from './_import.mjs';
-import { config, request, serviceKey, signInOperator } from './_supabase.mjs';
-import { discover } from './discover.mjs';
+import { choose, discover, formatPrice, preview, publishAll, syncCatalog } from './_import.mjs';
+import { config, describeTarget, request, serviceKey, signInOperator } from './_supabase.mjs';
 
 function parseArgs(argv) {
   const positional = [];
@@ -75,20 +83,39 @@ async function confirm(question) {
   }
 }
 
+/**
+ * Makes the operator type the shop's name before an irreversible change to a
+ * live project.
+ *
+ * `--yes` exists to repeat a local reset without ceremony, and it sits one
+ * character away from a command that deletes a real shop and every listing
+ * under it. So the flag is honoured on local and ignored on production, where
+ * the only thing that counts as consent is naming what is about to go.
+ */
+async function confirmByName(name) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question(`Type the shop's name to confirm on PRODUCTION — ${name}: `);
+    return answer.trim() === name;
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * A preview is the shop's own words, not a typed watch.
+ *
+ * It reads the catalogue and stops, so there is no brand, model or year to
+ * print — those come from the model at publish time. Asking for them anyway
+ * printed a column of blank names and `????`, which is the opposite of what a
+ * preview is for.
+ */
 function printSample(listings) {
   for (const listing of listings) {
-    const name = [listing.brand, listing.model].filter(Boolean).join(' ');
-    const facts = [
-      listing.reference && `ref. ${listing.reference}`,
-      listing.case_size_mm && `${listing.case_size_mm}mm`,
-      listing.movement,
-    ].filter(Boolean);
-
-    console.log(`  ${String(listing.year ?? '????')}  ${name}`);
+    const state = listing.skipped ? `refused: ${listing.skipped}` : listing.available ? 'for sale' : 'sold';
+    console.log(`  ${listing.title || listing.source_url}`);
     console.log(
-      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos${
-        facts.length ? ` · ${facts.join(' · ')}` : ''
-      }`
+      `        ${formatPrice(listing.price_cents, listing.currency)} · ${listing.photo_count} photos · ${state}`
     );
   }
 }
@@ -110,8 +137,12 @@ async function add() {
     process.exit(1);
   }
 
+  // Signed in before discovery, not after: finding the catalogue is an import
+  // function call now, so it needs the same session the rest of the run uses.
+  const operator = await signInOperator();
+
   console.log(`\nLooking at ${target}…`);
-  const found = await discover(target);
+  const found = await discover({ domain: target, token: operator.token });
 
   const name = typeof flags.name === 'string' ? flags.name : found.name;
   const catalogUrl = typeof flags.url === 'string' ? flags.url : found.catalogUrl;
@@ -120,13 +151,15 @@ async function add() {
   console.log(`\n  ${name}`);
   console.log(`  ${found.platform} · ${catalogUrl}`);
   console.log(`  ${email ?? 'no contact address found — set one with --email'}`);
-  if (found.productCount) console.log(`  about ${found.productCount} products listed in their sitemap`);
+  if (found.sitemapProducts) {
+    console.log(
+      `  ${found.sitemapProducts} products in their sitemap — sold stock included, so not their stock`
+    );
+  }
   if (!found.sawSitemap) console.log('  no sitemap, so the catalog URL is a guess — pass --url to set it');
   if (found.platform === 'generic') {
     console.log('  unknown shop software: falls back to scraping, which is slower and less exact');
   }
-
-  const operator = await signInOperator();
 
   console.log(`\nReading ${SAMPLE_SIZE} of them…`);
   const sample = await preview({
@@ -148,18 +181,32 @@ async function add() {
     return;
   }
 
-  const job = await runImport({
+  const synced = await syncCatalog({
     sourceUrl: catalogUrl,
-    limit,
     dealerName: name,
     dealerEmail: email ?? undefined,
     token: operator.token,
-    onProgress: (current) => process.stdout.write(`\r  ${current.status}…    `),
+  });
+
+  console.log(
+    `\nRead ${synced.found} products via ${synced.provider} (${synced.forSale} for sale): ` +
+      `${synced.added} new, ${synced.changed} changed, ${synced.retired} retired.`
+  );
+
+  const picked = await choose({ dealerId: synced.dealerId, limit, token: operator.token });
+  console.log(`Queued ${picked}. Typing them now…`);
+
+  const totals = await publishAll({
+    dealerId: synced.dealerId,
+    token: operator.token,
+    onProgress: (current) =>
+      process.stdout.write(`\r  ${current.published} published, ${current.pending} left…    `),
   });
 
   process.stdout.write('\r');
-  console.log(`Imported ${job.listings_created} listing(s) via ${job.provider}.`);
-  if (job.error) console.log(job.error);
+  console.log(
+    `Published ${totals.published} listing(s). ${totals.skipped} skipped, ${totals.failed} failed.`
+  );
 
   await setPermission('approved', new URL(catalogUrl).hostname.replace(/^www\./, ''));
 }
@@ -226,7 +273,11 @@ async function remove() {
   console.log(`  ${dealer.website ?? 'no website'}`);
   console.log(`  ${ids.length} listing(s) and their photos will be deleted.\n`);
 
-  if (flags.yes !== true && !(await confirm('Delete permanently?'))) {
+  const agreed = config().isLocal
+    ? flags.yes === true || (await confirm('Delete permanently?'))
+    : await confirmByName(dealer.name);
+
+  if (!agreed) {
     console.log('Nothing deleted.');
     return;
   }
@@ -263,7 +314,8 @@ async function set() {
       process.exit(1);
     }
     console.log(`Reading ${dealer.website}…`);
-    const found = await discover(dealer.website);
+    const operator = await signInOperator();
+    const found = await discover({ domain: dealer.website, token: operator.token });
     if (found.email) patch.contact_email = found.email;
     if (found.name) patch.name = found.name;
 
@@ -334,6 +386,10 @@ async function stats() {
   console.log('');
 }
 
+/**
+ * Goes through set_dealer_permission rather than patching the column, so this
+ * and the operator UI share one implementation of "make a shop live".
+ */
 async function setPermission(permission, explicitTarget) {
   const subject = explicitTarget ?? target;
   if (!subject) {
@@ -341,31 +397,206 @@ async function setPermission(permission, explicitTarget) {
     process.exit(1);
   }
 
-  const isUuid = /^[0-9a-f-]{36}$/i.test(subject);
-  const filter = isUuid ? `id=eq.${subject}` : `website=ilike.*${subject}*`;
+  const dealer = await findDealer(subject);
 
-  const { body, ok, status } = await request(`/rest/v1/dealers?${filter}`, {
+  // Both directions are buyer-visible: approve puts stock in front of real
+  // people, revoke takes a working shop out of the deck. Neither asked before.
+  if (!config().isLocal) {
+    const verb = permission === 'approved' ? 'Publish' : 'Hide';
+    if (!(await confirm(`${verb} ${dealer.name} on PRODUCTION?`))) {
+      console.log('Nothing changed.');
+      return;
+    }
+  }
+
+  const { body, ok, status } = await request('/rest/v1/rpc/set_dealer_permission', {
     token: key,
-    method: 'PATCH',
-    body: { permission },
-    prefer: 'return=representation',
+    method: 'POST',
+    body: { p_dealer_id: dealer.id, p_permission: permission },
   });
 
   if (!ok) {
     console.error(`Failed (${status}): ${body?.message ?? ''}`);
     process.exit(1);
   }
-  if (!body?.length) {
-    console.error(`No dealer matched "${subject}".`);
+  console.log(`${dealer.name} → ${body}`);
+}
+
+/**
+ * Grants operator access. The one action that still needs the service key,
+ * because it is what bootstraps every other operator identity.
+ */
+async function operator() {
+  const email = target ?? process.env.GRAHAM_OPERATOR_EMAIL ?? 'operator@graham.local';
+  const password = typeof flags.password === 'string' ? flags.password : null;
+  let userId;
+
+  // The UI signs in with a password, so this account can be reached by anyone
+  // who guesses one — the auth endpoint is public and an operator decides which
+  // shops are live. Twelve is the floor here; Supabase's own minimum is six.
+  if (password !== null && password.length < 12) {
+    console.error('That password is too short. Use at least 12 characters.');
     process.exit(1);
   }
 
-  for (const dealer of body) {
-    console.log(`${dealer.name} → ${dealer.permission}`);
+  if (target) {
+    const { body } = await request('/auth/v1/admin/users?per_page=1000', { token: key });
+    const found = (body?.users ?? []).find(
+      (user) => user.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (found) {
+      userId = found.id;
+
+      if (password) {
+        const set = await request(`/auth/v1/admin/users/${userId}`, {
+          token: key,
+          method: 'PUT',
+          body: { password },
+        });
+        if (!set.ok) {
+          console.error(`Could not set the password (${set.status}): ${set.body?.msg ?? ''}`);
+          process.exit(1);
+        }
+        console.log(`Set a new password for ${email}.`);
+      }
+    } else {
+      // Created here rather than refused. The operator UI turns signups off, so
+      // an address with no account cannot make one by signing in, and telling
+      // the operator to go and sign in first is a circle with no way out.
+      // Confirmed on the way in: an unconfirmed address cannot claim a shop.
+      const made = await request('/auth/v1/admin/users', {
+        token: key,
+        method: 'POST',
+        body: { email, email_confirm: true, ...(password ? { password } : {}) },
+      });
+
+      if (!made.ok) {
+        console.error(`Could not create an account for ${email} (${made.status}): ${made.body?.msg ?? made.body?.message ?? ''}`);
+        process.exit(1);
+      }
+      userId = made.body.id;
+      console.log(`Created an account for ${email}.`);
+    }
+  } else {
+    // Creates the configured operator account if it does not exist yet, which
+    // is what every other command in this file already relies on.
+    userId = (await signInOperator()).id;
+  }
+
+  const { ok, status, body } = await request('/rest/v1/operators', {
+    token: key,
+    method: 'POST',
+    body: { user_id: userId, note: typeof flags.note === 'string' ? flags.note : email },
+    prefer: 'resolution=merge-duplicates,return=representation',
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+  console.log(`${email} can approve shops now.`);
+  console.log(`  ${userId}`);
+
+  if (!password) {
+    console.log(`\nThe operator UI signs in with a password. Set one with:`);
+    console.log(`  npm run dealers -- operator ${email} --password "..."`);
   }
 }
 
-console.log(`${config().isLocal ? 'local' : config().url}`);
+const VOLUME_LABELS = {
+  under_10: 'under 10',
+  '10_to_50': '10–50',
+  '50_to_200': '50–200',
+  over_200: '200+',
+};
+
+/**
+ * Unverified applications are listed but marked, because an operator cannot act
+ * on one: approve_dealer_application refuses until the mailbox is proved.
+ */
+async function applications() {
+  const wanted = typeof flags.status === 'string' ? flags.status : 'pending';
+  const { body } = await request(
+    `/rest/v1/dealer_applications?status=eq.${wanted}&select=*&order=created_at.asc`,
+    { token: key }
+  );
+
+  if (!Array.isArray(body) || body.length === 0) {
+    console.log(`\nNo ${wanted} applications.\n`);
+    return;
+  }
+
+  console.log('');
+  for (const app of body) {
+    const mark = app.verified_at ? '●' : '○';
+    console.log(`  ${mark} ${app.shop_name}`);
+    console.log(`    ${app.website}  ·  ${VOLUME_LABELS[app.volume] ?? app.volume} at a time`);
+    console.log(`    ${app.brands?.length ? app.brands.join(' · ') : 'no brands given'}`);
+    console.log(
+      `    ${app.verified_email ?? '⚠ mailbox not proved yet — cannot be accepted'}`
+    );
+    console.log(`    ${app.id}`);
+  }
+  console.log('\n  ● mailbox proved   ○ waiting on the applicant\n');
+}
+
+async function accept() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- accept <app-id> [--hold]');
+    console.error('  --hold  create the shop but leave its listings unpublished');
+    process.exit(1);
+  }
+
+  const operator = await signInOperator();
+  const { ok, status, body } = await request('/rest/v1/rpc/approve_dealer_application', {
+    token: key,
+    method: 'POST',
+    body: {
+      p_application_id: target,
+      p_permission: flags.hold === true ? 'pending' : 'approved',
+      // A service-key call has no subject, so the new shop's created_by has to
+      // be named. The operator UI omits this and is attributed from its session.
+      p_created_by: operator.id,
+    },
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(body);
+  console.log(`\n  ${dealer.name} → ${dealer.permission}`);
+  console.log(`  ${dealer.website}`);
+  console.log(`  claimed · ${dealer.contact_email ?? 'no contact address'}`);
+  console.log(`  ${dealer.id}\n`);
+  console.log('They can import their inventory from the app now.\n');
+}
+
+async function decline() {
+  const note = typeof flags.note === 'string' ? flags.note : null;
+  if (!target || !note) {
+    console.error('Usage: npm run dealers -- decline <app-id> --note "why"');
+    console.error('The note is required. The applicant reads it on their profile.');
+    process.exit(1);
+  }
+
+  const operator = await signInOperator();
+  const { ok, status, body } = await request('/rest/v1/rpc/decline_dealer_application', {
+    token: key,
+    method: 'POST',
+    body: { p_application_id: target, p_note: note, p_reviewed_by: operator.id },
+  });
+
+  if (!ok) {
+    console.error(`Failed (${status}): ${body?.message ?? ''}`);
+    process.exit(1);
+  }
+  console.log(`Declined. They will read: "${note}"`);
+}
+
+console.log(describeTarget());
 
 switch (command) {
   case undefined:
@@ -391,7 +622,21 @@ switch (command) {
   case 'revoke':
     await setPermission('revoked');
     break;
+  case 'applications':
+    await applications();
+    break;
+  case 'accept':
+    await accept();
+    break;
+  case 'decline':
+    await decline();
+    break;
+  case 'operator':
+    await operator();
+    break;
   default:
-    console.error(`Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke.`);
+    console.error(
+      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke, applications, accept, decline, operator.`
+    );
     process.exit(1);
 }

@@ -1,70 +1,107 @@
-/** Calling the importer and following the job it queues. Shared by import and dealers. */
+/** Calling the importer. Shared by import, sweep and dealers. */
 
 import { request } from './_supabase.mjs';
 
-const POLL_MS = 2000;
-const TIMEOUT_MS = 180_000;
+// A guard on a bug, not a limit on a shop. Each pass reports what is left, so
+// the loop normally ends because the queue emptied.
+const MAX_PASSES = 200;
 
-/** Extracts listings and returns them without writing anything. */
-export async function preview({ sourceUrl, limit, token }) {
-  const { ok, body, status } = await request('/functions/v1/import-listings', {
+async function call(body, token, failure) {
+  const { ok, body: result, status } = await request('/functions/v1/import-listings', {
     token,
     method: 'POST',
-    body: { sourceUrl, limit, dryRun: true },
+    body,
   });
 
-  if (!ok) throw new Error(body?.error ?? `Preview failed (${status}).`);
-  return body;
+  if (!ok) throw new Error(result?.error ?? `${failure} (${status}).`);
+  return result;
+}
+
+/** Reads a catalogue and returns what is on it, writing nothing. */
+export function preview({ sourceUrl, limit, token }) {
+  return call({ action: 'preview', sourceUrl, limit }, token, 'Preview failed');
 }
 
 /**
- * Re-reads a shop's stock and retires anything it no longer sells. No OpenAI and
- * no writes beyond two timestamps, so it is safe to run on a schedule.
+ * Where a shop keeps its watches, given a domain.
+ *
+ * Runs in the import function rather than here, because the operator UI needs
+ * the same answer and a browser cannot read another origin's sitemap.
  */
-export async function runSweep({ sourceUrl, token }) {
-  const { ok, body, status } = await request('/functions/v1/import-listings', {
-    token,
-    method: 'POST',
-    body: { sourceUrl, sweep: true },
-  });
-
-  if (!ok) throw new Error(body?.error ?? `Sweep failed (${status}).`);
-  return body;
+export function discover({ domain, token }) {
+  return call({ action: 'discover', domain }, token, 'Could not read that site');
 }
 
-export async function runImport({
-  sourceUrl,
-  limit,
-  dealerName,
-  dealerEmail,
-  token,
-  onProgress,
-}) {
-  const started = await request('/functions/v1/import-listings', {
+/**
+ * Reads the shop's catalogue into source_items: what it sells, at what price,
+ * and what it has since sold. No model call, so this is safe to run often.
+ */
+export function syncCatalog({ sourceUrl, dealerId, dealerName, dealerEmail, token }) {
+  return call(
+    { action: 'sync', sourceUrl, dealerId, dealerName, dealerEmail },
     token,
-    method: 'POST',
-    body: { sourceUrl, limit, dealerName, dealerEmail },
-  });
+    'Refresh failed'
+  );
+}
 
-  if (!started.ok) {
-    throw new Error(started.body?.error ?? `Failed to queue (${started.status}).`);
-  }
+/**
+ * Marks catalogue rows for publishing, oldest first. Watches already in the
+ * deck are marked from the moment they are adopted, so this only ever picks up
+ * ones the shop has not published here yet.
+ */
+export async function choose({ dealerId, limit, token }) {
+  // Zero means "publish changed listings only". Testing truthiness below used
+  // to omit `limit=0`, selecting every unpublished watch in the catalogue.
+  if (limit === 0) return 0;
 
-  let job = started.body.job;
-  const deadline = Date.now() + TIMEOUT_MS;
+  const available = await request(
+    `/rest/v1/source_items?dealer_id=eq.${dealerId}&listing_id=is.null&available=is.true&publish=is.false&select=id&order=first_seen_at${
+      limit !== undefined ? `&limit=${limit}` : ''
+    }`,
+    { token }
+  );
 
-  while (job.status === 'queued' || job.status === 'running') {
-    if (Date.now() > deadline) {
-      throw new Error(`Gave up after ${TIMEOUT_MS / 1000}s. Job ${job.id} is still ${job.status}.`);
+  const ids = (available.body ?? []).map((row) => row.id);
+  if (!ids.length) return 0;
+
+  const { ok, body, status } = await request(
+    `/rest/v1/source_items?id=in.(${ids.join(',')})`,
+    {
+      token,
+      method: 'PATCH',
+      body: { publish: true, error: null },
+      prefer: 'return=representation',
     }
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-    const polled = await request(`/rest/v1/import_jobs?id=eq.${job.id}`, { token });
-    job = polled.body?.[0] ?? job;
-    onProgress?.(job);
+  );
+
+  if (!ok) throw new Error(body?.error ?? `Could not choose watches (${status}).`);
+  return body?.length ?? 0;
+}
+
+/**
+ * Drains the publish queue, one bounded batch per call.
+ *
+ * The batch is what keeps each request inside its wall clock; the loop is what
+ * makes the shop's size irrelevant. A batch that fails leaves everything before
+ * it published and the rest still queued.
+ */
+export async function publishAll({ dealerId, token, onProgress }) {
+  const totals = { processed: 0, published: 0, skipped: 0, failed: 0, pending: 0 };
+
+  for (let pass = 0; pass < MAX_PASSES; pass += 1) {
+    const batch = await call({ action: 'publish', dealerId }, token, 'Publish failed');
+
+    totals.processed += batch.processed;
+    totals.published += batch.published;
+    totals.skipped += batch.skipped;
+    totals.failed += batch.failed;
+    totals.pending = batch.pending;
+
+    onProgress?.(totals);
+    if (batch.pending === 0 || batch.processed === 0) break;
   }
 
-  if (job.status === 'failed') throw new Error(job.error ?? 'Import failed.');
-  return job;
+  return totals;
 }
 
 export function formatPrice(cents, currency) {

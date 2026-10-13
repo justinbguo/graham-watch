@@ -1,10 +1,3 @@
-// Imported per weight, not from the package root: the root re-exports every
-// cut and Metro then bundles unused TTFs.
-import { EBGaramond_600SemiBold } from '@expo-google-fonts/eb-garamond/600SemiBold';
-import { EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond/700Bold';
-import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
-import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
-import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -18,34 +11,33 @@ import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
+import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
+import { haasFonts } from '@/lib/fonts';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
 
 SplashScreen.preventAutoHideAsync();
 
+// Catches what the per-screen boundaries cannot: a provider failing before any
+// screen exists. Without it that case is a white screen with no way out.
+export { RootErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
+
+// Neue Haas Grotesk, including the wordmark. One load, before the splash
+// drops, so the first screen is not set in the system face.
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    EBGaramond_600SemiBold,
-    EBGaramond_700Bold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-  });
-
-  // A failed font load must not block the app — fall through to system faces.
-  if (!fontsLoaded && !fontError) return null;
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <FilterProvider>
-              <SplashScreenController />
-              <Chrome />
-            </FilterProvider>
+            <GuestProvider>
+              <FilterProvider>
+                <SplashScreenController />
+                <Chrome />
+              </FilterProvider>
+            </GuestProvider>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>
@@ -56,7 +48,10 @@ export default function RootLayout() {
 function SplashScreenController() {
   const { isLoading } = useSession();
   const { ready } = useOnboardingGate();
-  if (!isLoading && ready) SplashScreen.hide();
+  // A failed download must not hold the splash forever: type falls back to
+  // the platform face and the app opens.
+  const [fontLoaded, fontError] = useFonts(haasFonts);
+  if (!isLoading && ready && (fontLoaded || fontError)) SplashScreen.hide();
   return null;
 }
 
@@ -92,8 +87,8 @@ function Chrome() {
 }
 
 /**
- * Three destinations, and the gate has to know which before it renders any of
- * them. While the profile is still loading no guard passes, the stack renders
+ * Guests land on the deck. Signed-in users who still need onboarding go there
+ * first. While the profile is loading no guard passes, the stack renders
  * nothing, and the splash screen stays up to cover it.
  */
 function RootNavigator() {
@@ -102,16 +97,12 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={isSignedIn && ready && !needsOnboarding}>
+      <Stack.Protected guard={!isSignedIn || (ready && !needsOnboarding)}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
       <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
         <Stack.Screen name="onboarding" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={!isSignedIn}>
-        <Stack.Screen name="sign-in" />
       </Stack.Protected>
     </Stack>
   );

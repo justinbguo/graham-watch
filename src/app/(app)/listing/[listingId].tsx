@@ -1,65 +1,72 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
-import { Button, Centered, CloseButton, Divider, Message, Screen, Spinner } from '@/components/ui';
+import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { useOpenMailDraft } from '@/data/inquiries';
 import { useListing, useSaved } from '@/data/listings';
-import { useRecordSwipe, useUnsave } from '@/data/swipes';
-import { DealerPanel } from '@/features/dealers/DealerPanel';
-import { formatPrice, formatSpecs, humanize } from '@/lib/format';
-import type { DeckCard } from '@/lib/models';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { useRecordSwipe } from '@/data/swipes';
+import { useGuest } from '@/features/auth/GuestProvider';
+import { ListingDetails } from '@/features/listings/ListingDetails';
+import { formatPrice, formatTitle } from '@/lib/format';
+import { useOpenStack } from '@/lib/openStack';
+import {
+  GUEST_SWIPE_BUDGET,
+  HIT_TARGET,
+  inset,
+  radius,
+  size,
+  space,
+  stack,
+  type,
+  type Theme,
+} from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
-function yesNo(value: boolean | null) {
-  if (value == null) return null;
-  return value ? 'Yes' : 'No';
-}
-
-function specs(card: DeckCard): [string, string][] {
-  const rows: [string, string | null][] = [
-    ['Reference', card.reference],
-    ['Year', card.year ? String(card.year) : null],
-    ['Case', card.case_size_mm ? `${card.case_size_mm}mm` : null],
-    ['Material', card.case_material ? humanize(card.case_material) : null],
-    ['Dial', card.dial_color ? humanize(card.dial_color) : null],
-    ['Winding', card.winding ? humanize(card.winding) : null],
-    ['Caliber', card.caliber],
-    ['Style', card.style ? humanize(card.style) : null],
-    [
-      'Complications',
-      card.complications.length ? card.complications.map(humanize).join(', ') : null,
-    ],
-    ['Condition', card.condition],
-    ['Box', yesNo(card.has_box)],
-    ['Papers', yesNo(card.has_papers)],
-  ];
-
-  return rows.filter((row): row is [string, string] => Boolean(row[1]));
-}
-
-function Spec({ label, value }: { label: string; value: string }) {
-  const styles = useThemedStyles(detailStyles);
-
-  return (
-    <View style={styles.specRow}>
-      <Text style={styles.specLabel}>{label}</Text>
-      <Text style={styles.specValue}>{value}</Text>
-    </View>
-  );
-}
+/**
+ * The frame a watch gets when there is no card to scroll: opened from the wishlist, a
+ * search result, or a grid tile. The deck reads the same content inside the
+ * card itself, so everything below the price comes from `ListingDetails`.
+ */
+// A full-screen modal over scraped fields. Its own boundary keeps the failure
+// inside the modal, where "Go back" still returns to the deck.
+export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function ListingScreen() {
-  const { listingId } = useLocalSearchParams<{ listingId: string }>();
-  const { userId } = useSession();
+  const { listingId, from } = useLocalSearchParams<{ listingId: string; from?: string }>();
+  const { userId, isSignedIn } = useSession();
+  const guest = useGuest();
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
   const save = useRecordSwipe(userId);
-  const unsave = useUnsave(userId);
+  const contact = useOpenMailDraft(userId);
+  const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
 
-  const isSaved = saved.some((entry) => entry.id === listingId);
+  const isSaved =
+    saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
+
+  const judge = (direction: 'left' | 'right', after?: () => void) => {
+    if (!isSignedIn && guest.exhausted) {
+      guest.openSignIn('budget');
+      return;
+    }
+    const used = guest.swipes.length + 1;
+    save.mutate(
+      { listingId: card!.id, direction },
+      {
+        onSuccess: () => {
+          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) guest.openSignIn('budget');
+          after?.();
+        },
+      }
+    );
+  };
+  // Search is a place to look. Passing there would drop a watch out of a deck
+  // the user has not reached yet, and writing to a dealer is a step you take
+  // about a watch you have kept, so saving is the only verdict it offers.
+  const fromSearch = from === 'search';
 
   if (isPending) {
     return (
@@ -74,93 +81,98 @@ export default function ListingScreen() {
       <Screen action={<CloseButton onPress={() => router.back()} />}>
         <Centered>
           <Message text="That watch is no longer available." tone="error" />
-          <Button label="Close" variant="secondary" onPress={() => router.back()} />
+          <Button label="Close" variant="outline" onPress={() => router.back()} />
         </Centered>
       </Screen>
     );
   }
 
   return (
-    <Screen title={card.brand} action={<CloseButton onPress={() => router.back()} />}>
-      <ScrollView contentContainerStyle={styles.body}>
+    <Screen>
+      {/* Outside the scroll, on the close button's line. A name that leaves
+          with the photograph is gone by the time you reach the caliber. */}
+      <View style={styles.headline}>
+        <Text style={styles.model}>{formatTitle(card)}</Text>
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(card)}</Text>
+          <CloseButton onPress={() => router.back()} />
+        </View>
+      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <View style={styles.photo}>
           <PhotoCarousel
             photos={card.photos}
             active
-            onExpand={(index) => router.push(`/photos/${card.id}?index=${index}`)}
-          />
-        </View>
-
-        <View style={styles.headline}>
-          <Text style={styles.model}>{card.model ?? 'Unknown model'}</Text>
-          <Text style={styles.meta}>{formatSpecs(card)}</Text>
-          <Text style={styles.price}>{formatPrice(card)}</Text>
-        </View>
-
-        {/* Only ever reached from Saved: the deck cannot serve a sold watch. It
-            says what the dealer would have said, before an email gets written. */}
-        {card.sold_at ? (
-          <View style={styles.sold}>
-            <Text style={styles.soldLabel}>Sold</Text>
-            <Text style={styles.soldNote}>
-              {card.dealer?.name ?? 'The dealer'} no longer has this watch.
-            </Text>
-          </View>
-        ) : null}
-
-        {card.description ? <Text style={styles.description}>{card.description}</Text> : null}
-
-        <Divider />
-
-        <View style={styles.specs}>
-          {specs(card).map(([label, value]) => (
-            <Spec key={label} label={label} value={value} />
-          ))}
-        </View>
-
-        {card.dealer ? <DealerPanel dealer={card.dealer} /> : null}
-
-        <View style={styles.actions}>
-          {/* A toggle, not a button that greys out once used. Saving from here
-              is the same right swipe, so undoing it has to be reachable too. */}
-          <Button
-            label={isSaved ? 'Saved' : 'Save watch'}
-            variant="secondary"
-            loading={save.isPending || unsave.isPending}
-            onPress={() =>
-              isSaved ? unsave.mutate(card.id) : save.mutate({ listingId: card.id, direction: 'right' })
+            onExpand={(index) =>
+              open(
+                'photos/[listingId]',
+                { listingId: card.id, index: String(index) },
+                `/photos/${card.id}?index=${index}`
+              )
             }
           />
-          {/* The whole point of tracking sold stock: no one writes to a dealer
-              about a watch that went months ago. */}
-          {card.sold_at ? null : (
-            <Button
-              label="Ask about this watch"
-              onPress={() => router.push(`/inquiry/${card.id}`)}
-            />
-          )}
         </View>
+
+        <ListingDetails
+          card={card}
+          // A watch already on the wishlist has nothing left to decide here. The row
+          // carries Message and slides left to remove, so repeating both
+          // on the page put a verdict in front of a watch already chosen.
+          actions={
+            isSaved ? null : (
+              <>
+                <Button
+                  label="Add to wishlist"
+                  icon="bookmark-outline"
+                  variant="outline"
+                  loading={save.isPending && save.variables?.direction === 'right'}
+                  onPress={() => judge('right')}
+                />
+                {/* The grid has no verdict of its own. Passing here is the left
+                    swipe: the watch leaves the deck, and this screen goes with it. */}
+                {fromSearch || card.sold_at ? null : (
+                  <Button
+                    label="Pass"
+                    icon="close"
+                    variant="ghost"
+                    loading={save.isPending && save.variables?.direction === 'left'}
+                    disabled={save.isPending}
+                    onPress={() => judge('left', () => router.back())}
+                  />
+                )}
+                {/* The whole point of tracking sold stock: no one writes to a dealer
+                    about a watch that went months ago. */}
+                {fromSearch || card.sold_at ? null : (
+                  <Button
+                    label="Ask about this watch"
+                    icon="email-outline"
+                    loading={contact.isPending}
+                    onPress={() => {
+                      if (!isSignedIn) {
+                        guest.openSignIn('action');
+                        return;
+                      }
+                      contact.mutate(
+                        { card, message: '' },
+                        {
+                          onError: (error) => Alert.alert('Could not open Gmail', error.message),
+                        }
+                      );
+                    }}
+                  />
+                )}
+              </>
+            )
+          }
+        />
       </ScrollView>
     </Screen>
   );
 }
 
 const detailStyles = (theme: Theme) => ({
-  sold: {
-    gap: space.xs,
-    padding: inset.card,
-    borderRadius: radius.md,
-    backgroundColor: theme.color.surfaceSunken,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
-  soldLabel: {
-    ...type.labelStrong,
-    color: theme.color.text,
-  },
-  soldNote: {
-    ...type.caption,
-    color: theme.color.textMuted,
+  scroll: {
+    flex: 1,
   },
   body: {
     paddingHorizontal: inset.screen,
@@ -168,50 +180,36 @@ const detailStyles = (theme: Theme) => ({
     gap: stack.group,
   },
   photo: {
-    aspectRatio: 1,
+    aspectRatio: 4 / 5,
     borderRadius: radius.lg,
     overflow: 'hidden' as const,
   },
+  // One line with the close control. The name takes the leftover width and
+  // wraps; the price and the X stay on that line.
   headline: {
-    gap: stack.tight,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.md,
+    paddingHorizontal: inset.screen,
+    paddingBottom: space.lg,
+    backgroundColor: theme.color.background,
   },
   model: {
-    ...type.display,
+    ...type.title,
     color: theme.color.text,
+    flex: 1,
+    minWidth: 0,
   },
-  meta: {
-    ...type.caption,
-    color: theme.color.textMuted,
+  priceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    flexShrink: 0,
   },
   price: {
     ...type.price,
     color: theme.color.text,
-    paddingTop: space.sm,
-  },
-  description: {
-    ...type.body,
-    color: theme.color.textMuted,
-  },
-  specs: {
-    gap: space.sm,
-  },
-  specRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.md,
-  },
-  specLabel: {
-    ...type.caption,
-    color: theme.color.textMuted,
-  },
-  specValue: {
-    ...type.label,
-    color: theme.color.text,
-    flexShrink: 1,
-    textAlign: 'right' as const,
-  },
-  actions: {
-    gap: stack.related,
+    // The X sits at the end of a 44pt target, so 20 points of that target
+    // fall between the price and the glyph. Cancel them, then leave space.sm.
+    marginRight: space.sm - (HIT_TARGET - size.icon),
   },
 });

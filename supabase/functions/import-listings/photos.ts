@@ -1,5 +1,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
+import { TIMEOUT } from '../_shared/timeouts.ts';
+
 const BUCKET = 'listing-photos';
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -32,8 +34,8 @@ async function copyOne(
 
   try {
     const response = await fetch(sourceUrl, {
-      headers: { 'User-Agent': 'GrahamBot/0.1 (+https://graham.app)' },
-      signal: AbortSignal.timeout(15_000),
+      headers: { 'User-Agent': 'GrahamBot/0.1 (+https://graham.watch)' },
+      signal: AbortSignal.timeout(TIMEOUT.photo),
     });
     if (!response.ok) return fallback;
 

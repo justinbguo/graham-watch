@@ -8,7 +8,7 @@ install link. That replaces Metro on your machine and Expo Go on the phone.
 
 | Profile | What you get | Backend |
 | --- | --- | --- |
-| `preview` | Install link (Android APK, iOS ad hoc / TestFlight path) | Demo fixtures — no Supabase |
+| `preview` | Install link (Android APK, iOS ad hoc / TestFlight path) | The EAS environment named `preview` |
 | `production` | Store build | Hosted Supabase (`EXPO_PUBLIC_*` secrets on EAS) |
 
 Start with `preview`. It is the same UI path as `npm run demo`, packaged as a
@@ -73,5 +73,5 @@ npx eas-cli@latest submit --platform ios    # TestFlight
 
 A `preview` build that still points at `http://127.0.0.1:54321` will open, then
 fail every query — on a phone, localhost is the phone itself. The `preview`
-profile sets `EXPO_PUBLIC_DEMO=1` so that cannot happen. If you hand-roll a
-profile, either keep demo on or use a hosted Supabase URL.
+profile reads the EAS environment named `preview`. That environment needs demo
+mode or a hosted Supabase URL, not the laptop's localhost.

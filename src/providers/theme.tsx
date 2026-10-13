@@ -11,7 +11,7 @@ import { StyleSheet, useColorScheme } from 'react-native';
 
 import { secureStorage } from '@/lib/secureStorage';
 import { themes, type ColorScheme, type Theme } from '@/lib/theme';
-import { applyScrollbarStyle } from '@/lib/webScrollbars';
+import { hideScrollbars } from '@/lib/webScrollbars';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -27,7 +27,9 @@ const ThemeContext = createContext<ThemeState | null>(null);
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
-  const [preference, setPreferenceState] = useState<ThemePreference>('system');
+  // Dark until someone chooses otherwise. A stored choice still wins, so
+  // Settings is not reset on the next launch.
+  const [preference, setPreferenceState] = useState<ThemePreference>('dark');
 
   useEffect(() => {
     // secureStorage rather than a separate key-value dependency: it already
@@ -48,11 +50,9 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   const scheme: ColorScheme =
     preference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : preference;
 
-  // The scrollbar is browser chrome, so it lives outside the React tree and has
-  // to be repainted by hand when the scheme flips.
-  useEffect(() => {
-    applyScrollbarStyle(themes[scheme]);
-  }, [scheme]);
+  // Browser chrome lives outside the React tree, so the rule that hides it is
+  // written to the document. It has no colour, so the scheme never touches it.
+  useEffect(hideScrollbars, []);
 
   const value = useMemo(
     () => ({ theme: themes[scheme], preference, setPreference }),

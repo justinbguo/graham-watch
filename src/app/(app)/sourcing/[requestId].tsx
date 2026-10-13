@@ -30,7 +30,7 @@ export default function SourcingRequestScreen() {
       <Screen title="Source" action={<CloseButton onPress={() => router.back()} />}>
         <Centered>
           <Message text="That request is gone." tone="error" />
-          <Button label="Close" variant="secondary" onPress={() => router.back()} />
+          <Button label="Close" variant="ghost" onPress={() => router.back()} />
         </Centered>
       </Screen>
     );

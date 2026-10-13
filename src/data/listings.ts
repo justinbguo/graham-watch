@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
+import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
 import { toRpcArgs, type Filters } from '@/features/filters/types';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
@@ -35,7 +36,7 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
       .order('position'),
     supabase
       .from('dealers')
-      .select('id, name, website')
+      .select('id, name, website, description, instagram, logo_url')
       .in('id', [...new Set(listings.map((l) => l.dealer_id))]),
   ]);
 
@@ -67,6 +68,7 @@ async function fetchDeck(limit: number, filters: Filters): Promise<DeckCard[]> {
     p_limit: limit,
     p_exclude_swiped: true,
     p_favorites_first: true,
+    p_exclude_own: true,
     ...toRpcArgs(filters),
   });
   if (error) throw error;
@@ -128,16 +130,71 @@ export function usePrimeListing() {
   );
 }
 
-export function useDeck(limit = 20) {
-  const { filters } = useFilters('deck');
+/**
+ * One pile at a time. The deck is not paged: it is fetched once, swiped down,
+ * and refilled by a refresh, so this is also the most a screen can truthfully
+ * say is left.
+ */
+export const DECK_LIMIT = 20;
 
-  return useQuery({
+export function useDeck(limit = DECK_LIMIT) {
+  const { filters } = useFilters('deck');
+  const guest = useGuest();
+
+  const query = useQuery({
     queryKey: keys.deck(filters),
     queryFn: () => fetchDeck(limit, filters),
     // The deck is consumed by swiping, not by refetching. Re-running it mid-pile
     // would shuffle cards out from under the user's thumb.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+  });
+
+  // Guest judgments never reach `swipes`, so the RPC cannot exclude them. Drop
+  // them here so a refetch after a filter change does not resurrect a pass.
+  const data = useMemo(() => {
+    if (!query.data || guest.swipedIds.size === 0) return query.data;
+    return query.data.filter((card) => !guest.swipedIds.has(card.id));
+  }, [query.data, guest.swipedIds]);
+
+  return { ...query, data };
+}
+
+export type ListingCounts = { matched: number; total: number };
+
+async function fetchCounts(filters: Filters): Promise<ListingCounts> {
+  if (isDemo) return demo.counts(filters);
+
+  const { data, error } = await supabase.rpc('listing_counts', {
+    p_exclude_swiped: true,
+    ...toRpcArgs(filters),
+  });
+  if (error) throw error;
+
+  const row = data?.[0];
+  return { matched: Number(row?.matched ?? 0), total: Number(row?.total ?? 0) };
+}
+
+/**
+ * How many watches the filters leave, and how many the marketplace holds. The
+ * deck cannot answer either: it is one pile deep, so its length tops out at
+ * `DECK_LIMIT` and the header had to say "20+".
+ *
+ * Counted in the database, in one round trip, by `listing_counts` — the same
+ * predicate the deck is drawn with. A count assembled here from the rows we
+ * happen to hold would be a different number from the deck's the moment a
+ * dealer is approved.
+ */
+export function useListingCounts() {
+  const { filters } = useFilters('deck');
+
+  return useQuery({
+    queryKey: keys.counts(filters),
+    queryFn: () => fetchCounts(filters),
+    // `matched` moves in the cache the moment a swipe lands (`useRecordSwipe`).
+    // This fetch is the correction, not the animation: a minute is long enough
+    // that a swipe does not wait on it.
+    staleTime: 60_000,
   });
 }
 
