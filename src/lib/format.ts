@@ -58,9 +58,68 @@ export function formatTitle(card: Pick<DeckCard, 'brand' | 'model' | 'year'>) {
  * the table a few lines down and saying it twice reads as filler.
  */
 export function formatSpecs(card: Pick<DeckCard, 'reference' | 'case_size_mm'>) {
-  return [card.reference, card.case_size_mm ? `${card.case_size_mm}mm` : null]
-    .filter(Boolean)
-    .join(' · ');
+  return [card.reference, formatMillimetres(card.case_size_mm)].filter(Boolean).join(' · ');
+}
+
+/** "36 mm". The space keeps the number from reading as a reference. */
+export function formatMillimetres(mm: number | null): string | null {
+  if (mm == null) return null;
+  return `${mm} mm`;
+}
+
+/**
+ * Diameter and metal are one fact: what the case is. Either may be missing
+ * on its own, and a row of just "Steel" is still the case.
+ */
+export function formatCase(card: Pick<DeckCard, 'case_size_mm' | 'case_material'>): string | null {
+  const material = card.case_material ? humanize(card.case_material) : null;
+  const value = [formatMillimetres(card.case_size_mm), material].filter(Boolean).join(' · ');
+  return value || null;
+}
+
+/**
+ * Winding and caliber are one fact: what the movement is. A caliber that
+ * already says "manual" does not need the word again in front of it.
+ */
+export function formatMovement(card: Pick<DeckCard, 'winding' | 'caliber'>): string | null {
+  const winding = card.winding ? humanize(card.winding) : null;
+  const caliber = card.caliber?.trim() || null;
+  if (winding && caliber && caliber.toLowerCase().includes(winding.toLowerCase())) return caliber;
+  const value = [winding, caliber].filter(Boolean).join(' · ');
+  return value || null;
+}
+
+/**
+ * A chronograph is often both the style and the only complication. The style
+ * row already said it, so the complication row keeps only what is left.
+ */
+export function formatComplications(
+  card: Pick<DeckCard, 'style' | 'complications'>
+): string | null {
+  const style = card.style ? humanize(card.style).toLowerCase() : null;
+  const names = card.complications.map(humanize).filter((name) => name.toLowerCase() !== style);
+  return names.length ? names.join(', ') : null;
+}
+
+/**
+ * Null means the dealer never said. That is a different fact from "no", and
+ * on a vintage watch the difference is the one a buyer is trying to find.
+ */
+export function formatStated(value: string | null): string {
+  const trimmed = value?.trim();
+  return trimmed || 'Not stated';
+}
+
+export function formatBoxAndPapers(hasBox: boolean | null, hasPapers: boolean | null): string {
+  if (hasBox == null && hasPapers == null) return 'Not stated';
+  if (hasBox === true && hasPapers === true) return 'Box and papers';
+  if (hasBox === false && hasPapers === false) return 'No box or papers';
+  if (hasBox === true && hasPapers === false) return 'Box, no papers';
+  if (hasBox === false && hasPapers === true) return 'Papers, no box';
+  if (hasBox === true) return 'Box, papers not stated';
+  if (hasBox === false) return 'No box, papers not stated';
+  if (hasPapers === true) return 'Papers, box not stated';
+  return 'No papers, box not stated';
 }
 
 /** Database enum to something you would say out loud: `yellow_gold` to `Yellow gold`. */

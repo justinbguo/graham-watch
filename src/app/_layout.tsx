@@ -11,8 +11,9 @@ import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
-import { haasFonts } from '@/lib/fonts';
+import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
+import { haasFonts } from '@/lib/fonts';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
@@ -31,10 +32,12 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <FilterProvider>
-              <SplashScreenController />
-              <Chrome />
-            </FilterProvider>
+            <GuestProvider>
+              <FilterProvider>
+                <SplashScreenController />
+                <Chrome />
+              </FilterProvider>
+            </GuestProvider>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>
@@ -84,8 +87,8 @@ function Chrome() {
 }
 
 /**
- * Three destinations, and the gate has to know which before it renders any of
- * them. While the profile is still loading no guard passes, the stack renders
+ * Guests land on the deck. Signed-in users who still need onboarding go there
+ * first. While the profile is loading no guard passes, the stack renders
  * nothing, and the splash screen stays up to cover it.
  */
 function RootNavigator() {
@@ -94,16 +97,12 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={isSignedIn && ready && !needsOnboarding}>
+      <Stack.Protected guard={!isSignedIn || (ready && !needsOnboarding)}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
       <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
         <Stack.Screen name="onboarding" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={!isSignedIn}>
-        <Stack.Screen name="sign-in" />
       </Stack.Protected>
     </Stack>
   );

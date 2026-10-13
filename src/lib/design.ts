@@ -385,15 +385,26 @@ export const layout = {
   grid: 1280,
   /** The glyph column on a wide window: one tab wide, plus air either side. */
   rail: 88,
+  /**
+   * Columns on the wide home grid. Photograph above the copy, so a desktop
+   * window fills with watches rather than one tall row each.
+   */
+  gridColumns: 4,
 } as const;
 
-export type LayoutWidth = Exclude<keyof typeof layout, 'rail'>;
+export type LayoutWidth = Exclude<keyof typeof layout, 'rail' | 'gridColumns'>;
 
 /**
  * Above this width the deck opens on the grid: there is a mouse and no thumb.
  * Only the starting view — both are reachable at any width.
  */
 export const WIDE_BREAKPOINT = 900;
+
+/**
+ * How many watches a guest may judge before the app asks them to sign in.
+ * Tracked on the device, not in the database — there is no actor_id yet.
+ */
+export const GUEST_SWIPE_BUDGET = 10;
 
 export const size = {
   thumb: 72,
@@ -439,6 +450,11 @@ export const size = {
   /** Glyphs. `icon` for a tab or a header control, `iconSmall` inline with text. */
   icon: 24,
   iconSmall: 16,
+  /**
+   * The specification label column. "Box and papers" at `type.label` is the
+   * longest label, and the values share the edge to its right.
+   */
+  specLabel: 120,
   /** The tab bar itself, before the home-indicator inset padded under it. */
   tabBar: 68,
   /** Tab glyphs are larger than the rest: they carry no word under them. */
@@ -461,12 +477,6 @@ export const size = {
    * ratio carries over unchanged.
    */
   providerMark: 18,
-  /**
-   * The watch beside `GRAHAM`. Portrait, and short enough to share the
-   * wordmark's line. Width fits the widest of the four photographs.
-   */
-  wordmarkWatch: 96,
-  wordmarkWatchWidth: 64,
   /** Buttons, fields, and the doors on sign-in. One height, so a column of them is a column. */
   controlMin: HIT_TARGET + space.sm,
   /** Four lines of `type.body` plus field padding. */

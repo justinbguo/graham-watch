@@ -98,28 +98,29 @@ nobody follows.
   the top edge, on `scrimTop`, and the count goes in the paging controls'
   `accessibilityValue`.
 - The launcher mark in the app, or a tagline anywhere but under the wordmark
-  on sign-in. That one sentence is `body` in `textMuted`, grouped to the word
-  with `stack.tight`, and as wide as the room beside the watch. The watch sits to the
-  left of that pair, and its frame
-  is as tall as the pair. Sign-in is the wordmark, that sentence, the watch,
-  and the doors. The doors name the mode: `Create account with` or `Log in
-  with`. No heading does. A header holds a word, a count, and controls; the
-  word is already the name. `Screen` has no slot for a mark.
+  on sign-in. Guests land on the deck with **Log in** in the header action
+  slot; after `GUEST_SWIPE_BUDGET` judgments the sign-in sheet opens itself.
+  The sheet is the wordmark, one `body`/`textMuted` sentence, and the doors —
+  never a second headline or a card around the doors. The doors name the mode:
+  `Create account with` or `Log in with`. No heading does. A header holds a
+  word, a count, and controls; the word is already the name. `Screen` has no
+  slot for a mark.
 - The deck's name in capitals, or larger than the other headers. The title is
   `Graham` in `type.display`, the same size as Search and Profile. Sign-in is
   the one `Wordmark`: the letters `GRAHAM` in `type.wordmark`.
 - A second line of header type laid under `Screen`'s title. That is its
   `subtitle`, which keeps the header's controls on the title's line.
 - A glyph beside a word that stands for the word rather than naming the same
-  thing literally. Outside the tab bar, the specification table, and the brass
-  check after a dealer in a list, a glyph belongs to a control.
+  thing literally. Outside the tab bar and the brass check after a dealer in
+  a list, a glyph belongs to a control.
 - A second type size under a card's photograph, or muted type there. The
-  description and the specification values are both `label` on `text`; weight
-  is the only difference between them.
-- A label in the specification table. A row is the glyph and the fact, both at
-  full strength — `text` and `labelStrong` — and the word lives in the row's
-  `accessibilityLabel` as "Year: 1972". A fact that cannot stand without its
-  word is written as one: `has()` prints "Box" and "No papers", never "Yes".
+  description and the specification labels are both `label` on `text`. A
+  specification value and a group heading are `labelStrong`. Weight is the
+  only difference.
+- A glyph in the specification table. A row is the label, at `size.specLabel`,
+  and the value. Reference, condition, and box and papers stay when empty and
+  read "Not stated". Case joins size and metal. Movement joins winding and
+  caliber. The year stays in the name.
 - A word under a tab glyph, or a tab glyph that is not `MaterialCommunityIcons`
   outline at `size.tabIcon`, except Buy (`assets/watch.svg` at that size) and
   Profile (the photograph). The current tab does not fill its glyph in.
@@ -165,11 +166,14 @@ nobody follows.
 - A sent message that waits for the server to appear. The row goes into the
   thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
   it.
-- More than one watch on a grid row, except Search. The home grid, the wishlist,
-  and a shop put the photograph on the left, `size.gridPhoto` wide at 5/7 (the
-  home grid and the wishlist use `gridScan`), and the details on the right. The
-  row does not pass or save. That happens on the listing it opens. Search is a
-  wall of square photographs, three across, described in `docs/DESIGN.md`.
+- More than one watch on a grid row, except Search and the wide home grid.
+  Above the breakpoint the home grid is `layout.gridColumns` tiles
+  (`ListingTile`): photograph on top at 5/7 `contain`, copy under it. Below it,
+  and on the wishlist and a shop, `ListingRow` puts the photograph on the left
+  (`gridScan` on the phone home grid and wishlist, `gridPhoto` in a shop) and
+  the details on the right. The row or tile does not pass or save — that
+  happens on the listing it opens. Search is a wall of square photographs,
+  three across, described in `docs/DESIGN.md`.
 - `surfaceSunken` on something sitting directly on the page. It is darker than
   the page in the dark scheme and disappears there; it only works inside a
   container.

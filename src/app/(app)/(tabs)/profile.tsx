@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
+import { GuestGate } from '@/features/auth/GuestGate';
 import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
 import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
 import {
@@ -17,12 +18,23 @@ import { FollowingList } from '@/features/profile/FollowingList';
 import { Posts } from '@/features/profile/Posts';
 import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
+import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function Profile() {
+  const { isSignedIn } = useSession();
   const shop = useDealerWorkspace();
+
+  if (!isSignedIn) {
+    return (
+      <GuestGate
+        title="Profile"
+        message="Sign in to set up your collector profile and claim a shop."
+      />
+    );
+  }
   const claimed = shop.shop;
   const open = useOpenStack();
   const styles = useThemedStyles(profileStyles);

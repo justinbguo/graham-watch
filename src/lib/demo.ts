@@ -191,6 +191,7 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
   status: 'active',
   // Demo mode is a deck to look at, and the deck never holds a sold watch.
   sold_at: null,
+  sold_source: null,
   availability_checked_at: null,
   edited_fields: [],
   created_at: new Date(Date.now() - index * 86_400_000).toISOString(),

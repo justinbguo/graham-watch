@@ -33,6 +33,7 @@ export default function AppLayout() {
           <Stack.Screen name="apply" options={{ presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
           <Stack.Screen name="filters/[surface]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
         </Stack>
       </SaveFlightProvider>
     </FilterProvider>

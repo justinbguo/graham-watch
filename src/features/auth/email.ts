@@ -1,7 +1,9 @@
+import * as Linking from 'expo-linking';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   GOOGLE_SIGN_IN_ENABLED,
+  callbackFailure,
   isAppleSignInAvailable,
   sendEmailCode,
   signInWithApple,
@@ -38,6 +40,7 @@ export function useSignIn() {
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const generation = useRef(0);
+  const incoming = Linking.useLinkingURL();
 
   useEffect(() => {
     isAppleSignInAvailable()
@@ -47,6 +50,12 @@ export function useSignIn() {
       generation.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if (!incoming) return;
+    const failed = callbackFailure(incoming);
+    if (failed) setError(failed);
+  }, [incoming]);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);

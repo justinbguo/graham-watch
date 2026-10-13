@@ -581,6 +581,7 @@ Every screen is a centred column with a ceiling, from `layout`:
 | `layout.card` | 480 | The swipe stage. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
+| `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
 
 `Screen` applies the cap and centres the column in the window, so a new screen
 is capped without doing anything. The type inside that column aligns left.
@@ -597,9 +598,10 @@ Why each one:
   the eye cannot find the start of the next line.
 - A swipe card stays hand-sized. Stretched to a desktop window it is a
   billboard, and the gesture that matches it is a shove rather than a flick.
-- The grid is one watch per row, photograph on the left and the details on
-  the right. The extra width goes to that row, and it still stops, so a row
-  does not become a banner on an ultrawide monitor.
+- The grid is a tile wall on a wide window: `layout.gridColumns` across,
+  photograph above the copy. On a phone it stays one watch per row. The
+  column still caps at `layout.grid`, so tiles do not stretch into banners
+  on an ultrawide monitor.
 
 ### Size comes from measurement, not from the window
 
@@ -691,8 +693,11 @@ between the three columns reads as a seam and the center row is the position.
   bottom; above it the same routes stand in `layout.rail` at the left. A desktop
   bottom strip under a narrow content column reads like a phone screenshot.
 - The current tab is the white one, on the bar and on the rail alike.
-- Anything doable by swipe is doable without one. The grid takes arrow keys to
-  move and Enter to open the listing. Pass and save live on that screen.
+- Anything doable by swipe is doable without one. On web, in the card view,
+  left passes and right saves — the top card flings the same way a committed
+  drag would. In the grid, the arrows move the selection (across a row, and
+  up or down by a row of tiles) and Enter opens the listing; pass and save
+  live there. Keys are ignored while a field has focus.
 - Hover is a web-only hint and never the only signal. A control that only
   reveals itself on hover is invisible on a touchscreen.
 - `HIT_TARGET` stays 44 on every platform. A mouse is precise, but the same
@@ -865,21 +870,19 @@ because the outgoing view is unmounted the frame the state changes; the new one 
 the page. The fade also covers the column width changing — `card` is 480 and `grid` is 1280
 on a desktop — which is a snap nobody would read as intentional.
 
-A row is one watch. The photograph sits on the left, `size.gridPhoto` wide and
-5/7 tall, and the details sit to its right. On the home grid the photograph is
-`size.gridScan`, the summary's vertical padding is `space.sm`, the gap between
-the photograph and the name is `space.md`, and the rows sit `space.sm`
-apart, so the list reads as a scan. A shop keeps the taller row. Search is a
-wall of photographs, described under Search. The wishlist has its own compact
-row, described below.
-The type steps down:
-`titleSmall` for the watch name, `priceSmall` for the price. The row does not
-decide. A tap opens the listing, and Pass or Save there is the verdict.
+On a wide window the home grid is tiles, not rows: `layout.gridColumns`
+across, each tile a 5/7 photograph on top (`contain`, full tile width) and
+the name, specs, price, and dealer under it in `ListingSummary` with
+`stacked` padding. Tiles sit on `surface` with `radius.md`, `space.sm`
+apart. The type is still `titleSmall` and `priceSmall`. A tap opens the
+listing; pass and save happen there.
 
-On the home grid the photograph pages. A sideways drag shows the watch's next
-photo; a tap still opens the listing. The drag must not count as that tap, or
-turning the page opens the watch. Bars along the bottom of the frame say which
-photo is showing. One photograph draws no bars.
+Below the breakpoint the home grid stays one watch per row: photograph on
+the left at `size.gridScan`, details on the right, denser summary padding.
+That row still pages its photographs sideways. A shop keeps the taller
+`gridPhoto` row. Search is a wall of photographs, described under Search.
+The wishlist has its own compact row, described below. The row or tile does
+not decide — a tap opens the listing, and Pass or Save there is the verdict.
 
 `size.gridPhoto` is a quarter of a phone's width, not a third. At 128 the
 photograph was big enough to inspect and three rows filled the screen, so a
@@ -897,9 +900,9 @@ Maker and model are one line in one size — `formatTitle`, "Omega Speedmaster P
 it. The brand used to be an `eyebrow` over the model, which made every row look like a
 section heading.
 
-Every list of watches uses that row: the deck's grid, Wishlist, and a dealer's
-shop. One component, `ListingRow`, so a watch is the same object wherever you
-meet it in a list. Search is photographs only. Wishlist used to set a 72px square thumbnail
+Wishlist and a dealer's shop still use `ListingRow`. The wide home grid uses
+`ListingTile` instead — same facts, stacked for columns. Search is photographs
+only. Wishlist used to set a 72px square thumbnail
 beside `bodyStrong` type, which made the same watch a different size depending
 on which tab you were standing in, and made the photograph too small to be
 worth looking at.

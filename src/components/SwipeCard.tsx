@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
@@ -63,26 +70,30 @@ function resistDown(travel: number, limit: number) {
   return limit + (travel - limit) * DRAG_RESISTANCE;
 }
 
-export function SwipeCard({
-  card,
-  onSwipe,
-  onExpandPhoto,
-  isTop,
-  nextPhoto,
-  returning = false,
-}: {
-  card: DeckCard;
-  /** `releaseX` is where the card sat when the thumb let go, so a save can fly
-      on from there rather than restarting at centre. */
-  onSwipe: (direction: SwipeDirection, releaseX: number) => void;
-  onExpandPhoto: (index: number) => void;
-  isTop: boolean;
-  /** The photograph of the watch behind this one. Lifting the card shows it. */
-  nextPhoto?: string;
-  /** An undone pass. The card comes back in by the edge it left, rather than
-      appearing on top of the pile as if it had never gone. */
-  returning?: boolean;
-}) {
+export type SwipeCardHandle = {
+  /** Keyboard stand-in for a thumb: same exit a committed drag would take. */
+  fling: (direction: SwipeDirection) => void;
+};
+
+export const SwipeCard = forwardRef<
+  SwipeCardHandle,
+  {
+    card: DeckCard;
+    /** `releaseX` is where the card sat when the thumb let go, so a save can fly
+        on from there rather than restarting at centre. */
+    onSwipe: (direction: SwipeDirection, releaseX: number) => void;
+    onExpandPhoto: (index: number) => void;
+    isTop: boolean;
+    /** The photograph of the watch behind this one. Lifting the card shows it. */
+    nextPhoto?: string;
+    /** An undone pass. The card comes back in by the edge it left, rather than
+        appearing on top of the pile as if it had never gone. */
+    returning?: boolean;
+  }
+>(function SwipeCard(
+  { card, onSwipe, onExpandPhoto, isTop, nextPhoto, returning = false },
+  ref
+) {
   const styles = useThemedStyles(cardStyles);
   const { save, danger } = useTheme().color;
   // The photograph is sized against the card, not against its own width. Two
@@ -136,6 +147,36 @@ export function SwipeCard({
   useEffect(() => {
     canPreview.value = Boolean(nextPhoto);
   }, [canPreview, nextPhoto]);
+  // A key fling in flight. A second press must not stack two exits on one card.
+  const leaving = useRef(false);
+  useEffect(() => {
+    leaving.current = false;
+  }, [card.id]);
+
+  useImperativeHandle(ref, () => ({
+    fling: (direction) => {
+      if (!isTop || leaving.current) return;
+      leaving.current = true;
+      impact();
+
+      if (direction === 'right') {
+        // Same as a committed right drag: the flight overlay takes the card
+        // from centre rather than flinging it off the edge first.
+        onSwipe('right', 0);
+        return;
+      }
+
+      const leave = { duration: motion.fast, easing: Easing.out(Easing.cubic) };
+      const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
+      cardX.value = withTiming(-distance, leave, (finished) => {
+        if (!finished) {
+          leaving.current = false;
+          return;
+        }
+        scheduleOnRN(onSwipe, 'left', -distance);
+      });
+    },
+  }));
 
   const applyWebScroll = useCallback(
     (offset: number) => {
@@ -434,7 +475,7 @@ export function SwipeCard({
       </Animated.View>
     </GestureDetector>
   );
-}
+});
 
 const cardStyles = (theme: Theme) => ({
   // The frame holds the shadow and the movement. The shell only rounds the

@@ -2,6 +2,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -12,10 +13,18 @@ WebBrowser.maybeCompleteAuthSession();
 // measured is on the allow-list. No effect on a real build (graham://).
 export const redirectTo = makeRedirectUri({ preferLocalhost: true });
 
-export async function createSessionFromUrl(url: string) {
+/** A failed OAuth return. Auth puts the reason in the URL and otherwise says nothing. */
+export function callbackFailure(url: string): string | null {
   const { params, errorCode } = QueryParams.getQueryParams(url);
-  if (errorCode) throw new Error(errorCode);
+  if (params.access_token) return null;
+  return params.error_description || params.error || errorCode || null;
+}
 
+export async function createSessionFromUrl(url: string) {
+  const failed = callbackFailure(url);
+  if (failed) throw new Error(failed);
+
+  const { params } = QueryParams.getQueryParams(url);
   const { access_token, refresh_token } = params;
   if (!access_token || !refresh_token) return null;
 
@@ -126,6 +135,14 @@ export async function signInWithProvider(provider: keyof typeof PROVIDER_LABEL) 
   // `skipBrowserRedirect` builds the URL locally, so "provider is not enabled"
   // only appears once the browser opens it. Ask first, or web shows raw JSON.
   await assertProviderReady(data.url, provider);
+
+  // Google's login page severs window.opener, so a popup cannot hand the
+  // session back to this tab. Web leaves and returns; the client reads the
+  // session from the URL. Native keeps the system sheet.
+  if (Platform.OS === 'web') {
+    window.location.assign(data.url);
+    return;
+  }
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type === 'success') {

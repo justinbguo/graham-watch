@@ -6,10 +6,21 @@ import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/compo
 import { useOpenMailDraft } from '@/data/inquiries';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
+import { useGuest } from '@/features/auth/GuestProvider';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
-import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import {
+  GUEST_SWIPE_BUDGET,
+  HIT_TARGET,
+  inset,
+  radius,
+  size,
+  space,
+  stack,
+  type,
+  type Theme,
+} from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -24,7 +35,8 @@ export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function ListingScreen() {
   const { listingId, from } = useLocalSearchParams<{ listingId: string; from?: string }>();
-  const { userId } = useSession();
+  const { userId, isSignedIn } = useSession();
+  const guest = useGuest();
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
   const save = useRecordSwipe(userId);
@@ -32,7 +44,25 @@ export default function ListingScreen() {
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
 
-  const isSaved = saved.some((entry) => entry.id === listingId);
+  const isSaved =
+    saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
+
+  const judge = (direction: 'left' | 'right', after?: () => void) => {
+    if (!isSignedIn && guest.exhausted) {
+      guest.openSignIn('budget');
+      return;
+    }
+    const used = guest.swipes.length + 1;
+    save.mutate(
+      { listingId: card!.id, direction },
+      {
+        onSuccess: () => {
+          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) guest.openSignIn('budget');
+          after?.();
+        },
+      }
+    );
+  };
   // Search is a place to look. Passing there would drop a watch out of a deck
   // the user has not reached yet, and writing to a dealer is a step you take
   // about a watch you have kept, so saving is the only verdict it offers.
@@ -96,7 +126,7 @@ export default function ListingScreen() {
                   icon="bookmark-outline"
                   variant="outline"
                   loading={save.isPending && save.variables?.direction === 'right'}
-                  onPress={() => save.mutate({ listingId: card.id, direction: 'right' })}
+                  onPress={() => judge('right')}
                 />
                 {/* The grid has no verdict of its own. Passing here is the left
                     swipe: the watch leaves the deck, and this screen goes with it. */}
@@ -107,12 +137,7 @@ export default function ListingScreen() {
                     variant="ghost"
                     loading={save.isPending && save.variables?.direction === 'left'}
                     disabled={save.isPending}
-                    onPress={() =>
-                      save.mutate(
-                        { listingId: card.id, direction: 'left' },
-                        { onSuccess: () => router.back() }
-                      )
-                    }
+                    onPress={() => judge('left', () => router.back())}
                   />
                 )}
                 {/* The whole point of tracking sold stock: no one writes to a dealer
@@ -122,14 +147,18 @@ export default function ListingScreen() {
                     label="Ask about this watch"
                     icon="email-outline"
                     loading={contact.isPending}
-                    onPress={() =>
+                    onPress={() => {
+                      if (!isSignedIn) {
+                        guest.openSignIn('action');
+                        return;
+                      }
                       contact.mutate(
                         { card, message: '' },
                         {
                           onError: (error) => Alert.alert('Could not open Gmail', error.message),
                         }
-                      )
-                    }
+                      );
+                    }}
                   />
                 )}
               </>

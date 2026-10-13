@@ -159,6 +159,9 @@ site_url = "graham://"
 # not matched here silently falls back to site_url, which on screen is the
 # browser sheet closing with no error and no session.
 #
+# Applied only when the auth container is created. Starting a container left
+# over from an older config keeps the old list. Stop the stack, then start it.
+#
 # Measured against this GoTrue, not assumed:
 #   - 127.0.0.1 is allowed on any port and path without being listed, so the
 #     simulator needs no entry. `localhost` is not — it needs the two below.

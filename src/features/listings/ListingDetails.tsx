@@ -1,15 +1,19 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { Divider } from '@/components/ui';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
-import { humanize } from '@/lib/format';
+import {
+  formatBoxAndPapers,
+  formatCase,
+  formatComplications,
+  formatMovement,
+  formatStated,
+  humanize,
+} from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
 import { inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
-import { useTheme, useThemedStyles } from '@/providers/theme';
-
-type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+import { useThemedStyles } from '@/providers/theme';
 
 /**
  * Everything about a watch below its price: what the dealer wrote, the
@@ -46,11 +50,8 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
 
       <Divider />
 
-      <View style={styles.specs}>
-        {specs(card).map((spec) => (
-          <Spec key={spec.label} {...spec} />
-        ))}
-      </View>
+      <SpecGroup title="Specifications" rows={specifications(card)} />
+      <SpecGroup title="Condition and provenance" rows={condition(card)} />
 
       {/* Above the dealer, not under them. Saving and asking are about the
           watch; the shop below is who you would be writing to. */}
@@ -66,76 +67,59 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
   );
 }
 
-function Spec({ icon, label, value }: Spec) {
+function SpecGroup({ title, rows }: { title: string; rows: Spec[] }) {
   const styles = useThemedStyles(detailsStyles);
-  const theme = useTheme();
+  if (rows.length === 0) return null;
 
   return (
-    // The word is gone from the row but not from the row's meaning, so it is
-    // spoken: a screen reader hearing "1972" on its own learns nothing.
+    <View style={styles.group}>
+      <Text style={styles.groupHeading}>{title}</Text>
+      {rows.map((spec) => (
+        <Spec key={spec.label} {...spec} />
+      ))}
+    </View>
+  );
+}
+
+function Spec({ label, value }: Spec) {
+  const styles = useThemedStyles(detailsStyles);
+
+  return (
     <View accessible accessibilityLabel={`${label}: ${value}`} style={styles.specRow}>
-      <MaterialCommunityIcons name={icon} size={size.iconSmall} color={theme.color.text} />
+      <Text style={styles.specLabel}>{label}</Text>
       <Text style={styles.specValue}>{value}</Text>
     </View>
   );
 }
 
+type Spec = { label: string; value: string };
+
 /**
- * "Yes" said nothing once the word in front of it went away, so the fact
- * becomes its own sentence. Absent papers are worth saying out loud on a
- * vintage watch, so a false is printed rather than dropped.
+ * The year stays in the name. Reference, condition, and box and papers stay
+ * even when the dealer never wrote them: a blank there is the thing a buyer
+ * is checking for, and hiding the row makes silence look like a complete listing.
+ *
+ * Case and movement each join the two facts that answer one question. Style
+ * "other" says the extractor gave up, so it is not printed.
  */
-function has(thing: string, value: boolean | null) {
-  if (value == null) return null;
-  return value ? thing : `No ${thing.toLowerCase()}`;
+function specifications(card: DeckCard): Spec[] {
+  const rows: Spec[] = [{ label: 'Reference', value: formatStated(card.reference) }];
+  const caseValue = formatCase(card);
+  if (caseValue) rows.push({ label: 'Case', value: caseValue });
+  const movement = formatMovement(card);
+  if (movement) rows.push({ label: 'Movement', value: movement });
+  if (card.dial_color) rows.push({ label: 'Dial', value: humanize(card.dial_color) });
+  const complications = formatComplications(card);
+  if (complications) rows.push({ label: 'Complications', value: complications });
+  if (card.style && card.style !== 'other') rows.push({ label: 'Style', value: humanize(card.style) });
+  return rows;
 }
 
-type Spec = { icon: IconName; label: string; value: string };
-
-/**
- * One line per fact: a glyph and the fact itself. The words that used to label
- * them — "Year", "Case", "Material" — were a column of type saying what the
- * value already said, and "1972" next to a calendar is not a puzzle.
- *
- * So the glyph carries the naming now, which is why each one is the literal
- * thing rather than a clever stand-in: a calendar for the year, a diameter for
- * the case, a cog for the caliber. Every row keeps its word for the screen
- * reader, and for two facts that cannot speak alone — box and papers — the
- * word *is* the value.
- *
- * Duplicates are dropped. A chronograph is often both the style and the only
- * complication, and the same word printed twice with two glyphs reads as a
- * mistake in the listing.
- */
-function specs(card: DeckCard): Spec[] {
-  const rows: [IconName, string, string | null][] = [
-    ['identifier', 'Reference', card.reference],
-    ['calendar-blank-outline', 'Year', card.year ? String(card.year) : null],
-    ['diameter-variant', 'Case', card.case_size_mm ? `${card.case_size_mm}mm` : null],
-    ['palette-swatch-outline', 'Material', card.case_material ? humanize(card.case_material) : null],
-    ['circle-outline', 'Dial', card.dial_color ? humanize(card.dial_color) : null],
-    ['autorenew', 'Winding', card.winding ? humanize(card.winding) : null],
-    ['cog-outline', 'Caliber', card.caliber],
-    ['tag-outline', 'Style', card.style ? humanize(card.style) : null],
-    [
-      'timer-outline',
-      'Complications',
-      card.complications.length ? card.complications.map(humanize).join(', ') : null,
-    ],
-    ['shield-check-outline', 'Condition', card.condition],
-    ['package-variant-closed', 'Box', has('Box', card.has_box)],
-    ['file-document-outline', 'Papers', has('Papers', card.has_papers)],
+function condition(card: DeckCard): Spec[] {
+  return [
+    { label: 'Condition', value: formatStated(card.condition) },
+    { label: 'Box and papers', value: formatBoxAndPapers(card.has_box, card.has_papers) },
   ];
-
-  const seen = new Set<string>();
-  return rows
-    .filter((row): row is [IconName, string, string] => Boolean(row[2]))
-    .filter(([, , value]) => {
-      if (seen.has(value)) return false;
-      seen.add(value);
-      return true;
-    })
-    .map(([icon, label, value]) => ({ icon, label, value }));
 }
 
 const detailsStyles = (theme: Theme) => ({
@@ -172,22 +156,27 @@ const detailsStyles = (theme: Theme) => ({
     ...type.title,
     color: theme.color.text,
   },
-  specs: {
-    // A row is a glyph tall, so this cannot go below `sm` without the lines
-    // touching.
+  group: {
     gap: space.sm,
+  },
+  groupHeading: {
+    ...type.labelStrong,
+    color: theme.color.text,
   },
   specRow: {
     flexDirection: 'row' as const,
-    // Centred rather than on the baseline: a glyph has no baseline to share,
-    // and sitting it on one hangs it below the word it belongs to.
-    alignItems: 'center' as const,
-    gap: space.sm,
+    alignItems: 'flex-start' as const,
+    gap: space.md,
+  },
+  specLabel: {
+    ...type.label,
+    color: theme.color.text,
+    width: size.specLabel,
   },
   specValue: {
     ...type.labelStrong,
     color: theme.color.text,
-    flexShrink: 1,
+    flex: 1,
   },
   actions: {
     gap: stack.related,
