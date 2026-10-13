@@ -7,20 +7,20 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
+type ArrowHandlers = {
+  onLeft?: () => void;
+  onRight?: () => void;
+  onUp?: () => void;
+  onDown?: () => void;
+};
+
 /**
- * Desktop arrow keys for a swipe-shaped action. Left and right only — up and
- * down stay free for lists. Skips when a field has focus, and only runs on web,
- * where a keyboard is a real pointer.
+ * Desktop arrow keys for the deck. Left/right are the swipe; up/down page the
+ * photograph roll. Skips when a field has focus, and only runs on web.
  */
-export function useWebArrowSwipe(
-  onLeft: (() => void) | undefined,
-  onRight: (() => void) | undefined,
-  enabled = true
-) {
-  const left = useRef(onLeft);
-  const right = useRef(onRight);
-  left.current = onLeft;
-  right.current = onRight;
+export function useWebArrowKeys(handlers: ArrowHandlers, enabled = true) {
+  const latest = useRef(handlers);
+  latest.current = handlers;
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !enabled) return;
@@ -29,14 +29,27 @@ export function useWebArrowSwipe(
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
 
-      if (event.key === 'ArrowLeft' && left.current) {
-        event.preventDefault();
-        left.current();
-        return;
-      }
-      if (event.key === 'ArrowRight' && right.current) {
-        event.preventDefault();
-        right.current();
+      const { onLeft, onRight, onUp, onDown } = latest.current;
+      switch (event.key) {
+        case 'ArrowLeft':
+          if (!onLeft) return;
+          event.preventDefault();
+          onLeft();
+          return;
+        case 'ArrowRight':
+          if (!onRight) return;
+          event.preventDefault();
+          onRight();
+          return;
+        case 'ArrowUp':
+          if (!onUp) return;
+          event.preventDefault();
+          onUp();
+          return;
+        case 'ArrowDown':
+          if (!onDown) return;
+          event.preventDefault();
+          onDown();
       }
     };
 

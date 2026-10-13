@@ -31,7 +31,7 @@ import {
   type,
   type Theme,
 } from '@/lib/theme';
-import { useWebArrowSwipe } from '@/lib/webKeys';
+import { useWebArrowKeys } from '@/lib/webKeys';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -113,11 +113,15 @@ export default function Deck() {
     judge(card, direction, from ? { ...from, x: from.x + releaseX } : undefined);
   };
 
-  // Desktop: left passes, right saves. The top card flings the same way a
-  // committed drag would. Ignored while the grid is up — that view owns keys.
-  useWebArrowSwipe(
-    () => topCard.current?.fling('left'),
-    () => topCard.current?.fling('right'),
+  // Desktop: left passes, right saves, up/down page the photograph roll.
+  // Ignored while the grid is up — that view owns the arrows for selection.
+  useWebArrowKeys(
+    {
+      onLeft: () => topCard.current?.fling('left'),
+      onRight: () => topCard.current?.fling('right'),
+      onUp: () => topCard.current?.stepPhoto(-1),
+      onDown: () => topCard.current?.stepPhoto(1),
+    },
     deckOnTop && view === 'cards' && cards.length > 0
   );
 

@@ -21,7 +21,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { PhotoCaption } from '@/components/PhotoCaption';
-import { PhotoCarousel } from '@/components/PhotoCarousel';
+import { PhotoCarousel, type PhotoCarouselHandle } from '@/components/PhotoCarousel';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { impact, tick } from '@/lib/haptics';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
@@ -73,6 +73,8 @@ function resistDown(travel: number, limit: number) {
 export type SwipeCardHandle = {
   /** Keyboard stand-in for a thumb: same exit a committed drag would take. */
   fling: (direction: SwipeDirection) => void;
+  /** Step the photograph roll. Same direction the tap zones use. */
+  stepPhoto: (by: number) => void;
 };
 
 export const SwipeCard = forwardRef<
@@ -149,6 +151,7 @@ export const SwipeCard = forwardRef<
   }, [canPreview, nextPhoto]);
   // A key fling in flight. A second press must not stack two exits on one card.
   const leaving = useRef(false);
+  const photos = useRef<PhotoCarouselHandle>(null);
   useEffect(() => {
     leaving.current = false;
   }, [card.id]);
@@ -175,6 +178,10 @@ export const SwipeCard = forwardRef<
         }
         scheduleOnRN(onSwipe, 'left', -distance);
       });
+    },
+    stepPhoto: (by) => {
+      if (!isTop || leaving.current) return;
+      photos.current?.step(by);
     },
   }));
 
@@ -454,6 +461,7 @@ export const SwipeCard = forwardRef<
           contentContainerStyle={styles.content}>
           <View style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
             <PhotoCarousel
+              ref={photos}
               photos={card.photos}
               active={isTop}
               onExpand={onExpandPhoto}

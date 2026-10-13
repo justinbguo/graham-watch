@@ -1,5 +1,11 @@
 import { Image } from 'expo-image';
-import { type RefObject, useEffect, useState } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+  type RefObject,
+} from 'react';
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -9,6 +15,11 @@ import type { DeckPhoto } from '@/lib/models';
 import { motion, scrimTop, size, space, type, type Theme } from '@/lib/theme';
 import { usePinchZoom } from '@/lib/zoom';
 import { useThemedStyles } from '@/providers/theme';
+
+export type PhotoCarouselHandle = {
+  /** Step through the roll. Positive is forward; paging never wraps. */
+  step: (by: number) => void;
+};
 
 /**
  * Tap the right of the photo for the next one, the left to go back — the same
@@ -32,22 +43,21 @@ import { useThemedStyles } from '@/providers/theme';
  * photographs and it caches them to disk; RN's Image only caches in memory, so
  * every return to a card would refetch.
  */
-export function PhotoCarousel({
-  photos,
-  active,
-  variant = 'card',
-  initialIndex = 0,
-  onExpand,
-  alongside,
-}: {
-  photos: DeckPhoto[];
-  active: boolean;
-  variant?: 'card' | 'viewer';
-  initialIndex?: number;
-  onExpand?: (index: number) => void;
-  /** The card's swipe, which the pinch has to run with. See `usePinchZoom`. */
-  alongside?: RefObject<GestureType | undefined>;
-}) {
+export const PhotoCarousel = forwardRef<
+  PhotoCarouselHandle,
+  {
+    photos: DeckPhoto[];
+    active: boolean;
+    variant?: 'card' | 'viewer';
+    initialIndex?: number;
+    onExpand?: (index: number) => void;
+    /** The card's swipe, which the pinch has to run with. See `usePinchZoom`. */
+    alongside?: RefObject<GestureType | undefined>;
+  }
+>(function PhotoCarousel(
+  { photos, active, variant = 'card', initialIndex = 0, onExpand, alongside },
+  ref
+) {
   const styles = useThemedStyles(carouselStyles);
   // A card sits inside a screen that already handled the notch; the viewer fills
   // the display, so it keeps its own bars clear of the status bar.
@@ -62,6 +72,11 @@ export function PhotoCarousel({
   const current = photos[Math.min(index, photos.length - 1)];
   const next = photos[index + 1];
   const isViewer = variant === 'viewer';
+
+  const step = (by: number) =>
+    setIndex((value) => Math.min(Math.max(value + by, 0), Math.max(photos.length - 1, 0)));
+
+  useImperativeHandle(ref, () => ({ step }), [photos.length]);
 
   // Warm the next photo while this one is still being looked at.
   useEffect(() => {
@@ -118,9 +133,6 @@ export function PhotoCarousel({
       </View>
     );
   }
-
-  const step = (by: number) =>
-    setIndex((value) => Math.min(Math.max(value + by, 0), photos.length - 1));
 
   const expand = onExpand ? () => onExpand(index) : undefined;
   const paged = photos.length > 1;
@@ -215,7 +227,7 @@ export function PhotoCarousel({
       </View>
     </GestureDetector>
   );
-}
+});
 
 /** Same gradient, two style keys: Fabric's prop, and the CSS name on web. */
 const topFade = Platform.select<ViewStyle>({

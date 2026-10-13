@@ -379,8 +379,11 @@ export const HIT_TARGET = 44;
 export const layout = {
   /** Prose, forms, lists, detail screens. About 64 characters of `type.body`. */
   reading: 560,
-  /** The swipe stage. A card should stay hand-sized at any window width. */
-  card: 480,
+  /**
+   * The swipe stage. Wide enough to read on a desktop, still capped so it does
+   * not become a billboard across the window.
+   */
+  card: 640,
   /** The browse grid, which spends width on columns rather than line length. */
   grid: 1280,
   /** The glyph column on a wide window: one tab wide, plus air either side. */

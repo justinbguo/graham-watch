@@ -578,7 +578,7 @@ Every screen is a centred column with a ceiling, from `layout`:
 | Token | Width | Job |
 | --- | --- | --- |
 | `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
-| `layout.card` | 480 | The swipe stage. |
+| `layout.card` | 640 | The swipe stage. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
 | `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
@@ -596,8 +596,8 @@ Why each one:
 - Reading width is the 65-character line from the typography rules, made
   literal. A full-window line at 16px runs past 200 characters, and
   the eye cannot find the start of the next line.
-- A swipe card stays hand-sized. Stretched to a desktop window it is a
-  billboard, and the gesture that matches it is a shove rather than a flick.
+- A swipe card caps at `layout.card`. Hand-sized on a phone; on a desktop wide
+  enough to read without becoming a billboard across the window.
 - The grid is a tile wall on a wide window: `layout.gridColumns` across,
   photograph above the copy. On a phone it stays one watch per row. The
   column still caps at `layout.grid`, so tiles do not stretch into banners
@@ -694,10 +694,10 @@ between the three columns reads as a seam and the center row is the position.
   bottom strip under a narrow content column reads like a phone screenshot.
 - The current tab is the white one, on the bar and on the rail alike.
 - Anything doable by swipe is doable without one. On web, in the card view,
-  left passes and right saves — the top card flings the same way a committed
-  drag would. In the grid, the arrows move the selection (across a row, and
-  up or down by a row of tiles) and Enter opens the listing; pass and save
-  live there. Keys are ignored while a field has focus.
+  left passes, right saves, and up/down step through the photograph roll —
+  the same directions the tap zones use, without wrapping. In the grid, the
+  arrows move the selection and Enter opens the listing; pass and save live
+  there. Keys are ignored while a field has focus.
 - Hover is a web-only hint and never the only signal. A control that only
   reveals itself on hover is invisible on a touchscreen.
 - `HIT_TARGET` stays 44 on every platform. A mouse is precise, but the same
@@ -867,7 +867,7 @@ information as a flicker, and the button reads as broken.
 
 The views behind it cross-fade at `motion.base`, entering only. There is no exit animation
 because the outgoing view is unmounted the frame the state changes; the new one fades up over
-the page. The fade also covers the column width changing — `card` is 480 and `grid` is 1280
+the page. The fade also covers the column width changing — `card` is 640 and `grid` is 1280
 on a desktop — which is a snap nobody would read as intentional.
 
 On a wide window the home grid is tiles, not rows: `layout.gridColumns`
