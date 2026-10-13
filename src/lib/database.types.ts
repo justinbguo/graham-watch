@@ -295,6 +295,14 @@ export type Database = {
           description: string | null
           id: string
           instagram: string | null
+          last_sync_added: number | null
+          last_sync_changed: number | null
+          last_sync_complete: boolean | null
+          last_sync_error: string | null
+          last_sync_found: number | null
+          last_sync_relisted: number | null
+          last_sync_retired: number | null
+          last_synced_at: string | null
           logo_url: string | null
           name: string
           permission: Database["public"]["Enums"]["dealer_permission"]
@@ -308,6 +316,14 @@ export type Database = {
           description?: string | null
           id?: string
           instagram?: string | null
+          last_sync_added?: number | null
+          last_sync_changed?: number | null
+          last_sync_complete?: boolean | null
+          last_sync_error?: string | null
+          last_sync_found?: number | null
+          last_sync_relisted?: number | null
+          last_sync_retired?: number | null
+          last_synced_at?: string | null
           logo_url?: string | null
           name: string
           permission?: Database["public"]["Enums"]["dealer_permission"]
@@ -321,6 +337,14 @@ export type Database = {
           description?: string | null
           id?: string
           instagram?: string | null
+          last_sync_added?: number | null
+          last_sync_changed?: number | null
+          last_sync_complete?: boolean | null
+          last_sync_error?: string | null
+          last_sync_found?: number | null
+          last_sync_relisted?: number | null
+          last_sync_retired?: number | null
+          last_synced_at?: string | null
           logo_url?: string | null
           name?: string
           permission?: Database["public"]["Enums"]["dealer_permission"]
@@ -689,6 +713,7 @@ export type Database = {
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -719,6 +744,7 @@ export type Database = {
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
+          sold_source?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -749,6 +775,7 @@ export type Database = {
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
+          sold_source?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           style?: Database["public"]["Enums"]["watch_style"] | null
@@ -1268,6 +1295,7 @@ export type Database = {
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -1379,6 +1407,14 @@ export type Database = {
           contact_email: string
           created_at: string
           id: string
+          last_sync_added: number
+          last_sync_changed: number
+          last_sync_complete: boolean
+          last_sync_error: string
+          last_sync_found: number
+          last_sync_relisted: number
+          last_sync_retired: number
+          last_synced_at: string
           listings_held: number
           listings_in_deck: number
           name: string
@@ -1449,6 +1485,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      record_dealer_sync: {
+        Args: {
+          p_added?: number
+          p_changed?: number
+          p_complete: boolean
+          p_dealer_id: string
+          p_error?: string
+          p_found?: number
+          p_relisted?: number
+          p_retired?: number
+        }
+        Returns: undefined
+      }
       replace_listing_photos: {
         Args: { p_listing_id: string; p_photos: Json }
         Returns: number
@@ -1511,6 +1560,7 @@ export type Database = {
           price_cents: number | null
           reference: string | null
           sold_at: string | null
+          sold_source: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["listing_status"]
           style: Database["public"]["Enums"]["watch_style"] | null
@@ -1550,8 +1600,12 @@ export type Database = {
         Returns: string
       }
       sync_source_availability: {
-        Args: { p_dealer_id: string; p_seen_ids: string[] }
-        Returns: number
+        Args: {
+          p_dealer_id: string
+          p_read_complete: boolean
+          p_seen_ids: string[]
+        }
+        Returns: Json
       }
       synced_listing_columns: { Args: never; Returns: string[] }
       url_path: { Args: { p_url: string }; Returns: string }

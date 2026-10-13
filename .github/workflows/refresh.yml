@@ -1,0 +1,36 @@
+name: Catalogue refresh
+
+# Keeps every approved shop current: re-read the catalogue, retire sold watches,
+# auto-publish new and changed ones. Secrets live in the repo settings — the
+# same trio as scripts/.env.operator.local, plus GRAHAM_CRON_SECRET which must
+# also be set on the hosted import-listings function.
+
+on:
+  schedule:
+    # 06:00 UTC daily. Vintage shops change slowly; once a day is enough and
+    # keeps the OpenAI bill to changed prose only.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    name: refresh approved shops
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: refresh
+        env:
+          GRAHAM_TARGET: hosted
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GRAHAM_CRON_SECRET: ${{ secrets.GRAHAM_CRON_SECRET }}
+        run: npm run refresh

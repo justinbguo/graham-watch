@@ -63,6 +63,7 @@
     "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
     "import": "node scripts/import.mjs",
     "sweep": "node scripts/sweep.mjs",
+    "refresh": "node scripts/refresh.mjs",
     "dealers": "node scripts/dealers.mjs",
     "dealers:local": "GRAHAM_TARGET=local node scripts/dealers.mjs",
     "snapshot": "GRAHAM_TARGET=hosted node scripts/snapshot.mjs"

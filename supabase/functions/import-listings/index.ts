@@ -362,20 +362,120 @@ function bad(message: string, status = 400) {
   return Response.json({ error: message }, { status });
 }
 
+async function recordSync(
+  supabase: SupabaseClient,
+  dealerId: string,
+  result: Awaited<ReturnType<typeof syncCatalog>>,
+  error: string | null = null
+) {
+  const { error: failed } = await supabase.rpc('record_dealer_sync', {
+    p_dealer_id: dealerId,
+    p_complete: result.complete,
+    p_error: error,
+    p_found: result.found,
+    p_added: result.added,
+    p_changed: result.changed,
+    p_retired: result.retired,
+    p_relisted: result.relisted,
+  });
+  if (failed) console.error('could not record dealer sync', failed.message);
+}
+
+async function recordSyncFailure(supabase: SupabaseClient, dealerId: string, message: string) {
+  const { error: failed } = await supabase.rpc('record_dealer_sync', {
+    p_dealer_id: dealerId,
+    p_complete: false,
+    p_error: message,
+  });
+  if (failed) console.error('could not record dealer sync failure', failed.message);
+}
+
 /**
- * Five actions, one function.
- *
- * `discover` turns a domain into the URL its watches live at, writing nothing.
- * `delete-listing` removes one imported watch and its photographs.
- * `sync` reads the shop's catalogue into source_items. It costs HTTP and
- * nothing else on a platform we have an adapter for, so it can walk the whole
- * shop. `publish` drains a bounded slice of the extraction queue and reports
- * what is left, so the caller loops rather than waiting on one long request —
- * that split is what removed the 40-watch ceiling. `preview` writes nothing and
- * exists for the operator scripts.
+ * Marks every for-sale catalogue row for publish so the nightly job can drain
+ * new watches without a human ticking them. Already-linked rows stay published.
  */
-export default {
-  fetch: withSupabase({ auth: 'user' }, async (req: Request, ctx: any) => {
+async function autoQueuePublish(supabase: SupabaseClient, dealerId: string) {
+  const { error } = await supabase
+    .from('source_items')
+    .update({ publish: true, error: null })
+    .eq('dealer_id', dealerId)
+    .eq('available', true);
+  if (error) throw new Error(error.message);
+}
+
+async function drainPublish(supabase: SupabaseClient, dealerId: string) {
+  const totals = { processed: 0, published: 0, skipped: 0, failed: 0, pending: 0 };
+  for (let pass = 0; pass < 200; pass += 1) {
+    const batch = await publishBatch(supabase, admin(), dealerId, DEFAULT_BATCH);
+    totals.processed += batch.processed;
+    totals.published += batch.published;
+    totals.skipped += batch.skipped;
+    totals.failed += batch.failed;
+    totals.pending = batch.pending;
+    if (batch.pending === 0 || batch.processed === 0) break;
+  }
+  return totals;
+}
+
+/**
+ * Nightly freshness. Auth is a shared secret, not a user session, because an
+ * operator identity cannot write a claimed shop's catalogue and the service
+ * role is what the RPCs already treat as the scheduler.
+ */
+async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
+  const secret = Deno.env.get('GRAHAM_CRON_SECRET');
+  if (!secret) return bad('Scheduled refresh is not configured.', 503);
+
+  // The gateway still wants a real JWT (service role from the refresh script).
+  // The cron secret is a second door so a leaked service key alone cannot start
+  // a full-catalogue publish of every approved shop.
+  const offered = req.headers.get('x-graham-cron-secret') ?? '';
+  if (offered !== secret) return bad('Not authorized.', 401);
+
+  const supabase = admin();
+  const onlyId = typeof body.dealerId === 'string' ? body.dealerId : null;
+
+  let query = supabase
+    .from('dealers')
+    .select('id, name, website')
+    .eq('permission', 'approved')
+    .not('website', 'is', null)
+    .order('name');
+  if (onlyId) query = query.eq('id', onlyId);
+
+  const { data: shops, error } = await query;
+  if (error) return bad(error.message, 502);
+  if (!shops?.length) return Response.json({ shops: 0, results: [] });
+
+  const results: Array<Record<string, unknown>> = [];
+
+  for (const shop of shops) {
+    const website = shop.website as string;
+    try {
+      const sync = await syncCatalog(supabase, shop.id, website, MAX_CATALOG_ITEMS);
+      await recordSync(supabase, shop.id, sync);
+      await autoQueuePublish(supabase, shop.id);
+      const published = await drainPublish(supabase, shop.id);
+      results.push({
+        dealerId: shop.id,
+        name: shop.name,
+        website,
+        ok: true,
+        ...sync,
+        ...published,
+      });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Refresh failed.';
+      await recordSyncFailure(supabase, shop.id, message);
+      results.push({ dealerId: shop.id, name: shop.name, website, ok: false, error: message });
+    }
+  }
+
+  const failed = results.filter((row) => row.ok === false).length;
+  return Response.json({ shops: results.length, failed, results });
+}
+
+const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) => {
     const userId = ctx.userClaims?.id ?? ctx.jwtClaims?.sub;
     if (!userId) return bad('Not signed in.', 401);
 
@@ -581,6 +681,7 @@ export default {
 
     try {
       const result = await syncCatalog(ctx.supabase, dealerId, sourceUrl, limit);
+      await recordSync(ctx.supabase, dealerId, result);
 
       if (job) {
         await admin()
@@ -599,6 +700,7 @@ export default {
       return Response.json({ dealerId, ...result });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Refresh failed.';
+      await recordSyncFailure(ctx.supabase, dealerId, message);
       if (job) {
         await admin()
           .from('import_jobs')
@@ -607,5 +709,35 @@ export default {
       }
       return bad(message, 502);
     }
-  }),
+});
+
+/**
+ * Six actions, one function.
+ *
+ * `scheduled-refresh` is the nightly job: cron secret, service role, sync then
+ * auto-publish every approved shop. Everything else needs a signed-in user.
+ *
+ * `discover` turns a domain into the URL its watches live at, writing nothing.
+ * `delete-listing` removes one imported watch and its photographs.
+ * `sync` reads the shop's catalogue into source_items. It costs HTTP and
+ * nothing else on a platform we have an adapter for, so it can walk the whole
+ * shop. `publish` drains a bounded slice of the extraction queue and reports
+ * what is left, so the caller loops rather than waiting on one long request —
+ * that split is what removed the 40-watch ceiling. `preview` writes nothing and
+ * exists for the operator scripts.
+ */
+export default {
+  async fetch(req: Request, info?: unknown) {
+    if (req.method === 'POST') {
+      try {
+        const body = (await req.clone().json()) as Record<string, unknown> | null;
+        if (body && body.action === 'scheduled-refresh') {
+          return scheduledRefresh(req, body);
+        }
+      } catch {
+        // Fall through to the user handler, which reports a bad body.
+      }
+    }
+    return userFetch(req, info as never);
+  },
 };

@@ -1,13 +1,14 @@
 /**
- * Re-read every shop and reconcile the deck against what it still sells.
+ * Re-read every shop's catalogue (sync only). Prefer `npm run refresh` for the
+ * nightly path: that syncs, retires sold watches, and auto-publishes.
  *
  *   npm run sweep -- https://www.craftandtailored.com
  *   npm run sweep                                        (every dealer)
  *
  * This is a catalogue read and nothing else: no model call, so it costs HTTP
- * and is cheap enough to run daily. It retires watches the shop has sold, picks
- * up price changes on watches already in the deck, and records anything new
- * without publishing it — a new watch still waits for someone to tick it.
+ * and is cheap enough to run by hand. It retires watches the shop has sold and
+ * records anything new without publishing it — a new watch still waits for
+ * someone to tick it, or for `npm run refresh`.
  */
 
 import { syncCatalog } from './_import.mjs';

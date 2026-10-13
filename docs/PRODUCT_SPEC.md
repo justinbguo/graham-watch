@@ -125,12 +125,14 @@ looks exactly like one they sent, so nothing counts `opened_at` as a delivered l
 
 ## 7. Import
 
-Two front doors, one pipeline. Everything runs through the `import-listings` edge
+Three front doors, one pipeline. Everything runs through the `import-listings` edge
 function; the operator scripts are HTTP clients, not a second implementation.
 
 1. **Operator** — `npm run dealers -- add <domain>` discovers the catalogue, previews
    what it read, imports, and approves.
 2. **Claimed dealer** — the same refresh from inside the app, against their own shop.
+3. **Nightly refresh** — `npm run refresh` / GitHub Actions syncs every approved shop
+   and auto-publishes new and changed watches (`scheduled-refresh`).
 
 The pipeline:
 
@@ -164,9 +166,14 @@ variant `available`; Squarespace drops `qtyInStock` to zero. Silence is not a sa
 that says nothing about stock is treated as for sale. Sold items are dropped before
 extraction, so a watch we cannot sell never costs a model call either.
 
-Importing only ever adds, so stock is re-read. `npm run sweep` walks each approved dealer
-and stamps `sold_at` on anything that has gone. A listing missing from the feed is left
-alone — the read stops at a limit, so absence means we did not get that far.
+Importing only ever adds, so stock is re-read. `npm run refresh` (and the nightly
+Actions job) syncs every approved shop and auto-publishes what is new or changed.
+`sold_at` is stamped when the shop says a seen watch is unavailable, or when a
+**complete** catalogue read no longer contains a previously linked watch. A listing
+missing from an incomplete read is left alone — the read stops at a limit, so
+absence then means we did not get that far. `sold_source` records who decided
+(`feed_unavailable`, `missing_from_catalog`, or `dealer`); a dealer-marked sold
+is never cleared by the feed.
 
 `sold_at` is its own column, not a `status`. `status` is what we chose to publish;
 `sold_at` is what the market did, and it carries the date. Keeping them apart is what
@@ -194,7 +201,10 @@ profiles        id, handle, collector_number, avatar_url, bio, first_name,
                 search_pain_points, notifications_enabled,
                 onboarded_at, created_at
 dealers         id, name, website, contact_email, description, instagram,
-                logo_url, permission, claimed_by, created_by, created_at
+                logo_url, permission, claimed_by, created_by, created_at,
+                last_synced_at, last_sync_complete, last_sync_error,
+                last_sync_found, last_sync_added, last_sync_changed,
+                last_sync_retired, last_sync_relisted
 operators       user_id, note, added_at
 dealer_applications
                 id, user_id, website, shop_name, brands, volume, status,
@@ -204,8 +214,8 @@ listings        id, dealer_id, imported_by, import_job_id, source_url, brand,
                 brand_key, model, reference, year, caliber, winding,
                 case_size_mm, case_material, dial_color, style, complications,
                 condition, has_box, has_papers, price_cents, currency,
-                description, status, sold_at, availability_checked_at,
-                edited_fields, created_at
+                description, status, sold_at, sold_source,
+                availability_checked_at, edited_fields, created_at
 listing_photos  id, listing_id, source_url, storage_path, position
 swipes          id, actor_id, listing_id, direction, created_at
 source_items    id, dealer_id, provider, external_id, source_url, raw,

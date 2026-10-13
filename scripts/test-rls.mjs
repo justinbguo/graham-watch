@@ -94,6 +94,15 @@ console.log('\nprofiles');
   );
 
   const adult = '1990-05-01';
+  // Finishing onboarding requires a handle (20260925000001). Claim it first so
+  // the profile patch below is not refused for a missing username.
+  const claimed = await api('/rest/v1/rpc/claim_username', {
+    token: buyer.token,
+    method: 'POST',
+    body: { candidate: `ada${String(stamp).slice(-6)}` },
+  });
+  check('a user can claim a username', claimed.status < 300, `got ${claimed.status}`);
+
   const onboard = await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
     token: buyer.token,
     method: 'PATCH',
@@ -657,7 +666,7 @@ let syncedListingId;
   const strangerSweep = await api('/rest/v1/rpc/sync_source_availability', {
     token: buyer.token,
     method: 'POST',
-    body: { p_dealer_id: dealerId, p_seen_ids: [itemId] },
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: true },
   });
   check(
     "a stranger cannot sweep another shop's stock",
@@ -674,14 +683,157 @@ let syncedListingId;
   const swept = await api('/rest/v1/rpc/sync_source_availability', {
     token: dealerUser.token,
     method: 'POST',
-    body: { p_dealer_id: dealerId, p_seen_ids: [itemId] },
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: false },
   });
-  check('a shop marking a watch gone retires the listing', swept.body === 1, `got ${JSON.stringify(swept.body)}`);
+  check(
+    'a shop marking a watch gone retires the listing',
+    swept.body?.retired === 1,
+    `got ${JSON.stringify(swept.body)}`
+  );
 
-  const retired = await api(`/rest/v1/listings?id=eq.${syncedListingId}&select=sold_at`, {
-    token: dealerUser.token,
-  });
+  const retired = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=sold_at,sold_source`,
+    { token: dealerUser.token }
+  );
   check('the retired listing carries a sold date', retired.body?.[0]?.sold_at !== null);
+  check(
+    'a feed-unavailable sale is attributed to the feed',
+    retired.body?.[0]?.sold_source === 'feed_unavailable',
+    JSON.stringify(retired.body?.[0])
+  );
+
+  // Relist: the shop says available again and a complete read may clear a
+  // feed-sourced sold. A dealer-marked sold must stick — checked below.
+  await api(`/rest/v1/source_items?id=eq.${itemId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { available: true },
+  });
+  const relisted = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: true },
+  });
+  check('a complete read can clear a feed-sourced sold', relisted.body?.relisted === 1);
+  const back = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=sold_at,sold_source`,
+    { token: dealerUser.token }
+  );
+  check('the relisted watch is for sale again', back.body?.[0]?.sold_at === null);
+
+  // Dealer-marked sold sticks across a feed that still shows the watch.
+  await api(`/rest/v1/listings?id=eq.${syncedListingId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { sold_at: new Date().toISOString() },
+    prefer: 'return=representation',
+  });
+  const dealerMarked = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=sold_source`,
+    { token: dealerUser.token }
+  );
+  check(
+    'a hand-sold watch is attributed to the dealer',
+    dealerMarked.body?.[0]?.sold_source === 'dealer'
+  );
+  const keepDealer = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: true },
+  });
+  check('a dealer-marked sold is not cleared by the feed', keepDealer.body?.relisted === 0);
+  const stillSold = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=sold_at,sold_source`,
+    { token: dealerUser.token }
+  );
+  check(
+    'the dealer-marked sold date remains',
+    stillSold.body?.[0]?.sold_at !== null && stillSold.body?.[0]?.sold_source === 'dealer'
+  );
+
+  // Put it back for sale so later checks that count live stock still work.
+  await api(`/rest/v1/listings?id=eq.${syncedListingId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { sold_at: null },
+  });
+
+  // Absence from an incomplete read must not retire. Seed a second linked
+  // listing, sweep with an empty seen set and complete=false, then prove it
+  // stayed live; complete=true must retire it.
+  const missingItem = await api('/rest/v1/source_items', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {
+      dealer_id: dealerId,
+      provider: 'test',
+      external_id: 'missing-1',
+      source_url: 'https://example.test/watches/missing-1',
+      raw: {},
+      text_hash: 'tm',
+      content_hash: 'cm',
+      available: true,
+      publish: true,
+      extracted: {
+        brand: 'Omega',
+        model: 'Speedmaster',
+        reference: 'MISS-1',
+        year: null,
+        caliber: null,
+        winding: null,
+        case_size_mm: null,
+        case_material: null,
+        dial_color: null,
+        style: null,
+        complications: [],
+        condition: null,
+        has_box: null,
+        has_papers: null,
+        price_cents: 100000,
+        currency: 'USD',
+        description: null,
+      },
+      extracted_hash: 'tm',
+    },
+    prefer: 'return=representation',
+  });
+  const missingId = missingItem.body?.[0]?.id;
+  const missingListing = await api('/rest/v1/rpc/apply_source_item', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_source_item_id: missingId },
+  });
+  check('a second catalogue item publishes', missingListing.status === 200);
+
+  const incomplete = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: false },
+  });
+  const incompleteRow = await api(
+    `/rest/v1/listings?id=eq.${missingListing.body}&select=sold_at`,
+    { token: dealerUser.token }
+  );
+  check(
+    'an incomplete read does not retire by absence',
+    incomplete.status < 300 && incompleteRow.body?.[0]?.sold_at === null,
+    JSON.stringify({ incomplete: incomplete.body, row: incompleteRow.body?.[0] })
+  );
+
+  const completeMiss = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: true },
+  });
+  const gone = await api(
+    `/rest/v1/listings?id=eq.${missingListing.body}&select=sold_at,sold_source`,
+    { token: dealerUser.token }
+  );
+  check(
+    'a complete read retires watches missing from the feed',
+    completeMiss.body?.retired >= 1 && gone.body?.[0]?.sold_source === 'missing_from_catalog',
+    JSON.stringify({ completeMiss: completeMiss.body, gone: gone.body?.[0] })
+  );
 
   const strangerAdopt = await api('/rest/v1/rpc/adopt_existing_listings', {
     token: buyer.token,
@@ -1919,7 +2071,7 @@ console.log('\noperators');
   const operatorSweep = await api('/rest/v1/rpc/sync_source_availability', {
     token: buyer.token,
     method: 'POST',
-    body: { p_dealer_id: dealerId, p_seen_ids: [] },
+    body: { p_dealer_id: dealerId, p_seen_ids: [], p_read_complete: true },
   });
   check(
     'an operator sweeps stock on an unclaimed shop it did not add',
@@ -1960,7 +2112,7 @@ console.log('\noperators');
   const claimedSweep = await api('/rest/v1/rpc/sync_source_availability', {
     token: buyer.token,
     method: 'POST',
-    body: { p_dealer_id: dealerId, p_seen_ids: [] },
+    body: { p_dealer_id: dealerId, p_seen_ids: [], p_read_complete: true },
   });
   const claimedAdopt = await api('/rest/v1/rpc/adopt_existing_listings', {
     token: buyer.token,
@@ -2044,6 +2196,29 @@ console.log('\nwhat anon can reach');
     body: { name: 'anon was here' },
   });
   check('anon cannot write dealers', anonWrite.status >= 400, `got ${anonWrite.status}`);
+
+  // Guests browse the approved catalogue before sign-in. Pending shops and
+  // their listings stay hidden; swipes stay unwritable.
+  const anonDeck = await asAnon('search_listings', { p_limit: 20, p_exclude_swiped: true });
+  check('anon can search the catalogue', anonDeck.status < 400, `got ${anonDeck.status}`);
+  check(
+    'anon search only sees approved listings',
+    Array.isArray(anonDeck.body) && anonDeck.body.every((row) => row.status === 'active'),
+    `got ${JSON.stringify(anonDeck.body)?.slice(0, 120)}`
+  );
+
+  const anonListing = await api(`/rest/v1/listings?id=eq.${listingId}&select=id`);
+  check(
+    'anon can read an approved listing',
+    anonListing.status < 400 && anonListing.body?.length === 1,
+    `got ${anonListing.status}`
+  );
+
+  const anonSwipe = await api('/rest/v1/swipes', {
+    method: 'POST',
+    body: { actor_id: buyer.id, listing_id: listingId, direction: 'right' },
+  });
+  check('anon cannot write swipes', anonSwipe.status >= 400, `got ${anonSwipe.status}`);
 
   // Authenticated is not the fix either: this one answers whether a guessed
   // address matches the column SELECT is revoked on, so any account could have

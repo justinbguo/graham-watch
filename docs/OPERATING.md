@@ -294,6 +294,22 @@ password is `graham-operator`.
 A `db:reset` drops the account, the password and the grant together. Run it
 again.
 
+### Keeping shops current
+
+```
+npm run refresh                 # every approved shop: sync + auto-publish
+npm run refresh -- <dealer-id>  # one shop
+```
+
+Needs `GRAHAM_CRON_SECRET` in `scripts/.env.operator.local` (and the same value
+on the hosted `import-listings` function) plus the ordinary service-role trio.
+GitHub Actions runs the same command nightly at 06:00 UTC
+(`.github/workflows/refresh.yml`); set the four secrets on the repo.
+
+The Dealers table shows **Last sync**. `incomplete` means the catalogue read
+hit the size cap, so absence was not treated as sold. `sync failed` carries the
+error on hover.
+
 ### Which Graham the UI is talking to
 
 `operator/.env.local` decides, and `npm run env` writes it alongside the app
@@ -776,7 +792,7 @@ in the project root and will try to parse this one as JavaScript. The ignored fi
 gives operator scripts access without putting the service-role key in the client
 bundle.
 
-That file is production. `dealers`, `import` and `sweep` write there whenever
+That file is production. `dealers`, `import`, `refresh` and `sweep` write there whenever
 the repo is switched to hosted (`npm run env`). Re-read the warning at the top
 of this document before running `add` or `remove`.
 

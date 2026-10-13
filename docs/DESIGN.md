@@ -205,18 +205,12 @@ beside the word on sign-in for a while, and that made the screen a poster
 before it was a form. No screen wears the mark in its header either: a header
 holds a word, a count, and controls, and the word is the name.
 
-One sentence sits under the wordmark, and only there. It is `body` in
-`textMuted`, left aligned, grouped to the word with `stack.tight`. It is not
-a second heading, and it does not appear on any other screen. Its width is
-the room left beside the watch, wider than the word itself. The sentence
-and the word together are about as tall as the watch beside them: the copy
-column is measured, and the photograph's frame takes that height.
-
-A watch sits to the left of that pair. Four photographs in `assets/sign-in/`,
-one showing at a time, crossfading every `motion.rotate`. The frame is
-`size.wordmarkWatchWidth` wide. The top and bottom of the frame fade into the
-page over `space.md`, so the photograph does not end in a hard edge. The photographs are decoration. They are not
-listings, and a screen reader does not announce them.
+Sign-in is a sheet over the deck, not a wall before it. Guests land on Buy with
+**Log in** in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the
+sheet opens itself with copy that says why. The sheet is the wordmark, one
+`body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
+with **Not now** to dismiss. There is no second headline, no decorative watch
+beside the word, and no card around the doors.
 
 `GRAHAM` is Neue Haas Grotesk Display Bold, at 44pt, tracked at
 `tracking.wordmark` (−2.2). Capitals at that size want to drift apart; pulling
@@ -544,28 +538,26 @@ toggle, Close, the dealer row actions. A control with no
 honest glyph keeps its word instead: `Mark sold`, `Start over`, `Send via Graham`.
 Never invent a symbol to avoid a label.
 
-The specification table is the one place a glyph appears next to something
-that is not a control, and there it does the naming. A row is a glyph and the
-fact — a calendar and "1972", a diameter and "42mm" — at `size.iconSmall` in
-`text`, the value at `labelStrong`. Both are full strength, because the table
-is what a buyer came for and a faint glyph beside muted type reads as a
-footnote.
+The specification table names each fact in words. A glyph cannot carry
+"manual" or "white gold" without the reader stopping to decode it, so a row
+is a label and a value: the label at `type.label`, the value at
+`labelStrong`, both in `text`. The label column is `size.specLabel`, wide
+enough for "Box and papers", and the values share the edge to its right.
 
-The words used to sit between them: "Year", "Case", "Material", a column of
-type saying what the value already said. They are gone. That makes the glyph
-the only thing naming the row, which is exactly why none of them is a
-metaphor — each is the literal object, and a row whose picture has to be worked
-out is now unreadable rather than merely slow.
+Two headings split the table, both at `labelStrong`. Specifications is what
+the watch is: reference, case, movement, dial, complications, style. Condition
+and provenance is whether this example is the one to buy. The year is not in
+either. It rides with the name.
 
-Two facts cannot speak alone. "Yes" means nothing without its word, so box and
-papers print the noun instead: "Box", or "No papers" — absence is worth saying
-on a vintage watch. And a value is dropped if an earlier row already said it,
-because a chronograph is often both the style and the only complication, and
-the same word printed twice under two glyphs reads as a fault in the listing.
+Related facts share a row. The case is "36 mm · Steel", the movement is
+"Manual · Cal. 861". A chronograph that is both the style and the only
+complication is printed once, on the style row.
 
-The word survives where it is needed: the row's `accessibilityLabel` is "Year:
-1972", spoken once. The glyph is inside that label rather than announced
-beside it, so a reader does not stutter "calendar" through twelve rows.
+Reference, condition, and box and papers are never dropped. A dealer who
+never wrote them leaves "Not stated". Hiding the row makes silence look like
+a complete listing, and "no papers" is a different fact from a page that
+never mentioned papers. Style "other" is the extractor giving up, so that
+value is not printed.
 
 An icon-only control needs an `accessibilityLabel` that reads as the sentence a
 user would say — "Undo, bring back the watch you passed on", not "undo".
@@ -1047,7 +1039,7 @@ The block is spaced at `stack.related` between its parts and `space.sm`
 between specification rows, not the `stack.group` a page uses. A card is read
 in the hand at arm's length and a page is scanned; the same air that looks
 generous on a screen looks like padding on an object. Tighter than this and
-the glyph rows touch.
+the lines touch.
 
 The photograph takes 58% of the card's height, capped at 5:4 of its width, so
 two things hold on every phone: the plate never starts below the fold, and the
@@ -1199,11 +1191,11 @@ that says nothing about stock is treated as for sale, because reading it the oth
 would empty an import from any shop we misread. Sold items are dropped before extraction,
 so a watch we cannot sell never costs an OpenAI call either.
 
-Importing only ever adds, so stock also has to be re-read. `npm run sweep` walks each
-approved dealer, compares what they still list against what we show, and stamps `sold_at`
-on anything that has gone. An import does the same sweep for the shop it just read. A
-listing missing from the feed is left alone — the read stops at a limit, so absence means
-we did not get that far, not that it sold.
+Importing only ever adds, so stock also has to be re-read. `npm run refresh` (nightly,
+and on demand) syncs every approved shop and auto-publishes what changed. A watch the
+shop marks unavailable is retired; a watch missing from a complete catalogue read is
+retired; an incomplete read never retires by absence. `sold_source` records who decided,
+so a dealer marking sold by hand is never cleared by a later feed.
 
 Sold is its own column, not a `status`. `status` is what we chose to publish; `sold_at` is
 what the market did, and it carries the date. Keeping them apart is also what lets a sold

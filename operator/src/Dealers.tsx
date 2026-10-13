@@ -201,6 +201,7 @@ export function Dealers() {
                 <th className="num">In the deck</th>
                 <th className="num">Imported</th>
                 <th className="num">Catalogue</th>
+                <th>Last sync</th>
                 <th>Description</th>
                 <th>Instagram</th>
                 <th>Status</th>
@@ -292,6 +293,10 @@ export function Dealers() {
                       ) : null}
                     </td>
 
+                    <td className="small">
+                      <Freshness dealer={dealer} />
+                    </td>
+
                     {/* Both read off the shop's own site by the scrape, and
                         both are what a buyer sees on the dealer's page. They
                         are columns because the only way to know the read worked
@@ -360,7 +365,7 @@ export function Dealers() {
 
                   expanded ? (
                     <tr key={`${dealer.id}-detail`} className="detail-row">
-                      <td colSpan={9}>
+                      <td colSpan={10}>
                         <ShopListings dealerId={dealer.id} reload={tick} onChanged={reload} />
                       </td>
                     </tr>
@@ -375,8 +380,10 @@ export function Dealers() {
             <strong>In the deck</strong> is what a buyer can see right now: the watch is
             active, unsold, and the shop is approved. <strong>Imported</strong> is every
             watch we hold for them. <strong>Catalogue</strong> is what their site is
-            offering. A gap between the first two means some are sold or hidden — or
-            that the shop is not approved, in which case none of them show.
+            offering. <strong>Last sync</strong> is when the nightly job or a manual
+            refresh last finished reading their site. A gap between the first two means
+            some are sold or hidden — or that the shop is not approved, in which case
+            none of them show.
           </p>
 
           <p className="muted small legend">
@@ -402,6 +409,45 @@ export function Dealers() {
       ) : null}
     </section>
   );
+}
+
+function Freshness({ dealer }: { dealer: Row }) {
+  if (dealer.last_sync_error) {
+    return (
+      <span className="badge wait" title={dealer.last_sync_error}>
+        sync failed
+      </span>
+    );
+  }
+
+  if (!dealer.last_synced_at) {
+    return <span className="muted">never</span>;
+  }
+
+  const when = formatAge(dealer.last_synced_at);
+  if (dealer.last_sync_complete === false) {
+    return (
+      <span title="The catalogue read stopped at the size limit; absence was not treated as sold.">
+        {when}
+        <br />
+        <span className="badge wait">incomplete</span>
+      </span>
+    );
+  }
+
+  return <span title={new Date(dealer.last_synced_at).toLocaleString()}>{when}</span>;
+}
+
+function formatAge(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
 }
 
 /**

@@ -189,10 +189,18 @@ Only extraction costs money, at roughly one `gpt-4o-mini` call per changed watch
 first import lands around ten cents and a nightly re-read where five watches
 changed is a rounding error.
 
-The reason refreshing is still a button a dealer presses is not cost. It is that
-nobody has decided what should happen to a watch a schedule finds — publish it
-unseen, or hold it. Until that is decided, a schedule would either put
-un-reviewed extractions in front of buyers or quietly pile up a queue.
+Nightly automation (`npm run refresh`, GitHub Actions at 06:00 UTC) syncs every
+approved shop and auto-publishes new and changed watches. A dealer or operator
+can still press Refresh by hand; that path keeps the picker so a person can
+choose what to import. The schedule does not, because freshness without a human
+in the loop is the point.
+
+Sold detection on that path is evidence-based: a watch the shop marks unavailable
+is retired; a watch missing from a **complete** catalogue read is retired; a
+truncated read never retires by absence. `listings.sold_source` records who
+decided (`feed_unavailable`, `missing_from_catalog`, or `dealer`). A dealer
+marking sold by hand sticks across later feeds; a feed-sourced sold clears if
+the shop lists the watch again.
 
 ## Recommendation
 

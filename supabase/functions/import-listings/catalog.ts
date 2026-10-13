@@ -129,6 +129,8 @@ export type SyncResult = {
   changed: number;
   adopted: number;
   retired: number;
+  /** Watches a feed-sourced sold cleared because the shop listed them again. */
+  relisted: number;
   /** For sale right now, of the ones found. The rest are the shop's sold stock. */
   forSale: number;
   /** Products the shop publishes that this read refused, and will not hold. */
@@ -214,11 +216,17 @@ export async function syncCatalog(
     .eq('dealer_id', dealerId)
     .gte('last_seen_at', readAt);
 
-  const retired = await supabase.rpc('sync_source_availability', {
+  const complete = items.length < limit;
+  const availability = await supabase.rpc('sync_source_availability', {
     p_dealer_id: dealerId,
     p_seen_ids: (seen ?? []).map((row) => row.id),
+    p_read_complete: complete,
   });
-  if (retired.error) throw new Error(retired.error.message);
+  if (availability.error) throw new Error(availability.error.message);
+
+  const counts = (availability.data ?? {}) as { retired?: number; relisted?: number };
+  const retired = Number(counts.retired ?? 0);
+  const relisted = Number(counts.relisted ?? 0);
 
   let added = 0;
   let changed = 0;
@@ -234,9 +242,10 @@ export async function syncCatalog(
     added,
     changed,
     adopted: (adopted.data as number) ?? 0,
-    retired: (retired.data as number) ?? 0,
+    retired,
+    relisted,
     forSale: items.filter((item) => item.available).length,
     skipped: skipped.length,
-    complete: items.length < limit,
+    complete,
   };
 }

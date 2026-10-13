@@ -284,6 +284,7 @@ not. Store binaries are a different path: [docs/OPERATING.md](docs/OPERATING.md)
 | `npm run dealers:local` | Any `dealers` command, against the local stack |
 | `npm run dealers -- add <domain>` | Find, preview, import and approve a new dealer |
 | `npm run import -- <url>` | Re-import a dealer you already added |
+| `npm run refresh` | Sync every approved shop and auto-publish changes (needs `GRAHAM_CRON_SECRET`) |
 | `npm run dealers` | List, approve, revoke, remove or measure dealers |
 | `npm run dealers -- applications` | Shops asking to be listed; answer with `accept` or `decline` |
 | `npm run dealers -- operator <email>` | Let an account use the operator UI |
