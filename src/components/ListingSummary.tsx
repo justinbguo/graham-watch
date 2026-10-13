@@ -17,7 +17,6 @@ export function ListingSummary({
   card,
   dense = false,
   compact = false,
-  stacked = false,
   note,
   notedAt,
   prompt = false,
@@ -31,8 +30,6 @@ export function ListingSummary({
    * one tap away on the listing.
    */
   compact?: boolean;
-  /** Under a tile photograph: even padding on every side, no left bias. */
-  stacked?: boolean;
   /** Between the name and the price. A last message, or the prompt to write one. */
   note?: string;
   /** The day that message was sent, at the top right of the name. */
@@ -50,9 +47,7 @@ export function ListingSummary({
     </View>
   );
   const terms = (
-    <Text
-      style={[styles.terms, (dense || compact || stacked) && styles.termsDense]}
-      numberOfLines={stacked ? 2 : 1}>
+    <Text style={[styles.terms, (dense || compact) && styles.termsDense]} numberOfLines={1}>
       <Text style={card.sold_at ? styles.sold : styles.price}>
         {card.sold_at ? 'Sold' : formatPrice(card)}
       </Text>
@@ -65,16 +60,8 @@ export function ListingSummary({
     </Text>
   );
 
-  const pad = compact
-    ? styles.summaryCompact
-    : stacked
-      ? styles.summaryStacked
-      : dense
-        ? styles.summaryDense
-        : styles.summary;
-
   return (
-    <View style={pad}>
+    <View style={compact ? styles.summaryCompact : dense ? styles.summaryDense : styles.summary}>
       {title}
       {compact ? null : (
         <Text style={styles.meta} numberOfLines={1}>
@@ -102,11 +89,6 @@ const summaryStyles = (theme: Theme) => ({
     paddingVertical: space.sm,
     paddingRight: space.sm,
     paddingLeft: space.md,
-    gap: space.xs,
-  },
-  // Under a tile photograph. Equal padding; the photo already ends above.
-  summaryStacked: {
-    padding: space.sm,
     gap: space.xs,
   },
   // The row's own padding holds the vertical air. Only the gap to the photo.

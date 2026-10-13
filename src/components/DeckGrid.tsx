@@ -9,7 +9,7 @@ import { layout, space } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 
-const GAP = space.sm;
+const GAP = space.md;
 const COLUMNS = layout.gridColumns;
 
 /**

@@ -871,11 +871,14 @@ the page. The fade also covers the column width changing — `card` is 480 and `
 on a desktop — which is a snap nobody would read as intentional.
 
 On a wide window the home grid is tiles, not rows: `layout.gridColumns`
-across, each tile a 5/7 photograph on top (`contain`, full tile width) and
-the name, specs, price, and dealer under it in `ListingSummary` with
-`stacked` padding. Tiles sit on `surface` with `radius.md`, `space.sm`
-apart. The type is still `titleSmall` and `priceSmall`. A tap opens the
-listing; pass and save happen there.
+across. The photograph is a square (`aspectRatio: 1`) with `radius.md` and
+`contain`, sitting alone on the page — not wrapped in a `surface` card. Bars
+along its bottom page extra photos. Under it, on the page colour: the name
+(`labelStrong`), the specs (`caption` / `textMuted`), then a row with the
+price on the left and the dealer in `brass` on the right. Tiles sit
+`space.md` apart. A tap opens the listing; pass and save happen there. No
+badges, hearts, or shipping lines on the photograph — those are another
+product's furniture.
 
 Below the breakpoint the home grid stays one watch per row: photograph on
 the left at `size.gridScan`, details on the right, denser summary padding.
