@@ -7,8 +7,8 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  // `operator` is its own TypeScript project with its own DOM and Vite types.
-  // Compiled from here, `import.meta.env` does not exist and every file in it
-  // fails. It has its own `npm run build`, which type checks it.
-  "exclude": ["node_modules", "supabase/functions", "operator"]
+  // `operator` and `studio` are their own TypeScript projects. Compiled from
+  // here, their path aliases and DOM types do not exist and every file fails.
+  // Each has its own build, which type checks it.
+  "exclude": ["node_modules", "supabase/functions", "operator", "studio"]
 }

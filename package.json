@@ -59,6 +59,8 @@
     "demo": "EXPO_PUBLIC_DEMO=1 expo start --go --clear",
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --go --clear",
     "demo:web": "EXPO_PUBLIC_DEMO=1 expo start --web",
+    "build:preview:android": "npx eas-cli@latest build --profile preview --platform android",
+    "build:preview:ios": "npx eas-cli@latest build --profile preview --platform ios",
     "operator": "cd operator && { test -d node_modules || npm install; } && npm run dev",
     "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
     "import": "node scripts/import.mjs",

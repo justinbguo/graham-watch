@@ -76,6 +76,8 @@ export default function TabsLayout() {
       />
       {/* Still a tab, so the bar stays on screen. No glyph: the deck's field is the door. */}
       <Tabs.Screen name="search" options={{ title: 'Search', href: null }} />
+      {/* Landed on main after this branch replaced that tab with Community. */}
+      <Tabs.Screen name="source" options={{ href: null }} />
     </Tabs>
   );
 }

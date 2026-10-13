@@ -7,6 +7,7 @@ Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and
 edge functions.
 
 - Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
+- Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
 - Design system: [docs/DESIGN.md](docs/DESIGN.md)
 - Scraper options: [docs/SCRAPING.md](docs/SCRAPING.md)

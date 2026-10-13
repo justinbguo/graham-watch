@@ -36,4 +36,6 @@ export const keys = {
   /** Listing ids the buyer has already named in a message. */
   discussed: ['discussed-listings'] as const,
   conversation: (conversationId: string) => ['conversation', conversationId] as const,
+  sourcing: ['sourcing'] as const,
+  sourcingRequest: (requestId: string) => ['sourcing-request', requestId] as const,
 };

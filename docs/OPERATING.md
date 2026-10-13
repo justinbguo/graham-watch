@@ -123,6 +123,9 @@ npm run db:start`. Do not reach for a container CLI.
 | `npm run ios` | iOS Simulator via Expo Go |
 | `npm run start:dev` | A development build already installed on a device |
 | `npm run demo:web` | Fixtures only, no backend needed |
+| `npm run build:preview:android` | Cloud APK with demo fixtures — install on a phone |
+
+Phone installs (no laptop left running): [PHONE.md](PHONE.md).
 
 With the dev server running, the terminal takes single keypresses:
 
