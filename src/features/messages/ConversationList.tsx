@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { FlatList, View } from 'react-native';
 
-import { Centered, Field, Heading, Message, Spinner } from '@/components/ui';
+import { SearchField } from '@/components/SearchBar';
+import { Centered, Heading, Message, Spinner } from '@/components/ui';
 import {
   BODY_SEARCH_MIN,
   useConversations,
@@ -63,14 +64,18 @@ export function ConversationList({ userId }: { userId: string }) {
 
   return (
     <View style={styles.root}>
-      <SearchField
-        value={query}
-        onChange={(text) => {
-          setQuery(text);
-          setFailure(null);
-        }}
-        onSubmit={sendToHandle}
-      />
+      <View style={styles.query}>
+        <SearchField
+          accessibilityLabel="Search messages or a username"
+          value={query}
+          onChangeText={(text) => {
+            setQuery(text);
+            setFailure(null);
+          }}
+          onSubmitEditing={sendToHandle}
+          autoComplete="off"
+        />
+      </View>
       {failure ? (
         <View style={styles.note}>
           <Message text={failure} tone="error" />
@@ -124,33 +129,6 @@ export function ConversationList({ userId }: { userId: string }) {
           )}
         />
       )}
-    </View>
-  );
-}
-
-function SearchField({
-  value,
-  onChange,
-  onSubmit,
-}: {
-  value: string;
-  onChange: (text: string) => void;
-  onSubmit: () => void;
-}) {
-  const styles = useThemedStyles(listStyles);
-  return (
-    <View style={styles.query}>
-      <Field
-        placeholder="Search messages or a username"
-        accessibilityLabel="Search messages or a username"
-        value={value}
-        onChangeText={onChange}
-        onSubmitEditing={onSubmit}
-        returnKeyType="search"
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-      />
     </View>
   );
 }
