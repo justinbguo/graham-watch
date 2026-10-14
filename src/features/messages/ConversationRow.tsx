@@ -19,24 +19,39 @@ import { partyName } from './party';
 export function ConversationRow({
   conversation,
   onPress,
+  detail,
+  label,
+  busy = false,
 }: {
   conversation: ConversationSummary;
   onPress: () => void;
+  /** Replaces the last-line preview. A row that is not a thread yet. */
+  detail?: string;
+  label?: string;
+  busy?: boolean;
 }) {
   const styles = useThemedStyles(rowStyles);
   const who = conversation.with;
   const name = partyName(who);
-  const unread = conversation.unread > 0;
-  const preview = conversation.last
-    ? `${conversation.last.mine ? 'You: ' : ''}${conversation.last.body}`
-    : 'No messages yet';
+  const unread = !detail && conversation.unread > 0;
+  const preview =
+    detail ??
+    (conversation.last
+      ? `${conversation.last.mine ? 'You: ' : ''}${conversation.last.body}`
+      : 'No messages yet');
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={unread ? `${name}, unread` : name}
+      accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      style={({ pressed }) => [
+        styles.row,
+        pressed && !busy && styles.pressed,
+        busy && styles.busy,
+      ]}>
       <Avatar
         url={who.kind === 'person' ? who.avatar_url : who.logoUrl}
         glyph={who.kind === 'person' ? 'account-outline' : undefined}
@@ -48,7 +63,7 @@ export function ConversationRow({
           <Text style={styles.name} numberOfLines={1}>
             {name}
           </Text>
-          {conversation.last ? (
+          {!detail && conversation.last ? (
             <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
           ) : null}
         </View>
@@ -72,6 +87,9 @@ const rowStyles = (theme: Theme) => ({
   },
   pressed: {
     opacity: 0.72,
+  },
+  busy: {
+    opacity: 0.4,
   },
   copy: {
     flex: 1,

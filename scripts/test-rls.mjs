@@ -2499,6 +2499,110 @@ async function cleanUp() {
   }
 }
 
+console.log('\nmessages');
+{
+  const handle = `ada${String(stamp).slice(-6)}`;
+
+  const peeked = await api(`/rest/v1/profiles?handle=eq.${handle}&select=id`, {
+    token: importer.token,
+  });
+  check(
+    'a username does not open someone else\'s profile',
+    Array.isArray(peeked.body) && peeked.body.length === 0,
+    JSON.stringify(peeked.body),
+  );
+
+  const opened = await api('/rest/v1/rpc/conversation_with_handle', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_handle: handle },
+  });
+  check(
+    'a username opens one thread',
+    opened.status < 300 && typeof opened.body === 'string',
+    JSON.stringify(opened.body),
+  );
+
+  const again = await api('/rest/v1/rpc/conversation_with_handle', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_handle: `@${handle.toUpperCase()}` },
+  });
+  check(
+    'the same username opens the same thread',
+    again.status < 300 && again.body === opened.body,
+    JSON.stringify(again.body),
+  );
+
+  const own = await api('/rest/v1/rpc/conversation_with_handle', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_handle: handle },
+  });
+  check(
+    'you cannot message your own username',
+    own.status >= 400 && String(own.body?.message ?? '').includes('yours'),
+    JSON.stringify(own.body),
+  );
+
+  const missing = await api('/rest/v1/rpc/conversation_with_handle', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_handle: `nobody${String(stamp).slice(-6)}` },
+  });
+  check(
+    'an unused username is refused',
+    missing.status >= 400 && String(missing.body?.message ?? '').includes('No one has'),
+    JSON.stringify(missing.body),
+  );
+
+  const partial = await api('/rest/v1/rpc/conversation_with_handle', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_handle: 'no' },
+  });
+  check('a partial username is refused', partial.status >= 400, JSON.stringify(partial.body));
+
+  const anon = await api('/rest/v1/rpc/conversation_with_handle', {
+    method: 'POST',
+    body: { p_handle: handle },
+  });
+  check('a guest cannot open a thread by username', anon.status >= 400, JSON.stringify(anon.body));
+
+  const phrase = `secret-phrase-${stamp}`;
+  const sent = await api('/rest/v1/messages', {
+    token: importer.token,
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: {
+      conversation_id: opened.body,
+      sender_id: importer.id,
+      body: phrase,
+    },
+  });
+  check('the opener can write in the thread', sent.status < 300, JSON.stringify(sent.body));
+
+  const found = await api(
+    `/rest/v1/messages?select=conversation_id&body=ilike.*${phrase}*`,
+    { token: buyer.token },
+  );
+  check(
+    'the other person can search that message',
+    Array.isArray(found.body) && found.body.some((row) => row.conversation_id === opened.body),
+    JSON.stringify(found.body),
+  );
+
+  const hidden = await api(
+    `/rest/v1/messages?select=conversation_id&body=ilike.*${phrase}*`,
+    { token: dealerUser.token },
+  );
+  check(
+    'someone outside the thread cannot search it',
+    Array.isArray(hidden.body) && hidden.body.length === 0,
+    JSON.stringify(hidden.body),
+  );
+}
+
 await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);

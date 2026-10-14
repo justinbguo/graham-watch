@@ -1166,6 +1166,7 @@ export type Database = {
         Args: { p_dealer_id: string }
         Returns: string
       }
+      conversation_with_handle: { Args: { p_handle: string }; Returns: string }
       conversation_with_person: { Args: { p_user_id: string }; Returns: string }
       conversation_writable: {
         Args: { p_conversation_id: string }
