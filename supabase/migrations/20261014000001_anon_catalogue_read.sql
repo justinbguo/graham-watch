@@ -7,7 +7,10 @@
 -- was invisible. Functions were revoked from anon wholesale in
 -- 20260917000001_revoke_anon_privileges.sql — search and counts need an
 -- explicit grant back. Writes stay revoked.
+--
+-- drop if exists: local may already have these from an earlier pending apply.
 
+drop policy if exists "approved catalogue is readable before sign-in" on public.listings;
 create policy "approved catalogue is readable before sign-in"
 on public.listings for select to anon
 using (
@@ -21,6 +24,8 @@ using (
   )
 );
 
+drop policy if exists "photos of the public catalogue are readable before sign-in"
+  on public.listing_photos;
 create policy "photos of the public catalogue are readable before sign-in"
 on public.listing_photos for select to anon
 using (
@@ -35,6 +40,7 @@ using (
   )
 );
 
+drop policy if exists "dealers are readable before sign-in" on public.dealers;
 create policy "dealers are readable before sign-in"
 on public.dealers for select to anon
 using (true);

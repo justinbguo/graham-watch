@@ -8,7 +8,7 @@ import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
-import { size, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const DOOR: Record<SignInMode, string> = {
@@ -22,17 +22,9 @@ const SWITCH: Record<SignInMode, string> = {
 };
 
 /**
- * The doors themselves. Used as a sheet over the deck (guest browsing) and as
- * the full sign-in surface when the stack still needs one.
+ * The doors on the sign-in page. The root gate lands here before the app opens.
  */
-export function SignInPanel({
-  reason,
-  footer,
-}: {
-  /** Why the sheet opened — budget is the ten-swipe gate. */
-  reason?: 'budget' | 'action';
-  footer?: ReactNode;
-}) {
+export function SignInPanel({ footer }: { footer?: ReactNode }) {
   const signIn = useSignIn();
   const styles = useThemedStyles(panelStyles);
 
@@ -43,9 +35,7 @@ export function SignInPanel({
       <View style={styles.copy}>
         <Wordmark />
         <Text style={styles.tagline}>
-          {reason === 'budget'
-            ? 'Sign in to keep swiping, save watches, and message dealers.'
-            : 'The best vintage dealers and the most passionate collectors.'}
+          The best vintage dealers and the most passionate collectors.
         </Text>
       </View>
 
@@ -185,6 +175,9 @@ const panelStyles = (theme: Theme) => ({
     flex: 1,
     justifyContent: 'center' as const,
     gap: stack.group,
+    // Screen only gutters the header; this page has none, so the doors pad
+    // themselves with the same page gutter every other surface uses.
+    paddingHorizontal: inset.screen,
   },
   copy: {
     alignItems: 'flex-start' as const,

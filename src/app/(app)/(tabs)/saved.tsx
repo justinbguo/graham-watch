@@ -8,7 +8,6 @@ import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { usePrimeListing, useSaved } from '@/data/listings';
 import { useListingThreads, useMessageAboutListing } from '@/data/messages';
 import { useUnsave } from '@/data/swipes';
-import { GuestGate } from '@/features/auth/GuestGate';
 import { useOpenStack } from '@/lib/openStack';
 import { formatMessageDay, formatTitle, totalPrice } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
@@ -19,17 +18,8 @@ import { useSession } from '@/providers/session';
 export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function Saved() {
-  const { userId, isSignedIn } = useSession();
+  const { userId } = useSession();
   const { data: cards = [], isPending, error } = useSaved(userId);
-
-  if (!isSignedIn) {
-    return (
-      <GuestGate
-        title="Wishlist"
-        message="Sign in to keep the watches you save and message the dealers who have them."
-      />
-    );
-  }
   const threads = useListingThreads(userId);
   const unsave = useUnsave(userId);
   const message = useMessageAboutListing();

@@ -205,12 +205,11 @@ beside the word on sign-in for a while, and that made the screen a poster
 before it was a form. No screen wears the mark in its header either: a header
 holds a word, a count, and controls, and the word is the name.
 
-Sign-in is a sheet over the deck, not a wall before it. Guests land on Buy with
-**Log in** in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the
-sheet opens itself with copy that says why. The sheet is the wordmark, one
-`body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
-with **Not now** to dismiss. There is no second headline, no decorative watch
-beside the word, and no card around the doors.
+Sign-in is a full page before the app, not a sheet over the deck. The wordmark,
+one `body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
+are the whole surface. There is no second headline, no decorative watch beside
+the word, no **Not now**, and no card around the doors. The app stack opens
+only after a session lands.
 
 `GRAHAM` is Neue Haas Grotesk Display Bold, at 44pt, tracked at
 `tracking.wordmark` (−2.2). Capitals at that size want to drift apart; pulling
@@ -296,11 +295,12 @@ answered no, and the palette and the `ThemeOverride` that carried it are gone.
 One scheme, keyed off the system, and the status bar follows it like every
 other screen.
 
-The screen is the wordmark, the sentence under it, the watch beside that
-pair, and a column of doors: Apple, Google, a rule with `or` on it, then
-email. Apple's native button stands first on an
-iPhone. Everywhere else Apple is our door, because the native view does not
-exist in a browser or in Expo Go.
+The screen is the wordmark, the sentence under it, and a column of doors:
+Apple, Google, a rule with `or` on it, then email. A watch collage once sat
+beside the word; that made the screen a poster before it was a form, and it
+does not return. Apple's native button stands first on an iPhone. Everywhere
+else Apple is our door, because the native view does not exist in a browser
+or in Expo Go.
 A door is `SignInOption` in `src/features/auth/` — the same capsule as
 `Button`: `size.controlMin` tall, `radius.full`, `accent` on the page, mark
 and `labelStrong` label centred as one group in `onAccent`.

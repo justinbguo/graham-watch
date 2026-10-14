@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
@@ -71,11 +70,10 @@ async function deletePasses(actorId: string) {
  */
 export function useRecordSwipe(actorId: string | null) {
   const queryClient = useQueryClient();
-  const guest = useGuest();
 
   return useMutation({
     mutationFn: ({ listingId, direction }: { listingId: string; direction: SwipeDirection }) => {
-      if (!actorId) return guest.recordSwipe(listingId, direction);
+      if (!actorId) throw new Error('Sign in to judge a watch.');
       return recordSwipe(actorId, listingId, direction);
     },
     onMutate: ({ listingId }) => {
@@ -132,13 +130,12 @@ export function useRecordSwipe(actorId: string | null) {
  */
 export function useUndoPass(actorId: string | null) {
   const queryClient = useQueryClient();
-  const guest = useGuest();
   const { filters } = useFilters('deck');
   const deckKey = keys.deck(filters);
 
   return useMutation({
     mutationFn: (card: DeckCard) => {
-      if (!actorId) return guest.undoPass(card.id);
+      if (!actorId) throw new Error('Sign in to undo a pass.');
       return deleteSwipe(actorId, card.id);
     },
     onMutate: (card) => {

@@ -400,12 +400,6 @@ export type LayoutWidth = Exclude<keyof typeof layout, 'rail' | 'gridColumns'>;
  */
 export const WIDE_BREAKPOINT = 900;
 
-/**
- * How many watches a guest may judge before the app asks them to sign in.
- * Tracked on the device, not in the database — there is no actor_id yet.
- */
-export const GUEST_SWIPE_BUDGET = 10;
-
 export const size = {
   thumb: 72,
   /**

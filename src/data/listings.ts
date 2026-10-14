@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
-import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
 import { toRpcArgs, type Filters } from '@/features/filters/types';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
@@ -139,9 +138,8 @@ export const DECK_LIMIT = 20;
 
 export function useDeck(limit = DECK_LIMIT) {
   const { filters } = useFilters('deck');
-  const guest = useGuest();
 
-  const query = useQuery({
+  return useQuery({
     queryKey: keys.deck(filters),
     queryFn: () => fetchDeck(limit, filters),
     // The deck is consumed by swiping, not by refetching. Re-running it mid-pile
@@ -149,15 +147,6 @@ export function useDeck(limit = DECK_LIMIT) {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
-
-  // Guest judgments never reach `swipes`, so the RPC cannot exclude them. Drop
-  // them here so a refetch after a filter change does not resurrect a pass.
-  const data = useMemo(() => {
-    if (!query.data || guest.swipedIds.size === 0) return query.data;
-    return query.data.filter((card) => !guest.swipedIds.has(card.id));
-  }, [query.data, guest.swipedIds]);
-
-  return { ...query, data };
 }
 
 export type ListingCounts = { matched: number; total: number };

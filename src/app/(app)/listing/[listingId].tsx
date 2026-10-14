@@ -6,21 +6,10 @@ import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/compo
 import { useOpenMailDraft } from '@/data/inquiries';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
-import { useGuest } from '@/features/auth/GuestProvider';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
-import {
-  GUEST_SWIPE_BUDGET,
-  HIT_TARGET,
-  inset,
-  radius,
-  size,
-  space,
-  stack,
-  type,
-  type Theme,
-} from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -35,8 +24,7 @@ export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function ListingScreen() {
   const { listingId, from } = useLocalSearchParams<{ listingId: string; from?: string }>();
-  const { userId, isSignedIn } = useSession();
-  const guest = useGuest();
+  const { userId } = useSession();
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
   const save = useRecordSwipe(userId);
@@ -44,20 +32,13 @@ export default function ListingScreen() {
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
 
-  const isSaved =
-    saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
+  const isSaved = saved.some((entry) => entry.id === listingId);
 
   const judge = (direction: 'left' | 'right', after?: () => void) => {
-    if (!isSignedIn && guest.exhausted) {
-      guest.openSignIn('budget');
-      return;
-    }
-    const used = guest.swipes.length + 1;
     save.mutate(
       { listingId: card!.id, direction },
       {
         onSuccess: () => {
-          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) guest.openSignIn('budget');
           after?.();
         },
       }
@@ -148,10 +129,6 @@ export default function ListingScreen() {
                     icon="email-outline"
                     loading={contact.isPending}
                     onPress={() => {
-                      if (!isSignedIn) {
-                        guest.openSignIn('action');
-                        return;
-                      }
                       contact.mutate(
                         { card, message: '' },
                         {

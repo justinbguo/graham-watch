@@ -12,7 +12,6 @@ import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
-import { useGuest } from '@/features/auth/GuestProvider';
 import { useOpenFilters } from '@/features/filters/open';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
@@ -20,17 +19,7 @@ import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import {
-  GUEST_SWIPE_BUDGET,
-  HIT_TARGET,
-  inset,
-  motion,
-  radius,
-  size,
-  space,
-  type,
-  type Theme,
-} from '@/lib/theme';
+import { HIT_TARGET, inset, motion, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useWebArrowSwipe } from '@/lib/webKeys';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -40,8 +29,7 @@ import { useSession } from '@/providers/session';
 export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function Deck() {
-  const { userId, isSignedIn } = useSession();
-  const guest = useGuest();
+  const { userId } = useSession();
   const { data: cards = [], isPending, error, refetch } = useDeck();
   const { data: counts } = useListingCounts();
   const swipe = useRecordSwipe(userId);
@@ -57,7 +45,7 @@ export default function Deck() {
   const openFilters = useOpenFilters();
   const count = activeCount(filters);
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
-  // them, so keys must not keep judging watches while a listing or sign-in is up.
+  // them, so keys must not keep judging watches while a listing is up.
   const deckOnTop = pathname === '/' || pathname === '/index';
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
@@ -82,28 +70,13 @@ export default function Deck() {
   // One step back, and only for a pass. A save is recoverable from the wishlist
   // tab, so a right swipe retires the offer instead of queueing behind it.
   const judge = (card: DeckCard, direction: SwipeDirection, from?: Rect) => {
-    if (!isSignedIn && guest.exhausted) {
-      guest.openSignIn('budget');
-      return;
-    }
-
     // A save flies from wherever it was judged, and only the view that judged
     // it knows where that was: the card stage here, the tile in the grid.
     if (direction === 'right' && from) {
       launch({ from, photo: card.photos[0]?.url });
     }
 
-    const used = guest.swipes.length + 1;
-    swipe.mutate(
-      { listingId: card.id, direction },
-      {
-        onSuccess: () => {
-          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) {
-            guest.openSignIn('budget');
-          }
-        },
-      }
-    );
+    swipe.mutate({ listingId: card.id, direction });
     setLastPass(direction === 'left' ? card : null);
     setReturning(null);
   };
@@ -131,9 +104,6 @@ export default function Deck() {
 
   const actions = (
     <View style={styles.actions}>
-      {!isSignedIn ? (
-        <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
-      ) : null}
       <UndoButton onPress={undo} />
       <FilterButton count={count} onPress={() => openFilters('deck')} />
       <ViewToggle value={view} onChange={setView} />

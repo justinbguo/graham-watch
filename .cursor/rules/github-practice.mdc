@@ -1,0 +1,17 @@
+---
+description: Graham's GitHub loop, including when a merge is allowed
+alwaysApply: true
+---
+
+# GitHub practice
+
+Before any commit, push, pull request, or merge, read and follow
+`.cursor/skills/github-practice/SKILL.md`.
+
+Justin authorized the full cycle in this repo. When he asks for a change to
+the app, commit, push, open a draft, and squash-merge it once every gate in
+that skill passes. Stop early when he names an earlier step, or when a gate
+fails.
+
+Never force-merge. Never bypass branch protection. Never merge a pull request
+this task did not open. A failed or pending check blocks the merge.

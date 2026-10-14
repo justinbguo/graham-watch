@@ -11,7 +11,6 @@ import { useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
-import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
 import { haasFonts } from '@/lib/fonts';
 import { QueryProvider } from '@/providers/query';
@@ -32,12 +31,10 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <GuestProvider>
-              <FilterProvider>
-                <SplashScreenController />
-                <Chrome />
-              </FilterProvider>
-            </GuestProvider>
+            <FilterProvider>
+              <SplashScreenController />
+              <Chrome />
+            </FilterProvider>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>
@@ -87,9 +84,9 @@ function Chrome() {
 }
 
 /**
- * Guests land on the deck. Signed-in users who still need onboarding go there
- * first. While the profile is loading no guard passes, the stack renders
- * nothing, and the splash screen stays up to cover it.
+ * Sign-in first. The app and onboarding only open after a session exists.
+ * While the profile is loading no guard passes, the stack renders nothing,
+ * and the splash screen stays up to cover it.
  */
 function RootNavigator() {
   const { isSignedIn } = useSession();
@@ -97,12 +94,16 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!isSignedIn || (ready && !needsOnboarding)}>
+      <Stack.Protected guard={isSignedIn && ready && !needsOnboarding}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
       <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
         <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen name="sign-in" />
       </Stack.Protected>
     </Stack>
   );
