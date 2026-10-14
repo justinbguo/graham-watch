@@ -1790,9 +1790,17 @@ the brass dot rather than a number: how many messages are waiting in that one th
 does not change what you do about it. The number on the tab is how many threads are
 waiting, which is the thing the badge on Wishlist is already for.
 
-There is no way to look someone up. A conversation starts from something a person put on
-the board or a watch a shop is selling, never from a search box, because a directory of
-collectors is a directory of strangers to be written to unasked.
+A field under the title searches the threads you are already in. The other party's
+name, their handle, and the latest line filter as you type. After a short pause the
+same words are matched against older messages in those threads, so a sentence from
+last week still finds the conversation.
+
+A complete username in that field — the same rule as sign-up — offers a new message
+to that account. `@ada` does not list everyone whose name starts the same way. There
+is still no directory of collectors. Profiles stay readable only by their owner;
+`conversation_with_handle` turns one exact handle into one thread, and a thread that
+already exists is the one that opens. A conversation also still starts from a post
+or from a watch a shop is selling.
 
 A row is the other party's photograph, their name, the last line said, and when. A shop
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same

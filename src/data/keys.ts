@@ -33,6 +33,8 @@ export const keys = {
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
   collectorPosts: (userId: string) => ['collector-posts', userId] as const,
   conversations: ['conversations'] as const,
+  /** Conversation ids whose messages contain this text. */
+  messageSearch: (query: string) => ['message-search', query] as const,
   /** Listing ids the buyer has already named in a message. */
   discussed: ['discussed-listings'] as const,
   conversation: (conversationId: string) => ['conversation', conversationId] as const,

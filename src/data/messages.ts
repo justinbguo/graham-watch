@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isDemo } from '@/lib/demo';
 import { formatTitle } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
+import { normalizeUsername } from '@/lib/username';
 
 import { keys } from './keys';
 
@@ -281,6 +282,62 @@ export function useMessagePerson() {
       return data;
     },
   });
+}
+
+/**
+ * Opens the thread with the account that owns this username, or finds the
+ * one that already exists. Profiles are readable only by their owner, so the
+ * handle is resolved inside `conversation_with_handle` — one exact name, not
+ * a list of people.
+ */
+export function useMessageByHandle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (handle: string): Promise<string> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { data, error } = await supabase.rpc('conversation_with_handle', {
+        p_handle: normalizeUsername(handle),
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('Could not open that conversation.');
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
+/** A one-letter search matches almost every thread. Wait for a real word. */
+export const BODY_SEARCH_MIN = 2;
+
+/**
+ * Threads whose messages contain this text. The list already has the latest
+ * line; this finds a word said earlier, from the newest thousand matches.
+ * Row-level security — rules stored in the database about who may read which
+ * rows — limits this to conversations you are in.
+ */
+export function useMessagesMatching(query: string) {
+  const term = query.trim().toLowerCase();
+  return useQuery({
+    queryKey: keys.messageSearch(term),
+    enabled: term.length >= BODY_SEARCH_MIN && !isDemo,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .ilike('body', likePattern(term))
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return [...new Set((data ?? []).map((row) => row.conversation_id))];
+    },
+  });
+}
+
+/** `%` and `_` are wildcards in `ilike`. A search for them should find them. */
+function likePattern(query: string) {
+  return `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
 }
 
 /**
