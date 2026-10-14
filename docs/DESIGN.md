@@ -1752,11 +1752,19 @@ slot holds controls that act on the screen.
 ## Search opens from the deck
 
 The bar has no Search glyph. Under the count on Buy — "12 of 148 watches available" —
-sits a bar reading "Search brand, model or reference". It is a button, not a field:
-typing there would be thrown away when the screen changed. So it is drawn as one — a
-`fill` capsule, `HIT_TARGET` tall, a `magnify` glyph at `size.iconSmall` and the words
-in `label`, both `inkMuted`. It shares the screen with the card, and the 8 points a
-`controlMin` field would take come off the photograph. Pressing it opens Search, which stays a route inside the tabs so the bar is
+sits a bar reading "Search". It is a button, not a field: typing there would be
+thrown away when the screen changed. It is `SearchDoor`, and it looks the same as the
+`SearchField` it opens, so the door reads as the field.
+
+Every search bar — Buy, Search, Messages — is one of those two, from
+`src/components/SearchBar.tsx`. A `surface` rounded square at `radius.md`, the same
+tone as a card. `HIT_TARGET` tall, `space.sm` on the sides. A `magnify` glyph at
+`size.icon`, then the word "Search" in `type.body`, both `inkMuted`. The placeholder
+is one word on every screen; the `accessibilityLabel` tells a screen reader what
+that screen searches. The bar is shorter than a `controlMin` field because on Buy
+it shares the screen with the card, and every point comes off the photograph.
+
+Pressing the door opens Search, which stays a route inside the tabs so the bar is
 still under it, and the real field takes focus. Coming back from a listing does not
 open the keyboard again. An X at the start of the title's line returns to the deck.
 Filters stay at the trailing edge.

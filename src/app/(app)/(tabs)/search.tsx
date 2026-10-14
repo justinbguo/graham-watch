@@ -3,7 +3,8 @@ import { Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { FilterButton } from '@/components/FilterButton';
-import { CloseButton, Field, Message, Screen, Spinner } from '@/components/ui';
+import { SearchField } from '@/components/SearchBar';
+import { CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { usePrimeListing } from '@/data/listings';
 import { useSearch, useSearchCount } from '@/data/search';
 import { useOpenFilters } from '@/features/filters/open';
@@ -72,12 +73,11 @@ export default function Search() {
         <FilterButton count={chipCount} onPress={() => openFilters('search')} />
       }>
       <View style={styles.queryRow}>
-        <Field
+        <SearchField
           ref={field}
-          placeholder="Search brand, model or reference"
+          accessibilityLabel="Search brand, model or reference"
           value={filters.query}
           onChangeText={(text) => setOne('query', text)}
-          returnKeyType="search"
         />
         <Text style={styles.count}>
           {matched == null ? ' ' : `${matched} watch${matched === 1 ? '' : 'es'}`}
