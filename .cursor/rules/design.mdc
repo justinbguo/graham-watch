@@ -98,13 +98,14 @@ nobody follows.
   the top edge, on `scrimTop`, and the count goes in the paging controls'
   `accessibilityValue`.
 - The launcher mark in the app, or a tagline anywhere but under the wordmark
-  on sign-in. Guests land on the deck with **Log in** in the header action
-  slot; after `GUEST_SWIPE_BUDGET` judgments the sign-in sheet opens itself.
-  The sheet is the wordmark, one `body`/`textMuted` sentence, and the doors —
-  never a second headline or a card around the doors. The doors name the mode:
-  `Create account with` or `Log in with`. No heading does. A header holds a
-  word, a count, and controls; the word is already the name. `Screen` has no
-  slot for a mark.
+  on sign-in. On phone and narrow web, guests land on the deck with **Log in**
+  in the header action slot; after `GUEST_SWIPE_BUDGET` judgments the sign-in
+  sheet opens itself. On a wide browser, sign-in is a landing wall before the
+  app. Either surface is the wordmark, one `body`/`textMuted` sentence, and
+  the doors — never a second headline, a watch collage, or a card around the
+  doors. The doors name the mode: `Create account with` or `Log in with`. No
+  heading does. A header holds a word, a count, and controls; the word is
+  already the name. `Screen` has no slot for a mark.
 - The deck's name in capitals, or larger than the other headers. The title is
   `Graham` in `type.display`, the same size as Search and Profile. Sign-in is
   the one `Wordmark`: the letters `GRAHAM` in `type.wordmark`.

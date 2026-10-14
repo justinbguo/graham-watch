@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useOnboardingGate } from '@/data/profile';
 import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
+import { useDesktopSignInWall } from '@/lib/layout';
 import { haasFonts } from '@/lib/fonts';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
@@ -87,18 +88,29 @@ function Chrome() {
 }
 
 /**
- * Guests land on the deck. Signed-in users who still need onboarding go there
- * first. While the profile is loading no guard passes, the stack renders
- * nothing, and the splash screen stays up to cover it.
+ * Wide web: unsigned visitors hit the sign-in landing before the app. Phone and
+ * narrow web open on the deck as guests; sign-in is a sheet they can dismiss.
+ * Signed-in users who still need onboarding go there first. While the profile
+ * is loading no guard passes, the stack renders nothing, and the splash stays
+ * up to cover it.
  */
 function RootNavigator() {
   const { isSignedIn } = useSession();
   const { ready, needsOnboarding } = useOnboardingGate();
+  const desktopWall = useDesktopSignInWall() && !isSignedIn;
+  const appReady = !isSignedIn || (ready && !needsOnboarding);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!isSignedIn || (ready && !needsOnboarding)}>
+      <Stack.Protected guard={!desktopWall && appReady}>
         <Stack.Screen name="(app)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen
+          name="sign-in"
+          options={{ presentation: desktopWall ? 'card' : 'modal' }}
+        />
       </Stack.Protected>
 
       <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>

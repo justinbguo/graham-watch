@@ -22,8 +22,9 @@ const SWITCH: Record<SignInMode, string> = {
 };
 
 /**
- * The doors themselves. Used as a sheet over the deck (guest browsing) and as
- * the full sign-in surface when the stack still needs one.
+ * The doors themselves. On a wide browser this is the landing wall; on phone
+ * and narrow web it is the sheet over guest browse. No decorative watch beside
+ * the word — that lockup was the old phone poster and stays gone.
  */
 export function SignInPanel({
   reason,
