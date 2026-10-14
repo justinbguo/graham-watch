@@ -2,7 +2,8 @@
 
 Day-to-day commands and habits. Setup lives in the [README](../README.md); this is
 what to do once it is set up. What the app is for lives in
-[PRODUCT_SPEC](PRODUCT_SPEC.md); this is how to run it.
+[PRODUCT_SPEC](PRODUCT_SPEC.md); this is how to run it. Shipping a change
+onto `main` lives in [DEVELOPING](DEVELOPING.md).
 
 ## Which Graham am I looking at?
 

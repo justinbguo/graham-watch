@@ -6,5 +6,7 @@
 !metro.config.js
 !package-lock.json
 !package.json
+# npm ci fails ERESOLVE without legacy-peer-deps.
+!.npmrc
 !tsconfig.json
 !vercel.json
