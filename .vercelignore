@@ -4,6 +4,9 @@
 !src
 !app.json
 !metro.config.js
+# Root Directory of the graham-watch-operator project. Stripped, that project
+# falls back to this repo's vercel.json and runs the Expo export.
+!operator
 !package-lock.json
 !package.json
 # npm ci fails ERESOLVE without legacy-peer-deps.
