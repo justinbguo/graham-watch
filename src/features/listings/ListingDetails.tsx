@@ -43,7 +43,7 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
 
       {card.description ? (
         <View style={styles.about}>
-          <Text style={styles.aboutHeading}>About this watch</Text>
+          <Text style={styles.heading}>About this watch</Text>
           <Text style={styles.description}>{card.description}</Text>
         </View>
       ) : null}
@@ -51,7 +51,7 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
       <Divider />
 
       <SpecGroup title="Specifications" rows={specifications(card)} />
-      <SpecGroup title="Condition and provenance" rows={condition(card)} />
+      <SpecGroup title="Condition" rows={condition(card)} />
 
       {/* Above the dealer, not under them. Saving and asking are about the
           watch; the shop below is who you would be writing to. */}
@@ -73,7 +73,7 @@ function SpecGroup({ title, rows }: { title: string; rows: Spec[] }) {
 
   return (
     <View style={styles.group}>
-      <Text style={styles.groupHeading}>{title}</Text>
+      <Text style={styles.heading}>{title}</Text>
       {rows.map((spec) => (
         <Spec key={spec.label} {...spec} />
       ))}
@@ -152,16 +152,12 @@ const detailsStyles = (theme: Theme) => ({
   about: {
     gap: space.sm,
   },
-  aboutHeading: {
+  heading: {
     ...type.title,
     color: theme.color.text,
   },
   group: {
     gap: space.sm,
-  },
-  groupHeading: {
-    ...type.labelStrong,
-    color: theme.color.text,
   },
   specRow: {
     flexDirection: 'row' as const,
