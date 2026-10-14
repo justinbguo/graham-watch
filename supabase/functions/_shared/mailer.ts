@@ -41,7 +41,9 @@ async function sendViaResend(email: Email, from: string, apiKey: string): Promis
 }
 
 function deadline<T>(work: Promise<T>, ms: number): Promise<T> {
-  let timer: number;
+  // Deno 2 returns a Timeout handle. The DOM types in this check say number.
+  // ReturnType follows whichever signature the checker resolved.
+  let timer: ReturnType<typeof setTimeout>;
   const expired = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`Mail server did not answer within ${ms}ms.`)), ms);
   });
