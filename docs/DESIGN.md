@@ -544,10 +544,10 @@ is a label and a value: the label at `type.label`, the value at
 `labelStrong`, both in `text`. The label column is `size.specLabel`, wide
 enough for "Box and papers", and the values share the edge to its right.
 
-Two headings split the table, both at `labelStrong`. Specifications is what
-the watch is: reference, case, movement, dial, complications, style. Condition
-and provenance is whether this example is the one to buy. The year is not in
-either. It rides with the name.
+Two headings split the table, both at `title`, the same size as "About this
+watch". Specifications is what the watch is: reference, case, movement, dial,
+complications, style. Condition is whether this example is the one to buy.
+The year is not in either. It rides with the name.
 
 Related facts share a row. The case is "36 mm · Steel", the movement is
 "Manual · Cal. 861". A chronograph that is both the style and the only
@@ -1029,13 +1029,12 @@ Deciding on a five-figure watch takes the reference and the caliber, and a card
 that made you leave to read them turned one decision into a navigation.
 
 The block under the photograph opens on "About this watch" when the dealer wrote
-one, then the description. The heading is `title`, the same face as the dealer
-name under it, so the two headers on the card are one size. The description
-stays at `label`. Everything else under the photograph is
-`label`, 14pt, the description in regular and the specification values in
-semibold. The description used to be `body` over specs at `label`, which made
-the dealer's sentence the loudest thing on a card whose facts are the reason
-to read it.
+one, then the description. That heading, Specifications, and Condition are all
+`title`, the same face as the dealer name under them. The description stays at
+`label`. The specification rows stay `label`, 14pt, the labels in regular and
+the values in semibold. The description used to be `body` over specs at
+`label`, which made the dealer's sentence the loudest thing on a card whose
+facts are the reason to read it.
 
 Both are full-strength `text` — white in the dark scheme — with nothing under
 the photograph in a muted tone, because a muted paragraph on a raised card

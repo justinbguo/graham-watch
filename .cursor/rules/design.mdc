@@ -113,10 +113,10 @@ nobody follows.
 - A glyph beside a word that stands for the word rather than naming the same
   thing literally. Outside the tab bar and the brass check after a dealer in
   a list, a glyph belongs to a control.
-- A second type size under a card's photograph, or muted type there. The
-  description and the specification labels are both `label` on `text`. A
-  specification value and a group heading are `labelStrong`. Weight is the
-  only difference.
+- A second type size under a card's photograph, or muted type there. About
+  this watch, Specifications, and Condition are `title` on `text`. The
+  description and the specification labels are `label`. A specification value
+  is `labelStrong`. Weight is the only difference among the rows.
 - A glyph in the specification table. A row is the label, at `size.specLabel`,
   and the value. Reference, condition, and box and papers stay when empty and
   read "Not stated". Case joins size and metal. Movement joins winding and
