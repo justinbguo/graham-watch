@@ -1798,7 +1798,9 @@ is the limit. A sixth is the one you tap by mistake.
 
 ## Messages
 
-The middle tab, between Community and Wishlist (`message-outline`). Two
+The middle tab, between Community and Wishlist (`chat-outline`). It was
+`message-outline`, a box with a tail, and it was the square glyph in a bar of
+round ones. Two
 things end up here: the shops you have asked about a watch, and the people you have
 written to from a post. They are the same kind of object — a thread with one other
 party — so they are one list, ordered by whichever moved last.
