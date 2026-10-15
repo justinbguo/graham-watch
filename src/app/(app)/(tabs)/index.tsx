@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -121,7 +121,9 @@ export default function Deck() {
 
   const actions = (
     <View style={styles.actions}>
-      {!isSignedIn ? (
+      {/* Web only. On iOS the unsigned app is the sign-in wall, and this
+          slot is already undo, filters, and the view toggle. */}
+      {Platform.OS !== 'ios' && !isSignedIn ? (
         <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
       ) : null}
       <UndoButton onPress={undo} />
