@@ -64,14 +64,17 @@ export function ConversationScreen({
         photoUrl: listing.photos[0]?.url ?? null,
       }
     : null;
+  // Wishlist opens this thread with the watch still named. Once a message
+  // already quotes it, the composer must not quote it again.
   const asked = Boolean(
     listingId && data?.messages.some((message) => message.listing?.id === listingId),
   );
+  const quoting = quote && !asked ? quote : null;
   const value = draft ?? (listingId && data && !asked ? DEFAULT_INQUIRY : '');
   const send = useSendMessage(
     conversationId,
     userId ?? '',
-    listingId ? { listingId, title: quote?.title ?? null, photoUrl: quote?.photoUrl ?? null } : null,
+    quoting ? { listingId: quoting.id, title: quoting.title, photoUrl: quoting.photoUrl } : null,
   );
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
@@ -188,16 +191,18 @@ export function ConversationScreen({
         />
         {!byEmail || listing ? (
           <SendBar
-            placeholder={quote ? 'Write about this watch' : 'Write a message'}
+            placeholder={quoting ? 'Write about this watch' : 'Write a message'}
             value={value}
             onChangeText={setDraft}
             onSend={submit}
             busy={byEmail ? mail.isPending : send.isPending}
             sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
             note={
-              quote || send.error ? (
+              quoting || send.error ? (
                 <View style={styles.note}>
-                  {quote ? <ListingQuote listing={quote} onPress={() => openWatch(quote.id)} /> : null}
+                  {quoting ? (
+                    <ListingQuote listing={quoting} onPress={() => openWatch(quoting.id)} />
+                  ) : null}
                   {send.error ? <Message text="That message did not send." tone="error" /> : null}
                 </View>
               ) : null

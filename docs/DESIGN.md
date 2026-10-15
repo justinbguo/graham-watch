@@ -1862,7 +1862,9 @@ say almost nothing.
 A message about a watch quotes it. The photograph sits above the name, and both
 sit above the words, on the side of whoever asked, because one thread holds every
 watch you have asked that shop about. In the composer the quote is on the right:
-it is what you are about to send. The frame is `quotePhoto`
+it is what you are about to send. Once a message in the thread already quotes
+that watch, the composer does not quote it again — coming back from Wishlist
+would otherwise draw the same photograph twice. The frame is `quotePhoto`
 wide, 5/7, `contain`, `radius.md` — larger than a shop-page thumbnail, because
 this photograph is the only one on the row. The name is `title`, in a box about
 15% narrower than a message bubble, so the bigger type wraps. A tap opens the
