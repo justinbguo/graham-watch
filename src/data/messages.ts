@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { normalizeUsername } from '@/lib/username';
 
 import { keys } from './keys';
+import { listingPhotoUrl } from './listings';
 
 /**
  * Who a thread is with. A shop, or a person — never both, and the database
@@ -37,6 +38,13 @@ export type ConversationHeader = {
   writable: boolean;
 };
 
+/** The watch a message is answering. Drawn above the words, like a reply. */
+export type MessageListing = {
+  id: string;
+  title: string;
+  photoUrl: string | null;
+};
+
 export type Message = {
   id: string;
   sender_id: string;
@@ -44,7 +52,7 @@ export type Message = {
   /** `email` is an inquiry that left Graham for a shop with no account here. */
   via: 'app' | 'email';
   /** The watch an inquiry named, when the listing is still readable. */
-  listing: string | null;
+  listing: MessageListing | null;
   created_at: string;
 };
 
@@ -123,29 +131,57 @@ export function useConversation(conversationId: string | null) {
           .from('messages')
           // The watch comes along for the ride: an inquiry names one, and a
           // buyer writes to the same shop about more than one.
-          .select('id, sender_id, body, via, created_at, listings (brand, model, year)')
+          .select('id, sender_id, body, via, created_at, listing_id, listings (brand, model, year)')
           .eq('conversation_id', conversationId)
           .order('created_at'),
       ]);
       if (header.error) throw header.error;
       if (messages.error) throw messages.error;
+      const rows = messages.data ?? [];
+      const covers = await coverPhotos(rows.flatMap((row) => (row.listing_id ? [row.listing_id] : [])));
       const head = header.data?.[0];
       return {
         header: head ? { id: head.id, with: party(head), writable: head.writable } : null,
-        messages: (messages.data ?? []).map((row) => {
+        messages: rows.map((row) => {
           const listing = Array.isArray(row.listings) ? row.listings[0] : row.listings;
           return {
             id: row.id,
             sender_id: row.sender_id,
             body: row.body,
             via: row.via === 'email' ? ('email' as const) : ('app' as const),
-            listing: listing ? formatTitle(listing) : null,
+            listing:
+              row.listing_id && listing
+                ? {
+                    id: row.listing_id,
+                    title: formatTitle(listing),
+                    photoUrl: covers.get(row.listing_id) ?? null,
+                  }
+                : null,
             created_at: row.created_at,
           };
         }),
       };
     },
   });
+}
+
+/** The first photograph of each watch, in the order the dealer arranged them. */
+async function coverPhotos(listingIds: string[]): Promise<Map<string, string>> {
+  const covers = new Map<string, string>();
+  const ids = [...new Set(listingIds)];
+  if (ids.length === 0) return covers;
+
+  const { data, error } = await supabase
+    .from('listing_photos')
+    .select('listing_id, position, storage_path, source_url')
+    .in('listing_id', ids)
+    .order('position');
+  if (error) throw error;
+
+  for (const photo of data ?? []) {
+    if (!covers.has(photo.listing_id)) covers.set(photo.listing_id, listingPhotoUrl(photo));
+  }
+  return covers;
 }
 
 /** Marks a message the server has not confirmed yet. Never a real row's id. */
@@ -167,7 +203,7 @@ export function useSendMessage(
   conversationId: string,
   userId: string,
   /** Set when this visit is a reply to one watch. Later messages in the visit name it too. */
-  about?: { listingId: string; title: string | null } | null,
+  about?: { listingId: string; title: string | null; photoUrl: string | null } | null,
 ) {
   const queryClient = useQueryClient();
   const queryKey = keys.conversation(conversationId);
@@ -192,7 +228,9 @@ export function useSendMessage(
         sender_id: userId,
         body: body.trim(),
         via: 'app',
-        listing: about?.title ?? null,
+        listing: about?.title
+          ? { id: about.listingId, title: about.title, photoUrl: about.photoUrl }
+          : null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<Thread>(queryKey, (thread) =>

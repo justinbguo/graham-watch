@@ -1826,6 +1826,15 @@ the two sides differ in colour as well. A run of messages from one person shows 
 under the last of them; a time on every bubble doubles the height of a conversation to
 say almost nothing.
 
+A message about a watch quotes it. The photograph and the name sit above the
+words, on the same side as the bubble, because one thread holds every watch you
+have asked that shop about. The frame is the wishlist's: `gridScan` wide, 5/7,
+`contain`, `radius.md`. The name is `labelStrong`. A tap opens the listing.
+The first time you write about that watch, the field already says "Hey, is
+this watch still available?" A thread that already names it starts empty, so a
+follow-up does not ask again. A shop with no account here gets the same
+sentence in the email.
+
 A thread catches up every five seconds while it is open, and the list every thirty. That
 is polling, not a live connection: a websocket is a second thing to authorise and
 reconcile, and an answer that lands within a few seconds reads as live. It is the first
@@ -1834,7 +1843,7 @@ thing to change if a slow answer starts costing a deal.
 ### A shop that has not claimed its account
 
 Asking a shop about a watch still sends the email it always did. The thread is what that
-email leaves behind: each inquiry is a message in it, captioned with the watch it named
+email leaves behind: each inquiry is a message in it, quoting the watch it named
 and marked as sent by email.
 
 If nobody at the shop has claimed it on Graham, the composer is replaced by a line

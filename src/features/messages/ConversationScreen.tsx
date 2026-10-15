@@ -8,22 +8,28 @@ import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
-import { useListing } from '@/data/listings';
+import { useListing, usePrimeListing } from '@/data/listings';
 import {
   isPending as isSending,
   useConversation,
   useMarkConversationRead,
   useSendMessage,
   type Message as ChatMessage,
+  type MessageListing,
 } from '@/data/messages';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
+import { useOpenStack } from '@/lib/openStack';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 import { Bubble } from './Bubble';
+import { ListingQuote } from './ListingQuote';
 import { partyLine, partyName } from './party';
+
+/** The first thing you send a shop about a watch, until you write your own. */
+const DEFAULT_INQUIRY = 'Hey, is this watch still available?';
 
 /** A run of messages from one person inside this many minutes shows one time. */
 const RUN = 60 * 60 * 1000;
@@ -41,19 +47,38 @@ export function ConversationScreen({
   const styles = useThemedStyles(screenStyles);
   const lift = useKeyboardLift();
   const list = useRef<FlatList<ChatMessage>>(null);
-  const [draft, setDraft] = useState('');
+  // Null until they edit. The default below is what an untouched field shows,
+  // so clearing the sentence stays cleared.
+  const [draft, setDraft] = useState<string | null>(null);
 
   const { data, isPending, error } = useConversation(conversationId);
   const { data: listing } = useListing(listingId ?? '');
-  const about = listing ? formatTitle(listing) : null;
+  const primeListing = usePrimeListing();
+  const open = useOpenStack();
+  const quote: MessageListing | null = listing
+    ? {
+        id: listing.id,
+        title: formatTitle(listing),
+        photoUrl: listing.photos[0]?.url ?? null,
+      }
+    : null;
+  const asked = Boolean(
+    listingId && data?.messages.some((message) => message.listing?.id === listingId),
+  );
+  const value = draft ?? (listingId && data && !asked ? DEFAULT_INQUIRY : '');
   const send = useSendMessage(
     conversationId,
     userId ?? '',
-    listingId ? { listingId, title: about } : null,
+    listingId ? { listingId, title: quote?.title ?? null, photoUrl: quote?.photoUrl ?? null } : null,
   );
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
   const close = () => router.back();
+
+  function openWatch(id: string) {
+    if (listing?.id === id) primeListing(listing);
+    open('listing/[listingId]', { listingId: id }, `/listing/${id}`);
+  }
 
   const last = data?.messages.at(-1)?.id;
   useEffect(() => {
@@ -84,7 +109,7 @@ export function ConversationScreen({
   const who = header.with;
 
   function submit() {
-    const body = draft.trim();
+    const body = value.trim();
     if (!body || send.isPending) return;
     // The field clears as the bubble rises. If the write fails the words come
     // back to the field, unless something new has been typed over them.
@@ -112,29 +137,34 @@ export function ConversationScreen({
           ListEmptyComponent={
             <Message text="No messages yet. Say what you are after." />
           }
-          renderItem={({ item, index }) => (
-            <Bubble
-              body={item.body}
-              mine={item.sender_id === userId}
-              caption={caption(item)}
-              when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
-              // The pending row is the one that rises. The server's copy of it
-              // takes its place without moving, so one send is one arrival.
-              sent={isSending(item)}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            const watchId = item.listing?.id;
+            return (
+              <Bubble
+                body={item.body}
+                mine={item.sender_id === userId}
+                listing={item.listing}
+                onOpenListing={watchId ? () => openWatch(watchId) : undefined}
+                caption={item.via === 'email' ? 'Sent by email' : null}
+                when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
+                // The pending row is the one that rises. The server's copy of it
+                // takes its place without moving, so one send is one arrival.
+                sent={isSending(item)}
+              />
+            );
+          }}
         />
         {header.writable ? (
           <SendBar
-            placeholder={about ? 'Write about this watch' : 'Write a message'}
-            value={draft}
+            placeholder={quote ? 'Write about this watch' : 'Write a message'}
+            value={value}
             onChangeText={setDraft}
             onSend={submit}
             busy={send.isPending}
             note={
-              about || send.error ? (
+              quote || send.error ? (
                 <View style={styles.note}>
-                  {about ? <Text style={styles.about}>About {about}</Text> : null}
+                  {quote ? <ListingQuote listing={quote} onPress={() => openWatch(quote.id)} /> : null}
                   {send.error ? <Message text="That message did not send." tone="error" /> : null}
                 </View>
               ) : null
@@ -145,7 +175,8 @@ export function ConversationScreen({
           // thread is still the record of what was asked. Email is how the
           // message leaves, and the inquiry lands in this same thread.
           <View style={styles.closed}>
-            {about ? <Text style={styles.about}>About {about}</Text> : null}
+            {quote ? <ListingQuote listing={quote} onPress={() => openWatch(quote.id)} /> : null}
+            {value ? <Text style={styles.inquiry}>{value}</Text> : null}
             <Message
               text={`${partyName(who)} has not claimed their shop on Graham. Their reply comes to your email.`}
             />
@@ -157,7 +188,7 @@ export function ConversationScreen({
                 busy={mail.isPending}
                 onPress={() =>
                   mail.mutate(
-                    { card: listing, message: '' },
+                    { card: listing, message: value },
                     {
                       onSuccess: () => {
                         void queryClient.invalidateQueries({
@@ -175,12 +206,6 @@ export function ConversationScreen({
       </View>
     </Screen>
   );
-}
-
-function caption(message: ChatMessage) {
-  const about = message.listing ? `About ${message.listing}` : null;
-  if (message.via === 'email') return about ? `${about} · Sent by email` : 'Sent by email';
-  return about;
 }
 
 /** The last message of a run: the next one is someone else's, or an hour later. */
@@ -204,9 +229,9 @@ const screenStyles = (theme: Theme) => ({
   note: {
     gap: space.xs,
   },
-  about: {
-    ...type.caption,
-    color: theme.color.textMuted,
+  inquiry: {
+    ...type.body,
+    color: theme.color.text,
   },
   closed: {
     paddingHorizontal: inset.screen,
