@@ -35,6 +35,8 @@ export const keys = {
   conversations: ['conversations'] as const,
   /** Conversation ids whose messages contain this text. */
   messageSearch: (query: string) => ['message-search', query] as const,
+  /** People whose username or name starts with this text. */
+  people: (query: string) => ['people', query] as const,
   /** Listing ids the buyer has already named in a message. */
   discussed: ['discussed-listings'] as const,
   conversation: (conversationId: string) => ['conversation', conversationId] as const,

@@ -337,15 +337,18 @@ has two sides and no member list: `opener_id` is whoever wrote first, and the ot
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
 shop that claims its account later inherits the threads already addressed to it.
 
-A conversation with a person starts from their post, their comment, or their
-username on the Messages tab. A conversation with a shop starts from Message
-beside Follow, on the shop's page and on a listing's dealer panel, or from
-Message on a saved watch. The username is an exact handle, resolved by
-`conversation_with_handle`, because `profiles` is readable only by its owner.
-There is no directory of people. The same field filters the threads you are
-in, by name, handle, and message text. The shop button calls
-`conversation_with_dealer`, which opens the same thread `dealer_conversation`
-already keeps, one per shop.
+A conversation with a person starts from their post, their comment, the plus
+on the Messages tab, or an exact username in the thread search. A conversation
+with a shop starts from Message beside Follow, on the shop's page and on a
+listing's dealer panel, or from Message on a saved watch. The plus opens New
+message as a sheet and calls `suggest_people`, which returns at most eight
+accounts and never the caller. An empty field returns the people you already
+talk to, then the earliest members by collector number. Typing narrows it to a
+username or name prefix. `conversation_with_handle` still resolves
+one exact handle. Both exist because `profiles` is readable only by its owner.
+The field under the title filters the threads you are in, by name, handle, and
+message text. The shop button calls `conversation_with_dealer`, which opens the
+same thread `dealer_conversation` already keeps, one per shop.
 
 Sending an inquiry still emails the shop. A trigger also drops that message into the
 buyer's thread with the shop, marked `via = 'email'` and naming the listing. Until the

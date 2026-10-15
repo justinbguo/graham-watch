@@ -111,7 +111,7 @@ export function ConversationList({ userId }: { userId: string }) {
             ) : (
               <Centered>
                 <Heading>No messages yet</Heading>
-                <Message text="Search a username above, ask a shop about a watch, or write from a post." />
+                <Message text="Tap + to message someone, ask a shop about a watch, or write from a post." />
               </Centered>
             )
           }

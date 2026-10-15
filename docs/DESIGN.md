@@ -1813,12 +1813,18 @@ name, their handle, and the latest line filter as you type. After a short pause 
 same words are matched against older messages in those threads, so a sentence from
 last week still finds the conversation.
 
-A complete username in that field — the same rule as sign-up — offers a new message
-to that account. `@ada` does not list everyone whose name starts the same way. There
-is still no directory of collectors. Profiles stay readable only by their owner;
-`conversation_with_handle` turns one exact handle into one thread, and a thread that
-already exists is the one that opens. A conversation also still starts from a post
-or from a watch a shop is selling.
+A plus at the end of the title opens New message, a sheet over the tab. The
+sheet is a field with people under it before anything is typed: the people you
+already talk to, then the earliest members. There is no line telling you what
+to search; the list is the instruction. Typing narrows it to a username prefix
+or the start of a name. It is never more than eight and never you. Profiles
+stay readable only by their owner; `suggest_people` is the one place a list of
+accounts leaves that table, and pressing one calls `conversation_with_person`.
+The thread replaces the sheet, so closing the thread lands on Messages. The
+thread search under Messages still accepts one exact username, through
+`conversation_with_handle`, and a thread that already exists is the one that
+opens. A conversation also still starts from a post or from a watch a shop is
+selling.
 
 A row is the other party's photograph, their name, the last line said, and when. A shop
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same

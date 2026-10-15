@@ -2569,6 +2569,61 @@ console.log('\nmessages');
   });
   check('a guest cannot open a thread by username', anon.status >= 400, JSON.stringify(anon.body));
 
+  const blank = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: '  ' },
+  });
+  check(
+    'an empty search suggests at most eight, people you talk to first, never you',
+    blank.status < 300 &&
+      Array.isArray(blank.body) &&
+      blank.body.length <= 8 &&
+      blank.body.some((row) => row.handle === handle) &&
+      !blank.body.some((row) => row.id === importer.id),
+    JSON.stringify(blank.body),
+  );
+
+  const suggested = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: handle.slice(0, 4) },
+  });
+  check(
+    'a username prefix suggests that person',
+    suggested.status < 300 &&
+      suggested.body?.some((row) => row.handle === handle && row.name === 'Ada Byron'),
+    JSON.stringify(suggested.body),
+  );
+
+  const byName = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: 'byr' },
+  });
+  check(
+    'a last name suggests that person too',
+    byName.status < 300 && byName.body?.some((row) => row.handle === handle),
+    JSON.stringify(byName.body),
+  );
+
+  const self = await api('/rest/v1/rpc/suggest_people', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_query: handle },
+  });
+  check(
+    'you are not a suggestion for yourself',
+    self.status < 300 && !self.body?.some((row) => row.id === buyer.id),
+    JSON.stringify(self.body),
+  );
+
+  const guest = await api('/rest/v1/rpc/suggest_people', {
+    method: 'POST',
+    body: { p_query: handle },
+  });
+  check('a guest cannot search people', guest.status >= 400, JSON.stringify(guest.body));
+
   const phrase = `secret-phrase-${stamp}`;
   const sent = await api('/rest/v1/messages', {
     token: importer.token,

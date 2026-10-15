@@ -346,6 +346,38 @@ export function useMessageByHandle() {
   });
 }
 
+export type PersonSuggestion = {
+  id: string;
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  number: number;
+};
+
+/**
+ * People to start a thread with. At most eight, and never the caller. An
+ * empty field suggests the people you already talk to, then the earliest
+ * members.
+ */
+export function useSuggestPeople(query: string) {
+  const term = query.trim().toLowerCase();
+  return useQuery({
+    queryKey: keys.people(term),
+    enabled: !isDemo,
+    queryFn: async (): Promise<PersonSuggestion[]> => {
+      const { data, error } = await supabase.rpc('suggest_people', { p_query: term });
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        handle: row.handle,
+        name: row.name,
+        avatarUrl: row.avatar_url,
+        number: row.collector_number,
+      }));
+    },
+  });
+}
+
 /** A one-letter search matches almost every thread. Wait for a real word. */
 export const BODY_SEARCH_MIN = 2;
 

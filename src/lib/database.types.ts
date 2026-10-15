@@ -1600,6 +1600,16 @@ export type Database = {
         }
         Returns: string
       }
+      suggest_people: {
+        Args: { p_query: string }
+        Returns: {
+          avatar_url: string
+          collector_number: number
+          handle: string
+          id: string
+          name: string
+        }[]
+      }
       sync_source_availability: {
         Args: {
           p_dealer_id: string
