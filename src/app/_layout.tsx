@@ -87,9 +87,10 @@ function Chrome() {
 }
 
 /**
- * Guests land on the deck. Signed-in users who still need onboarding go there
- * first. While the profile is loading no guard passes, the stack renders
- * nothing, and the splash screen stays up to cover it.
+ * Web guests land on the deck. On iOS the app layout is the sign-in wall
+ * until there is a session. Signed-in users who still need onboarding go
+ * there first. While the profile is loading no guard passes, the stack
+ * renders nothing, and the splash screen stays up to cover it.
  */
 function RootNavigator() {
   const { isSignedIn } = useSession();

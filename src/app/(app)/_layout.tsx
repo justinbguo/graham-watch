@@ -1,7 +1,11 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
+import { Screen } from '@/components/ui';
+import { SignInPanel } from '@/features/auth/SignInPanel';
 import { FilterProvider } from '@/features/filters/provider';
 import { SaveFlightProvider } from '@/features/saved/flight';
+import { useSession } from '@/providers/session';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -13,6 +17,20 @@ export const unstable_settings = {
 export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function AppLayout() {
+  const { isSignedIn, isLoading } = useSession();
+
+  // iOS has no guest deck. The header cannot spare a Log in control beside
+  // the title, and the phone is not a preview of the site. Web keeps the
+  // deck, with Log in in that slot.
+  if (Platform.OS === 'ios' && !isSignedIn) {
+    if (isLoading) return null;
+    return (
+      <Screen>
+        <SignInPanel />
+      </Screen>
+    );
+  }
+
   return (
     <FilterProvider>
       {/* Outside the Stack: a saved card flies over the tab bar on its way to
