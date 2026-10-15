@@ -6,7 +6,7 @@ like. Dealer inventory is imported by an operator, not by users.
 Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and
 edge functions.
 
-- Operating guide: [docs/OPERATING.md](docs/OPERATING.md)
+- Operating guide, test accounts, operator UI: [docs/OPERATING.md](docs/OPERATING.md)
 - Shipping a change: [docs/DEVELOPING.md](docs/DEVELOPING.md)
 - Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
@@ -106,120 +106,11 @@ Go it is ours, and the tap needs that Services ID before Apple will answer.
 
 If you ship on iOS offering Google, App Store review requires Sign in with Apple too.
 
-## Importing listings
+## Operating
 
-Importing is an operator job, so it runs from the terminal rather than the app:
-
-```
-npm run dealers -- add goldfingersvintage.com   # the whole flow, from a domain
-npm run dealers                                 # list dealers and their permission
-npm run dealers -- approve <id|host>            # publish their listings
-npm run dealers -- revoke  <id|host>            # pull them back
-npm run dealers -- set     <id|host>            # re-read their name and address
-npm run dealers -- stats   <id|host>            # saves and inquiries per watch
-npm run dealers -- remove  <id|host>            # delete them, listings and photos
-```
-
-`add` finds the dealer's catalog from their sitemap, reads their shop name and contact
-address, prints a few watches it extracted, and waits for you before writing anything.
-Then it imports and approves in one step. Flags: `--limit 10`, `--url <catalog>`,
-`--name "Shop"`, `--email <address>`, `--yes`.
-
-The contact address is what makes an inquiry reach a dealer, so `list` warns about any
-dealer missing one.
-
-Use `npm run import -- <url> --limit 10` to re-run a dealer you have already added.
-Listings already imported are skipped, so it is safe to repeat.
-
-Imported listings stay invisible to everyone but the importer until the dealer is
-approved, and RLS makes self-approval impossible. That is deliberate: it keeps a shop's
-inventory from being republished just because someone scraped it.
-
-The importer needs an OpenAI key to turn a scraped page into typed listings:
-
-```
-cp supabase/functions/.env.example supabase/functions/.env   # add OPENAI_API_KEY
-npm run db:stop && npm run db:start
-```
-
-Secrets are read when the function's container is built, so editing the file is not
-enough — the container keeps the environment it was created with. Restart the stack
-with `npm run db:stop && npm run db:start`, not a container CLI. Scraping falls back to
-plain `fetch` with no key, which handles
-static HTML only; set `FIRECRAWL_API_KEY` or `JINA_API_KEY` for JavaScript-rendered
-shops. See [docs/SCRAPING.md](docs/SCRAPING.md).
-
-`npm run env -- hosted` points the scripts at production. The hosted keys stay
-in `scripts/.env.operator.local`, which the switch reads and never rewrites.
-
-## The operator UI
-
-Answering dealer applications and publishing shops runs in a web app, separate
-from the phone app and with its own dependencies:
-
-```
-npm run env -- local     # writes operator/.env.local from `supabase status`
-npm run operator         # http://localhost:5173
-```
-
-Sign in with an email and password, both set from the terminal. There is no
-sign-up and no reset in the UI, so this is the only way in:
-
-```
-npm run dealers -- operator you@example.com --password "..."
-```
-
-That creates the account if it does not exist, sets the password if it does, and
-grants operator either way. Twelve characters minimum. With no argument it
-grants `operator@graham.local`, whose local password is `graham-operator`.
-
-Watch which backend you grant on. A grant only counts in the project it was
-made in, and `npm run env` moves the scripts and the UI together so they agree.
-`npm run dealers:local` grants on the local stack whichever way the repo is
-switched.
-
-An operator is a row in an `operators` table, not whoever holds
-`SUPABASE_SERVICE_ROLE_KEY` — that key bypasses row-level security on every
-table and never belongs in a browser. So access is revocable per person, and
-`npm run db:reset` drops the grant along with everything else.
-
-### Seeding the deck
-
-Filling the app with watches is three steps, deliberately separate, because only
-the second costs money and only the third is visible to a buyer.
-
-1. **Add shops.** Paste domains one per line, or upload a CSV with a
-   `domain,name,email` header. Each site is read first and shown as a table you
-   can cut rows from; then each shop is created unpublished with its catalogue
-   read. Costs HTTP on Shopify and Squarespace.
-
-   **Listed** on that table counts product URLs in their sitemap, sold stock and
-   all — a vintage dealer's is mostly watches they sold years ago, so 970 listed
-   against 79 for sale is normal. **Inspect** on a row reads their whole feed and
-   opens every product underneath it: brand, type, price, SKU, photo count,
-   publish date, and whether it is for sale, sold, or refused with the reason.
-   It writes nothing.
-2. **Import** on a shop's row. Turns catalogue items into watches — a model call
-   and a photo download each, so you type the count.
-3. **Publish** the shop. This is what puts its watches in the deck.
-
-Nothing is lost if you close the tab mid-run. Domains are keyed on the shop's
-website, so pasting the same list again skips what is already there, and a shop's
-**Catalogue** column reports what is still queued for a stopped import.
-
-The arrow on a shop's row opens what has been imported, with photos, prices and
-the catalogue items that failed to read.
-
-Adding or refreshing a shop also reads three things off their homepage for their
-page in the app: a description in their own words, an Instagram handle, and the
-icon their site declares. Of eight real dealer sites, 7 published a description,
-7 a handle and 6 an icon. A phone number and a postal address were on 1 and 0,
-so neither is collected.
-
-Importing is refused on a shop a dealer has claimed — they manage their own
-inventory from the app. Those rows show Import disabled.
-
-More in [docs/OPERATING.md](docs/OPERATING.md).
+Importing shops, the operator UI, keys, and the local test accounts live in
+[docs/OPERATING.md](docs/OPERATING.md). For two accounts that can message each
+other and a shop that answers in the app, run `npm run mock:users`.
 
 ## Layout
 
@@ -281,6 +172,7 @@ not. Store binaries are a different path: [docs/OPERATING.md](docs/OPERATING.md)
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:rls` | Exercise every row-level security policy over HTTP |
 | `npm run db:reset` | Re-apply migrations and seed the inventory snapshot |
+| `npm run mock:users` | Create the local test accounts and Mock Desk (after every reset) |
 | `npm run db:types` | Regenerate `src/lib/database.types.ts` from the live schema |
 | `npm run snapshot` | Rewrite `supabase/seed.sql` from a live project's inventory |
 | `npm run dealers:local` | Any `dealers` command, against the local stack |

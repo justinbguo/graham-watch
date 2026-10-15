@@ -63,6 +63,7 @@
     "build:preview:ios": "npx eas-cli@latest build --profile preview --platform ios",
     "operator": "cd operator && { test -d node_modules || npm install; } && npm run dev",
     "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
+    "mock:users": "GRAHAM_TARGET=local node scripts/mock-users.mjs",
     "import": "node scripts/import.mjs",
     "sweep": "node scripts/sweep.mjs",
     "refresh": "node scripts/refresh.mjs",

@@ -1,9 +1,11 @@
 # Operating Graham
 
-Day-to-day commands and habits. Setup lives in the [README](../README.md); this is
-what to do once it is set up. What the app is for lives in
-[PRODUCT_SPEC](PRODUCT_SPEC.md); this is how to run it. Shipping a change
-onto `main` lives in [DEVELOPING](DEVELOPING.md).
+Everything behind the app that is neither the product nor the code: test
+accounts, keys, backends, importing shops, the operator UI, and day-to-day
+commands. First-time setup lives in the [README](../README.md). What the app
+is for lives in [PRODUCT_SPEC](PRODUCT_SPEC.md), and how it looks in
+[DESIGN](DESIGN.md). Shipping a change onto `main` lives in
+[DEVELOPING](DEVELOPING.md).
 
 ## Which Graham am I looking at?
 
@@ -298,6 +300,28 @@ password is `graham-operator`.
 A `db:reset` drops the account, the password and the grant together. Run it
 again.
 
+### Seeding the deck
+
+Filling the app with watches is three steps, kept apart because only the
+second costs money and only the third reaches a buyer.
+
+1. **Add shops.** Paste domains or upload a CSV ([Adding shops in bulk](#adding-shops-in-bulk)).
+   Each shop is created unpublished with its catalogue read. Costs HTTP on
+   Shopify and Squarespace.
+2. **Import** on a shop's row. Turns catalogue items into watches: a model call
+   and a photo download each, so you type the count.
+3. **Publish** the shop. This puts its watches in the deck.
+
+**Listed** on the preview table counts product URLs in the shop's sitemap,
+sold stock included. A vintage dealer's sitemap is mostly watches sold years
+ago, so 970 listed against 79 for sale is normal. **Inspect** on a row reads
+the whole feed and shows every product: brand, type, price, SKU, photo count,
+publish date, and whether it is for sale, sold, or refused with the reason. It
+writes nothing.
+
+The arrow on a shop's row opens what has been imported, with photos, prices,
+and the catalogue items that failed to read.
+
 ### Keeping shops current
 
 ```
@@ -565,7 +589,7 @@ Two interfaces worth bookmarking:
 `npm run db:reset` leaves one shop and 52 watches in the deck already — the
 snapshot in `supabase/seed.sql`. Nothing to import first:
 
-1. `npm run web`, sign in with any address.
+1. `npm run web`, sign in with any address, or as one of the [test accounts](#test-accounts).
 2. Onboarding asks for a name — the inquiry email opens with it, so it is not optional.
 3. Swipe the deck. Right saves, left passes.
 4. Wishlist tab → **Message** under the price. The seed shop has not claimed, so
@@ -634,6 +658,41 @@ The account is created on first use. Codes expire after an hour.
 That Mailpit-reading shortcut is gated on the Supabase URL being a local host,
 not on `__DEV__`. Expo Go is always "dev" even when pointed at hosted, where
 there is no Mailpit to read.
+
+### Test accounts
+
+Every one is local. None exists on hosted, and `npm run db:reset` deletes them
+all. The seed account comes back with the reset; run the command in the last
+column for the rest.
+
+| Address | Name | What it is for | Made by |
+| --- | --- | --- | --- |
+| `ada@graham.test` | Ada Byron, `@ada` | Buyer. Messages Bea, and Mock Desk about its watch. | `npm run mock:users` |
+| `bea@graham.test` | Bea Cole, `@bea` | The second buyer, for a buyer-to-buyer thread. | `npm run mock:users` |
+| `dealer@graham.test` | Dana Hart, `@desk` | Dealer. Owns Mock Desk and answers Ada in the app. | `npm run mock:users` |
+| `seed-shop@graham.test` | none | Added Goldfinger's Vintage. Never sign in as it: the deck hides a shop's watches from whoever added it, so it shows an empty deck. | `npm run db:reset` |
+| `operator@graham.local` | none | Operator UI sign-in, password `graham-operator`. The terminal scripts import as this account. | `npm run dealers:local -- operator` |
+
+Sign in to the app as Ada, Bea, or Dana with **Log in with email**. The code
+fills in from Mailpit, so there is no password to type. One device holds one
+session, so sign out before switching. Two simulators let both sides of a
+thread stay open.
+
+Two shops exist after both commands:
+
+| Shop | Contact | State | Walks |
+| --- | --- | --- | --- |
+| Goldfinger's Vintage | `sales@goldfingersvintage.com.test` | Unclaimed, 52 watches | **Email the shop** |
+| Mock Desk, `mock-desk.graham.test` | `dealer@graham.test` | Claimed by Dana, one watch: Fixture Message Test, `MOCK-1` | A reply in the app |
+
+`mock:users` refuses to run against hosted and is safe to repeat. It finishes
+each profile (name, handle, birthday, onboarded), so these accounts skip
+onboarding. To walk onboarding, sign in with a new address.
+
+`npm run test:rls` makes its own accounts, such as `buyer-<timestamp>@example.com`
+and `claimer-<timestamp>@personal.test`, with password `password123`. It deletes
+them when it finishes. A run that crashes partway leaves some behind. They are
+harmless, and the next reset clears them.
 
 ## Which failures are expected
 
@@ -810,6 +869,25 @@ Fix it with `set --email`.
 `remove` deletes the photo files too. Foreign keys cascade the rows; storage has no
 idea the listing is gone, so the CLI clears it.
 
+`add` takes `--limit 10`, `--url <catalog>`, `--name "Shop"`, `--email <address>`,
+and `--yes`. To re-run a shop already added, use `npm run import -- <url> --limit 10`.
+It skips listings already imported, so a repeat costs nothing twice.
+
+### Importer keys
+
+The importer needs an OpenAI key to turn a scraped page into typed listings:
+
+```
+cp supabase/functions/.env.example supabase/functions/.env   # add OPENAI_API_KEY
+npm run db:stop && npm run db:start
+```
+
+A function's container reads secrets when it is built, so editing the file is
+not enough. Restart the stack as above, not with a container CLI. With no
+scraping key, the importer falls back to plain `fetch`, which reads static HTML
+only. Set `FIRECRAWL_API_KEY` or `JINA_API_KEY` for shops that render with
+JavaScript. See [SCRAPING](SCRAPING.md).
+
 ## Shipping a binary
 
 `npm run ios` still opens Expo Go. That is a host app Expo publishes, not Graham.
@@ -880,8 +958,8 @@ applications.
 
 Only email codes work today. Google's door stays off until
 `EXPO_PUBLIC_GOOGLE_SIGN_IN=1`. Apple's door is always on screen; the native
-button needs a development build, and the tap needs a Services ID. See the
-README for what turning either on takes.
+button needs a development build, and the tap needs a Services ID. See
+[AUTH](AUTH.md) for what turning either on takes.
 
 The automated tests above the database are the Squarespace, Shopify, and
 sitemap parsers, plus the operator UI's pasted-list parser. `test:rls` covers
