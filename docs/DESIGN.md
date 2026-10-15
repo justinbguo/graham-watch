@@ -205,12 +205,14 @@ beside the word on sign-in for a while, and that made the screen a poster
 before it was a form. No screen wears the mark in its header either: a header
 holds a word, a count, and controls, and the word is the name.
 
-Sign-in is a sheet over the deck, not a wall before it. Guests land on Buy with
-**Log in** in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the
-sheet opens itself with copy that says why. The sheet is the wordmark, one
+On web, sign-in is a sheet over the deck. Guests land on Buy with **Log in**
+in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the sheet
+opens itself with copy that says why. The sheet is the wordmark, one
 `body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
-with **Not now** to dismiss. There is no second headline, no decorative watch
-beside the word, and no card around the doors.
+with **Not now** to dismiss. On iOS, that same panel is the first screen, and
+it does not dismiss: the header has no room for a **Log in** control beside
+undo, filters, and the view toggle. There is no second headline, no decorative
+watch beside the word, and no card around the doors.
 
 `GRAHAM` is Neue Haas Grotesk Display Bold, at 44pt, tracked at
 `tracking.wordmark` (−2.2). Capitals at that size want to drift apart; pulling
