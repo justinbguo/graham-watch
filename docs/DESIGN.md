@@ -1832,6 +1832,11 @@ square a person's photograph fills. A shop that declared none, or whose icon fai
 load, gets `assets/dealer.png` — one picture every such shop shares, bundled with the
 app. A person with no photograph still gets the account glyph. A miss never draws a
 globe: an invented mark fetched for that one shop makes the name harder to trust.
+The photograph is a second door inside the row: it opens the shop page or the
+collector profile, while the name and message preview open the thread. The same
+photograph in a thread's header opens that profile too. `collector_profile`
+returns one named collector for that durable route; the profiles table itself
+stays private.
 Unread is a dot at the end of the line rather than a count: how
 many messages are waiting does not change what you do about them, and a number on every
 row turns a list into a scoreboard.

@@ -2624,6 +2624,43 @@ console.log('\nmessages');
   });
   check('a guest cannot search people', guest.status >= 400, JSON.stringify(guest.body));
 
+  const collector = await api('/rest/v1/rpc/collector_profile', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_user_id: buyer.id },
+  });
+  check(
+    'a message avatar opens that collector profile',
+    collector.status < 300 &&
+      collector.body?.[0]?.id === buyer.id &&
+      collector.body?.[0]?.handle === handle &&
+      collector.body?.[0]?.name === 'Ada Byron',
+    JSON.stringify(collector.body),
+  );
+
+  const missingCollector = await api('/rest/v1/rpc/collector_profile', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_user_id: '00000000-0000-0000-0000-000000000000' },
+  });
+  check(
+    'a missing collector returns no profile',
+    missingCollector.status < 300 &&
+      Array.isArray(missingCollector.body) &&
+      missingCollector.body.length === 0,
+    JSON.stringify(missingCollector.body),
+  );
+
+  const guestCollector = await api('/rest/v1/rpc/collector_profile', {
+    method: 'POST',
+    body: { p_user_id: buyer.id },
+  });
+  check(
+    'a guest cannot open a collector profile',
+    guestCollector.status >= 400,
+    JSON.stringify(guestCollector.body),
+  );
+
   const phrase = `secret-phrase-${stamp}`;
   const sent = await api('/rest/v1/messages', {
     token: importer.token,

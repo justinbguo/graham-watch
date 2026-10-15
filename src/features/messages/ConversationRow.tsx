@@ -21,6 +21,7 @@ export function ConversationRow({
   detail,
   label,
   busy = false,
+  onOpenParty,
 }: {
   conversation: ConversationSummary;
   onPress: () => void;
@@ -28,6 +29,7 @@ export function ConversationRow({
   detail?: string;
   label?: string;
   busy?: boolean;
+  onOpenParty?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
   const who = conversation.with;
@@ -40,35 +42,33 @@ export function ConversationRow({
       : 'No messages yet');
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
-      accessibilityState={{ disabled: busy, busy }}
-      disabled={busy}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && !busy && styles.pressed,
-        busy && styles.busy,
-      ]}>
-      <PartyAvatar who={who} />
-      <View style={styles.copy}>
-        <View style={styles.line}>
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
-          {!detail && conversation.last ? (
-            <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
-          ) : null}
+    <View style={[styles.row, busy && styles.busy]}>
+      <PartyAvatar who={who} onPress={onOpenParty} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
+        accessibilityState={{ disabled: busy, busy }}
+        disabled={busy}
+        onPress={onPress}
+        style={({ pressed }) => [styles.rowPress, pressed && !busy && styles.pressed]}>
+        <View style={styles.copy}>
+          <View style={styles.line}>
+            <Text style={styles.name} numberOfLines={1}>
+              {name}
+            </Text>
+            {!detail && conversation.last ? (
+              <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
+            ) : null}
+          </View>
+          <View style={styles.line}>
+            <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
+              {preview}
+            </Text>
+            {unread ? <View style={styles.dot} /> : null}
+          </View>
         </View>
-        <View style={styles.line}>
-          <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
-            {preview}
-          </Text>
-          {unread ? <View style={styles.dot} /> : null}
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -78,6 +78,10 @@ const rowStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.md,
     paddingVertical: space.md,
+  },
+  rowPress: {
+    flex: 1,
+    minWidth: 0,
   },
   pressed: {
     opacity: 0.72,

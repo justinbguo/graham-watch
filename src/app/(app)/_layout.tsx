@@ -40,6 +40,7 @@ export default function AppLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="listing/[listingId]" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="dealer/[dealerId]" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="collector/[userId]" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen
             name="conversation/[conversationId]"
             options={{ presentation: 'fullScreenModal' }}

@@ -17,6 +17,7 @@ import { useThemedStyles } from '@/providers/theme';
 import { ConversationRow } from './ConversationRow';
 import { MessageHandle } from './MessageHandle';
 import { hasHandle, visibleConversations } from './match';
+import { useOpenParty } from './openParty';
 
 /** Each letter is not a search. Older lines are asked once typing pauses. */
 const BODY_SEARCH_PAUSE = 300;
@@ -32,6 +33,7 @@ const BODY_SEARCH_PAUSE = 300;
 export function ConversationList({ userId }: { userId: string }) {
   const styles = useThemedStyles(listStyles);
   const open = useOpenStack();
+  const openParty = useOpenParty();
   const { data: conversations = [], isPending, error } = useConversations(userId);
   const [query, setQuery] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export function ConversationList({ userId }: { userId: string }) {
           renderItem={({ item }) => (
             <ConversationRow
               conversation={item}
+              onOpenParty={() => openParty(item.with)}
               onPress={() =>
                 open(
                   'conversation/[conversationId]',

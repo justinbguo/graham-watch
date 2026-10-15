@@ -32,6 +32,7 @@ export const keys = {
   exchange: ['exchange'] as const,
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
   collectorPosts: (userId: string) => ['collector-posts', userId] as const,
+  collectorProfile: (userId: string) => ['collector-profile', userId] as const,
   conversations: ['conversations'] as const,
   /** Conversation ids whose messages contain this text. */
   messageSearch: (query: string) => ['message-search', query] as const,

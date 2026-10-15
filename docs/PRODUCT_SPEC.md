@@ -361,7 +361,9 @@ per person as messages after their read mark that they did not send.
 
 The list, a thread's header, and starting a conversation go through security-definer
 functions, because the other side's name and photograph live in `profiles`, which is
-readable only by its owner.
+readable only by its owner. Tapping that photograph in the list or thread header
+opens the dealer's shop or the collector's profile; the rest of the row still
+opens the conversation.
 
 ## 15. Next phase, in rough order
 

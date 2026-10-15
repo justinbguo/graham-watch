@@ -25,6 +25,7 @@ import { useThemedStyles } from '@/providers/theme';
 
 import { Bubble } from './Bubble';
 import { ListingQuote } from './ListingQuote';
+import { useOpenParty } from './openParty';
 import { PartyAvatar } from './PartyAvatar';
 import { partyLine, partyName } from './party';
 
@@ -55,6 +56,7 @@ export function ConversationScreen({
   const { data: listing } = useListing(listingId ?? '');
   const primeListing = usePrimeListing();
   const open = useOpenStack();
+  const openParty = useOpenParty();
   const quote: MessageListing | null = listing
     ? {
         id: listing.id,
@@ -155,7 +157,7 @@ export function ConversationScreen({
           (partyLine(who) ?? undefined)
         )
       }
-      leading={<PartyAvatar who={who} px={size.avatarHeader} />}
+      leading={<PartyAvatar who={who} px={size.avatarHeader} onPress={() => openParty(who)} />}
       action={<CloseButton onPress={close} />}>
       <View style={[styles.fill, { paddingBottom: lift }]}>
         <FlatList

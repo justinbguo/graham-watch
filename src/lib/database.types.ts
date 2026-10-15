@@ -1122,6 +1122,16 @@ export type Database = {
         Returns: string
       }
       claim_username: { Args: { candidate: string }; Returns: string }
+      collector_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          avatar_url: string
+          collector_number: number
+          handle: string
+          id: string
+          name: string
+        }[]
+      }
       controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
       conversation_about_listing: {
         Args: { p_listing_id: string }
