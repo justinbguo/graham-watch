@@ -1821,8 +1821,10 @@ to search; the list is the instruction. Typing narrows it to a username prefix
 or the start of a name. It is never more than eight and never you. Profiles
 stay readable only by their owner; `suggest_people` is the one place a list of
 accounts leaves that table, and pressing one calls `conversation_with_person`.
-The thread replaces the sheet, so closing the thread lands on Messages. The
-thread search under Messages still accepts one exact username, through
+That opens the thread already there with that person, including the one that
+started because they wrote to your shop, rather than a second thread with the
+same name on it. The thread replaces the sheet, so closing the thread lands on
+Messages. The thread search under Messages still accepts one exact username, through
 `conversation_with_handle`, and a thread that already exists is the one that
 opens. A conversation also still starts from a person's profile or from a watch
 a shop is selling.

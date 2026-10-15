@@ -332,7 +332,7 @@ the feed, which stays newest-first.
 
 ## 14. Messages
 
-The Messages tab, between Community and Wishlist. One thread per pair of people, and one per shop a buyer has written to. A conversation
+The Messages tab, between Community and Wishlist. One thread per pair of people, and one per shop a buyer has written to. A shop thread is already the chat with that buyer, so messaging them opens it instead of a second thread. A conversation
 has two sides and no member list: `opener_id` is whoever wrote first, and the other side
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
 shop that claims its account later inherits the threads already addressed to it.
