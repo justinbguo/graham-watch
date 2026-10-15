@@ -451,6 +451,12 @@ export const size = {
    */
   gridPhoto: 96,
   /**
+   * The watch quoted in a message. One photograph, not a cell in a row of
+   * three, so it can be larger than `gridPhoto` and still leave the field
+   * above the keyboard.
+   */
+  quotePhoto: 160,
+  /**
    * The same frame on the home grid and the wishlist. Shorter, so a scan of
    * the deck or a saved list is a list. A shop keeps `gridPhoto`. Search is a
    * wall of photographs, not a row.

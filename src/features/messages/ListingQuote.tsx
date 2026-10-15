@@ -6,9 +6,10 @@ import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * The watch a message is answering: the photograph, the name under it. The
- * shop-page frame, `gridPhoto`, 5/7 and `contain`, so the case stays
- * recognisable beside the composer. It sits on the side of whoever is asking.
+ * The watch a message is answering: the photograph, the name under it. One
+ * photograph in the composer, so the frame is `quotePhoto` rather than a grid
+ * cell. The name is `title`, and its box is about 15% narrower than a message
+ * bubble, so the bigger type wraps instead of running the width of the thread.
  */
 export function ListingQuote({
   listing,
@@ -51,7 +52,8 @@ const quoteStyles = (theme: Theme) => ({
     alignSelf: 'flex-start' as const,
     alignItems: 'flex-start' as const,
     gap: stack.tight,
-    maxWidth: '82%' as const,
+    // A bubble stops at 82% of the column. The name's box is about 15% under that.
+    width: '70%' as const,
   },
   mine: {
     alignSelf: 'flex-end' as const,
@@ -61,7 +63,7 @@ const quoteStyles = (theme: Theme) => ({
     opacity: 0.72,
   },
   photo: {
-    width: size.gridPhoto,
+    width: size.quotePhoto,
     aspectRatio: 5 / 7,
     borderRadius: radius.md,
     overflow: 'hidden' as const,
@@ -77,7 +79,8 @@ const quoteStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
   },
   title: {
-    ...type.titleSmall,
+    ...type.title,
+    width: '100%' as const,
     color: theme.color.text,
   },
   titleMine: {
