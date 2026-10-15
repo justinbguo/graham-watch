@@ -1561,9 +1561,10 @@ signed in can comment. The comment is the public record that they are in the dea
 
 It was Exchange, under two arrows, with Messages as a tab of its own beside it. The
 arrows named the deal and nothing else on the board; the people are who you are among.
-Messages moved in, then back out. A conversation still starts here or from a shop's
-watch, but the reply arrives later, and a header control on this tab and on Wishlist
-could not show it while you were swiping. Search left the bar so Messages could take
+Messages moved in, then back out. A conversation with a person starts from their
+profile. One with a shop starts from that shop's watch. The reply arrives later,
+and a header control on this tab and on Wishlist could not show it while you were
+swiping. Search left the bar so Messages could take
 a seat without a sixth glyph. The database keeps the old word: the tables are `exchange_*`
 and so are the hooks and the feature folder, because a rename there is a migration, and
 the name a user reads and the name a table has are two different things.
@@ -1651,8 +1652,8 @@ background; the one you are on is the warm tan, the same accent the deck's bars 
 the mark is the one thing on a photograph that is not white. The next photo is prefetched
 while this one is being looked at.
 
-Everything you can do about a post is in one row of capsules at its foot: the votes, the
-comment count, and — on anyone else's post — writing to them. That row is `ActionBar`,
+Everything you can do about a post is in one row of capsules at its foot: the votes and the
+comment count. Writing to the person is on their profile, not on the post. That row is `ActionBar`,
 and each capsule is an `ActionPill`: a glyph at `size.iconSmall` with a count in `control`
 beside it, both `ink`, filled with `fill` rather than outlined, because a row of outlines
 reads as a row of empty boxes and this app keeps depth in the step between surfaces. At
@@ -1731,15 +1732,15 @@ Nesting stops at one level. A reply to a reply attaches to the same root, becaus
 deep enough to need a rule down the left margin is a tree nobody can follow on a phone,
 and the database flattens it rather than trusting every client to.
 
-Anyone else's post or comment ends its action bar with a message pill. It opens the
-conversation with that person, and finds the one already there if you have written
-before. Your own post has no such pill — writing to yourself is not a thing — and the
-three dots in the byline are what stands in its place.
+The three dots in your own byline are how you edit or delete that post.
 
 The byline is a button. Tapping the face or the name opens that person. The
 screen title is their name, so the row under it does not say it again: the
 photograph at `size.profile`, the `@handle`, and the collector number in brass,
-centred on the photograph, then the posts they have written. Back returns to
+centred on the photograph. Message sits at the end of that row when the profile
+is someone else's, and it opens the conversation with them, finding the one
+already there if you have written before. Your own profile has no such button.
+Then the posts they have written. Back returns to
 the post or the feed you came from, and a post there opens the thread. The page
 is built from the author already on the post and from `exchange_posts`, which
 anyone signed in can read. It does not read `profiles`. The wishlist, the shop,
@@ -1823,8 +1824,8 @@ accounts leaves that table, and pressing one calls `conversation_with_person`.
 The thread replaces the sheet, so closing the thread lands on Messages. The
 thread search under Messages still accepts one exact username, through
 `conversation_with_handle`, and a thread that already exists is the one that
-opens. A conversation also still starts from a post or from a watch a shop is
-selling.
+opens. A conversation also still starts from a person's profile or from a watch
+a shop is selling.
 
 A row is the other party's photograph, their name, the last line said, and when. A shop
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same

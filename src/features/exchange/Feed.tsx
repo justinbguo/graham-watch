@@ -10,23 +10,20 @@ import {
   useExchangeFeed,
 } from '@/data/exchange';
 import { ActionBar, ActionPill } from '@/components/ActionBar';
-import { MessagePerson } from '@/features/messages/MessagePerson';
 import { inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { atHandle, commentCount } from './copy';
+import { commentCount } from './copy';
 import type { FeedFilter } from './IntentFilter';
 import { PostHeader, PostLead } from './PostHeader';
 import { PostTitle } from './PostTitle';
 import { Votes } from './Votes';
 
 export function Feed({
-  userId,
   filter,
   onOpen,
   onOpenAuthor,
 }: {
-  userId: string;
   filter: FeedFilter;
   onOpen: (id: string) => void;
   onOpenAuthor: (author: ExchangeAuthor) => void;
@@ -72,7 +69,6 @@ export function Feed({
         <PostCard
           post={item}
           first={index === 0 && buying.length === 0}
-          mine={item.author.id === userId}
           onPress={() => onOpen(item.id)}
           onOpenAuthor={() => onOpenAuthor(item.author)}
           onVote={(value) => vote.mutate({ postId: item.id, value })}
@@ -129,7 +125,6 @@ function PinnedBuys({
 function PostCard({
   post,
   first,
-  mine,
   onPress,
   onOpenAuthor,
   onVote,
@@ -137,7 +132,6 @@ function PostCard({
   post: ExchangePost;
   /** The screen header already ends in air; a second gap above it doubles it. */
   first: boolean;
-  mine: boolean;
   onPress: () => void;
   onOpenAuthor: () => void;
   onVote: (value: VoteValue) => void;
@@ -171,12 +165,6 @@ function PostCard({
           text={String(post.comment_count)}
           onPress={onPress}
         />
-        {mine ? null : (
-          <MessagePerson
-            userId={post.author.id}
-            name={atHandle(post.author.handle) ?? 'this person'}
-          />
-        )}
       </ActionBar>
     </View>
   );

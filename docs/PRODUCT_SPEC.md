@@ -337,7 +337,7 @@ has two sides and no member list: `opener_id` is whoever wrote first, and the ot
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
 shop that claims its account later inherits the threads already addressed to it.
 
-A conversation with a person starts from their post, their comment, the plus
+A conversation with a person starts from their profile, the plus
 on the Messages tab, or an exact username in the thread search. A conversation
 with a shop starts from Message beside Follow, on the shop's page and on a
 listing's dealer panel, or from Message on a saved watch. The plus opens New
