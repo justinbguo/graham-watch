@@ -1816,20 +1816,21 @@ name, their handle, and the latest line filter as you type. After a short pause 
 same words are matched against older messages in those threads, so a sentence from
 last week still finds the conversation.
 
-A plus at the end of the title opens New message, a sheet over the tab. The
-sheet is a field with people under it before anything is typed: the people you
-already talk to, then the earliest members. There is no line telling you what
-to search; the list is the instruction. Typing narrows it to a username prefix
-or the start of a name. It is never more than eight and never you. Profiles
-stay readable only by their owner; `suggest_people` is the one place a list of
-accounts leaves that table, and pressing one calls `conversation_with_person`.
-That opens the thread already there with that person, including the one that
-started because they wrote to your shop, rather than a second thread with the
-same name on it. The thread replaces the sheet, so closing the thread lands on
-Messages. The thread search under Messages still accepts one exact username, through
-`conversation_with_handle`, and a thread that already exists is the one that
-opens. A conversation also still starts from a person's profile or from a watch
-a shop is selling.
+A plus at the end of the title opens New message, a sheet over the tab. It was
+the tab's own body swapping to a search, which read as Messages changing rather
+than a task you could close. The sheet is a field with people under it before
+anything is typed: the people you already talk to, then the earliest members.
+There is no line telling you what to search; the list is the instruction.
+Typing narrows it to a username prefix or the start of a name. It is never more
+than eight and never you. Profiles stay readable only by their owner;
+`suggest_people` is the one place a list of accounts leaves that table, and
+pressing one calls `conversation_with_person`. The thread replaces the sheet,
+so closing the thread lands on Messages. That opens the thread already there with that
+person, including the one that started because they wrote to your shop, rather
+than a second thread with the same name on it. The thread search under Messages
+still accepts one exact username, through `conversation_with_handle`, and a
+thread that already exists is the one that opens. A conversation also still
+starts from a person's profile or from a watch a shop is selling.
 
 A row is the other party's photograph, their name, the last line said, and when. A shop
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same
