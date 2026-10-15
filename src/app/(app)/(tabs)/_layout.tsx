@@ -20,7 +20,9 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
  */
 const ICONS: Record<string, IconName> = {
   community: 'account-multiple-outline',
-  messages: 'message-outline',
+  // `message-outline` is a box with a tail. `chat-outline` is the same bubble
+  // drawn round, which sits with the other round marks in this bar.
+  messages: 'chat-outline',
 };
 
 export default function TabsLayout() {
