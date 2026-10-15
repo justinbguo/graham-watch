@@ -17,7 +17,7 @@ its own — see "Phone" below.
 
 ## Guest browsing
 
-The app opens on the deck without an account. Guests get the same Buy surface —
+Web opens on the deck without an account. Guests get the same Buy surface —
 search, filters, grid or cards — with **Log in** at the top right. Judgments
 live on the device for `GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the
 sign-in sheet. Community, messages, wishlist, and profile ask for an account up
@@ -25,16 +25,21 @@ front. Anon may read the approved catalogue (and run `search_listings` /
 `listing_counts`); swipes and everything personal stay authenticated. Local
 guest judgments flush into `swipes` once a session lands.
 
+iOS does not browse as a guest. The first screen is the sign-in wall, and the
+deck mounts only after a session exists. There is no **Log in** control in the
+header, because that slot is already the undo, filter, and view controls.
+
 ## Create an account, or log in
 
-Sign-in is a sheet over the app, not a wall before it. It opens on creating an
-account. The doors read `Create account with`, and a line under them flips the
-doors to `Log in with`. Apple and Google behave the same in both — Supabase
-creates or finds the user from the verified address. Email is where the modes
-differ: creating sends `shouldCreateUser: true`, logging in sends `false`, so an
-address with no account gets "No account uses that address yet" instead of a
-silent new account under a typo. GoTrue reports that case as a 422 with
-`Signups not allowed for otp`; `sendEmailCode` rewrites it.
+On web, sign-in is a sheet over the app. On iOS, it is the wall in front of
+the app. Both open on creating an account. The doors read `Create account
+with`, and a line under them flips the doors to `Log in with`. Apple and
+Google behave the same in both — Supabase creates or finds the user from the
+verified address. Email is where the modes differ: creating sends
+`shouldCreateUser: true`, logging in sends `false`, so an address with no
+account gets "No account uses that address yet" instead of a silent new
+account under a typo. GoTrue reports that case as a 422 with `Signups not
+allowed for otp`; `sendEmailCode` rewrites it.
 
 ## Email code
 
