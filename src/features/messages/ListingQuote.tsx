@@ -2,14 +2,23 @@ import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
 
 import type { MessageListing } from '@/data/messages';
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * The watch a message is answering, drawn above the words. Same frame as a
- * wishlist row: 5/7 and `contain`, so the case stays recognisable at this size.
+ * The watch a message is answering: the photograph, the name under it. The
+ * shop-page frame, `gridPhoto`, 5/7 and `contain`, so the case stays
+ * recognisable beside the composer. It sits on the side of whoever is asking.
  */
-export function ListingQuote({ listing, onPress }: { listing: MessageListing; onPress: () => void }) {
+export function ListingQuote({
+  listing,
+  onPress,
+  mine = true,
+}: {
+  listing: MessageListing;
+  onPress: () => void;
+  mine?: boolean;
+}) {
   const styles = useThemedStyles(quoteStyles);
 
   return (
@@ -17,7 +26,7 @@ export function ListingQuote({ listing, onPress }: { listing: MessageListing; on
       accessibilityRole="button"
       accessibilityLabel={`View ${listing.title}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.quote, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.quote, mine && styles.mine, pressed && styles.pressed]}>
       {listing.photoUrl ? (
         <Image
           source={{ uri: listing.photoUrl }}
@@ -30,7 +39,7 @@ export function ListingQuote({ listing, onPress }: { listing: MessageListing; on
           <Text style={styles.emptyLabel}>No photograph</Text>
         </View>
       )}
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={[styles.title, mine && styles.titleMine]} numberOfLines={2}>
         {listing.title}
       </Text>
     </Pressable>
@@ -39,16 +48,20 @@ export function ListingQuote({ listing, onPress }: { listing: MessageListing; on
 
 const quoteStyles = (theme: Theme) => ({
   quote: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
+    alignSelf: 'flex-start' as const,
+    alignItems: 'flex-start' as const,
+    gap: stack.tight,
     maxWidth: '82%' as const,
+  },
+  mine: {
+    alignSelf: 'flex-end' as const,
+    alignItems: 'flex-end' as const,
   },
   pressed: {
     opacity: 0.72,
   },
   photo: {
-    width: size.gridScan,
+    width: size.gridPhoto,
     aspectRatio: 5 / 7,
     borderRadius: radius.md,
     overflow: 'hidden' as const,
@@ -64,8 +77,10 @@ const quoteStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
   },
   title: {
-    ...type.labelStrong,
+    ...type.titleSmall,
     color: theme.color.text,
-    flexShrink: 1,
+  },
+  titleMine: {
+    textAlign: 'right' as const,
   },
 });

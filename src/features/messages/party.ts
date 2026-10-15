@@ -9,11 +9,12 @@ export function partyName(who: ConversationWith): string {
 
 /**
  * The line under that name. A person is placed by their handle and their
- * number; a shop, by whether anyone there can answer you in the app.
+ * number. A claimed shop is a shop. One that has not claimed gets the claim
+ * badge under the name instead of this line.
  */
 export function partyLine(who: ConversationWith): string | null {
   if (who.kind === 'dealer') {
-    return who.byEmail ? 'Answers by email' : 'Shop';
+    return who.byEmail ? null : 'Shop';
   }
   const collector = who.number ? `Collector #${who.number}` : null;
   // The name is already the heading, so the handle only repeats it when

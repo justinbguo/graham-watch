@@ -76,8 +76,11 @@ export function Screen({
   titleSize?: 'display' | 'title';
   /** A control on the title's line. Wraps under the title when the line is full. */
   titleExtra?: ReactNode;
-  /** A line under the title: what the screen is holding right now. */
-  subtitle?: string;
+  /**
+   * Under the title. A string is the quiet line. A node is a mark that has
+   * to sit on that same line, such as the unclaimed-shop badge.
+   */
+  subtitle?: ReactNode;
   /** Return to where you came from. `label` is spoken; it names the place. */
   back?: { label: string; onPress: () => void };
   /** A control at the start of the title's line. Search's close. */
@@ -132,7 +135,11 @@ export function Screen({
                   ) : null}
                   {titleExtra}
                 </View>
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                {typeof subtitle === 'string' ? (
+                  <Text style={styles.subtitle}>{subtitle}</Text>
+                ) : (
+                  subtitle
+                )}
               </View>
               {action ? <View style={styles.actionSlot}>{action}</View> : null}
             </View>

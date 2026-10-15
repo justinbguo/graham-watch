@@ -3,7 +3,6 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 
-import { ActionPill } from '@/components/ActionBar';
 import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
@@ -20,12 +19,13 @@ import {
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { useOpenStack } from '@/lib/openStack';
-import { inset, space, type, type Theme } from '@/lib/theme';
+import { inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 import { Bubble } from './Bubble';
 import { ListingQuote } from './ListingQuote';
+import { PartyAvatar } from './PartyAvatar';
 import { partyLine, partyName } from './party';
 
 /** The first thing you send a shop about a watch, until you write your own. */
@@ -107,10 +107,30 @@ export function ConversationScreen({
 
   const { header, messages } = data;
   const who = header.with;
+  // A shop with no account here cannot read the app. The same field writes
+  // the email instead, and the inquiry lands back in this thread.
+  const byEmail = !header.writable;
 
   function submit() {
     const body = value.trim();
-    if (!body || send.isPending) return;
+    if (!body) return;
+
+    if (byEmail) {
+      if (!listing || mail.isPending) return;
+      mail.mutate(
+        { card: listing, message: body },
+        {
+          onSuccess: () => {
+            setDraft('');
+            void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+          },
+          onError: (error) => Alert.alert('Could not open Gmail', error.message),
+        },
+      );
+      return;
+    }
+
+    if (send.isPending) return;
     // The field clears as the bubble rises. If the write fails the words come
     // back to the field, unless something new has been typed over them.
     setDraft('');
@@ -122,7 +142,20 @@ export function ConversationScreen({
   return (
     <Screen
       title={partyName(who)}
-      subtitle={partyLine(who) ?? undefined}
+      titleSize="title"
+      subtitle={
+        byEmail ? (
+          <View style={styles.unclaimed}>
+            <Text style={styles.unclaimedLabel}>
+              Not claimed on Graham yet. Your inquiry goes to their email until they claim their
+              profile.
+            </Text>
+          </View>
+        ) : (
+          (partyLine(who) ?? undefined)
+        )
+      }
+      leading={<PartyAvatar who={who} px={size.avatarHeader} />}
       action={<CloseButton onPress={close} />}>
       <View style={[styles.fill, { paddingBottom: lift }]}>
         <FlatList
@@ -134,9 +167,6 @@ export function ConversationScreen({
           // The bottom of a conversation is the live end of it, so a thread
           // opens there and stays there as messages arrive.
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <Message text="No messages yet. Say what you are after." />
-          }
           renderItem={({ item, index }) => {
             const watchId = item.listing?.id;
             return (
@@ -154,13 +184,14 @@ export function ConversationScreen({
             );
           }}
         />
-        {header.writable ? (
+        {!byEmail || listing ? (
           <SendBar
             placeholder={quote ? 'Write about this watch' : 'Write a message'}
             value={value}
             onChangeText={setDraft}
             onSend={submit}
-            busy={send.isPending}
+            busy={byEmail ? mail.isPending : send.isPending}
+            sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
             note={
               quote || send.error ? (
                 <View style={styles.note}>
@@ -170,39 +201,7 @@ export function ConversationScreen({
               ) : null
             }
           />
-        ) : (
-          // A shop with no account here cannot be written to in the app. The
-          // thread is still the record of what was asked. Email is how the
-          // message leaves, and the inquiry lands in this same thread.
-          <View style={styles.closed}>
-            {quote ? <ListingQuote listing={quote} onPress={() => openWatch(quote.id)} /> : null}
-            {value ? <Text style={styles.inquiry}>{value}</Text> : null}
-            <Message
-              text={`${partyName(who)} has not claimed their shop on Graham. Their reply comes to your email.`}
-            />
-            {listing ? (
-              <ActionPill
-                icon="email-outline"
-                label={`Email ${partyName(who)}`}
-                text="Email the shop"
-                busy={mail.isPending}
-                onPress={() =>
-                  mail.mutate(
-                    { card: listing, message: value },
-                    {
-                      onSuccess: () => {
-                        void queryClient.invalidateQueries({
-                          queryKey: keys.conversation(conversationId),
-                        });
-                      },
-                      onError: (error) => Alert.alert('Could not open Gmail', error.message),
-                    },
-                  )
-                }
-              />
-            ) : null}
-          </View>
-        )}
+        ) : null}
       </View>
     </Screen>
   );
@@ -229,16 +228,17 @@ const screenStyles = (theme: Theme) => ({
   note: {
     gap: space.xs,
   },
-  inquiry: {
-    ...type.body,
-    color: theme.color.text,
+  // On the subtitle's line, so it starts under the name rather than under the logo.
+  unclaimed: {
+    alignSelf: 'flex-start' as const,
+    marginTop: space.xs,
+    backgroundColor: theme.color.caution,
+    borderRadius: radius.lg,
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
   },
-  closed: {
-    paddingHorizontal: inset.screen,
-    paddingTop: space.md,
-    paddingBottom: space.lg,
-    gap: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
+  unclaimedLabel: {
+    ...type.caption,
+    color: theme.color.onCaution,
   },
 });

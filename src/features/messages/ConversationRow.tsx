@@ -1,12 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { Avatar } from '@/components/Avatar';
 import type { ConversationSummary } from '@/data/messages';
-import { dealerPicture } from '@/features/dealers/picture';
 import { formatRelativeTime } from '@/lib/format';
 import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+import { PartyAvatar } from './PartyAvatar';
 import { partyName } from './party';
 
 /**
@@ -52,12 +51,7 @@ export function ConversationRow({
         pressed && !busy && styles.pressed,
         busy && styles.busy,
       ]}>
-      <Avatar
-        url={who.kind === 'person' ? who.avatar_url : who.logoUrl}
-        glyph={who.kind === 'person' ? 'account-outline' : undefined}
-        fallback={who.kind === 'dealer' ? dealerPicture : undefined}
-        fit={who.kind === 'dealer' ? 'contain' : 'cover'}
-      />
+      <PartyAvatar who={who} />
       <View style={styles.copy}>
         <View style={styles.line}>
           <Text style={styles.name} numberOfLines={1}>

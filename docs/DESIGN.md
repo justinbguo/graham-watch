@@ -39,6 +39,7 @@ literal hex in a component.
 | `bar` / `onBar` / `onBarActive` | The tab bar's floor, its idle glyphs at 55% white, and the one you are on in full white |
 | `badge` / `onBadge` | A count on a tab, red with white numerals. The same in both schemes, because the bar is dark in both |
 | `notice` | The saved-row dot. Brighter than `badge`, the same in both schemes. Nothing is set on it |
+| `caution` / `onCaution` | The unclaimed-shop badge. Yellow, with dark type, the same in both schemes. Not `brass`: that highlight is already the name |
 | `raised` | The swipe card, which floats on `shadow.card` instead of stepping |
 
 `scrim` sits outside the table because it is not themed: it is the fade a caption sits on
@@ -1697,13 +1698,20 @@ twice. Every other intent stays in the list, newest first. The strip is a plain
 horizontal scroller. A second list nested in the feed's list warns and takes the
 vertical scroll.
 
-A comment is one line and a round send button, nothing else. A comment is a reply, not a
+A comment is one line with a send glyph in it, nothing else. A comment is a reply, not a
 second offer: asking someone to name buying, selling, or trading before they could type a
 word was three chips, a label, and a full-width button in the way of one sentence. So
 comments carry no intent and the thread does not sort them.
 
 That one line is `SendBar`, the same control a conversation uses, because saying one
-thing to whoever is already on the screen is the same act in both places. It sits on the
+thing to whoever is already on the screen is the same act in both places. It is drawn
+like the deck's search capsule: `fill`, `HIT_TARGET` tall, `radius.full`, the text
+inset by half the height, on the page gutter with no hairline above it. It is the one
+field that takes a capsule, because it should read as the same object as the search
+bar. Send is `send-outline` at `size.icon` inside the capsule's trailing edge, `ink`
+when there is something to send and `inkFaint` when there is not.
+It was a filled `accent` circle beside the field with a `size.iconSmall` glyph: a block
+behind an icon-only control, and a mark too small to read as the way out. It sits on the
 keyboard's top edge while it is being typed into, the same way the onboarding footer
 does: the screen pads its bottom by `useKeyboardLift`, which is the keyboard's coverage
 minus whatever already stands there — the tab bar and the home indicator inside the tabs,
@@ -1822,20 +1830,30 @@ Unread is a dot at the end of the line rather than a count: how
 many messages are waiting does not change what you do about them, and a number on every
 row turns a list into a scoreboard.
 
+A thread's header puts the other party's picture at the start of the title's line:
+the same `PartyAvatar` the list uses, at `size.avatarHeader`. The list showed who
+a thread was with by face, and opening it used to lose the face. A shop that
+has not claimed its account wears one `caution` badge on the subtitle's line,
+directly under the name: it has not claimed, and the inquiry goes to their
+email until they claim their profile.
+
 In a thread, yours are on the right in the accent and theirs are on the left in the
 fill. Alignment alone fails the moment a message wraps to the width of the column, so
 the two sides differ in colour as well. A run of messages from one person shows one time
 under the last of them; a time on every bubble doubles the height of a conversation to
 say almost nothing.
 
-A message about a watch quotes it. The photograph and the name sit above the
-words, on the same side as the bubble, because one thread holds every watch you
-have asked that shop about. The frame is the wishlist's: `gridScan` wide, 5/7,
-`contain`, `radius.md`. The name is `labelStrong`. A tap opens the listing.
+A message about a watch quotes it. The photograph sits above the name, and both
+sit above the words, on the side of whoever asked, because one thread holds every
+watch you have asked that shop about. In the composer the quote is on the right:
+it is what you are about to send. The frame is the shop page's: `gridPhoto`
+wide, 5/7, `contain`, `radius.md`. The name is `titleSmall`. A tap opens the
+listing. The thread's own title is `title`, not `display`, so a shop name
+shares its line with the picture and the close control.
 The first time you write about that watch, the field already says "Hey, is
-this watch still available?" A thread that already names it starts empty, so a
-follow-up does not ask again. A shop with no account here gets the same
-sentence in the email.
+this watch still available?" It is the field's text, not a placeholder, so
+you edit it on the keyboard or send it as it is. A thread that already names
+the watch starts empty, so a follow-up does not ask again.
 
 A thread catches up every five seconds while it is open, and the list every thirty. That
 is polling, not a live connection: a websocket is a second thing to authorise and
@@ -1848,10 +1866,12 @@ Asking a shop about a watch still sends the email it always did. The thread is w
 email leaves behind: each inquiry is a message in it, quoting the watch it named
 and marked as sent by email.
 
-If nobody at the shop has claimed it on Graham, the composer is replaced by a line
-saying so and where the answer will arrive. A field that accepted a message nobody could
-read would be the worst of the three options; hiding the thread entirely would be the
-second, because the buyer still needs to see what they asked and when.
+If nobody at the shop has claimed it on Graham, the composer is the same field.
+Send opens that message as an email to the shop, so the words reach someone who
+can read them. The yellow badge under the name is what says so. Hiding the
+thread entirely would be worse, because the buyer still needs to see what they
+asked and when. A visit that names no watch has nothing to email about, so it
+shows the header and no field. An empty thread shows nothing in place of a prompt.
 
 The moment the shop claims its account, the same threads become writable on both sides.
 Nothing is copied at the time of the inquiry — the shop's side of a conversation is the

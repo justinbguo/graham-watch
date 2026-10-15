@@ -45,7 +45,9 @@ export function Bubble({
 
   return (
     <Animated.View entering={sent ? rise : undefined} style={[styles.row, mine && styles.rowMine]}>
-      {listing && onOpenListing ? <ListingQuote listing={listing} onPress={onOpenListing} /> : null}
+      {listing && onOpenListing ? (
+        <ListingQuote listing={listing} onPress={onOpenListing} mine={mine} />
+      ) : null}
       <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
