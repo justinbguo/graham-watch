@@ -8,7 +8,7 @@ import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
-import { size, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const DOOR: Record<SignInMode, string> = {
@@ -185,6 +185,9 @@ const panelStyles = (theme: Theme) => ({
     flex: 1,
     justifyContent: 'center' as const,
     gap: stack.group,
+    // Screen pads a header, not its body. Without this the wordmark and the
+    // capsule ends run off the glass.
+    paddingHorizontal: inset.screen,
   },
   copy: {
     alignItems: 'flex-start' as const,
