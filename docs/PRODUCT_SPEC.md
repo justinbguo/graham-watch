@@ -354,9 +354,13 @@ message as a sheet. The field is first. Create a group is the row under it. The 
 accounts and never the caller. An empty field returns the people you already
 talk to, including people you share a group with, then the earliest members by
 collector number. Typing narrows it to a
-username or name prefix. Choosing Create a group keeps that search and selects
-several people; Create group calls `create_group`. The thread is named for the
-other people in it. `conversation_with_handle` still resolves
+username or name prefix. Choosing Create a group opens New group chat, a second
+sheet. The name is optional and at most 40 characters. Create calls
+`create_group`, which stores that name. The same set returns the group that
+already exists, and a name fills in only when that group has none. Later,
+`rename_group` changes it. Any member may call it, and an empty name clears
+it. A stranger cannot. The thread uses the name, or the other people when
+there is none. `conversation_with_handle` still resolves
 one exact handle. Both exist because `profiles` is readable only by its owner.
 The field under the title filters the threads you are in, by name, handle, and
 message text. The shop button calls `conversation_with_dealer`, which opens the

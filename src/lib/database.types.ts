@@ -110,6 +110,7 @@ export type Database = {
           members_key: string | null
           opener_id: string
           partner_id: string | null
+          title: string | null
         }
         Insert: {
           created_at?: string
@@ -120,6 +121,7 @@ export type Database = {
           members_key?: string | null
           opener_id: string
           partner_id?: string | null
+          title?: string | null
         }
         Update: {
           created_at?: string
@@ -130,6 +132,7 @@ export type Database = {
           members_key?: string | null
           opener_id?: string
           partner_id?: string | null
+          title?: string | null
         }
         Relationships: [
           {
@@ -1185,6 +1188,7 @@ export type Database = {
           dealer_name: string
           group_handles: string[]
           group_names: string[]
+          group_title: string
           id: string
           is_group: boolean
           member_count: number
@@ -1206,6 +1210,7 @@ export type Database = {
           dealer_name: string
           group_handles: string[]
           group_names: string[]
+          group_title: string
           id: string
           is_group: boolean
           last_at: string
@@ -1231,7 +1236,10 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
-      create_group: { Args: { p_member_ids: string[] }; Returns: string }
+      create_group: {
+        Args: { p_member_ids: string[]; p_title?: string }
+        Returns: string
+      }
       dealer_accounts: {
         Args: never
         Returns: {
@@ -1557,6 +1565,10 @@ export type Database = {
           p_relisted?: number
           p_retired?: number
         }
+        Returns: undefined
+      }
+      rename_group: {
+        Args: { p_conversation_id: string; p_title: string }
         Returns: undefined
       }
       replace_listing_photos: {

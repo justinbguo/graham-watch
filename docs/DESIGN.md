@@ -1830,12 +1830,18 @@ person, including the one that started because they wrote to your shop, rather
 than a second thread with the same name on it.
 
 Create a group is a row under the search, the same photograph and padding as
-a person, with the words in `bodyStrong`. It turns the list into a selection:
-the brass rule marks each person, their names sit under the field, and Create
-group stays off until two are chosen. Twelve is the most.
-The same people open the group that already exists. A group in the list wears
-`account-group-outline` where a photograph would be, and its name is the other
-people in it. The line under that name in the thread is how many people.
+a person, with the words in `bodyStrong`. It opens New group chat, a second
+sheet. The X is on the left. Create is on the right, and it stays off until
+two people are chosen. Twelve is the most. The name sits above the search,
+in the same bar: `surface`, `HIT_TARGET`, a pencil where search has its
+magnifying glass.
+A name you type is the group's name, at most 40 characters. With none, the
+name is the other people. The same people open the group that already exists.
+Opening it again does not change the name. In the thread, the name is a
+button: tap it, edit, and return saves. Anyone in the group can. Clearing
+it returns the name to the other people. The brass rule marks
+each person chosen. A group in the list wears
+`account-group-outline` where a photograph would be. The line under that name in the thread is how many people.
 Someone else's message names them, in `caption` above the first bubble of
 their run, and that name leads the latest line in the list. Yours stay on the
 right with no name, and the list still leads those with "You".

@@ -3,20 +3,15 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TextInput, View } from 'react-native';
 
-import { SearchField } from '@/components/SearchBar';
-import { Button, Centered, Message, Spinner } from '@/components/ui';
+import { IconBar, SearchField } from '@/components/SearchBar';
+import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { keys } from '@/data/keys';
-import {
-  useCreateGroup,
-  useSuggestPeople,
-  type PersonSuggestion,
-} from '@/data/messages';
+import { useCreateGroup, useSuggestPeople, type PersonSuggestion } from '@/data/messages';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { ConversationRow } from './ConversationRow';
-import { GroupDoor } from './GroupDoor';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
 
@@ -26,17 +21,21 @@ const SUGGEST_PAUSE = 300;
 /** Besides you. `create_group` refuses the same number. */
 const GROUP_OTHERS = 12;
 
+/** `conversations.title` refuses a longer name. */
+const GROUP_NAME = 40;
+
 /**
- * Pick at least two people and open one thread with all of them. The same
- * set opens the group that already exists, so Create does not fork a second
- * thread with the same names on it.
+ * Name a group and pick at least two people. Create sits in the header.
+ * The same set opens the group that already exists. A name is kept only
+ * when that group does not have one yet.
  */
-export function CreateGroup({ onMessageOne }: { onMessageOne: () => void }) {
+export function CreateGroup() {
   const styles = useThemedStyles(groupStyles);
   const openParty = useOpenParty();
   const queryClient = useQueryClient();
   const lift = useKeyboardLift();
-  const field = useRef<TextInput>(null);
+  const search = useRef<TextInput>(null);
+  const [name, setName] = useState('');
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<PersonSuggestion[]>([]);
   const [failure, setFailure] = useState<string | null>(null);
@@ -52,9 +51,10 @@ export function CreateGroup({ onMessageOne }: { onMessageOne: () => void }) {
     ...picked.filter((person) => !people.some((row) => row.id === person.id)),
     ...people,
   ];
+  const title = name.trim().replace(/\s+/g, ' ');
 
   useEffect(() => {
-    const id = setTimeout(() => field.current?.focus(), 50);
+    const id = setTimeout(() => search.current?.focus(), 50);
     return () => clearTimeout(id);
   }, []);
 
@@ -72,11 +72,14 @@ export function CreateGroup({ onMessageOne }: { onMessageOne: () => void }) {
   function createGroup() {
     if (picked.length < 2 || create.isPending) return;
     create.mutate(
-      picked.map((person) => person.id),
+      { memberIds: picked.map((person) => person.id), title: title || null },
       {
         onSuccess: (conversationId) => {
           void queryClient.invalidateQueries({ queryKey: keys.conversations });
-          router.replace(`/conversation/${conversationId}`);
+          // This sheet sits on New message. Close on the thread should land
+          // on Messages, so both sheets go before the thread opens.
+          router.dismissAll();
+          router.push(`/conversation/${conversationId}`);
         },
         onError: (error) => setFailure(said(error)),
       },
@@ -86,80 +89,101 @@ export function CreateGroup({ onMessageOne }: { onMessageOne: () => void }) {
   const chosen = picked.map((person) => person.name ?? `@${person.handle}`).join(', ');
 
   return (
-    <View style={[styles.root, { paddingBottom: lift }]}>
-      <View style={styles.query}>
-        <SearchField
-          ref={field}
-          accessibilityLabel="Search people"
-          value={query}
-          onChangeText={(text) => {
-            setQuery(text);
-            setFailure(null);
-          }}
-        />
-        <GroupDoor grouping onPress={onMessageOne} />
-        {chosen ? (
-          <Text style={styles.chosen} numberOfLines={2}>
-            {chosen}
-          </Text>
-        ) : null}
-      </View>
-      {failure ? (
-        <View style={styles.note}>
-          <Message text={failure} tone="error" />
-        </View>
-      ) : null}
-      {suggestions.isPending || !ready ? (
-        <Spinner />
-      ) : suggestions.isError ? (
-        <View style={styles.note}>
-          <Message text="People did not load." tone="error" />
-        </View>
-      ) : shown.length === 0 ? (
-        <Centered>
-          <Message text={term ? 'No one matches.' : 'No one else is here yet.'} />
-        </Centered>
-      ) : (
-        <FlatList
-          style={styles.list}
-          data={shown}
-          keyExtractor={(person) => person.id}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => {
-            const on = picked.some((person) => person.id === item.id);
-            const who = {
-              kind: 'person' as const,
-              userId: item.id,
-              name: item.name,
-              handle: item.handle,
-              number: item.number,
-              avatar_url: item.avatarUrl,
-            };
-            const name = item.name ?? `@${item.handle}`;
-            return (
-              <ConversationRow
-                conversation={{ id: item.id, with: who, last: null, unread: 0 }}
-                detail={`@${item.handle}`}
-                label={on ? `Remove ${name}` : `Add ${name}`}
-                selected={on}
-                busy={create.isPending}
-                onOpenParty={() => openParty(who)}
-                onPress={() => toggle(item)}
-              />
-            );
-          }}
-        />
-      )}
-      <View style={styles.create}>
+    <Screen
+      title="New group chat"
+      titleSize="title"
+      inSheet
+      leading={<CloseButton edge="start" onPress={() => router.back()} />}
+      action={
         <Button
-          label="Create group"
+          label="Create"
+          variant="ghost"
           onPress={createGroup}
           disabled={picked.length < 2}
           loading={create.isPending}
         />
+      }>
+      <View style={[styles.root, { paddingBottom: lift }]}>
+        <View style={styles.form}>
+          <IconBar
+            icon="pencil-outline"
+            accessibilityLabel="Group name"
+            placeholder="Group name"
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              setFailure(null);
+            }}
+            autoCapitalize="words"
+            autoCorrect
+            maxLength={GROUP_NAME}
+            returnKeyType="next"
+            onSubmitEditing={() => search.current?.focus()}
+          />
+          <SearchField
+            ref={search}
+            accessibilityLabel="Search people"
+            value={query}
+            onChangeText={(text) => {
+              setQuery(text);
+              setFailure(null);
+            }}
+          />
+          {chosen ? (
+            <Text style={styles.chosen} numberOfLines={2}>
+              {chosen}
+            </Text>
+          ) : null}
+        </View>
+        {failure ? (
+          <View style={styles.note}>
+            <Message text={failure} tone="error" />
+          </View>
+        ) : null}
+        {suggestions.isPending || !ready ? (
+          <Spinner />
+        ) : suggestions.isError ? (
+          <View style={styles.note}>
+            <Message text="People did not load." tone="error" />
+          </View>
+        ) : shown.length === 0 ? (
+          <Centered>
+            <Message text={term ? 'No one matches.' : 'No one else is here yet.'} />
+          </Centered>
+        ) : (
+          <FlatList
+            style={styles.list}
+            data={shown}
+            keyExtractor={(person) => person.id}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => {
+              const on = picked.some((person) => person.id === item.id);
+              const who = {
+                kind: 'person' as const,
+                userId: item.id,
+                name: item.name,
+                handle: item.handle,
+                number: item.number,
+                avatar_url: item.avatarUrl,
+              };
+              const label = item.name ?? `@${item.handle}`;
+              return (
+                <ConversationRow
+                  conversation={{ id: item.id, with: who, last: null, unread: 0 }}
+                  detail={`@${item.handle}`}
+                  label={on ? `Remove ${label}` : `Add ${label}`}
+                  selected={on}
+                  busy={create.isPending}
+                  onOpenParty={() => openParty(who)}
+                  onPress={() => toggle(item)}
+                />
+              );
+            }}
+          />
+        )}
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -167,6 +191,7 @@ function said(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
   if (message.includes('at least two')) return 'Choose at least two other people.';
   if (message.includes('at most 12')) return 'A group holds at most 12 other people.';
+  if (message.includes('40 characters')) return 'A group name is at most 40 characters.';
   if (message.includes('gone')) return 'One of those accounts is gone.';
   if (message.includes('sign in') || message.includes('signed-in')) return 'Sign in to send a message.';
   return 'Could not create that group.';
@@ -176,7 +201,7 @@ const groupStyles = (theme: Theme) => ({
   root: {
     flex: 1,
   },
-  query: {
+  form: {
     marginTop: space.sm - space.lg,
     paddingHorizontal: inset.screen,
     gap: space.sm,
@@ -195,11 +220,5 @@ const groupStyles = (theme: Theme) => ({
   note: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.sm,
-  },
-  create: {
-    paddingHorizontal: inset.screen,
-    paddingTop: space.sm,
-    paddingBottom: space.md,
-    alignItems: 'flex-start' as const,
   },
 });

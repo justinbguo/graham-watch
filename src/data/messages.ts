@@ -31,7 +31,7 @@ export type ConversationWith =
       number: number;
       avatar_url: string | null;
     }
-  | { kind: 'group'; title: string; count: number; handles: string[] };
+  | { kind: 'group'; title: string; givenName: string | null; count: number; handles: string[] };
 
 export type ConversationSummary = {
   id: string;
@@ -80,14 +80,17 @@ type PartyColumns = {
   is_group: boolean;
   group_names: string[] | null;
   group_handles: string[] | null;
+  group_title: string | null;
   member_count: number | null;
 };
 
 function party(row: PartyColumns): ConversationWith {
   if (row.is_group) {
+    const givenName = row.group_title?.trim() || null;
     return {
       kind: 'group',
-      title: groupTitle(row.group_names ?? []),
+      title: givenName ?? groupTitle(row.group_names ?? []),
+      givenName,
       count: row.member_count ?? 0,
       handles: (row.group_handles ?? []).filter((handle): handle is string => Boolean(handle)),
     };
@@ -376,9 +379,18 @@ export function useListingThreads(userId: string | null) {
  */
 export function useCreateGroup() {
   return useMutation({
-    mutationFn: async (memberIds: string[]): Promise<string> => {
+    mutationFn: async ({
+      memberIds,
+      title,
+    }: {
+      memberIds: string[];
+      title: string | null;
+    }): Promise<string> => {
       if (isDemo) throw new Error('Messages need a signed-in account.');
-      const { data, error } = await supabase.rpc('create_group', { p_member_ids: memberIds });
+      const { data, error } = await supabase.rpc('create_group', {
+        p_member_ids: memberIds,
+        p_title: title ?? undefined,
+      });
       if (error) throw new Error(error.message);
       if (!data) throw new Error('Could not create that group.');
       return data;
@@ -386,6 +398,33 @@ export function useCreateGroup() {
   });
 }
 
+/**
+ * Changes a group's name, or clears it. Any member may. create_group will
+ * not do this: opening the same people again leaves the name alone.
+ */
+export function useRenameGroup(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (title: string): Promise<void> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { error } = await supabase.rpc('rename_group', {
+        p_conversation_id: conversationId,
+        p_title: title,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
+/**
+ * Opens the thread with a person, or finds the one that already exists. There
+ * is no second thread with the same person: two halves of one conversation is
+ * two places to look for the same answer.
+ */
 export function useMessagePerson() {
   return useMutation({
     mutationFn: async (userId: string): Promise<string> => {

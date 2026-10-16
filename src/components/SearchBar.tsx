@@ -7,9 +7,46 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const PLACEHOLDER = 'Search';
 
+type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
+
 /**
- * Every search bar in the app is this shape: a `surface` rounded square,
- * `HIT_TARGET` tall, the `magnify` glyph at `size.icon`, and the word
+ * The bar under a title: `surface`, `HIT_TARGET` tall, `radius.md`, a glyph
+ * at `size.icon`, then the words. Search uses it with a magnifying glass.
+ * The group name uses it with a pencil, so the two rows on New group chat
+ * are the same height and the words start at the same place.
+ */
+export function IconBar({
+  ref,
+  icon,
+  placeholder,
+  accessibilityLabel,
+  ...props
+}: Omit<TextInputProps, 'style'> & {
+  ref?: Ref<TextInput>;
+  icon: GlyphName;
+  placeholder: string;
+}) {
+  const styles = useThemedStyles(searchStyles);
+  const theme = useTheme();
+  return (
+    <View style={styles.bar}>
+      <MaterialCommunityIcons name={icon} size={size.icon} color={theme.color.inkMuted} />
+      <TextInput
+        ref={ref}
+        placeholder={placeholder}
+        placeholderTextColor={theme.color.inkMuted}
+        accessibilityLabel={accessibilityLabel ?? placeholder}
+        autoCapitalize="none"
+        autoCorrect={false}
+        {...props}
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
+/**
+ * Every search bar in the app is an `IconBar` with `magnify` and the word
  * "Search". The field types; the door only opens a screen that has the field.
  * They share one look so the door reads as the field it opens.
  */
@@ -18,23 +55,15 @@ export function SearchField({
   accessibilityLabel = PLACEHOLDER,
   ...props
 }: Omit<TextInputProps, 'placeholder' | 'style'> & { ref?: Ref<TextInput> }) {
-  const styles = useThemedStyles(searchStyles);
-  const theme = useTheme();
   return (
-    <View style={styles.bar}>
-      <Glyph />
-      <TextInput
-        ref={ref}
-        placeholder={PLACEHOLDER}
-        placeholderTextColor={theme.color.inkMuted}
-        accessibilityLabel={accessibilityLabel}
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="search"
-        {...props}
-        style={styles.input}
-      />
-    </View>
+    <IconBar
+      ref={ref}
+      icon="magnify"
+      placeholder={PLACEHOLDER}
+      accessibilityLabel={accessibilityLabel}
+      returnKeyType="search"
+      {...props}
+    />
   );
 }
 

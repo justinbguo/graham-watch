@@ -2674,6 +2674,7 @@ console.log('\nmessages');
   });
   check('the opener can write in the thread', sent.status < 300, JSON.stringify(sent.body));
 
+
   const found = await api(
     `/rest/v1/messages?select=conversation_id&body=ilike.*${phrase}*`,
     { token: buyer.token },
@@ -2851,6 +2852,141 @@ console.log('\nmessages');
       JSON.stringify(groupRow),
     );
 
+    const titled = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id], p_title: '  Friday desk  ' },
+    });
+    check(
+      'naming the same people keeps that group',
+      titled.status < 300 && titled.body === groupId,
+      JSON.stringify(titled.body),
+    );
+
+    const namedList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const namedRow = Array.isArray(namedList.body)
+      ? namedList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a group name replaces the list of people',
+      namedRow?.group_names?.length === 1 && namedRow.group_names[0] === 'Friday desk',
+      JSON.stringify(namedRow),
+    );
+
+    const renamed = await api('/rest/v1/rpc/create_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_member_ids: [dealerUser.id, importer.id], p_title: 'Other name' },
+    });
+    const keptList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const keptRow = Array.isArray(keptList.body)
+      ? keptList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a second name does not replace the first',
+      renamed.status < 300 &&
+        renamed.body === groupId &&
+        keptRow?.group_names?.length === 1 &&
+        keptRow.group_names[0] === 'Friday desk',
+      JSON.stringify(keptRow),
+    );
+
+    const tooLong = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id], p_title: 'x'.repeat(41) },
+    });
+    check(
+      'a group name is at most 40 characters',
+      tooLong.status >= 400 && String(tooLong.body?.message ?? '').includes('40'),
+      JSON.stringify(tooLong.body),
+    );
+
+    const renamedGroup = await api('/rest/v1/rpc/rename_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: '  Saturday desk  ' },
+    });
+    const afterRename = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const renamedRow = Array.isArray(afterRename.body)
+      ? afterRename.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a member can rename the group',
+      renamedGroup.status < 300 &&
+        renamedRow?.group_title === 'Saturday desk' &&
+        renamedRow?.group_names?.length === 1 &&
+        renamedRow.group_names[0] === 'Saturday desk',
+      JSON.stringify({ renamedGroup: renamedGroup.body, renamedRow }),
+    );
+
+    const strangerRename = await api('/rest/v1/rpc/rename_group', {
+      token: outsider.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: 'Stolen' },
+    });
+    check(
+      'a stranger cannot rename the group',
+      strangerRename.status >= 400,
+      JSON.stringify(strangerRename.body),
+    );
+
+    const longRename = await api('/rest/v1/rpc/rename_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: 'x'.repeat(41) },
+    });
+    check(
+      'renaming still stops at 40 characters',
+      longRename.status >= 400 && String(longRename.body?.message ?? '').includes('40'),
+      JSON.stringify(longRename.body),
+    );
+
+    const directRename = await api('/rest/v1/rpc/rename_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_conversation_id: opened.body, p_title: 'Not a group' },
+    });
+    check(
+      'a direct thread cannot be renamed',
+      directRename.status >= 400,
+      JSON.stringify(directRename.body),
+    );
+
+    const cleared = await api('/rest/v1/rpc/rename_group', {
+      token: dealerUser.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: '   ' },
+    });
+    const clearedList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const clearedRow = Array.isArray(clearedList.body)
+      ? clearedList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'clearing the name returns the other people',
+      cleared.status < 300 &&
+        clearedRow?.group_title == null &&
+        clearedRow?.group_names?.includes('Ada Byron') &&
+        clearedRow?.group_names?.includes('Grace Hopper'),
+      JSON.stringify(clearedRow),
+    );
+
     const strangersList = await api('/rest/v1/rpc/conversation_list', {
       token: outsider.token,
       method: 'POST',
@@ -2880,6 +3016,7 @@ console.log('\nmessages');
         head.members.some((member) => member.handle === handle),
       JSON.stringify(header.body),
     );
+
   } finally {
     await fetch(`${URL}/auth/v1/admin/users/${outsider.id}`, {
       method: 'DELETE',

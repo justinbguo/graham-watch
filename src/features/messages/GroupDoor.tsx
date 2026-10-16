@@ -10,25 +10,17 @@ import { useThemedStyles } from '@/providers/theme';
  * The words are `bodyStrong`, one step larger than a name, because this row
  * is the action and the names under it are people.
  */
-export function GroupDoor({
-  grouping,
-  onPress,
-}: {
-  grouping: boolean;
-  onPress: () => void;
-}) {
+export function GroupDoor({ onPress }: { onPress: () => void }) {
   const styles = useThemedStyles(doorStyles);
-  const label = grouping ? 'Message one person' : 'Create a group';
-  const glyph = grouping ? 'account-outline' : 'account-group-outline';
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel="Create a group"
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <Avatar url={null} px={size.avatar} glyph={glyph} />
-      <Text style={styles.label}>{label}</Text>
+      <Avatar url={null} px={size.avatar} glyph="account-group-outline" />
+      <Text style={styles.label}>Create a group</Text>
     </Pressable>
   );
 }

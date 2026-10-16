@@ -11,7 +11,6 @@ import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { ConversationRow } from './ConversationRow';
-import { CreateGroup } from './CreateGroup';
 import { GroupDoor } from './GroupDoor';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
@@ -24,14 +23,13 @@ const SUGGEST_PAUSE = 300;
  * typed. Picking one replaces the sheet with the thread, so Close on the
  * thread lands back on Messages rather than on this list.
  *
- * Create a group turns the same sheet into a selection of several people.
+ * Create a group opens a second sheet, so closing it returns here.
  */
 export function StartChat() {
   const styles = useThemedStyles(startStyles);
   const openParty = useOpenParty();
   const queryClient = useQueryClient();
   const field = useRef<TextInput>(null);
-  const [grouping, setGrouping] = useState(false);
   const [query, setQuery] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const term = query.trim();
@@ -42,10 +40,9 @@ export function StartChat() {
   const people = ready ? (suggestions.data ?? []) : [];
 
   useEffect(() => {
-    if (grouping) return;
     const id = setTimeout(() => field.current?.focus(), 50);
     return () => clearTimeout(id);
-  }, [grouping]);
+  }, []);
 
   function openPerson(person: PersonSuggestion) {
     if (start.isPending) return;
@@ -60,73 +57,64 @@ export function StartChat() {
 
   return (
     <View style={styles.root}>
-      {grouping ? (
-        <CreateGroup
-          onMessageOne={() => {
-            setGrouping(false);
-            setFailure(null);
-          }}
-        />
-      ) : (
-        <View style={styles.direct}>
-          <View style={styles.query}>
-            <SearchField
-              ref={field}
-              accessibilityLabel="Search people"
-              value={query}
-              onChangeText={(text) => {
-                setQuery(text);
-                setFailure(null);
-              }}
-            />
-            <GroupDoor grouping={false} onPress={() => setGrouping(true)} />
-          </View>
-          {failure ? (
-            <View style={styles.note}>
-              <Message text={failure} tone="error" />
-            </View>
-          ) : null}
-          {suggestions.isPending || !ready ? (
-            <Spinner />
-          ) : suggestions.isError ? (
-            <View style={styles.note}>
-              <Message text="People did not load." tone="error" />
-            </View>
-          ) : people.length === 0 ? (
-            <Centered>
-              <Message text={term ? 'No one matches.' : 'No one else is here yet.'} />
-            </Centered>
-          ) : (
-            <FlatList
-              data={people}
-              keyExtractor={(person) => person.id}
-              keyboardShouldPersistTaps="handled"
-              style={styles.list}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => {
-                const who = {
-                  kind: 'person' as const,
-                  userId: item.id,
-                  name: item.name,
-                  handle: item.handle,
-                  number: item.number,
-                  avatar_url: item.avatarUrl,
-                };
-                return (
-                  <ConversationRow
-                    conversation={{ id: item.id, with: who, last: null, unread: 0 }}
-                    detail={`@${item.handle}`}
-                    label={item.name ? `Message ${item.name}` : `Message @${item.handle}`}
-                    busy={start.isPending && start.variables === item.id}
-                    onOpenParty={() => openParty(who)}
-                    onPress={() => openPerson(item)}
-                  />
-                );
-              }}
-            />
-          )}
+      <View style={styles.direct}>
+        <View style={styles.query}>
+          <SearchField
+            ref={field}
+            accessibilityLabel="Search people"
+            value={query}
+            onChangeText={(text) => {
+              setQuery(text);
+              setFailure(null);
+            }}
+          />
+          <GroupDoor onPress={() => router.push('/new-group')} />
         </View>
-      )}
+        {failure ? (
+          <View style={styles.note}>
+            <Message text={failure} tone="error" />
+          </View>
+        ) : null}
+        {suggestions.isPending || !ready ? (
+          <Spinner />
+        ) : suggestions.isError ? (
+          <View style={styles.note}>
+            <Message text="People did not load." tone="error" />
+          </View>
+        ) : people.length === 0 ? (
+          <Centered>
+            <Message text={term ? 'No one matches.' : 'No one else is here yet.'} />
+          </Centered>
+        ) : (
+          <FlatList
+            data={people}
+            keyExtractor={(person) => person.id}
+            keyboardShouldPersistTaps="handled"
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => {
+              const who = {
+                kind: 'person' as const,
+                userId: item.id,
+                name: item.name,
+                handle: item.handle,
+                number: item.number,
+                avatar_url: item.avatarUrl,
+              };
+              return (
+                <ConversationRow
+                  conversation={{ id: item.id, with: who, last: null, unread: 0 }}
+                  detail={`@${item.handle}`}
+                  label={item.name ? `Message ${item.name}` : `Message @${item.handle}`}
+                  busy={start.isPending && start.variables === item.id}
+                  onOpenParty={() => openParty(who)}
+                  onPress={() => openPerson(item)}
+                />
+              );
+            }}
+          />
+        )}
+      </View>
     </View>
   );
 }

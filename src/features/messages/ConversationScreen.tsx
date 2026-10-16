@@ -12,6 +12,7 @@ import {
   isPending as isSending,
   useConversation,
   useMarkConversationRead,
+  useRenameGroup,
   useSendMessage,
   type Message as ChatMessage,
   type MessageListing,
@@ -24,6 +25,7 @@ import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 import { Bubble } from './Bubble';
+import { GroupTitle } from './GroupTitle';
 import { ListingQuote } from './ListingQuote';
 import { useOpenParty } from './openParty';
 import { PartyAvatar } from './PartyAvatar';
@@ -51,6 +53,7 @@ export function ConversationScreen({
   // Null until they edit. The default below is what an untouched field shows,
   // so clearing the sentence stays cleared.
   const [draft, setDraft] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
 
   const { data, isPending, error } = useConversation(conversationId);
   const { data: listing } = useListing(listingId ?? '');
@@ -78,6 +81,7 @@ export function ConversationScreen({
   );
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
+  const rename = useRenameGroup(conversationId);
   const close = () => router.back();
 
   function openWatch(id: string) {
@@ -146,7 +150,24 @@ export function ConversationScreen({
 
   return (
     <Screen
-      title={partyName(who)}
+      title={who.kind === 'group' ? undefined : partyName(who)}
+      titleControl={
+        who.kind === 'group' ? (
+          <GroupTitle
+            name={partyName(who)}
+            givenName={who.givenName}
+            editing={renaming}
+            onStart={() => setRenaming(true)}
+            onClose={() => setRenaming(false)}
+            onCommit={(title) => {
+              setRenaming(false);
+              rename.mutate(title, {
+                onError: (error) => Alert.alert('Could not rename the group', renameError(error)),
+              });
+            }}
+          />
+        ) : undefined
+      }
       titleSize="title"
       subtitle={
         byEmail ? (
@@ -221,6 +242,14 @@ export function ConversationScreen({
 }
 
 /** The first message of a run: the previous one is someone else's, or this is the start. */
+function renameError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('40 characters')) return 'A group name is at most 40 characters.';
+  if (message.includes('not yours')) return 'You are not in that group.';
+  if (message.includes('sign in') || message.includes('signed-in')) return 'Sign in to send a message.';
+  return 'Try again in a moment.';
+}
+
 function startOfRun(messages: ChatMessage[], index: number) {
   const previous = messages[index - 1];
   if (!previous) return true;
