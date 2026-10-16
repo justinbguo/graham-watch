@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_members: {
+        Row: {
+          conversation_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_reads: {
         Row: {
           conversation_id: string
@@ -72,7 +105,9 @@ export type Database = {
           created_at: string
           dealer_id: string | null
           id: string
+          is_group: boolean
           last_message_at: string
+          members_key: string | null
           opener_id: string
           partner_id: string | null
         }
@@ -80,7 +115,9 @@ export type Database = {
           created_at?: string
           dealer_id?: string | null
           id?: string
+          is_group?: boolean
           last_message_at?: string
+          members_key?: string | null
           opener_id: string
           partner_id?: string | null
         }
@@ -88,7 +125,9 @@ export type Database = {
           created_at?: string
           dealer_id?: string | null
           id?: string
+          is_group?: boolean
           last_message_at?: string
+          members_key?: string | null
           opener_id?: string
           partner_id?: string | null
         }
@@ -1144,7 +1183,12 @@ export type Database = {
           dealer_id: string
           dealer_logo_url: string
           dealer_name: string
+          group_handles: string[]
+          group_names: string[]
           id: string
+          is_group: boolean
+          member_count: number
+          members: Json
           person_avatar_url: string
           person_handle: string
           person_id: string
@@ -1160,10 +1204,15 @@ export type Database = {
           dealer_id: string
           dealer_logo_url: string
           dealer_name: string
+          group_handles: string[]
+          group_names: string[]
           id: string
+          is_group: boolean
           last_at: string
           last_body: string
           last_mine: boolean
+          last_sender_name: string
+          member_count: number
           person_avatar_url: string
           person_handle: string
           person_id: string
@@ -1182,6 +1231,7 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      create_group: { Args: { p_member_ids: string[] }; Returns: string }
       dealer_accounts: {
         Args: never
         Returns: {
@@ -1629,6 +1679,10 @@ export type Database = {
         Returns: Json
       }
       synced_listing_columns: { Args: never; Returns: string[] }
+      thread_with_person: {
+        Args: { p_me: string; p_them: string }
+        Returns: string
+      }
       url_path: { Args: { p_url: string }; Returns: string }
       verify_application_email: {
         Args: { p_application_id: string; p_code: string }

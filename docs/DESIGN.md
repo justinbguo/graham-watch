@@ -1800,10 +1800,10 @@ is the limit. A sixth is the one you tap by mistake.
 
 The middle tab, between Community and Wishlist (`chat-outline`). It was
 `message-outline`, a box with a tail, and it was the square glyph in a bar of
-round ones. Two
-things end up here: the shops you have asked about a watch, and the people you have
-written to from a post. They are the same kind of object — a thread with one other
-party — so they are one list, ordered by whichever moved last.
+round ones. Three
+things end up here: the shops you have asked about a watch, the people you have
+written to, and the groups you are in. They are one list, ordered by whichever
+moved last.
 
 The glyph carries the unread count, the same badge the wishlist uses, and it counts threads.
 Six replies in one thread is one thing to go and read. A row in the list still wears
@@ -1818,7 +1818,7 @@ last week still finds the conversation.
 
 A plus at the end of the title opens New message, a sheet over the tab. It was
 the tab's own body swapping to a search, which read as Messages changing rather
-than a task you could close. The sheet is a field with people under it before
+than a task you could close. The sheet is a field, then Create a group, then people under it before
 anything is typed: the people you already talk to, then the earliest members.
 There is no line telling you what to search; the list is the instruction.
 Typing narrows it to a username prefix or the start of a name. It is never more
@@ -1827,7 +1827,20 @@ than eight and never you. Profiles stay readable only by their owner;
 pressing one calls `conversation_with_person`. The thread replaces the sheet,
 so closing the thread lands on Messages. That opens the thread already there with that
 person, including the one that started because they wrote to your shop, rather
-than a second thread with the same name on it. The thread search under Messages
+than a second thread with the same name on it.
+
+Create a group is a row under the search, the same photograph and padding as
+a person, with the words in `bodyStrong`. It turns the list into a selection:
+the brass rule marks each person, their names sit under the field, and Create
+group stays off until two are chosen. Twelve is the most.
+The same people open the group that already exists. A group in the list wears
+`account-group-outline` where a photograph would be, and its name is the other
+people in it. The line under that name in the thread is how many people.
+Someone else's message names them, in `caption` above the first bubble of
+their run, and that name leads the latest line in the list. Yours stay on the
+right with no name, and the list still leads those with "You".
+
+The thread search under Messages
 still accepts one exact username, through `conversation_with_handle`, and a
 thread that already exists is the one that opens. A conversation also still
 starts from a person's profile or from a watch a shop is selling.

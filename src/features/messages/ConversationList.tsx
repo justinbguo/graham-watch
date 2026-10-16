@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 
 import { SearchField } from '@/components/SearchBar';
@@ -18,6 +18,7 @@ import { ConversationRow } from './ConversationRow';
 import { MessageHandle } from './MessageHandle';
 import { hasHandle, visibleConversations } from './match';
 import { useOpenParty } from './openParty';
+import { useDebounced } from './useDebounced';
 
 /** Each letter is not a search. Older lines are asked once typing pauses. */
 const BODY_SEARCH_PAUSE = 300;
@@ -134,15 +135,6 @@ export function ConversationList({ userId }: { userId: string }) {
       )}
     </View>
   );
-}
-
-function useDebounced(value: string, delay: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return debounced;
 }
 
 function said(error: unknown): string {

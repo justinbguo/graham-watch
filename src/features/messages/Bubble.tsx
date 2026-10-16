@@ -31,6 +31,7 @@ export function Bubble({
   caption,
   when,
   sent = false,
+  speaker,
 }: {
   body: string;
   mine: boolean;
@@ -40,6 +41,8 @@ export function Bubble({
   when?: string | null;
   /** Just sent from this screen, so it arrives rather than being there. */
   sent?: boolean;
+  /** Who said this, above the first bubble of their run in a group. */
+  speaker?: string | null;
 }) {
   const styles = useThemedStyles(bubbleStyles);
 
@@ -48,6 +51,7 @@ export function Bubble({
       {listing && onOpenListing ? (
         <ListingQuote listing={listing} onPress={onOpenListing} mine={mine} />
       ) : null}
+      {speaker ? <Text style={styles.speaker}>{speaker}</Text> : null}
       <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
@@ -100,5 +104,9 @@ const bubbleStyles = (theme: Theme) => ({
   when: {
     ...type.caption,
     color: theme.color.textFaint,
+  },
+  speaker: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
 });

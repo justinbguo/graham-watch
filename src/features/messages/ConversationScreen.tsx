@@ -27,7 +27,7 @@ import { Bubble } from './Bubble';
 import { ListingQuote } from './ListingQuote';
 import { useOpenParty } from './openParty';
 import { PartyAvatar } from './PartyAvatar';
-import { partyLine, partyName } from './party';
+import { memberLabel, partyLine, partyName } from './party';
 
 /** The first thing you send a shop about a watch, until you write your own. */
 const DEFAULT_INQUIRY = 'Hey, is this watch still available?';
@@ -174,13 +174,19 @@ export function ConversationScreen({
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
           renderItem={({ item, index }) => {
             const watchId = item.listing?.id;
+            const mine = item.sender_id === userId;
             return (
               <Bubble
                 body={item.body}
-                mine={item.sender_id === userId}
+                mine={mine}
                 listing={item.listing}
                 onOpenListing={watchId ? () => openWatch(watchId) : undefined}
                 caption={item.via === 'email' ? 'Sent by email' : null}
+                speaker={
+                  who.kind === 'group' && !mine && startOfRun(messages, index)
+                    ? memberLabel(header.members, item.sender_id)
+                    : null
+                }
                 when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
                 // The pending row is the one that rises. The server's copy of it
                 // takes its place without moving, so one send is one arrival.
@@ -212,6 +218,13 @@ export function ConversationScreen({
       </View>
     </Screen>
   );
+}
+
+/** The first message of a run: the previous one is someone else's, or this is the start. */
+function startOfRun(messages: ChatMessage[], index: number) {
+  const previous = messages[index - 1];
+  if (!previous) return true;
+  return previous.sender_id !== messages[index].sender_id;
 }
 
 /** The last message of a run: the next one is someone else's, or an hour later. */

@@ -234,8 +234,10 @@ exchange_comments
 exchange_photos id, post_id, storage_path, position
 exchange_votes  user_id, post_id, comment_id, value, created_at
 dealer_follows  user_id, dealer_id, created_at
-conversations   id, opener_id, partner_id, dealer_id, created_at,
-                last_message_at
+conversations   id, opener_id, partner_id, dealer_id, is_group, members_key,
+                created_at, last_message_at
+conversation_members
+                conversation_id, user_id, joined_at
 messages        id, conversation_id, sender_id, body, via, listing_id,
                 created_at
 conversation_reads
@@ -248,16 +250,18 @@ dealer_claim_codes
 `dealers.permission`: `pending | approved | revoked`. `listings.status`:
 `active | hidden`. `import_jobs.status`: `queued | running | succeeded | failed`.
 `swipes.direction`: `left | right`. `inquiries.status`: `pending | sent | failed`.
-`messages.via`: `app | email`. A conversation names exactly one other side:
-`partner_id` for a person, `dealer_id` for a shop.
+`messages.via`: `app | email`. A direct conversation names exactly one other side:
+`partner_id` for a person, `dealer_id` for a shop. A group sets `is_group` and
+leaves both empty. Its people are `conversation_members`, and `members_key` is
+their ids sorted so the same set is one group.
 
 Access rules: a profile is readable only by its owner. Dealers are readable by anyone
 signed in, except `contact_email`, which is revoked at the column level. A listing is
 readable if its dealer is approved, or if you imported or claimed it. Swipes and
 inquiries are private to their owner, and a shop reads the inquiries for its own
-listings once claimed. A conversation and its messages are readable by its two sides:
-the opener, the other person, and — for a thread with a shop — whoever has claimed that
-shop right now. `import_jobs` is readable by its owner and writable only by the
+listings once claimed. A conversation and its messages are readable by its sides:
+the opener, the other person, every member of a group, and — for a thread with a shop —
+whoever has claimed that shop right now. `import_jobs` is readable by its owner and writable only by the
 service role. `dealer_claim_codes` has RLS on and no policies at all. Nobody can approve
 a dealer through the app.
 
@@ -332,19 +336,27 @@ the feed, which stays newest-first.
 
 ## 14. Messages
 
-The Messages tab, between Community and Wishlist. One thread per pair of people, and one per shop a buyer has written to. A shop thread is already the chat with that buyer, so messaging them opens it instead of a second thread. A conversation
+The Messages tab, between Community and Wishlist. One thread per pair of people, one per shop a buyer has written to, and one per set of people in a group. A shop thread is already the chat with that buyer, so messaging them opens it instead of a second thread. A direct conversation
 has two sides and no member list: `opener_id` is whoever wrote first, and the other side
 is `partner_id` or `dealer_id`. A shop's side is `dealers.claimed_by`, read live, so a
-shop that claims its account later inherits the threads already addressed to it.
+shop that claims its account later inherits the threads already addressed to it. A group
+is `is_group` with both of those empty. The people in it are rows in `conversation_members`.
+`create_group` writes the thread and those rows together. It needs two other people —
+one is a direct thread — and it holds at most twelve. The same set returns the group
+that already exists.
 
 A conversation with a person starts from their profile, the plus
 on the Messages tab, or an exact username in the thread search. A conversation
 with a shop starts from Message beside Follow, on the shop's page and on a
 listing's dealer panel, or from Message on a saved watch. The plus opens New
-message as a sheet and calls `suggest_people`, which returns at most eight
+message as a sheet. The field is first. Create a group is the row under it. The field calls
+`suggest_people`, which returns at most eight
 accounts and never the caller. An empty field returns the people you already
-talk to, then the earliest members by collector number. Typing narrows it to a
-username or name prefix. `conversation_with_handle` still resolves
+talk to, including people you share a group with, then the earliest members by
+collector number. Typing narrows it to a
+username or name prefix. Choosing Create a group keeps that search and selects
+several people; Create group calls `create_group`. The thread is named for the
+other people in it. `conversation_with_handle` still resolves
 one exact handle. Both exist because `profiles` is readable only by its owner.
 The field under the title filters the threads you are in, by name, handle, and
 message text. The shop button calls `conversation_with_dealer`, which opens the

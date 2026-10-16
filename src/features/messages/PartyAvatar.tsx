@@ -15,6 +15,10 @@ export function PartyAvatar({
   px?: number;
   onPress?: () => void;
 }) {
+  if (who.kind === 'group') {
+    return <Avatar url={null} px={px} glyph="account-group-outline" />;
+  }
+
   const avatar = who.kind === 'person' ? (
     <Avatar url={who.avatar_url} px={px} glyph="account-outline" />
   ) : (

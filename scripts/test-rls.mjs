@@ -2693,6 +2693,199 @@ console.log('\nmessages');
     Array.isArray(hidden.body) && hidden.body.length === 0,
     JSON.stringify(hidden.body),
   );
+
+  const grace = `grace${String(stamp).slice(-6)}`;
+  const claimedGrace = await api('/rest/v1/rpc/claim_username', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { candidate: grace },
+  });
+  check('a second person can claim a username', claimedGrace.status < 300, JSON.stringify(claimedGrace.body));
+
+  const namedGrace = await api(`/rest/v1/profiles?id=eq.${dealerUser.id}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { first_name: 'Grace', last_name: 'Hopper' },
+  });
+  check('that person can set their name', namedGrace.status < 300, `got ${namedGrace.status}`);
+
+  const outsider = await createUser(`group-out-${stamp}@example.com`);
+  try {
+    const alone = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id] },
+    });
+    check(
+      'a group needs two other people',
+      alone.status >= 400 && String(alone.body?.message ?? '').includes('two'),
+      JSON.stringify(alone.body),
+    );
+
+    const guestGroup = await api('/rest/v1/rpc/create_group', {
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id] },
+    });
+    check('a guest cannot create a group', guestGroup.status >= 400, JSON.stringify(guestGroup.body));
+
+    const forged = await api('/rest/v1/conversations', {
+      token: importer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { opener_id: importer.id, is_group: true, members_key: 'forged' },
+    });
+    check(
+      'you cannot open a group except through create_group',
+      forged.status >= 400,
+      JSON.stringify(forged.body),
+    );
+
+    const grouped = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id] },
+    });
+    check(
+      'two people open one group',
+      grouped.status < 300 && typeof grouped.body === 'string',
+      JSON.stringify(grouped.body),
+    );
+
+    const same = await api('/rest/v1/rpc/create_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_member_ids: [dealerUser.id, importer.id] },
+    });
+    check(
+      'the same people open the same group',
+      same.status < 300 && same.body === grouped.body,
+      JSON.stringify(same.body),
+    );
+
+    const groupId = grouped.body;
+    const members = await api(
+      `/rest/v1/conversation_members?conversation_id=eq.${groupId}&select=user_id`,
+      { token: buyer.token },
+    );
+    check(
+      'a member can see who is in the group',
+      Array.isArray(members.body) && members.body.length === 3,
+      JSON.stringify(members.body),
+    );
+
+    const hiddenMembers = await api(
+      `/rest/v1/conversation_members?conversation_id=eq.${groupId}&select=user_id`,
+      { token: outsider.token },
+    );
+    check(
+      'a stranger cannot see who is in the group',
+      Array.isArray(hiddenMembers.body) && hiddenMembers.body.length === 0,
+      JSON.stringify(hiddenMembers.body),
+    );
+
+    const joined = await api('/rest/v1/conversation_members', {
+      token: outsider.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { conversation_id: groupId, user_id: outsider.id },
+    });
+    check(
+      'a stranger cannot add themselves to a group',
+      joined.status >= 400,
+      JSON.stringify(joined.body),
+    );
+
+    const heard = await api('/rest/v1/messages', {
+      token: buyer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: {
+        conversation_id: groupId,
+        sender_id: buyer.id,
+        body: `group-secret-${stamp}`,
+      },
+    });
+    check('a member can write in the group', heard.status < 300, JSON.stringify(heard.body));
+
+    const eavesdrop = await api('/rest/v1/messages', {
+      token: outsider.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: {
+        conversation_id: groupId,
+        sender_id: outsider.id,
+        body: 'nope',
+      },
+    });
+    check(
+      'a stranger cannot write in the group',
+      eavesdrop.status >= 400,
+      JSON.stringify(eavesdrop.body),
+    );
+
+    const readGroup = await api(
+      `/rest/v1/messages?conversation_id=eq.${groupId}&select=id`,
+      { token: outsider.token },
+    );
+    check(
+      'a stranger cannot read the group',
+      Array.isArray(readGroup.body) && readGroup.body.length === 0,
+      JSON.stringify(readGroup.body),
+    );
+
+    const listed = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const groupRow = Array.isArray(listed.body)
+      ? listed.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'the group is in your list, named for the other people',
+      groupRow?.is_group === true &&
+        groupRow.member_count === 3 &&
+        groupRow.group_names?.includes('Ada Byron') &&
+        groupRow.group_names?.includes('Grace Hopper') &&
+        groupRow.last_sender_name === 'Ada',
+      JSON.stringify(groupRow),
+    );
+
+    const strangersList = await api('/rest/v1/rpc/conversation_list', {
+      token: outsider.token,
+      method: 'POST',
+      body: {},
+    });
+    check(
+      'a stranger does not see the group in their list',
+      Array.isArray(strangersList.body) && !strangersList.body.some((row) => row.id === groupId),
+      JSON.stringify(strangersList.body),
+    );
+
+    const header = await api('/rest/v1/rpc/conversation_header', {
+      token: dealerUser.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId },
+    });
+    const head = header.body?.[0];
+    check(
+      'a member can open the group, and does not see themselves in its names',
+      header.status < 300 &&
+        head?.is_group === true &&
+        head.writable === true &&
+        head.member_count === 3 &&
+        Array.isArray(head.members) &&
+        head.members.length === 2 &&
+        !head.members.some((member) => member.id === dealerUser.id) &&
+        head.members.some((member) => member.handle === handle),
+      JSON.stringify(header.body),
+    );
+  } finally {
+    await fetch(`${URL}/auth/v1/admin/users/${outsider.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    });
+  }
 }
 
 await cleanUp();

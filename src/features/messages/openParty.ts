@@ -6,6 +6,7 @@ export function useOpenParty() {
   const open = useOpenStack();
 
   return (who: ConversationWith) => {
+    if (who.kind === 'group') return;
     if (who.kind === 'dealer') {
       open('dealer/[dealerId]', { dealerId: who.dealerId }, `/dealer/${who.dealerId}`);
       return;

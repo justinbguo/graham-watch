@@ -13,6 +13,14 @@ import { listingPhotoUrl } from './listings';
  * decides which one you are looking at: a buyer sees the shop, and the shop's
  * owner sees the buyer.
  */
+/** Someone else in a group. Names come from the header, because profiles are private. */
+export type GroupMember = {
+  userId: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+};
+
 export type ConversationWith =
   | { kind: 'dealer'; dealerId: string; name: string; logoUrl: string | null; byEmail: boolean }
   | {
@@ -22,12 +30,13 @@ export type ConversationWith =
       handle: string | null;
       number: number;
       avatar_url: string | null;
-    };
+    }
+  | { kind: 'group'; title: string; count: number; handles: string[] };
 
 export type ConversationSummary = {
   id: string;
   with: ConversationWith;
-  last: { body: string; at: string; mine: boolean } | null;
+  last: { body: string; at: string; mine: boolean; senderName: string | null } | null;
   unread: number;
 };
 
@@ -36,6 +45,8 @@ export type ConversationHeader = {
   with: ConversationWith;
   /** False in a thread with a shop that has not claimed its account. */
   writable: boolean;
+  /** The other people in a group. Empty for a direct thread. */
+  members: GroupMember[];
 };
 
 /** The watch a message is answering. Drawn above the words, like a reply. */
@@ -66,9 +77,21 @@ type PartyColumns = {
   person_number: number | null;
   person_avatar_url: string | null;
   by_email: boolean;
+  is_group: boolean;
+  group_names: string[] | null;
+  group_handles: string[] | null;
+  member_count: number | null;
 };
 
 function party(row: PartyColumns): ConversationWith {
+  if (row.is_group) {
+    return {
+      kind: 'group',
+      title: groupTitle(row.group_names ?? []),
+      count: row.member_count ?? 0,
+      handles: (row.group_handles ?? []).filter((handle): handle is string => Boolean(handle)),
+    };
+  }
   if (row.dealer_id) {
     return {
       kind: 'dealer',
@@ -86,6 +109,32 @@ function party(row: PartyColumns): ConversationWith {
     number: row.person_number ?? 0,
     avatar_url: row.person_avatar_url,
   };
+}
+
+/** "Ada and Grace", or "Ada, Grace, and Joan". The order is the one the database returned. */
+function groupTitle(names: string[]): string {
+  const people = names.map((name) => name.trim()).filter(Boolean);
+  if (people.length === 0) return 'Group';
+  if (people.length === 1) return people[0];
+  if (people.length === 2) return `${people[0]} and ${people[1]}`;
+  return `${people.slice(0, -1).join(', ')}, and ${people[people.length - 1]}`;
+}
+
+function membersOf(value: unknown): GroupMember[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!row || typeof row !== 'object') return [];
+    const member = row as Record<string, unknown>;
+    if (typeof member.id !== 'string') return [];
+    return [
+      {
+        userId: member.id,
+        name: typeof member.name === 'string' ? member.name : null,
+        handle: typeof member.handle === 'string' ? member.handle : null,
+        avatar_url: typeof member.avatar_url === 'string' ? member.avatar_url : null,
+      },
+    ];
+  });
 }
 
 /**
@@ -110,7 +159,12 @@ export function useConversations(userId: string | null) {
         id: row.id,
         with: party(row),
         last: row.last_at
-          ? { body: row.last_body ?? '', at: row.last_at, mine: Boolean(row.last_mine) }
+          ? {
+              body: row.last_body ?? '',
+              at: row.last_at,
+              mine: Boolean(row.last_mine),
+              senderName: row.is_group && !row.last_mine ? row.last_sender_name : null,
+            }
           : null,
         unread: Number(row.unread),
       }));
@@ -141,7 +195,14 @@ export function useConversation(conversationId: string | null) {
       const covers = await coverPhotos(rows.flatMap((row) => (row.listing_id ? [row.listing_id] : [])));
       const head = header.data?.[0];
       return {
-        header: head ? { id: head.id, with: party(head), writable: head.writable } : null,
+        header: head
+          ? {
+              id: head.id,
+              with: party(head),
+              writable: head.writable,
+              members: head.is_group ? membersOf(head.members) : [],
+            }
+          : null,
         messages: rows.map((row) => {
           const listing = Array.isArray(row.listings) ? row.listings[0] : row.listings;
           return {
@@ -308,6 +369,23 @@ export function useListingThreads(userId: string | null) {
  * is no second thread with the same person: two halves of one conversation is
  * two places to look for the same answer.
  */
+/**
+ * Opens a group with these people, or the one that already has exactly this
+ * set. The database refuses fewer than two other people: one other person is
+ * a direct thread, and two threads with the same person is two places to look.
+ */
+export function useCreateGroup() {
+  return useMutation({
+    mutationFn: async (memberIds: string[]): Promise<string> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { data, error } = await supabase.rpc('create_group', { p_member_ids: memberIds });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('Could not create that group.');
+      return data;
+    },
+  });
+}
+
 export function useMessagePerson() {
   return useMutation({
     mutationFn: async (userId: string): Promise<string> => {
