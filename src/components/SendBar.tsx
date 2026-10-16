@@ -3,13 +3,15 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Field } from '@/components/ui';
-import { inset, radius, size, space, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
- * One line and a round send button, at the foot of a thread. The exchange's
- * comments and a conversation are the same act — say one thing to whoever is
- * already on this screen — so they are the same control.
+ * One line at the foot of a thread, shaped like the deck's search capsule: the
+ * same fill, height, and gutter, with no rule above it. Send is the glyph at
+ * the capsule's trailing edge. The exchange's comments and a conversation are the
+ * same act — say one thing to whoever is already on this screen — so they are
+ * the same control.
  *
  * It does not lift itself. The screen it sits in pads its own bottom by
  * `useKeyboardLift`, because how much room the keyboard leaves depends on
@@ -23,6 +25,8 @@ export function SendBar({
   busy = false,
   /** Above the field: who you are answering, or what went wrong. */
   note,
+  /** What the glyph does, for a screen reader, when it is not a message. */
+  sendLabel = 'Send',
 }: {
   placeholder: string;
   value: string;
@@ -30,6 +34,7 @@ export function SendBar({
   onSend: () => void;
   busy?: boolean;
   note?: ReactNode;
+  sendLabel?: string;
 }) {
   const styles = useThemedStyles(sendStyles);
   const theme = useTheme();
@@ -38,7 +43,7 @@ export function SendBar({
   return (
     <View style={styles.bar}>
       {note}
-      <View style={styles.row}>
+      <View>
         <Field
           placeholder={placeholder}
           value={value}
@@ -52,11 +57,16 @@ export function SendBar({
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Send"
+          accessibilityLabel={sendLabel}
+          accessibilityState={{ disabled: !sendable, busy }}
           disabled={!sendable}
           onPress={onSend}
-          style={({ pressed }) => [styles.send, !sendable && styles.off, pressed && styles.pressed]}>
-          <MaterialCommunityIcons name="send-outline" size={size.iconSmall} color={theme.color.onAccent} />
+          style={({ pressed }) => [styles.send, pressed && styles.pressed]}>
+          <MaterialCommunityIcons
+            name="send-outline"
+            size={size.icon}
+            color={sendable ? theme.color.ink : theme.color.inkFaint}
+          />
         </Pressable>
       </View>
     </View>
@@ -69,27 +79,25 @@ const sendStyles = (theme: Theme) => ({
     paddingTop: space.sm,
     paddingBottom: space.md,
     gap: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
+    backgroundColor: theme.color.background,
   },
-  row: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
-  },
+  // The deck's search capsule: `HIT_TARGET` tall, `fill`, the label inset by
+  // half the height. Typing stops short of the glyph instead of running under it.
   input: {
-    flex: 1,
-  },
-  send: {
-    width: size.controlMin,
-    height: size.controlMin,
+    height: HIT_TARGET,
     borderRadius: radius.full,
+    paddingLeft: HIT_TARGET / 2,
+    paddingRight: HIT_TARGET,
+  },
+  // No fill behind it: the glyph is the control, and its colour is its state.
+  send: {
+    position: 'absolute' as const,
+    top: 0,
+    right: space.xs,
+    width: HIT_TARGET,
+    height: HIT_TARGET,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    backgroundColor: theme.color.accent,
-  },
-  off: {
-    opacity: 0.4,
   },
   pressed: {
     opacity: 0.72,

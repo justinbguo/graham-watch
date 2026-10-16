@@ -77,6 +77,13 @@ export const color = {
      * `badge`: nothing is set on it, so it does not have to hold white type.
      */
     notice: '#FF4B3E',
+    /**
+     * A shop that has not claimed. Yellow in both schemes: `brass` is the
+     * highlight on a name, and this mark has to read as a warning on paper
+     * and on charcoal. The type on it stays dark.
+     */
+    caution: '#F5C518',
+    onCaution: '#17140F',
     /** The swipe card, which floats on `shadow.card` instead of stepping. */
     raised: '#FFFFFF',
   },
@@ -112,6 +119,8 @@ export const color = {
     badge: '#D93025',
     onBadge: '#FFFFFF',
     notice: '#FF4B3E',
+    caution: '#F5C518',
+    onCaution: '#17140F',
     // A shadow is nothing against a near-black page, so in the dark the card
     // floats the only way it can: a tone above `surface`.
     raised: '#262320',
@@ -422,6 +431,11 @@ export const size = {
    * height of the whole row.
    */
   avatar: 40,
+  /**
+   * The other party beside a conversation's title. The `display` line is 36,
+   * so 36 sits flush with the name's line instead of hanging below it.
+   */
+  avatarHeader: 36,
   avatarSmall: 32,
   /** A community byline. One line of `body` type; the face is a step taller than it. */
   avatarByline: 32,
@@ -436,6 +450,12 @@ export const size = {
    * filled the screen and a list of watches read as a stack of posters.
    */
   gridPhoto: 96,
+  /**
+   * The watch quoted in a message. One photograph, not a cell in a row of
+   * three, so it can be larger than `gridPhoto` and still leave the field
+   * above the keyboard.
+   */
+  quotePhoto: 160,
   /**
    * The same frame on the home grid and the wishlist. Shorter, so a scan of
    * the deck or a saved list is a list. A shop keeps `gridPhoto`. Search is a

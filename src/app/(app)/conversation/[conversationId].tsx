@@ -12,6 +12,7 @@ export default function ConversationRoute() {
   if (!conversationId) return null;
   return (
     <ConversationScreen
+      key={`${conversationId}:${listingId ?? ''}`}
       conversationId={conversationId}
       listingId={listingId || null}
     />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 
 import { SearchField } from '@/components/SearchBar';
@@ -17,6 +17,8 @@ import { useThemedStyles } from '@/providers/theme';
 import { ConversationRow } from './ConversationRow';
 import { MessageHandle } from './MessageHandle';
 import { hasHandle, visibleConversations } from './match';
+import { useOpenParty } from './openParty';
+import { useDebounced } from './useDebounced';
 
 /** Each letter is not a search. Older lines are asked once typing pauses. */
 const BODY_SEARCH_PAUSE = 300;
@@ -32,6 +34,7 @@ const BODY_SEARCH_PAUSE = 300;
 export function ConversationList({ userId }: { userId: string }) {
   const styles = useThemedStyles(listStyles);
   const open = useOpenStack();
+  const openParty = useOpenParty();
   const { data: conversations = [], isPending, error } = useConversations(userId);
   const [query, setQuery] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
@@ -111,13 +114,14 @@ export function ConversationList({ userId }: { userId: string }) {
             ) : (
               <Centered>
                 <Heading>No messages yet</Heading>
-                <Message text="Search a username above, ask a shop about a watch, or write from a post." />
+                <Message text="Tap + to message someone, ask a shop about a watch, or write from a post." />
               </Centered>
             )
           }
           renderItem={({ item }) => (
             <ConversationRow
               conversation={item}
+              onOpenParty={() => openParty(item.with)}
               onPress={() =>
                 open(
                   'conversation/[conversationId]',
@@ -131,15 +135,6 @@ export function ConversationList({ userId }: { userId: string }) {
       )}
     </View>
   );
-}
-
-function useDebounced(value: string, delay: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return debounced;
 }
 
 function said(error: unknown): string {

@@ -33,13 +33,18 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return;
     }
 
+    // The stored session, and the listener. They race. The listener's first
+    // event is often null, and writing that null used to replace the session
+    // `getSession` had just read — `isSignedIn` flipped off and the deck
+    // painted Log in for someone who was signed in. A null that is not an
+    // explicit sign-out leaves the session we already hold.
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+      if (data.session) setSession(data.session);
       setIsLoading(false);
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      setSession((current) => (next || event === 'SIGNED_OUT' ? next : current));
       setIsLoading(false);
     });
 

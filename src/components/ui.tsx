@@ -61,6 +61,7 @@ export function Screen({
   title,
   titleSize = 'display',
   titleExtra,
+  titleControl,
   subtitle,
   back,
   leading,
@@ -76,8 +77,13 @@ export function Screen({
   titleSize?: 'display' | 'title';
   /** A control on the title's line. Wraps under the title when the line is full. */
   titleExtra?: ReactNode;
-  /** A line under the title: what the screen is holding right now. */
-  subtitle?: string;
+  /** Replaces the title text. The header still owns the line. */
+  titleControl?: ReactNode;
+  /**
+   * Under the title. A string is the quiet line. A node is a mark that has
+   * to sit on that same line, such as the unclaimed-shop badge.
+   */
+  subtitle?: ReactNode;
   /** Return to where you came from. `label` is spoken; it names the place. */
   back?: { label: string; onPress: () => void };
   /** A control at the start of the title's line. Search's close. */
@@ -121,18 +127,32 @@ export function Screen({
             </Pressable>
           </View>
         ) : null}
-        {title || action || leading || subhead ? (
+        {title || titleControl || action || leading || subhead ? (
           <View style={subhead ? styles.headed : undefined}>
             <View style={[styles.header, subhead ? styles.headerFlush : null]}>
               {leading ? <View style={styles.leading}>{leading}</View> : null}
-              <View style={[styles.heading, titleExtra || leading ? styles.headingShare : null]}>
-                <View style={[styles.titleRow, titleExtra ? styles.titleRowWrap : null]}>
-                  {title ? (
-                    <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
-                  ) : null}
+              <View
+                style={[
+                  styles.heading,
+                  titleExtra || leading || titleControl ? styles.headingShare : null,
+                ]}>
+                <View
+                  style={[
+                    styles.titleRow,
+                    titleExtra ? styles.titleRowWrap : null,
+                    titleControl ? styles.titleRowFill : null,
+                  ]}>
+                  {titleControl ??
+                    (title ? (
+                      <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
+                    ) : null)}
                   {titleExtra}
                 </View>
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                {typeof subtitle === 'string' ? (
+                  <Text style={styles.subtitle}>{subtitle}</Text>
+                ) : (
+                  subtitle
+                )}
               </View>
               {action ? <View style={styles.actionSlot}>{action}</View> : null}
             </View>
@@ -410,6 +430,9 @@ const screenStyles = (theme: Theme) => ({
     gap: space.sm,
     flexShrink: 1,
     minWidth: 0,
+  },
+  titleRowFill: {
+    flex: 1,
   },
   titleRowWrap: {
     flexWrap: 'wrap' as const,

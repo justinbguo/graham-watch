@@ -1,8 +1,11 @@
 import { Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import type { MessageListing } from '@/data/messages';
 import { motion, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
+
+import { ListingQuote } from './ListingQuote';
 
 /**
  * The one you just sent rises out of the composer into the thread. A reply
@@ -21,22 +24,34 @@ const rise = FadeInDown.duration(motion.base).withInitialValues({
 export function Bubble({
   body,
   mine,
-  /** What this message was about, or how it left: "About a Rolex", "Sent by email". */
+  /** The watch this message answers. Sits above the words. */
+  listing,
+  onOpenListing,
+  /** How it left, when that is not obvious: "Sent by email". */
   caption,
   when,
   sent = false,
+  speaker,
 }: {
   body: string;
   mine: boolean;
+  listing?: MessageListing | null;
+  onOpenListing?: () => void;
   caption?: string | null;
   when?: string | null;
   /** Just sent from this screen, so it arrives rather than being there. */
   sent?: boolean;
+  /** Who said this, above the first bubble of their run in a group. */
+  speaker?: string | null;
 }) {
   const styles = useThemedStyles(bubbleStyles);
 
   return (
     <Animated.View entering={sent ? rise : undefined} style={[styles.row, mine && styles.rowMine]}>
+      {listing && onOpenListing ? (
+        <ListingQuote listing={listing} onPress={onOpenListing} mine={mine} />
+      ) : null}
+      {speaker ? <Text style={styles.speaker}>{speaker}</Text> : null}
       <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
@@ -89,5 +104,9 @@ const bubbleStyles = (theme: Theme) => ({
   when: {
     ...type.caption,
     color: theme.color.textFaint,
+  },
+  speaker: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
 });

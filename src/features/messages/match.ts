@@ -12,12 +12,19 @@ export function conversationMatches(conversation: ConversationSummary, query: st
   const bare = term.replace(/^@/, '');
   const who = conversation.with;
   const name = partyName(who).toLowerCase();
-  const handle = who.kind === 'person' ? (who.handle ?? '').toLowerCase() : '';
+  const handles =
+    who.kind === 'group'
+      ? who.handles
+      : who.kind === 'person' && who.handle
+        ? [who.handle]
+        : [];
   const last = conversation.last?.body.toLowerCase() ?? '';
   const named =
     name.includes(term) ||
     (bare.length > 0 && name.includes(bare)) ||
-    (handle.length > 0 && (handle.includes(bare) || `@${handle}`.includes(term)));
+    handles.some(
+      (handle) => handle.toLowerCase().includes(bare) || `@${handle.toLowerCase()}`.includes(term),
+    );
   return named || last.includes(term);
 }
 

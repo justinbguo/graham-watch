@@ -6,12 +6,21 @@ import { supabase } from '@/lib/supabase';
 import { normalizeUsername } from '@/lib/username';
 
 import { keys } from './keys';
+import { listingPhotoUrl } from './listings';
 
 /**
  * Who a thread is with. A shop, or a person — never both, and the database
  * decides which one you are looking at: a buyer sees the shop, and the shop's
  * owner sees the buyer.
  */
+/** Someone else in a group. Names come from the header, because profiles are private. */
+export type GroupMember = {
+  userId: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+};
+
 export type ConversationWith =
   | { kind: 'dealer'; dealerId: string; name: string; logoUrl: string | null; byEmail: boolean }
   | {
@@ -21,12 +30,13 @@ export type ConversationWith =
       handle: string | null;
       number: number;
       avatar_url: string | null;
-    };
+    }
+  | { kind: 'group'; title: string; givenName: string | null; count: number; handles: string[] };
 
 export type ConversationSummary = {
   id: string;
   with: ConversationWith;
-  last: { body: string; at: string; mine: boolean } | null;
+  last: { body: string; at: string; mine: boolean; senderName: string | null } | null;
   unread: number;
 };
 
@@ -35,6 +45,15 @@ export type ConversationHeader = {
   with: ConversationWith;
   /** False in a thread with a shop that has not claimed its account. */
   writable: boolean;
+  /** The other people in a group. Empty for a direct thread. */
+  members: GroupMember[];
+};
+
+/** The watch a message is answering. Drawn above the words, like a reply. */
+export type MessageListing = {
+  id: string;
+  title: string;
+  photoUrl: string | null;
 };
 
 export type Message = {
@@ -44,7 +63,7 @@ export type Message = {
   /** `email` is an inquiry that left Graham for a shop with no account here. */
   via: 'app' | 'email';
   /** The watch an inquiry named, when the listing is still readable. */
-  listing: string | null;
+  listing: MessageListing | null;
   created_at: string;
 };
 
@@ -58,9 +77,24 @@ type PartyColumns = {
   person_number: number | null;
   person_avatar_url: string | null;
   by_email: boolean;
+  is_group: boolean;
+  group_names: string[] | null;
+  group_handles: string[] | null;
+  group_title: string | null;
+  member_count: number | null;
 };
 
 function party(row: PartyColumns): ConversationWith {
+  if (row.is_group) {
+    const givenName = row.group_title?.trim() || null;
+    return {
+      kind: 'group',
+      title: givenName ?? groupTitle(row.group_names ?? []),
+      givenName,
+      count: row.member_count ?? 0,
+      handles: (row.group_handles ?? []).filter((handle): handle is string => Boolean(handle)),
+    };
+  }
   if (row.dealer_id) {
     return {
       kind: 'dealer',
@@ -78,6 +112,32 @@ function party(row: PartyColumns): ConversationWith {
     number: row.person_number ?? 0,
     avatar_url: row.person_avatar_url,
   };
+}
+
+/** "Ada and Grace", or "Ada, Grace, and Joan". The order is the one the database returned. */
+function groupTitle(names: string[]): string {
+  const people = names.map((name) => name.trim()).filter(Boolean);
+  if (people.length === 0) return 'Group';
+  if (people.length === 1) return people[0];
+  if (people.length === 2) return `${people[0]} and ${people[1]}`;
+  return `${people.slice(0, -1).join(', ')}, and ${people[people.length - 1]}`;
+}
+
+function membersOf(value: unknown): GroupMember[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!row || typeof row !== 'object') return [];
+    const member = row as Record<string, unknown>;
+    if (typeof member.id !== 'string') return [];
+    return [
+      {
+        userId: member.id,
+        name: typeof member.name === 'string' ? member.name : null,
+        handle: typeof member.handle === 'string' ? member.handle : null,
+        avatar_url: typeof member.avatar_url === 'string' ? member.avatar_url : null,
+      },
+    ];
+  });
 }
 
 /**
@@ -102,7 +162,12 @@ export function useConversations(userId: string | null) {
         id: row.id,
         with: party(row),
         last: row.last_at
-          ? { body: row.last_body ?? '', at: row.last_at, mine: Boolean(row.last_mine) }
+          ? {
+              body: row.last_body ?? '',
+              at: row.last_at,
+              mine: Boolean(row.last_mine),
+              senderName: row.is_group && !row.last_mine ? row.last_sender_name : null,
+            }
           : null,
         unread: Number(row.unread),
       }));
@@ -123,29 +188,64 @@ export function useConversation(conversationId: string | null) {
           .from('messages')
           // The watch comes along for the ride: an inquiry names one, and a
           // buyer writes to the same shop about more than one.
-          .select('id, sender_id, body, via, created_at, listings (brand, model, year)')
+          .select('id, sender_id, body, via, created_at, listing_id, listings (brand, model, year)')
           .eq('conversation_id', conversationId)
           .order('created_at'),
       ]);
       if (header.error) throw header.error;
       if (messages.error) throw messages.error;
+      const rows = messages.data ?? [];
+      const covers = await coverPhotos(rows.flatMap((row) => (row.listing_id ? [row.listing_id] : [])));
       const head = header.data?.[0];
       return {
-        header: head ? { id: head.id, with: party(head), writable: head.writable } : null,
-        messages: (messages.data ?? []).map((row) => {
+        header: head
+          ? {
+              id: head.id,
+              with: party(head),
+              writable: head.writable,
+              members: head.is_group ? membersOf(head.members) : [],
+            }
+          : null,
+        messages: rows.map((row) => {
           const listing = Array.isArray(row.listings) ? row.listings[0] : row.listings;
           return {
             id: row.id,
             sender_id: row.sender_id,
             body: row.body,
             via: row.via === 'email' ? ('email' as const) : ('app' as const),
-            listing: listing ? formatTitle(listing) : null,
+            listing:
+              row.listing_id && listing
+                ? {
+                    id: row.listing_id,
+                    title: formatTitle(listing),
+                    photoUrl: covers.get(row.listing_id) ?? null,
+                  }
+                : null,
             created_at: row.created_at,
           };
         }),
       };
     },
   });
+}
+
+/** The first photograph of each watch, in the order the dealer arranged them. */
+async function coverPhotos(listingIds: string[]): Promise<Map<string, string>> {
+  const covers = new Map<string, string>();
+  const ids = [...new Set(listingIds)];
+  if (ids.length === 0) return covers;
+
+  const { data, error } = await supabase
+    .from('listing_photos')
+    .select('listing_id, position, storage_path, source_url')
+    .in('listing_id', ids)
+    .order('position');
+  if (error) throw error;
+
+  for (const photo of data ?? []) {
+    if (!covers.has(photo.listing_id)) covers.set(photo.listing_id, listingPhotoUrl(photo));
+  }
+  return covers;
 }
 
 /** Marks a message the server has not confirmed yet. Never a real row's id. */
@@ -167,7 +267,7 @@ export function useSendMessage(
   conversationId: string,
   userId: string,
   /** Set when this visit is a reply to one watch. Later messages in the visit name it too. */
-  about?: { listingId: string; title: string | null } | null,
+  about?: { listingId: string; title: string | null; photoUrl: string | null } | null,
 ) {
   const queryClient = useQueryClient();
   const queryKey = keys.conversation(conversationId);
@@ -192,7 +292,9 @@ export function useSendMessage(
         sender_id: userId,
         body: body.trim(),
         via: 'app',
-        listing: about?.title ?? null,
+        listing: about?.title
+          ? { id: about.listingId, title: about.title, photoUrl: about.photoUrl }
+          : null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<Thread>(queryKey, (thread) =>
@@ -270,6 +372,59 @@ export function useListingThreads(userId: string | null) {
  * is no second thread with the same person: two halves of one conversation is
  * two places to look for the same answer.
  */
+/**
+ * Opens a group with these people, or the one that already has exactly this
+ * set. The database refuses fewer than two other people: one other person is
+ * a direct thread, and two threads with the same person is two places to look.
+ */
+export function useCreateGroup() {
+  return useMutation({
+    mutationFn: async ({
+      memberIds,
+      title,
+    }: {
+      memberIds: string[];
+      title: string | null;
+    }): Promise<string> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { data, error } = await supabase.rpc('create_group', {
+        p_member_ids: memberIds,
+        p_title: title ?? undefined,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('Could not create that group.');
+      return data;
+    },
+  });
+}
+
+/**
+ * Changes a group's name, or clears it. Any member may. create_group will
+ * not do this: opening the same people again leaves the name alone.
+ */
+export function useRenameGroup(conversationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (title: string): Promise<void> => {
+      if (isDemo) throw new Error('Messages need a signed-in account.');
+      const { error } = await supabase.rpc('rename_group', {
+        p_conversation_id: conversationId,
+        p_title: title,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
+/**
+ * Opens the thread with a person, or finds the one that already exists. There
+ * is no second thread with the same person: two halves of one conversation is
+ * two places to look for the same answer.
+ */
 export function useMessagePerson() {
   return useMutation({
     mutationFn: async (userId: string): Promise<string> => {
@@ -304,6 +459,38 @@ export function useMessageByHandle() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
+export type PersonSuggestion = {
+  id: string;
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  number: number;
+};
+
+/**
+ * People to start a thread with. At most eight, and never the caller. An
+ * empty field suggests the people you already talk to, then the earliest
+ * members.
+ */
+export function useSuggestPeople(query: string) {
+  const term = query.trim().toLowerCase();
+  return useQuery({
+    queryKey: keys.people(term),
+    enabled: !isDemo,
+    queryFn: async (): Promise<PersonSuggestion[]> => {
+      const { data, error } = await supabase.rpc('suggest_people', { p_query: term });
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        handle: row.handle,
+        name: row.name,
+        avatarUrl: row.avatar_url,
+        number: row.collector_number,
+      }));
     },
   });
 }

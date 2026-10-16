@@ -136,7 +136,6 @@ export function CommunityScreen() {
       }>
       <Animated.View key="feed" entering={arrive} style={styles.view}>
         <Feed
-          userId={userId}
           filter={filter}
           onOpen={(id) => push({ kind: 'post', id })}
           onOpenAuthor={openAuthor}

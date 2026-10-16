@@ -2569,6 +2569,98 @@ console.log('\nmessages');
   });
   check('a guest cannot open a thread by username', anon.status >= 400, JSON.stringify(anon.body));
 
+  const blank = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: '  ' },
+  });
+  check(
+    'an empty search suggests at most eight, people you talk to first, never you',
+    blank.status < 300 &&
+      Array.isArray(blank.body) &&
+      blank.body.length <= 8 &&
+      blank.body.some((row) => row.handle === handle) &&
+      !blank.body.some((row) => row.id === importer.id),
+    JSON.stringify(blank.body),
+  );
+
+  const suggested = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: handle.slice(0, 4) },
+  });
+  check(
+    'a username prefix suggests that person',
+    suggested.status < 300 &&
+      suggested.body?.some((row) => row.handle === handle && row.name === 'Ada Byron'),
+    JSON.stringify(suggested.body),
+  );
+
+  const byName = await api('/rest/v1/rpc/suggest_people', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_query: 'byr' },
+  });
+  check(
+    'a last name suggests that person too',
+    byName.status < 300 && byName.body?.some((row) => row.handle === handle),
+    JSON.stringify(byName.body),
+  );
+
+  const self = await api('/rest/v1/rpc/suggest_people', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_query: handle },
+  });
+  check(
+    'you are not a suggestion for yourself',
+    self.status < 300 && !self.body?.some((row) => row.id === buyer.id),
+    JSON.stringify(self.body),
+  );
+
+  const guest = await api('/rest/v1/rpc/suggest_people', {
+    method: 'POST',
+    body: { p_query: handle },
+  });
+  check('a guest cannot search people', guest.status >= 400, JSON.stringify(guest.body));
+
+  const collector = await api('/rest/v1/rpc/collector_profile', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_user_id: buyer.id },
+  });
+  check(
+    'a message avatar opens that collector profile',
+    collector.status < 300 &&
+      collector.body?.[0]?.id === buyer.id &&
+      collector.body?.[0]?.handle === handle &&
+      collector.body?.[0]?.name === 'Ada Byron',
+    JSON.stringify(collector.body),
+  );
+
+  const missingCollector = await api('/rest/v1/rpc/collector_profile', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_user_id: '00000000-0000-0000-0000-000000000000' },
+  });
+  check(
+    'a missing collector returns no profile',
+    missingCollector.status < 300 &&
+      Array.isArray(missingCollector.body) &&
+      missingCollector.body.length === 0,
+    JSON.stringify(missingCollector.body),
+  );
+
+  const guestCollector = await api('/rest/v1/rpc/collector_profile', {
+    method: 'POST',
+    body: { p_user_id: buyer.id },
+  });
+  check(
+    'a guest cannot open a collector profile',
+    guestCollector.status >= 400,
+    JSON.stringify(guestCollector.body),
+  );
+
   const phrase = `secret-phrase-${stamp}`;
   const sent = await api('/rest/v1/messages', {
     token: importer.token,
@@ -2581,6 +2673,7 @@ console.log('\nmessages');
     },
   });
   check('the opener can write in the thread', sent.status < 300, JSON.stringify(sent.body));
+
 
   const found = await api(
     `/rest/v1/messages?select=conversation_id&body=ilike.*${phrase}*`,
@@ -2601,6 +2694,335 @@ console.log('\nmessages');
     Array.isArray(hidden.body) && hidden.body.length === 0,
     JSON.stringify(hidden.body),
   );
+
+  const grace = `grace${String(stamp).slice(-6)}`;
+  const claimedGrace = await api('/rest/v1/rpc/claim_username', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { candidate: grace },
+  });
+  check('a second person can claim a username', claimedGrace.status < 300, JSON.stringify(claimedGrace.body));
+
+  const namedGrace = await api(`/rest/v1/profiles?id=eq.${dealerUser.id}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { first_name: 'Grace', last_name: 'Hopper' },
+  });
+  check('that person can set their name', namedGrace.status < 300, `got ${namedGrace.status}`);
+
+  const outsider = await createUser(`group-out-${stamp}@example.com`);
+  try {
+    const alone = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id] },
+    });
+    check(
+      'a group needs two other people',
+      alone.status >= 400 && String(alone.body?.message ?? '').includes('two'),
+      JSON.stringify(alone.body),
+    );
+
+    const guestGroup = await api('/rest/v1/rpc/create_group', {
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id] },
+    });
+    check('a guest cannot create a group', guestGroup.status >= 400, JSON.stringify(guestGroup.body));
+
+    const forged = await api('/rest/v1/conversations', {
+      token: importer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { opener_id: importer.id, is_group: true, members_key: 'forged' },
+    });
+    check(
+      'you cannot open a group except through create_group',
+      forged.status >= 400,
+      JSON.stringify(forged.body),
+    );
+
+    const grouped = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id] },
+    });
+    check(
+      'two people open one group',
+      grouped.status < 300 && typeof grouped.body === 'string',
+      JSON.stringify(grouped.body),
+    );
+
+    const same = await api('/rest/v1/rpc/create_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_member_ids: [dealerUser.id, importer.id] },
+    });
+    check(
+      'the same people open the same group',
+      same.status < 300 && same.body === grouped.body,
+      JSON.stringify(same.body),
+    );
+
+    const groupId = grouped.body;
+    const members = await api(
+      `/rest/v1/conversation_members?conversation_id=eq.${groupId}&select=user_id`,
+      { token: buyer.token },
+    );
+    check(
+      'a member can see who is in the group',
+      Array.isArray(members.body) && members.body.length === 3,
+      JSON.stringify(members.body),
+    );
+
+    const hiddenMembers = await api(
+      `/rest/v1/conversation_members?conversation_id=eq.${groupId}&select=user_id`,
+      { token: outsider.token },
+    );
+    check(
+      'a stranger cannot see who is in the group',
+      Array.isArray(hiddenMembers.body) && hiddenMembers.body.length === 0,
+      JSON.stringify(hiddenMembers.body),
+    );
+
+    const joined = await api('/rest/v1/conversation_members', {
+      token: outsider.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { conversation_id: groupId, user_id: outsider.id },
+    });
+    check(
+      'a stranger cannot add themselves to a group',
+      joined.status >= 400,
+      JSON.stringify(joined.body),
+    );
+
+    const heard = await api('/rest/v1/messages', {
+      token: buyer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: {
+        conversation_id: groupId,
+        sender_id: buyer.id,
+        body: `group-secret-${stamp}`,
+      },
+    });
+    check('a member can write in the group', heard.status < 300, JSON.stringify(heard.body));
+
+    const eavesdrop = await api('/rest/v1/messages', {
+      token: outsider.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: {
+        conversation_id: groupId,
+        sender_id: outsider.id,
+        body: 'nope',
+      },
+    });
+    check(
+      'a stranger cannot write in the group',
+      eavesdrop.status >= 400,
+      JSON.stringify(eavesdrop.body),
+    );
+
+    const readGroup = await api(
+      `/rest/v1/messages?conversation_id=eq.${groupId}&select=id`,
+      { token: outsider.token },
+    );
+    check(
+      'a stranger cannot read the group',
+      Array.isArray(readGroup.body) && readGroup.body.length === 0,
+      JSON.stringify(readGroup.body),
+    );
+
+    const listed = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const groupRow = Array.isArray(listed.body)
+      ? listed.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'the group is in your list, named for the other people',
+      groupRow?.is_group === true &&
+        groupRow.member_count === 3 &&
+        groupRow.group_names?.includes('Ada Byron') &&
+        groupRow.group_names?.includes('Grace Hopper') &&
+        groupRow.last_sender_name === 'Ada',
+      JSON.stringify(groupRow),
+    );
+
+    const titled = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id], p_title: '  Friday desk  ' },
+    });
+    check(
+      'naming the same people keeps that group',
+      titled.status < 300 && titled.body === groupId,
+      JSON.stringify(titled.body),
+    );
+
+    const namedList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const namedRow = Array.isArray(namedList.body)
+      ? namedList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a group name replaces the list of people',
+      namedRow?.group_names?.length === 1 && namedRow.group_names[0] === 'Friday desk',
+      JSON.stringify(namedRow),
+    );
+
+    const renamed = await api('/rest/v1/rpc/create_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_member_ids: [dealerUser.id, importer.id], p_title: 'Other name' },
+    });
+    const keptList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const keptRow = Array.isArray(keptList.body)
+      ? keptList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a second name does not replace the first',
+      renamed.status < 300 &&
+        renamed.body === groupId &&
+        keptRow?.group_names?.length === 1 &&
+        keptRow.group_names[0] === 'Friday desk',
+      JSON.stringify(keptRow),
+    );
+
+    const tooLong = await api('/rest/v1/rpc/create_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_member_ids: [buyer.id, dealerUser.id], p_title: 'x'.repeat(41) },
+    });
+    check(
+      'a group name is at most 40 characters',
+      tooLong.status >= 400 && String(tooLong.body?.message ?? '').includes('40'),
+      JSON.stringify(tooLong.body),
+    );
+
+    const renamedGroup = await api('/rest/v1/rpc/rename_group', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: '  Saturday desk  ' },
+    });
+    const afterRename = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const renamedRow = Array.isArray(afterRename.body)
+      ? afterRename.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'a member can rename the group',
+      renamedGroup.status < 300 &&
+        renamedRow?.group_title === 'Saturday desk' &&
+        renamedRow?.group_names?.length === 1 &&
+        renamedRow.group_names[0] === 'Saturday desk',
+      JSON.stringify({ renamedGroup: renamedGroup.body, renamedRow }),
+    );
+
+    const strangerRename = await api('/rest/v1/rpc/rename_group', {
+      token: outsider.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: 'Stolen' },
+    });
+    check(
+      'a stranger cannot rename the group',
+      strangerRename.status >= 400,
+      JSON.stringify(strangerRename.body),
+    );
+
+    const longRename = await api('/rest/v1/rpc/rename_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: 'x'.repeat(41) },
+    });
+    check(
+      'renaming still stops at 40 characters',
+      longRename.status >= 400 && String(longRename.body?.message ?? '').includes('40'),
+      JSON.stringify(longRename.body),
+    );
+
+    const directRename = await api('/rest/v1/rpc/rename_group', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_conversation_id: opened.body, p_title: 'Not a group' },
+    });
+    check(
+      'a direct thread cannot be renamed',
+      directRename.status >= 400,
+      JSON.stringify(directRename.body),
+    );
+
+    const cleared = await api('/rest/v1/rpc/rename_group', {
+      token: dealerUser.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId, p_title: '   ' },
+    });
+    const clearedList = await api('/rest/v1/rpc/conversation_list', {
+      token: importer.token,
+      method: 'POST',
+      body: {},
+    });
+    const clearedRow = Array.isArray(clearedList.body)
+      ? clearedList.body.find((row) => row.id === groupId)
+      : null;
+    check(
+      'clearing the name returns the other people',
+      cleared.status < 300 &&
+        clearedRow?.group_title == null &&
+        clearedRow?.group_names?.includes('Ada Byron') &&
+        clearedRow?.group_names?.includes('Grace Hopper'),
+      JSON.stringify(clearedRow),
+    );
+
+    const strangersList = await api('/rest/v1/rpc/conversation_list', {
+      token: outsider.token,
+      method: 'POST',
+      body: {},
+    });
+    check(
+      'a stranger does not see the group in their list',
+      Array.isArray(strangersList.body) && !strangersList.body.some((row) => row.id === groupId),
+      JSON.stringify(strangersList.body),
+    );
+
+    const header = await api('/rest/v1/rpc/conversation_header', {
+      token: dealerUser.token,
+      method: 'POST',
+      body: { p_conversation_id: groupId },
+    });
+    const head = header.body?.[0];
+    check(
+      'a member can open the group, and does not see themselves in its names',
+      header.status < 300 &&
+        head?.is_group === true &&
+        head.writable === true &&
+        head.member_count === 3 &&
+        Array.isArray(head.members) &&
+        head.members.length === 2 &&
+        !head.members.some((member) => member.id === dealerUser.id) &&
+        head.members.some((member) => member.handle === handle),
+      JSON.stringify(header.body),
+    );
+
+  } finally {
+    await fetch(`${URL}/auth/v1/admin/users/${outsider.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    });
+  }
 }
 
 await cleanUp();

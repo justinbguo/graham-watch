@@ -3,27 +3,36 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 
-import { ActionPill } from '@/components/ActionBar';
 import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
-import { useListing } from '@/data/listings';
+import { useListing, usePrimeListing } from '@/data/listings';
 import {
   isPending as isSending,
   useConversation,
   useMarkConversationRead,
+  useRenameGroup,
   useSendMessage,
   type Message as ChatMessage,
+  type MessageListing,
 } from '@/data/messages';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
-import { inset, space, type, type Theme } from '@/lib/theme';
+import { useOpenStack } from '@/lib/openStack';
+import { inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
 import { Bubble } from './Bubble';
-import { partyLine, partyName } from './party';
+import { GroupTitle } from './GroupTitle';
+import { ListingQuote } from './ListingQuote';
+import { useOpenParty } from './openParty';
+import { PartyAvatar } from './PartyAvatar';
+import { memberLabel, partyLine, partyName } from './party';
+
+/** The first thing you send a shop about a watch, until you write your own. */
+const DEFAULT_INQUIRY = 'Hey, is this watch still available?';
 
 /** A run of messages from one person inside this many minutes shows one time. */
 const RUN = 60 * 60 * 1000;
@@ -41,19 +50,44 @@ export function ConversationScreen({
   const styles = useThemedStyles(screenStyles);
   const lift = useKeyboardLift();
   const list = useRef<FlatList<ChatMessage>>(null);
-  const [draft, setDraft] = useState('');
+  // Null until they edit. The default below is what an untouched field shows,
+  // so clearing the sentence stays cleared.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
 
   const { data, isPending, error } = useConversation(conversationId);
   const { data: listing } = useListing(listingId ?? '');
-  const about = listing ? formatTitle(listing) : null;
+  const primeListing = usePrimeListing();
+  const open = useOpenStack();
+  const openParty = useOpenParty();
+  const quote: MessageListing | null = listing
+    ? {
+        id: listing.id,
+        title: formatTitle(listing),
+        photoUrl: listing.photos[0]?.url ?? null,
+      }
+    : null;
+  // Wishlist opens this thread with the watch still named. Once a message
+  // already quotes it, the composer must not quote it again.
+  const asked = Boolean(
+    listingId && data?.messages.some((message) => message.listing?.id === listingId),
+  );
+  const quoting = quote && !asked ? quote : null;
+  const value = draft ?? (listingId && data && !asked ? DEFAULT_INQUIRY : '');
   const send = useSendMessage(
     conversationId,
     userId ?? '',
-    listingId ? { listingId, title: about } : null,
+    quoting ? { listingId: quoting.id, title: quoting.title, photoUrl: quoting.photoUrl } : null,
   );
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
+  const rename = useRenameGroup(conversationId);
   const close = () => router.back();
+
+  function openWatch(id: string) {
+    if (listing?.id === id) primeListing(listing);
+    open('listing/[listingId]', { listingId: id }, `/listing/${id}`);
+  }
 
   const last = data?.messages.at(-1)?.id;
   useEffect(() => {
@@ -82,10 +116,30 @@ export function ConversationScreen({
 
   const { header, messages } = data;
   const who = header.with;
+  // A shop with no account here cannot read the app. The same field writes
+  // the email instead, and the inquiry lands back in this thread.
+  const byEmail = !header.writable;
 
   function submit() {
-    const body = draft.trim();
-    if (!body || send.isPending) return;
+    const body = value.trim();
+    if (!body) return;
+
+    if (byEmail) {
+      if (!listing || mail.isPending) return;
+      mail.mutate(
+        { card: listing, message: body },
+        {
+          onSuccess: () => {
+            setDraft('');
+            void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+          },
+          onError: (error) => Alert.alert('Could not open Gmail', error.message),
+        },
+      );
+      return;
+    }
+
+    if (send.isPending) return;
     // The field clears as the bubble rises. If the write fails the words come
     // back to the field, unless something new has been typed over them.
     setDraft('');
@@ -96,8 +150,38 @@ export function ConversationScreen({
 
   return (
     <Screen
-      title={partyName(who)}
-      subtitle={partyLine(who) ?? undefined}
+      title={who.kind === 'group' ? undefined : partyName(who)}
+      titleControl={
+        who.kind === 'group' ? (
+          <GroupTitle
+            name={partyName(who)}
+            givenName={who.givenName}
+            editing={renaming}
+            onStart={() => setRenaming(true)}
+            onClose={() => setRenaming(false)}
+            onCommit={(title) => {
+              setRenaming(false);
+              rename.mutate(title, {
+                onError: (error) => Alert.alert('Could not rename the group', renameError(error)),
+              });
+            }}
+          />
+        ) : undefined
+      }
+      titleSize="title"
+      subtitle={
+        byEmail ? (
+          <View style={styles.unclaimed}>
+            <Text style={styles.unclaimedLabel}>
+              Not claimed on Graham yet. Your inquiry goes to their email until they claim their
+              profile.
+            </Text>
+          </View>
+        ) : (
+          (partyLine(who) ?? undefined)
+        )
+      }
+      leading={<PartyAvatar who={who} px={size.avatarHeader} onPress={() => openParty(who)} />}
       action={<CloseButton onPress={close} />}>
       <View style={[styles.fill, { paddingBottom: lift }]}>
         <FlatList
@@ -109,78 +193,67 @@ export function ConversationScreen({
           // The bottom of a conversation is the live end of it, so a thread
           // opens there and stays there as messages arrive.
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <Message text="No messages yet. Say what you are after." />
-          }
-          renderItem={({ item, index }) => (
-            <Bubble
-              body={item.body}
-              mine={item.sender_id === userId}
-              caption={caption(item)}
-              when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
-              // The pending row is the one that rises. The server's copy of it
-              // takes its place without moving, so one send is one arrival.
-              sent={isSending(item)}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            const watchId = item.listing?.id;
+            const mine = item.sender_id === userId;
+            return (
+              <Bubble
+                body={item.body}
+                mine={mine}
+                listing={item.listing}
+                onOpenListing={watchId ? () => openWatch(watchId) : undefined}
+                caption={item.via === 'email' ? 'Sent by email' : null}
+                speaker={
+                  who.kind === 'group' && !mine && startOfRun(messages, index)
+                    ? memberLabel(header.members, item.sender_id)
+                    : null
+                }
+                when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
+                // The pending row is the one that rises. The server's copy of it
+                // takes its place without moving, so one send is one arrival.
+                sent={isSending(item)}
+              />
+            );
+          }}
         />
-        {header.writable ? (
+        {!byEmail || listing ? (
           <SendBar
-            placeholder={about ? 'Write about this watch' : 'Write a message'}
-            value={draft}
+            placeholder={quoting ? 'Write about this watch' : 'Write a message'}
+            value={value}
             onChangeText={setDraft}
             onSend={submit}
-            busy={send.isPending}
+            busy={byEmail ? mail.isPending : send.isPending}
+            sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
             note={
-              about || send.error ? (
+              quoting || send.error ? (
                 <View style={styles.note}>
-                  {about ? <Text style={styles.about}>About {about}</Text> : null}
+                  {quoting ? (
+                    <ListingQuote listing={quoting} onPress={() => openWatch(quoting.id)} />
+                  ) : null}
                   {send.error ? <Message text="That message did not send." tone="error" /> : null}
                 </View>
               ) : null
             }
           />
-        ) : (
-          // A shop with no account here cannot be written to in the app. The
-          // thread is still the record of what was asked. Email is how the
-          // message leaves, and the inquiry lands in this same thread.
-          <View style={styles.closed}>
-            {about ? <Text style={styles.about}>About {about}</Text> : null}
-            <Message
-              text={`${partyName(who)} has not claimed their shop on Graham. Their reply comes to your email.`}
-            />
-            {listing ? (
-              <ActionPill
-                icon="email-outline"
-                label={`Email ${partyName(who)}`}
-                text="Email the shop"
-                busy={mail.isPending}
-                onPress={() =>
-                  mail.mutate(
-                    { card: listing, message: '' },
-                    {
-                      onSuccess: () => {
-                        void queryClient.invalidateQueries({
-                          queryKey: keys.conversation(conversationId),
-                        });
-                      },
-                      onError: (error) => Alert.alert('Could not open Gmail', error.message),
-                    },
-                  )
-                }
-              />
-            ) : null}
-          </View>
-        )}
+        ) : null}
       </View>
     </Screen>
   );
 }
 
-function caption(message: ChatMessage) {
-  const about = message.listing ? `About ${message.listing}` : null;
-  if (message.via === 'email') return about ? `${about} · Sent by email` : 'Sent by email';
-  return about;
+/** The first message of a run: the previous one is someone else's, or this is the start. */
+function renameError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('40 characters')) return 'A group name is at most 40 characters.';
+  if (message.includes('not yours')) return 'You are not in that group.';
+  if (message.includes('sign in') || message.includes('signed-in')) return 'Sign in to send a message.';
+  return 'Try again in a moment.';
+}
+
+function startOfRun(messages: ChatMessage[], index: number) {
+  const previous = messages[index - 1];
+  if (!previous) return true;
+  return previous.sender_id !== messages[index].sender_id;
 }
 
 /** The last message of a run: the next one is someone else's, or an hour later. */
@@ -204,16 +277,17 @@ const screenStyles = (theme: Theme) => ({
   note: {
     gap: space.xs,
   },
-  about: {
-    ...type.caption,
-    color: theme.color.textMuted,
+  // On the subtitle's line, so it starts under the name rather than under the logo.
+  unclaimed: {
+    alignSelf: 'flex-start' as const,
+    marginTop: space.xs,
+    backgroundColor: theme.color.caution,
+    borderRadius: radius.lg,
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
   },
-  closed: {
-    paddingHorizontal: inset.screen,
-    paddingTop: space.md,
-    paddingBottom: space.lg,
-    gap: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
+  unclaimedLabel: {
+    ...type.caption,
+    color: theme.color.onCaution,
   },
 });

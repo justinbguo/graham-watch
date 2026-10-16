@@ -11,7 +11,6 @@ import {
   useExchangePost,
   type ExchangeComment,
 } from '@/data/exchange';
-import { MessagePerson } from '@/features/messages/MessagePerson';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -129,12 +128,6 @@ export function Thread({
                 mine={data.my_vote}
                 onVote={(value) => vote.mutate({ postId, value })}
               />
-              {mine ? null : (
-                <MessagePerson
-                  userId={data.author.id}
-                  name={atHandle(data.author.handle) ?? 'this person'}
-                />
-              )}
             </ActionBar>
             {remove.isPending ? <Message text="Deleting…" /> : null}
             {remove.error ? <Message text="That post did not delete." tone="error" /> : null}
@@ -144,7 +137,6 @@ export function Thread({
         renderItem={({ item }) => (
           <Comment
             comment={item}
-            mine={item.author.id === userId}
             onVote={(value) => vote.mutate({ postId, commentId: item.id, value })}
             onOpenAuthor={() => onOpenAuthor(item.author)}
             onReply={() => reply(item)}
@@ -177,13 +169,11 @@ export function Thread({
  */
 function Comment({
   comment,
-  mine,
   onVote,
   onReply,
   onOpenAuthor,
 }: {
   comment: ExchangeComment;
-  mine: boolean;
   onVote: (value: 1 | 0 | -1) => void;
   onReply: () => void;
   onOpenAuthor: () => void;
@@ -203,7 +193,6 @@ function Comment({
           text="Reply"
           onPress={onReply}
         />
-        {mine ? null : <MessagePerson userId={comment.author.id} name={name} />}
       </ActionBar>
     </View>
   );

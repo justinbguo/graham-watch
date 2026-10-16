@@ -1,12 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { Avatar } from '@/components/Avatar';
 import type { ConversationSummary } from '@/data/messages';
-import { dealerPicture } from '@/features/dealers/picture';
 import { formatRelativeTime } from '@/lib/format';
 import { radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+import { PartyAvatar } from './PartyAvatar';
 import { partyName } from './party';
 
 /**
@@ -22,6 +21,8 @@ export function ConversationRow({
   detail,
   label,
   busy = false,
+  selected,
+  onOpenParty,
 }: {
   conversation: ConversationSummary;
   onPress: () => void;
@@ -29,53 +30,57 @@ export function ConversationRow({
   detail?: string;
   label?: string;
   busy?: boolean;
+  /** Set when this row is a choice. The brass rule is the selection. */
+  selected?: boolean;
+  onOpenParty?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
   const who = conversation.with;
   const name = partyName(who);
   const unread = !detail && conversation.unread > 0;
-  const preview =
-    detail ??
-    (conversation.last
-      ? `${conversation.last.mine ? 'You: ' : ''}${conversation.last.body}`
-      : 'No messages yet');
+  const preview = detail ?? lastLine(conversation);
+  const choosing = selected !== undefined;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
-      accessibilityState={{ disabled: busy, busy }}
-      disabled={busy}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && !busy && styles.pressed,
-        busy && styles.busy,
-      ]}>
-      <Avatar
-        url={who.kind === 'person' ? who.avatar_url : who.logoUrl}
-        glyph={who.kind === 'person' ? 'account-outline' : undefined}
-        fallback={who.kind === 'dealer' ? dealerPicture : undefined}
-        fit={who.kind === 'dealer' ? 'contain' : 'cover'}
-      />
-      <View style={styles.copy}>
-        <View style={styles.line}>
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
-          {!detail && conversation.last ? (
-            <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
-          ) : null}
+    <View style={[styles.row, choosing && styles.choosing, busy && styles.busy]}>
+      {selected ? <View style={styles.rule} /> : null}
+      <PartyAvatar who={who} onPress={onOpenParty} />
+      <Pressable
+        accessibilityRole={choosing ? 'checkbox' : 'button'}
+        accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
+        accessibilityState={{ disabled: busy, busy, checked: selected }}
+        disabled={busy}
+        onPress={onPress}
+        style={({ pressed }) => [styles.rowPress, pressed && !busy && styles.pressed]}>
+        <View style={styles.copy}>
+          <View style={styles.line}>
+            <Text style={[styles.name, selected && styles.chosen]} numberOfLines={1}>
+              {name}
+            </Text>
+            {!detail && conversation.last ? (
+              <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
+            ) : null}
+          </View>
+          <View style={styles.line}>
+            <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
+              {preview}
+            </Text>
+            {unread ? <View style={styles.dot} /> : null}
+          </View>
         </View>
-        <View style={styles.line}>
-          <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
-            {preview}
-          </Text>
-          {unread ? <View style={styles.dot} /> : null}
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
+}
+
+function lastLine(conversation: ConversationSummary) {
+  if (!conversation.last) return 'No messages yet';
+  const speaker = conversation.last.mine
+    ? 'You: '
+    : conversation.last.senderName
+      ? `${conversation.last.senderName}: `
+      : '';
+  return `${speaker}${conversation.last.body}`;
 }
 
 const rowStyles = (theme: Theme) => ({
@@ -84,6 +89,21 @@ const rowStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.md,
     paddingVertical: space.md,
+  },
+  choosing: {
+    paddingLeft: space.sm,
+  },
+  rule: {
+    position: 'absolute' as const,
+    left: 0,
+    top: space.sm,
+    bottom: space.sm,
+    width: size.rule,
+    backgroundColor: theme.color.brass,
+  },
+  rowPress: {
+    flex: 1,
+    minWidth: 0,
   },
   pressed: {
     opacity: 0.72,
@@ -105,6 +125,9 @@ const rowStyles = (theme: Theme) => ({
     ...type.labelStrong,
     color: theme.color.text,
     flexShrink: 1,
+  },
+  chosen: {
+    color: theme.color.brass,
   },
   when: {
     ...type.caption,

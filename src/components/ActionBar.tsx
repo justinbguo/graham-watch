@@ -7,7 +7,7 @@ import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
- * The row of capsules under a post: vote, answer, write to them. Everything
+ * The row of capsules under a post: vote and answer. Everything
  * you can do about a post is in one place at its foot, rather than scattered
  * through the lines above it — the post is then read top to bottom and acted
  * on at the end.

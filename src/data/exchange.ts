@@ -90,6 +90,29 @@ const NOBODY: ExchangeAuthor = {
   avatar_url: null,
 };
 
+/** The identity shown on a collector route opened outside Community. */
+export function useCollectorProfile(userId: string | null) {
+  return useQuery({
+    queryKey: keys.collectorProfile(userId ?? 'none'),
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<ExchangeAuthor | null> => {
+      if (isDemo || !userId) return null;
+      const { data, error } = await supabase.rpc('collector_profile', { p_user_id: userId });
+      if (error) throw error;
+      const row = data?.[0];
+      return row
+        ? {
+            id: row.id,
+            handle: row.handle,
+            number: row.collector_number,
+            name: row.name,
+            avatar_url: row.avatar_url,
+          }
+        : null;
+    },
+  });
+}
+
 const PHOTO_BUCKET = 'exchange-photos';
 
 const PHOTO_TYPES: Record<string, { ext: string; contentType: string }> = {

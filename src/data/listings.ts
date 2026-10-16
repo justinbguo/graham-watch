@@ -13,12 +13,14 @@ import { keys } from './keys';
 const PHOTO_BUCKET = 'listing-photos';
 
 /** Our copy when we have one, the dealer's own file when a copy failed. */
-function display(photo: ListingPhoto): DeckPhoto {
-  const url = photo.storage_path
+export function listingPhotoUrl(photo: Pick<ListingPhoto, 'storage_path' | 'source_url'>): string {
+  return photo.storage_path
     ? supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path).data.publicUrl
     : photo.source_url;
+}
 
-  return { ...photo, url };
+function display(photo: ListingPhoto): DeckPhoto {
+  return { ...photo, url: listingPhotoUrl(photo) };
 }
 
 /** Listings carry only a dealer_id; cards need the dealer's name and link too. */

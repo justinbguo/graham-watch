@@ -66,21 +66,33 @@ export function useOpenStack() {
 export function useOpenTab() {
   const navigation = useNavigation() as unknown as Nav;
 
-  return (name: 'index' | 'search' | 'saved' | 'profile') => {
+  return (
+    name: 'index' | 'community' | 'messages' | 'search' | 'saved' | 'profile',
+    params?: Params,
+  ) => {
     const navigators = ancestors(navigation);
     const tabs = navigators.find((nav) => registeredName(nav, name));
     if (tabs) {
-      dispatchTo(tabs, registeredName(tabs, name) ?? name, undefined);
+      dispatchTo(tabs, registeredName(tabs, name) ?? name, params);
       return;
     }
 
     const stack = navigators.find((nav) => registeredName(nav, '(tabs)'));
     if (stack) {
-      dispatchTo(stack, registeredName(stack, '(tabs)') ?? '(tabs)', { screen: name });
+      dispatchTo(stack, registeredName(stack, '(tabs)') ?? '(tabs)', {
+        screen: name,
+        ...(params ?? {}),
+      });
       return;
     }
 
-    router.navigate(name === 'index' ? '/' : `/${name}`);
+    router.navigate(
+      params
+        ? ({ pathname: name === 'index' ? '/' : `/${name}`, params } as Href)
+        : name === 'index'
+          ? '/'
+          : `/${name}`,
+    );
   };
 }
 

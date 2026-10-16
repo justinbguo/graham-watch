@@ -39,6 +39,7 @@ literal hex in a component.
 | `bar` / `onBar` / `onBarActive` | The tab bar's floor, its idle glyphs at 55% white, and the one you are on in full white |
 | `badge` / `onBadge` | A count on a tab, red with white numerals. The same in both schemes, because the bar is dark in both |
 | `notice` | The saved-row dot. Brighter than `badge`, the same in both schemes. Nothing is set on it |
+| `caution` / `onCaution` | The unclaimed-shop badge. Yellow, with dark type, the same in both schemes. Not `brass`: that highlight is already the name |
 | `raised` | The swipe card, which floats on `shadow.card` instead of stepping |
 
 `scrim` sits outside the table because it is not themed: it is the fade a caption sits on
@@ -1560,9 +1561,10 @@ signed in can comment. The comment is the public record that they are in the dea
 
 It was Exchange, under two arrows, with Messages as a tab of its own beside it. The
 arrows named the deal and nothing else on the board; the people are who you are among.
-Messages moved in, then back out. A conversation still starts here or from a shop's
-watch, but the reply arrives later, and a header control on this tab and on Wishlist
-could not show it while you were swiping. Search left the bar so Messages could take
+Messages moved in, then back out. A conversation with a person starts from their
+profile. One with a shop starts from that shop's watch. The reply arrives later,
+and a header control on this tab and on Wishlist could not show it while you were
+swiping. Search left the bar so Messages could take
 a seat without a sixth glyph. The database keeps the old word: the tables are `exchange_*`
 and so are the hooks and the feature folder, because a rename there is a migration, and
 the name a user reads and the name a table has are two different things.
@@ -1650,8 +1652,8 @@ background; the one you are on is the warm tan, the same accent the deck's bars 
 the mark is the one thing on a photograph that is not white. The next photo is prefetched
 while this one is being looked at.
 
-Everything you can do about a post is in one row of capsules at its foot: the votes, the
-comment count, and — on anyone else's post — writing to them. That row is `ActionBar`,
+Everything you can do about a post is in one row of capsules at its foot: the votes and the
+comment count. Writing to the person is on their profile, not on the post. That row is `ActionBar`,
 and each capsule is an `ActionPill`: a glyph at `size.iconSmall` with a count in `control`
 beside it, both `ink`, filled with `fill` rather than outlined, because a row of outlines
 reads as a row of empty boxes and this app keeps depth in the step between surfaces. At
@@ -1697,13 +1699,20 @@ twice. Every other intent stays in the list, newest first. The strip is a plain
 horizontal scroller. A second list nested in the feed's list warns and takes the
 vertical scroll.
 
-A comment is one line and a round send button, nothing else. A comment is a reply, not a
+A comment is one line with a send glyph in it, nothing else. A comment is a reply, not a
 second offer: asking someone to name buying, selling, or trading before they could type a
 word was three chips, a label, and a full-width button in the way of one sentence. So
 comments carry no intent and the thread does not sort them.
 
 That one line is `SendBar`, the same control a conversation uses, because saying one
-thing to whoever is already on the screen is the same act in both places. It sits on the
+thing to whoever is already on the screen is the same act in both places. It is drawn
+like the deck's search capsule: `fill`, `HIT_TARGET` tall, `radius.full`, the text
+inset by half the height, on the page gutter with no hairline above it. It is the one
+field that takes a capsule, because it should read as the same object as the search
+bar. Send is `send-outline` at `size.icon` inside the capsule's trailing edge, `ink`
+when there is something to send and `inkFaint` when there is not.
+It was a filled `accent` circle beside the field with a `size.iconSmall` glyph: a block
+behind an icon-only control, and a mark too small to read as the way out. It sits on the
 keyboard's top edge while it is being typed into, the same way the onboarding footer
 does: the screen pads its bottom by `useKeyboardLift`, which is the keyboard's coverage
 minus whatever already stands there — the tab bar and the home indicator inside the tabs,
@@ -1723,15 +1732,15 @@ Nesting stops at one level. A reply to a reply attaches to the same root, becaus
 deep enough to need a rule down the left margin is a tree nobody can follow on a phone,
 and the database flattens it rather than trusting every client to.
 
-Anyone else's post or comment ends its action bar with a message pill. It opens the
-conversation with that person, and finds the one already there if you have written
-before. Your own post has no such pill — writing to yourself is not a thing — and the
-three dots in the byline are what stands in its place.
+The three dots in your own byline are how you edit or delete that post.
 
 The byline is a button. Tapping the face or the name opens that person. The
 screen title is their name, so the row under it does not say it again: the
 photograph at `size.profile`, the `@handle`, and the collector number in brass,
-centred on the photograph, then the posts they have written. Back returns to
+centred on the photograph. Message sits at the end of that row when the profile
+is someone else's, and it opens the conversation with them, finding the one
+already there if you have written before. Your own profile has no such button.
+Then the posts they have written. Back returns to
 the post or the feed you came from, and a post there opens the thread. The page
 is built from the author already on the post and from `exchange_posts`, which
 anyone signed in can read. It does not read `profiles`. The wishlist, the shop,
@@ -1789,10 +1798,12 @@ is the limit. A sixth is the one you tap by mistake.
 
 ## Messages
 
-The middle tab, between Community and Wishlist (`message-outline`). Two
-things end up here: the shops you have asked about a watch, and the people you have
-written to from a post. They are the same kind of object — a thread with one other
-party — so they are one list, ordered by whichever moved last.
+The middle tab, between Community and Wishlist (`chat-outline`). It was
+`message-outline`, a box with a tail, and it was the square glyph in a bar of
+round ones. Three
+things end up here: the shops you have asked about a watch, the people you have
+written to, and the groups you are in. They are one list, ordered by whichever
+moved last.
 
 The glyph carries the unread count, the same badge the wishlist uses, and it counts threads.
 Six replies in one thread is one thing to go and read. A row in the list still wears
@@ -1805,12 +1816,40 @@ name, their handle, and the latest line filter as you type. After a short pause 
 same words are matched against older messages in those threads, so a sentence from
 last week still finds the conversation.
 
-A complete username in that field — the same rule as sign-up — offers a new message
-to that account. `@ada` does not list everyone whose name starts the same way. There
-is still no directory of collectors. Profiles stay readable only by their owner;
-`conversation_with_handle` turns one exact handle into one thread, and a thread that
-already exists is the one that opens. A conversation also still starts from a post
-or from a watch a shop is selling.
+A plus at the end of the title opens New message, a sheet over the tab. It was
+the tab's own body swapping to a search, which read as Messages changing rather
+than a task you could close. The sheet is a field, then Create a group, then people under it before
+anything is typed: the people you already talk to, then the earliest members.
+There is no line telling you what to search; the list is the instruction.
+Typing narrows it to a username prefix or the start of a name. It is never more
+than eight and never you. Profiles stay readable only by their owner;
+`suggest_people` is the one place a list of accounts leaves that table, and
+pressing one calls `conversation_with_person`. The thread replaces the sheet,
+so closing the thread lands on Messages. That opens the thread already there with that
+person, including the one that started because they wrote to your shop, rather
+than a second thread with the same name on it.
+
+Create a group is a row under the search, the same photograph and padding as
+a person, with the words in `bodyStrong`. It opens New group chat, a second
+sheet. The X is on the left. Create is on the right, and it stays off until
+two people are chosen. Twelve is the most. The name sits above the search,
+in the same bar: `surface`, `HIT_TARGET`, a pencil where search has its
+magnifying glass.
+A name you type is the group's name, at most 40 characters. With none, the
+name is the other people. The same people open the group that already exists.
+Opening it again does not change the name. In the thread, the name is a
+button: tap it, edit, and return saves. Anyone in the group can. Clearing
+it returns the name to the other people. The brass rule marks
+each person chosen. A group in the list wears
+`account-group-outline` where a photograph would be. The line under that name in the thread is how many people.
+Someone else's message names them, in `caption` above the first bubble of
+their run, and that name leads the latest line in the list. Yours stay on the
+right with no name, and the list still leads those with "You".
+
+The thread search under Messages
+still accepts one exact username, through `conversation_with_handle`, and a
+thread that already exists is the one that opens. A conversation also still
+starts from a person's profile or from a watch a shop is selling.
 
 A row is the other party's photograph, their name, the last line said, and when. A shop
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same
@@ -1818,15 +1857,43 @@ square a person's photograph fills. A shop that declared none, or whose icon fai
 load, gets `assets/dealer.png` — one picture every such shop shares, bundled with the
 app. A person with no photograph still gets the account glyph. A miss never draws a
 globe: an invented mark fetched for that one shop makes the name harder to trust.
+The photograph is a second door inside the row: it opens the shop page or the
+collector profile, while the name and message preview open the thread. The same
+photograph in a thread's header opens that profile too. `collector_profile`
+returns one named collector for that durable route; the profiles table itself
+stays private.
 Unread is a dot at the end of the line rather than a count: how
 many messages are waiting does not change what you do about them, and a number on every
 row turns a list into a scoreboard.
+
+A thread's header puts the other party's picture at the start of the title's line:
+the same `PartyAvatar` the list uses, at `size.avatarHeader`. The list showed who
+a thread was with by face, and opening it used to lose the face. A shop that
+has not claimed its account wears one `caution` badge on the subtitle's line,
+directly under the name: it has not claimed, and the inquiry goes to their
+email until they claim their profile.
 
 In a thread, yours are on the right in the accent and theirs are on the left in the
 fill. Alignment alone fails the moment a message wraps to the width of the column, so
 the two sides differ in colour as well. A run of messages from one person shows one time
 under the last of them; a time on every bubble doubles the height of a conversation to
 say almost nothing.
+
+A message about a watch quotes it. The photograph sits above the name, and both
+sit above the words, on the side of whoever asked, because one thread holds every
+watch you have asked that shop about. In the composer the quote is on the right:
+it is what you are about to send. Once a message in the thread already quotes
+that watch, the composer does not quote it again — coming back from Wishlist
+would otherwise draw the same photograph twice. The frame is `quotePhoto`
+wide, 5/7, `contain`, `radius.md` — larger than a shop-page thumbnail, because
+this photograph is the only one on the row. The name is `title`, in a box about
+15% narrower than a message bubble, so the bigger type wraps. A tap opens the
+listing. The thread's own title is `title`, not `display`, so a shop name
+shares its line with the picture and the close control.
+The first time you write about that watch, the field already says "Hey, is
+this watch still available?" It is the field's text, not a placeholder, so
+you edit it on the keyboard or send it as it is. A thread that already names
+the watch starts empty, so a follow-up does not ask again.
 
 A thread catches up every five seconds while it is open, and the list every thirty. That
 is polling, not a live connection: a websocket is a second thing to authorise and
@@ -1836,13 +1903,15 @@ thing to change if a slow answer starts costing a deal.
 ### A shop that has not claimed its account
 
 Asking a shop about a watch still sends the email it always did. The thread is what that
-email leaves behind: each inquiry is a message in it, captioned with the watch it named
+email leaves behind: each inquiry is a message in it, quoting the watch it named
 and marked as sent by email.
 
-If nobody at the shop has claimed it on Graham, the composer is replaced by a line
-saying so and where the answer will arrive. A field that accepted a message nobody could
-read would be the worst of the three options; hiding the thread entirely would be the
-second, because the buyer still needs to see what they asked and when.
+If nobody at the shop has claimed it on Graham, the composer is the same field.
+Send opens that message as an email to the shop, so the words reach someone who
+can read them. The yellow badge under the name is what says so. Hiding the
+thread entirely would be worse, because the buyer still needs to see what they
+asked and when. A visit that names no watch has nothing to email about, so it
+shows the header and no field. An empty thread shows nothing in place of a prompt.
 
 The moment the shop claims its account, the same threads become writable on both sides.
 Nothing is copied at the time of the inquiry — the shop's side of a conversation is the

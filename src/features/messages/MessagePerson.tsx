@@ -16,6 +16,7 @@ export function MessagePerson({ userId, name }: { userId: string; name: string }
     <ActionPill
       mark={require('../../../assets/message.svg')}
       label={`Message ${name}`}
+      text="Message"
       busy={start.isPending}
       onPress={() =>
         start.mutate(userId, {

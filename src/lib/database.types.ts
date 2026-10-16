@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_members: {
+        Row: {
+          conversation_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_reads: {
         Row: {
           conversation_id: string
@@ -72,25 +105,34 @@ export type Database = {
           created_at: string
           dealer_id: string | null
           id: string
+          is_group: boolean
           last_message_at: string
+          members_key: string | null
           opener_id: string
           partner_id: string | null
+          title: string | null
         }
         Insert: {
           created_at?: string
           dealer_id?: string | null
           id?: string
+          is_group?: boolean
           last_message_at?: string
+          members_key?: string | null
           opener_id: string
           partner_id?: string | null
+          title?: string | null
         }
         Update: {
           created_at?: string
           dealer_id?: string | null
           id?: string
+          is_group?: boolean
           last_message_at?: string
+          members_key?: string | null
           opener_id?: string
           partner_id?: string | null
+          title?: string | null
         }
         Relationships: [
           {
@@ -1122,6 +1164,16 @@ export type Database = {
         Returns: string
       }
       claim_username: { Args: { candidate: string }; Returns: string }
+      collector_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          avatar_url: string
+          collector_number: number
+          handle: string
+          id: string
+          name: string
+        }[]
+      }
       controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
       conversation_about_listing: {
         Args: { p_listing_id: string }
@@ -1134,7 +1186,13 @@ export type Database = {
           dealer_id: string
           dealer_logo_url: string
           dealer_name: string
+          group_handles: string[]
+          group_names: string[]
+          group_title: string
           id: string
+          is_group: boolean
+          member_count: number
+          members: Json
           person_avatar_url: string
           person_handle: string
           person_id: string
@@ -1150,10 +1208,16 @@ export type Database = {
           dealer_id: string
           dealer_logo_url: string
           dealer_name: string
+          group_handles: string[]
+          group_names: string[]
+          group_title: string
           id: string
+          is_group: boolean
           last_at: string
           last_body: string
           last_mine: boolean
+          last_sender_name: string
+          member_count: number
           person_avatar_url: string
           person_handle: string
           person_id: string
@@ -1171,6 +1235,10 @@ export type Database = {
       conversation_writable: {
         Args: { p_conversation_id: string }
         Returns: boolean
+      }
+      create_group: {
+        Args: { p_member_ids: string[]; p_title?: string }
+        Returns: string
       }
       dealer_accounts: {
         Args: never
@@ -1499,6 +1567,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      rename_group: {
+        Args: { p_conversation_id: string; p_title: string }
+        Returns: undefined
+      }
       replace_listing_photos: {
         Args: { p_listing_id: string; p_photos: Json }
         Returns: number
@@ -1600,6 +1672,16 @@ export type Database = {
         }
         Returns: string
       }
+      suggest_people: {
+        Args: { p_query: string }
+        Returns: {
+          avatar_url: string
+          collector_number: number
+          handle: string
+          id: string
+          name: string
+        }[]
+      }
       sync_source_availability: {
         Args: {
           p_dealer_id: string
@@ -1609,6 +1691,10 @@ export type Database = {
         Returns: Json
       }
       synced_listing_columns: { Args: never; Returns: string[] }
+      thread_with_person: {
+        Args: { p_me: string; p_them: string }
+        Returns: string
+      }
       url_path: { Args: { p_url: string }; Returns: string }
       verify_application_email: {
         Args: { p_application_id: string; p_code: string }

@@ -1,6 +1,5 @@
-import { Screen } from '@/components/ui';
 import { GuestGate } from '@/features/auth/GuestGate';
-import { ConversationList } from '@/features/messages/ConversationList';
+import { MessagesScreen } from '@/features/messages/MessagesScreen';
 import { useSession } from '@/providers/session';
 
 export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
@@ -17,9 +16,5 @@ export default function Messages() {
     );
   }
 
-  return (
-    <Screen title="Messages" inTabs>
-      <ConversationList userId={userId!} />
-    </Screen>
-  );
+  return <MessagesScreen userId={userId!} />;
 }

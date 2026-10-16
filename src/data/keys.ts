@@ -32,9 +32,12 @@ export const keys = {
   exchange: ['exchange'] as const,
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
   collectorPosts: (userId: string) => ['collector-posts', userId] as const,
+  collectorProfile: (userId: string) => ['collector-profile', userId] as const,
   conversations: ['conversations'] as const,
   /** Conversation ids whose messages contain this text. */
   messageSearch: (query: string) => ['message-search', query] as const,
+  /** People whose username or name starts with this text. */
+  people: (query: string) => ['people', query] as const,
   /** Listing ids the buyer has already named in a message. */
   discussed: ['discussed-listings'] as const,
   conversation: (conversationId: string) => ['conversation', conversationId] as const,
