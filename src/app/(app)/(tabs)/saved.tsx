@@ -104,7 +104,7 @@ export default function Saved() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderSectionHeader={({ section }) => (
           <Text style={[styles.section, section.key === 'rest' && inConversation.length > 0 && styles.sectionNext]}>
-            {section.key === 'talking' ? 'Pending' : 'Saved'}
+            {section.key === 'talking' ? 'Pending watches' : 'Saved watches'}
           </Text>
         )}
         renderItem={({ item }) => (

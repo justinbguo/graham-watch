@@ -42,7 +42,10 @@ export default function Profile() {
   const header = (
     <View style={styles.header}>
       <ProfileHeader />
-      <Posts onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })} />
+      <Posts
+        onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })}
+        onCreate={() => router.navigate({ pathname: '/community', params: { compose: '1' } })}
+      />
       <SavedStrip />
       <FollowingList />
       {claimed ? (

@@ -1,6 +1,7 @@
 import { ScrollView } from 'react-native';
 
-import { Button, ChoiceRow } from '@/components/ui';
+import { CheckRow } from '@/components/CheckRow';
+import { Button } from '@/components/ui';
 import { useThemedStyles } from '@/providers/theme';
 
 import { StepShell } from './StepShell';
@@ -33,7 +34,7 @@ export function ChoiceStep<T extends string>({
       actions={<Button label="Continue" disabled={!selected} onPress={onContinue} />}>
       <ScrollView style={styles.fill} contentContainerStyle={styles.choices}>
         {options.map((option) => (
-          <ChoiceRow
+          <CheckRow
             key={option.value}
             label={option.label}
             selected={selected === option.value}

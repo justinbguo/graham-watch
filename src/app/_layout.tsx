@@ -7,13 +7,14 @@ import {
   ThemeProvider as NavigationThemeProvider,
 } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
 import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
 import { haasFonts } from '@/lib/fonts';
+import { applySystemChrome } from '@/lib/systemChrome';
 import { QueryProvider } from '@/providers/query';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
@@ -62,6 +63,10 @@ function SplashScreenController() {
  */
 function Chrome() {
   const theme = useTheme();
+
+  useEffect(() => {
+    applySystemChrome(theme);
+  }, [theme]);
 
   const navigationTheme = useMemo(() => {
     const base = theme.scheme === 'dark' ? NavigationDarkTheme : NavigationLightTheme;

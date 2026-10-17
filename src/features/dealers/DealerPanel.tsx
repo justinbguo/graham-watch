@@ -1,11 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { useDealerReputation } from '@/data/dealers';
 import type { Dealer } from '@/lib/models';
+import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -108,7 +108,12 @@ function Website({ url }: { url: string }) {
       accessibilityRole="link"
       accessibilityLabel={label}
       style={styles.linkRow}>
-      <MaterialCommunityIcons name="web" size={size.icon} color={theme.color.text} accessible={false} />
+      <MaterialCommunityIcons
+        name="web"
+        size={size.icon + 2}
+        color={theme.color.text}
+        accessible={false}
+      />
       <Text style={styles.link}>{label}</Text>
     </Pressable>
   );
@@ -156,44 +161,46 @@ export function DealerPanel({
   except?: string;
 }) {
   const styles = useThemedStyles(panelStyles);
+  const theme = useTheme();
+  const open = useOpenStack();
   const { data } = useDealerReputation(dealer.id);
   const showFollow = follow || browse;
-  // Follow shares the name's line while it fits. A long name pushes it to a
-  // row of its own, where a short capsule at the left reads as an orphan, so
-  // there it takes the row. Measured, not guessed: whether it wraps depends
-  // on the name and the card's width. A new width re-asks the question.
-  const [headingWidth, setHeadingWidth] = useState(0);
-  const [followRow, setFollowRow] = useState(false);
+  const openShop = () => open('dealer/[dealerId]', { dealerId: dealer.id }, `/dealer/${dealer.id}`);
 
   return (
     <View style={styles.panel}>
-      {named ? (
-        <View
-          style={styles.heading}
-          onLayout={(event) => {
-            const width = event.nativeEvent.layout.width;
-            if (width === headingWidth) return;
-            setHeadingWidth(width);
-            setFollowRow(false);
-          }}>
+      {named && browse ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${dealer.name}`}
+          onPress={openShop}
+          style={({ pressed }) => [styles.headingOpen, pressed && styles.pressed]}>
           <DealerMark logoUrl={dealer.logo_url} />
           <Text style={styles.name}>{dealer.name}</Text>
-          {showFollow ? (
-            <View
-              style={[styles.actions, followRow && styles.followRow]}
-              onLayout={(event) => {
-                if (!followRow && event.nativeEvent.layout.y > size.avatarSmall / 2) {
-                  setFollowRow(true);
-                }
-              }}>
-              <FollowDealer dealer={dealer} />
-              <MessageDealer dealer={dealer} listingId={except} />
-            </View>
-          ) : null}
+          <View style={styles.chevronSlot}>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={size.icon}
+              color={theme.color.text}
+              accessible={false}
+            />
+          </View>
+        </Pressable>
+      ) : named ? (
+        <View style={styles.heading}>
+          <DealerMark logoUrl={dealer.logo_url} />
+          <Text style={styles.name}>{dealer.name}</Text>
         </View>
       ) : null}
 
       {dealer.description ? <Text style={styles.about}>{dealer.description}</Text> : null}
+
+      {showFollow ? (
+        <View style={styles.actions}>
+          <FollowDealer dealer={dealer} block />
+          <MessageDealer dealer={dealer} listingId={except} block />
+        </View>
+      ) : null}
 
       {data ? (
         <View style={styles.stats}>
@@ -210,8 +217,6 @@ export function DealerPanel({
         {dealer.website ? <Website url={dealer.website} /> : null}
         {dealer.instagram ? <Instagram handle={dealer.instagram} /> : null}
       </View>
-
-      <Text style={styles.note}>Inquiries reach this shop by email.</Text>
     </View>
   );
 }
@@ -224,26 +229,37 @@ const panelStyles = (theme: Theme) => ({
   },
   heading: {
     flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+  },
+  headingOpen: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
+  },
+  chevronSlot: {
+    width: HIT_TARGET,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'center' as const,
+    flexShrink: 0,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   name: {
     ...type.title,
     color: theme.color.text,
     flexShrink: 1,
-    maxWidth: '100%' as const,
-  },
-  followRow: {
-    width: '100%' as const,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
+    minWidth: 0,
   },
   actions: {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    alignSelf: 'stretch' as const,
+    alignItems: 'stretch' as const,
     gap: space.sm,
+    width: '100%' as const,
   },
   // The same face, size, and ink as the watch's description above it. Both
   // are the dealer's own words, and in two styles they read as two authors.
@@ -260,33 +276,30 @@ const panelStyles = (theme: Theme) => ({
     gap: stack.tight,
   },
   statValue: {
-    ...type.bodyStrong,
+    ...type.panelLead,
     color: theme.color.text,
   },
   statLabel: {
-    ...type.caption,
+    ...type.panelNote,
     color: theme.color.textMuted,
   },
   links: {
-    gap: space.xs,
+    gap: space.sm,
   },
   linkRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: space.sm,
-    minHeight: HIT_TARGET,
+    gap: space.xs,
+    paddingVertical: space.xs,
+    minHeight: size.icon + space.xs * 2,
   },
   linkMark: {
     width: size.icon,
     height: size.icon,
   },
   link: {
-    ...type.body,
+    ...type.panelLink,
     color: theme.color.text,
     flexShrink: 1,
-  },
-  note: {
-    ...type.caption,
-    color: theme.color.textFaint,
   },
 });

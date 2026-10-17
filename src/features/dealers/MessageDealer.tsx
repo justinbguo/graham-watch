@@ -2,24 +2,26 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, Alert, Pressable, Text } from 'react-native';
 
 import { useMessageDealer } from '@/data/messages';
-import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
+import { type Theme } from '@/lib/theme';
 import { useOpenStack } from '@/lib/openStack';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+import { dealerSocialButtonStyles, dealerSocialHitSlop } from './socialButton';
+
 const MARK = require('../../../assets/message.svg');
 
-/**
- * The same capsule as Following: the body line, outline, the word in
- * `control`. Follow stays the loud one. This one opens the shop's thread.
- */
+/** Same chrome as Follow. Outline in every state. Opens the shop's thread. */
 export function MessageDealer({
   dealer,
   listingId,
+  block = false,
 }: {
   dealer: { id: string; name: string };
   /** Set when the button sits under one watch, so the message names it. */
   listingId?: string;
+  /** Half of a full-width pair beside Follow. */
+  block?: boolean;
 }) {
   const { userId } = useSession();
   const theme = useTheme();
@@ -35,7 +37,7 @@ export function MessageDealer({
       accessibilityLabel={`Message ${dealer.name}`}
       accessibilityState={{ busy: start.isPending }}
       disabled={start.isPending}
-      hitSlop={(HIT_TARGET - type.body.lineHeight) / 2}
+      hitSlop={dealerSocialHitSlop()}
       onPress={() =>
         start.mutate(dealer.id, {
           onSuccess: (conversationId) =>
@@ -49,7 +51,7 @@ export function MessageDealer({
           onError: (error) => Alert.alert('Could not open that message', error.message),
         })
       }
-      style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.button, block && styles.block, pressed && styles.pressed]}>
       {start.isPending ? (
         <ActivityIndicator size="small" color={theme.color.text} />
       ) : (
@@ -61,33 +63,9 @@ export function MessageDealer({
           accessible={false}
         />
       )}
-      <Text style={styles.label}>Message</Text>
+      <Text style={styles.label} numberOfLines={1}>Message</Text>
     </Pressable>
   );
 }
 
-const messageStyles = (theme: Theme) => ({
-  button: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    alignSelf: 'flex-start' as const,
-    gap: space.xs,
-    height: type.body.lineHeight,
-    paddingHorizontal: type.body.lineHeight / 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: theme.color.text,
-    backgroundColor: theme.color.background,
-  },
-  mark: {
-    width: size.iconSmall,
-    height: size.iconSmall,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  label: {
-    ...type.control,
-    color: theme.color.text,
-  },
-});
+const messageStyles = (theme: Theme) => dealerSocialButtonStyles(theme);

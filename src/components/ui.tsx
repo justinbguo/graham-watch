@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useEffect, type PropsWithChildren, type ReactNode, type Ref } from 'react';
+import { type PropsWithChildren, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,12 +8,6 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
-import Animated, {
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -103,6 +97,7 @@ export function Screen({
   const theme = useTheme();
   const isWide = useIsWide();
   const insets = useSafeAreaInsets();
+  const titleLine = titleSize === 'title' && !subtitle;
   return (
     <View
       style={[
@@ -129,7 +124,12 @@ export function Screen({
         ) : null}
         {title || titleControl || action || leading || subhead ? (
           <View style={subhead ? styles.headed : undefined}>
-            <View style={[styles.header, subhead ? styles.headerFlush : null]}>
+            <View
+              style={[
+                styles.header,
+                subhead ? styles.headerFlush : null,
+                titleLine ? styles.headerTitleLine : null,
+              ]}>
               {leading ? <View style={styles.leading}>{leading}</View> : null}
               <View
                 style={[
@@ -172,6 +172,7 @@ export function Button({
   variant = 'outline',
   loading = false,
   disabled = false,
+  compact = false,
 }: {
   label: string;
   /** A glyph that names the same act as the label. Silent: the label is spoken. */
@@ -180,6 +181,8 @@ export function Button({
   variant?: 'outline' | 'solid' | 'ghost';
   loading?: boolean;
   disabled?: boolean;
+  /** Header actions: `HIT_TARGET` tall, not `controlMin`. */
+  compact?: boolean;
 }) {
   const styles = useThemedStyles(buttonStyles);
   const theme = useTheme();
@@ -193,6 +196,7 @@ export function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
+        compact && styles.compact,
         variant === 'solid' && styles.solid,
         variant === 'ghost' && styles.ghost,
         pressed && styles.pressed,
@@ -233,9 +237,14 @@ function labelColour(theme: Theme, variant: 'outline' | 'solid' | 'ghost') {
   return theme.color.onAccent;
 }
 
-export function Field({ ref, ...props }: TextInputProps & { ref?: Ref<TextInput> }) {
+export function Field({
+  ref,
+  compact = false,
+  ...props
+}: TextInputProps & { ref?: Ref<TextInput>; compact?: boolean }) {
   const styles = useThemedStyles(fieldStyles);
   const theme = useTheme();
+  const base = props.multiline ? styles.multiline : compact ? styles.compact : styles.field;
   return (
     <TextInput
       ref={ref}
@@ -243,64 +252,8 @@ export function Field({ ref, ...props }: TextInputProps & { ref?: Ref<TextInput>
       autoCapitalize="none"
       autoCorrect={false}
       {...props}
-      style={[props.multiline ? styles.multiline : styles.field, props.style]}
+      style={[base, props.style]}
     />
-  );
-}
-
-/**
- * A choice settles rather than snapping. The brass rule grows in from the
- * row's middle, and the fill and the label shift with it, `motion.fast` on
- * the UI thread. In a list that takes one answer, the mark leaves one row as
- * it arrives on the next, which reads as the rule moving. Each row animates
- * its own mark because the row is also a checkbox in the filters, where
- * several are on at once and there is nothing to travel from.
- *
- * Starts at rest. A row that mounts already chosen is simply chosen.
- */
-export function ChoiceRow({
-  label,
-  selected,
-  count,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  count?: number;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(choiceStyles);
-  const { color } = useTheme();
-
-  // 0 at rest, 1 chosen.
-  const chosen = useSharedValue(selected ? 1 : 0);
-  useEffect(() => {
-    chosen.value = withTiming(selected ? 1 : 0, { duration: motion.fast });
-  }, [chosen, selected]);
-
-  const rowStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(chosen.value, [0, 1], [color.surface, color.surfaceSunken]),
-  }));
-  const ruleStyle = useAnimatedStyle(() => ({
-    opacity: chosen.value,
-    transform: [{ scaleY: chosen.value }],
-  }));
-  const labelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(chosen.value, [0, 1], [color.ink, color.brass]),
-  }));
-
-  return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.press, pressed && styles.pressed]}>
-      <Animated.View style={[styles.row, rowStyle]}>
-        <Animated.View pointerEvents="none" style={[styles.rule, ruleStyle]} />
-        <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
-        {count !== undefined ? <Text style={styles.count}>{count}</Text> : null}
-      </Animated.View>
-    </Pressable>
   );
 }
 
@@ -400,7 +353,6 @@ const screenStyles = (theme: Theme) => ({
     // On the title's line, not the block's centre: a subtitle under the title
     // would otherwise drag the controls half a line down with it.
     alignItems: 'flex-start' as const,
-    justifyContent: 'space-between' as const,
     gap: space.md,
     paddingHorizontal: inset.screen,
     paddingBottom: space.lg,
@@ -408,20 +360,27 @@ const screenStyles = (theme: Theme) => ({
   headerFlush: {
     paddingBottom: 0,
   },
+  // `title` shares a line with leading and trailing controls. Centre them on
+  // the title's cap height instead of pinning to the block top.
+  headerTitleLine: {
+    alignItems: 'center' as const,
+  },
   heading: {
     flexShrink: 1,
     minWidth: 0,
   },
-  // The title shares the row with a control, so the heading has to be a
-  // measured width. Without one, the row is as wide as its contents and the
-  // control never wraps under the title.
+  // A measured width, so a control on this line can wrap under the title.
+  // The buttons sit at the end, and this takes the width they leave.
   headingShare: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   // The title is display size. Without this it keeps its width and pushes the
   // control — the settings cog, the filters — off the trailing edge.
   actionSlot: {
     flexShrink: 0,
+    marginLeft: 'auto' as const,
     zIndex: 1,
   },
   titleRow: {
@@ -431,8 +390,10 @@ const screenStyles = (theme: Theme) => ({
     flexShrink: 1,
     minWidth: 0,
   },
+  // In a column, `flex: 1` is height. The row only needs the heading's width.
   titleRowFill: {
-    flex: 1,
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
   },
   titleRowWrap: {
     flexWrap: 'wrap' as const,
@@ -470,6 +431,11 @@ const buttonStyles = (theme: Theme) => ({
   },
   ghost: {
     backgroundColor: 'transparent',
+  },
+  compact: {
+    minHeight: HIT_TARGET,
+    paddingVertical: 0,
+    paddingHorizontal: space.sm,
   },
   pressed: {
     opacity: 0.72,
@@ -524,6 +490,21 @@ const fieldStyles = (theme: Theme) => ({
     // Android adds the font's extra ascent above the letters.
     includeFontPadding: false,
   },
+  compact: {
+    fontFamily: type.body.fontFamily,
+    fontSize: type.caption.fontSize,
+    lineHeight: type.caption.lineHeight,
+    backgroundColor: theme.color.fill,
+    minWidth: 0,
+    height: 36,
+    borderRadius: radius.md,
+    paddingHorizontal: space.sm,
+    paddingTop: 0,
+    paddingBottom: 0,
+    color: theme.color.ink,
+    textAlignVertical: 'center' as const,
+    includeFontPadding: false,
+  },
   multiline: {
     ...type.body,
     backgroundColor: theme.color.fill,
@@ -535,44 +516,6 @@ const fieldStyles = (theme: Theme) => ({
     minHeight: size.fieldMultiline,
     textAlignVertical: 'top' as const,
     includeFontPadding: false,
-  },
-});
-
-const choiceStyles = (theme: Theme) => ({
-  press: {
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-  },
-  row: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    gap: space.md,
-    // The rule's width stays reserved, so the label does not move when the
-    // rule is drawn over it.
-    paddingLeft: inset.controlX + size.rule,
-    paddingRight: inset.controlX,
-    paddingVertical: inset.controlY,
-    minHeight: HIT_TARGET,
-  },
-  // The chosen row's brass mark, on the left edge, scaled in from the middle.
-  rule: {
-    position: 'absolute' as const,
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: size.rule,
-    backgroundColor: theme.color.brass,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  label: {
-    ...type.labelStrong,
-  },
-  count: {
-    ...type.caption,
-    color: theme.color.inkFaint,
   },
 });
 

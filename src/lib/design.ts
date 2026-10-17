@@ -28,6 +28,10 @@ import { Platform, type TextStyle } from 'react-native';
  * warm schemes and only part company where a palette lights a container
  * differently from the page under it.
  */
+
+/** The one yellow: highlights, selection, photo-roll marks, and caution badges. */
+export const yellow = '#BF9001';
+
 export const color = {
   light: {
     background: '#FBF9F5',
@@ -45,7 +49,7 @@ export const color = {
     inkFaint: '#9C9483',
     accent: '#17140F',
     onAccent: '#FBF9F5',
-    brass: '#7E5F33',
+    brass: yellow,
     save: '#2E6B4F',
     /** A price chip. Not `save`: that green means a watch was kept. */
     money: '#1A7344',
@@ -56,12 +60,8 @@ export const color = {
     onOverlay: '#FFFFFF',
     /** The photo roll's unread bars. */
     onOverlayFaint: 'rgba(255, 255, 255, 0.4)',
-    /**
-     * Ours, on a photograph. `brass` is mixed for paper and goes to mud over a
-     * dark scrim, so the accent that marks a place on a photograph is this
-     * warm tan — the same in both schemes, because a photograph is not themed.
-     */
-    onOverlayAccent: '#E8C48A',
+    /** On a photograph. Same `yellow` as `brass`, in both schemes. */
+    onOverlayAccent: yellow,
     bar: '#17140F',
     onBar: 'rgba(255, 255, 255, 0.55)',
     onBarActive: '#FFFFFF',
@@ -78,14 +78,17 @@ export const color = {
      */
     notice: '#FF4B3E',
     /**
-     * A shop that has not claimed. Yellow in both schemes: `brass` is the
-     * highlight on a name, and this mark has to read as a warning on paper
-     * and on charcoal. The type on it stays dark.
+     * A shop that has not claimed. Same yellow as `brass`; the type on it
+     * stays dark.
      */
-    caution: '#F5C518',
+    caution: yellow,
     onCaution: '#17140F',
     /** The swipe card, which floats on `shadow.card` instead of stepping. */
     raised: '#FFFFFF',
+    /** Frosted chrome over photos and the page edge. Same in both schemes. */
+    glassFill: 'rgba(22, 20, 17, 0.52)',
+    glassBorder: 'rgba(255, 255, 255, 0.16)',
+    glassWell: 'rgba(255, 255, 255, 0.12)',
   },
   dark: {
     background: '#121110',
@@ -101,7 +104,7 @@ export const color = {
     inkFaint: '#6F675C',
     accent: '#F3EFE8',
     onAccent: '#17140F',
-    brass: '#C9A468',
+    brass: yellow,
     save: '#5FB68C',
     /** Lifted off the charcoal so the chip still reads as green. */
     money: '#1E7A4A',
@@ -110,7 +113,7 @@ export const color = {
     overlay: 'rgba(0, 0, 0, 0.6)',
     onOverlay: '#FFFFFF',
     onOverlayFaint: 'rgba(255, 255, 255, 0.4)',
-    onOverlayAccent: '#E8C48A',
+    onOverlayAccent: yellow,
     // A shade under the page rather than the same near-black as in the light
     // scheme, which would vanish into a #121110 background.
     bar: '#0A0908',
@@ -119,12 +122,29 @@ export const color = {
     badge: '#D93025',
     onBadge: '#FFFFFF',
     notice: '#FF4B3E',
-    caution: '#F5C518',
+    caution: yellow,
     onCaution: '#17140F',
     // A shadow is nothing against a near-black page, so in the dark the card
     // floats the only way it can: a tone above `surface`.
     raised: '#262320',
+    glassFill: 'rgba(22, 20, 17, 0.58)',
+    glassBorder: 'rgba(255, 255, 255, 0.14)',
+    glassWell: 'rgba(255, 255, 255, 0.1)',
   },
+} as const;
+
+/** Native blur strength and web fallback for `LiquidGlass`. */
+export const glass = {
+  intensity: 72,
+  blurPx: 28,
+} as const;
+
+/**
+ * Bottom tab dock. Dark frosted material and white glyphs in both schemes;
+ * `glassFill` still steps slightly with the page behind it.
+ */
+export const barChrome = {
+  blurTint: 'dark' as const,
 } as const;
 
 /**
@@ -134,7 +154,7 @@ export const color = {
  * a photograph crops the watch a second time.
  */
 export const scrim =
-  'linear-gradient(to top, rgba(23, 20, 15, 0.88) 0%, rgba(23, 20, 15, 0.55) 40%, rgba(23, 20, 15, 0) 100%)';
+  'linear-gradient(to top, rgba(23, 20, 15, 0.96) 0%, rgba(23, 20, 15, 0.82) 30%, rgba(23, 20, 15, 0.5) 55%, rgba(23, 20, 15, 0) 100%)';
 
 /**
  * The same wash upside down, under the paging bars. Shallower and weaker than
@@ -231,6 +251,31 @@ export const type = {
     ...cut(face.text.medium, '500'),
     fontSize: 17,
     lineHeight: 22,
+    letterSpacing: tracking.title,
+  },
+  /** Deck photo plate name: under the listing headline, above `titleSmall`. */
+  plateTitle: {
+    ...cut(face.display.medium, '500'),
+    fontSize: 19,
+    lineHeight: 24,
+    letterSpacing: tracking.title,
+  },
+  /** Dealer panel figures (tenure, stock) and contact lines share one track. */
+  panelLead: {
+    ...cut(face.display.bold, '700'),
+    fontSize: 18,
+    lineHeight: 24,
+    letterSpacing: tracking.title,
+  },
+  panelNote: {
+    ...cut(face.text.medium, '500'),
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  panelLink: {
+    ...cut(face.text.medium, '500'),
+    fontSize: 18,
+    lineHeight: 24,
     letterSpacing: tracking.title,
   },
   /** A lede: one sentence introducing a screen. Never fields, specs, or prices. */
@@ -360,8 +405,17 @@ export const radius = {
   full: 9999,
 } as const;
 
+/** Follow and Message beside a shop. Rounded rectangle, not a full capsule. */
+export const dealerSocial = {
+  minHeight: 36,
+  paddingX: space.md,
+  radius: radius.lg,
+} as const;
+
 export const motion = {
   fast: 160,
+  /** Checkboxes, chips, and other small state changes. */
+  smooth: 280,
   base: 240,
   // A released gesture returns to rest. No spring: overshoot on a card the user
   // just declined to swipe reads as a bug, not as physics.
@@ -399,9 +453,21 @@ export const layout = {
    * window fills with watches rather than one tall row each.
    */
   gridColumns: 4,
+  /** Buy header: search door width as a share of the title row (icons take the rest). */
+  deckHeaderSearchShare: 0.6,
+  /** Photo roll track width as a share of the card column (centered over the stack). */
+  photoRollTrackShare: 0.62,
+  /**
+   * Strip between the swipe card and the tab bar for the availability line.
+   * One caption line plus a little air above the dock.
+   */
+  deckTallyBand: type.caption.lineHeight + space.sm + space.sm,
 } as const;
 
-export type LayoutWidth = Exclude<keyof typeof layout, 'rail' | 'gridColumns'>;
+export type LayoutWidth = Exclude<
+  keyof typeof layout,
+  'rail' | 'gridColumns' | 'deckHeaderSearchShare' | 'photoRollTrackShare' | 'deckTallyBand'
+>;
 
 /**
  * Above this width the deck opens on the grid: there is a mouse and no thumb.
@@ -470,6 +536,9 @@ export const size = {
   /** Glyphs. `icon` for a tab or a header control, `iconSmall` inline with text. */
   icon: 24,
   iconSmall: 16,
+  /** Multi-select row checkbox. */
+  check: 22,
+  checkMark: 14,
   /**
    * The specification label column. "Box and papers" at `type.label` is the
    * longest label, and the values share the edge to its right.
@@ -483,8 +552,10 @@ export const size = {
   badge: 18,
   /** A waiting dot. An unread conversation, and a saved watch with no message yet. */
   unread: 8,
-  /** One photo's bar at the top of a carousel. */
+  /** One photo's bar on a photograph (overlay). */
   segment: 3,
+  /** Photo roll above the deck: slightly thicker so it reads at arm's length. */
+  segmentDeck: 4,
   /** One photo's dot under a post's roll, where bars would cut the picture. */
   dot: 6,
   /** The ring a card wears while it is being swiped. */

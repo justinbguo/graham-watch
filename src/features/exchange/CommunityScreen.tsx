@@ -37,8 +37,9 @@ export function CommunityScreen() {
   // Held here, not in the feed, so a thread opened and closed comes back to
   // the same filter: the feed unmounts while a post is on top.
   const [filter, setFilter] = useState<FeedFilter>('all');
-  const { post } = useLocalSearchParams<{ post?: string }>();
+  const { post, compose } = useLocalSearchParams<{ post?: string; compose?: string }>();
   const opened = Array.isArray(post) ? post[0] : post;
+  const wantsCompose = compose === '1';
   // The Profile tab has no thread of its own. It names the post, and this
   // screen opens it. Clearing the param keeps a later visit on the feed.
   useEffect(() => {
@@ -50,6 +51,17 @@ export function CommunityScreen() {
     });
     router.setParams({ post: '' });
   }, [opened]);
+  // Profile's empty posts row lands here on the composer. Reset to feed → new
+  // so Back returns to the board, not wherever Community was last left.
+  useEffect(() => {
+    if (!wantsCompose) return;
+    setStack((current) => {
+      const top = current[current.length - 1];
+      if (top?.kind === 'new') return current;
+      return [{ kind: 'feed' }, { kind: 'new' }];
+    });
+    router.setParams({ compose: '' });
+  }, [wantsCompose]);
   const mode = stack[stack.length - 1] ?? { kind: 'feed' };
   const back = () => setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
   const push = (next: Place) => setStack((current) => [...current, next]);

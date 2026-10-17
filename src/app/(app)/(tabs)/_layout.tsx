@@ -9,6 +9,7 @@ import { SaveTargetIcon } from '@/features/saved/flight';
 import { useSavedCount } from '@/features/saved/count';
 import { useIsWide } from '@/lib/layout';
 import { size } from '@/lib/theme';
+import { useTheme } from '@/providers/theme';
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -29,6 +30,7 @@ export default function TabsLayout() {
   const isWide = useIsWide();
   const saved = useSavedCount();
   const unread = useUnreadCount();
+  const theme = useTheme();
 
   return (
     <Tabs
@@ -37,6 +39,7 @@ export default function TabsLayout() {
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
+        sceneStyle: { backgroundColor: theme.color.background },
         tabBarPosition: isWide ? 'left' : 'bottom',
         tabBarIcon: ({ color }) => {
           const icon = ICONS[route.name];
@@ -48,7 +51,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Buy',
-          tabBarIcon: ({ color }) => <BuyTabIcon color={color} />,
+          tabBarIcon: ({ color, focused }) => <BuyTabIcon color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen name="community" options={{ title: 'Community' }} />
@@ -76,8 +79,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => <ProfileTabIcon color={color} focused={focused} />,
         }}
       />
-      {/* Still a tab, so the bar stays on screen. No glyph: the deck's field is the door. */}
-      <Tabs.Screen name="search" options={{ title: 'Search', href: null }} />
       {/* Landed on main after this branch replaced that tab with Community. */}
       <Tabs.Screen name="source" options={{ href: null }} />
     </Tabs>

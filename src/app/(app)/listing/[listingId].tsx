@@ -1,13 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
-import { useOpenMailDraft } from '@/data/inquiries';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
+import { AddToWishlist } from '@/features/listings/AddToWishlist';
 import { ListingDetails } from '@/features/listings/ListingDetails';
+import { PassWatch } from '@/features/listings/PassWatch';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
 import {
@@ -40,9 +42,9 @@ export default function ListingScreen() {
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
   const save = useRecordSwipe(userId);
-  const contact = useOpenMailDraft(userId);
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
+  const photoRef = useRef<View>(null);
 
   const isSaved =
     saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
@@ -99,10 +101,12 @@ export default function ListingScreen() {
         </View>
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
-        <View style={styles.photo}>
+        <View ref={photoRef} style={styles.photo}>
           <PhotoCarousel
             photos={card.photos}
             active
+            showBars
+            measureRef={photoRef}
             onExpand={(index) =>
               open(
                 'photos/[listingId]',
@@ -120,48 +124,20 @@ export default function ListingScreen() {
           // on the page put a verdict in front of a watch already chosen.
           actions={
             isSaved ? null : (
-              <>
-                <Button
-                  label="Add to wishlist"
-                  icon="bookmark-outline"
-                  variant="outline"
-                  loading={save.isPending && save.variables?.direction === 'right'}
-                  onPress={() => judge('right')}
-                />
-                {/* The grid has no verdict of its own. Passing here is the left
-                    swipe: the watch leaves the deck, and this screen goes with it. */}
+              <View style={styles.verdictRow}>
                 {fromSearch || card.sold_at ? null : (
-                  <Button
-                    label="Pass"
-                    icon="close"
-                    variant="ghost"
+                  <PassWatch
+                    block
                     loading={save.isPending && save.variables?.direction === 'left'}
-                    disabled={save.isPending}
                     onPress={() => judge('left', () => router.back())}
                   />
                 )}
-                {/* The whole point of tracking sold stock: no one writes to a dealer
-                    about a watch that went months ago. */}
-                {fromSearch || card.sold_at ? null : (
-                  <Button
-                    label="Ask about this watch"
-                    icon="email-outline"
-                    loading={contact.isPending}
-                    onPress={() => {
-                      if (!isSignedIn) {
-                        guest.openSignIn('action');
-                        return;
-                      }
-                      contact.mutate(
-                        { card, message: '' },
-                        {
-                          onError: (error) => Alert.alert('Could not open Gmail', error.message),
-                        }
-                      );
-                    }}
-                  />
-                )}
-              </>
+                <AddToWishlist
+                  block
+                  loading={save.isPending && save.variables?.direction === 'right'}
+                  onPress={() => judge('right')}
+                />
+              </View>
             )
           }
         />
@@ -211,5 +187,12 @@ const detailStyles = (theme: Theme) => ({
     // The X sits at the end of a 44pt target, so 20 points of that target
     // fall between the price and the glyph. Cancel them, then leave space.sm.
     marginRight: space.sm - (HIT_TARGET - size.icon),
+  },
+  verdictRow: {
+    flexDirection: 'row' as const,
+    alignSelf: 'stretch' as const,
+    alignItems: 'stretch' as const,
+    gap: space.sm,
+    width: '100%' as const,
   },
 });

@@ -58,16 +58,16 @@ export function useOpenStack() {
 }
 
 /**
- * A tab is not a sheet. On the deck the tab navigator owns Search. On a
- * listing the stack is in front, so the way there is back to `(tabs)` with
- * Search named. `router.navigate` from the listing asks the stack, which
- * does not have that screen.
+ * A tab is not a sheet. From a listing the stack is in front, so the way
+ * back to a tab is `(tabs)` with that tab named. `router.navigate` from the
+ * listing asks the stack, which does not have that screen. Search is a sheet
+ * on this stack, not a tab.
  */
 export function useOpenTab() {
   const navigation = useNavigation() as unknown as Nav;
 
   return (
-    name: 'index' | 'community' | 'messages' | 'search' | 'saved' | 'profile',
+    name: 'index' | 'community' | 'messages' | 'saved' | 'profile',
     params?: Params,
   ) => {
     const navigators = ancestors(navigation);

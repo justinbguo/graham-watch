@@ -1,6 +1,7 @@
 import { ScrollView } from 'react-native';
 
-import { Button, ChoiceRow } from '@/components/ui';
+import { CheckRow } from '@/components/CheckRow';
+import { Button } from '@/components/ui';
 import { useThemedStyles } from '@/providers/theme';
 
 import { WATCH_SEARCH_PAINS, type WatchSearchPain } from './options';
@@ -28,7 +29,7 @@ export function PainPointsStep({
       actions={<Button label="Continue" disabled={!selected.length} onPress={onContinue} />}>
       <ScrollView style={styles.fill} contentContainerStyle={styles.choices}>
         {WATCH_SEARCH_PAINS.map((option) => (
-          <ChoiceRow
+          <CheckRow
             key={option.value}
             label={option.label}
             selected={selected.includes(option.value)}

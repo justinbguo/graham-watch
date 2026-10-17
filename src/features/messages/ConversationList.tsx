@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 
-import { SearchField } from '@/components/SearchBar';
+import { SearchField, searchFieldInset } from '@/components/SearchBar';
 import { Centered, Heading, Message, Spinner } from '@/components/ui';
 import {
   BODY_SEARCH_MIN,
@@ -151,11 +151,8 @@ const listStyles = (_theme: Theme) => ({
     flex: 1,
   },
   query: {
-    // The header leaves space.lg under every title. This field is that title's
-    // own control, so it sits space.sm under "Messages".
+    ...searchFieldInset,
     marginTop: space.sm - space.lg,
-    paddingHorizontal: inset.screen,
-    paddingBottom: space.md,
   },
   compose: {
     paddingHorizontal: inset.screen,

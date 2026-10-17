@@ -164,7 +164,7 @@ export function useDeck(limit = DECK_LIMIT) {
 
 export type ListingCounts = { matched: number; total: number };
 
-async function fetchCounts(filters: Filters): Promise<ListingCounts> {
+export async function fetchCounts(filters: Filters): Promise<ListingCounts> {
   if (isDemo) return demo.counts(filters);
 
   const { data, error } = await supabase.rpc('listing_counts', {

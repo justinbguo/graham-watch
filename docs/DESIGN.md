@@ -31,15 +31,15 @@ literal hex in a component.
 | `textFaint` | Hints and placeholders you should be able to ignore |
 | `ink` / `inkMuted` / `inkFaint` | The same three jobs, on a `surface` or a `fill` |
 | `accent` / `onAccent` | A filled button and the type and icons on it. The inverse of the page |
-| `brass` | The one warm highlight: dealer names, selected states, a collector number in a byline |
+| `brass` | The one warm highlight (`#BF9001`): dealer names, selected states, a collector number in a byline |
 | `save` / `danger` | The two irreversible directions, and nothing else |
 | `money` / `onMoney` | A price chip and the type on it. Not `save` |
 | `overlay` / `onOverlay` | A flat plate on a photograph and the type on it |
-| `onOverlayFaint` / `onOverlayAccent` | The roll's unread bars, and the one tan mark on a photograph |
+| `onOverlayFaint` / `onOverlayAccent` | The roll's unread bars, and the current mark on a photograph (`#BF9001`) |
 | `bar` / `onBar` / `onBarActive` | The tab bar's floor, its idle glyphs at 55% white, and the one you are on in full white |
 | `badge` / `onBadge` | A count on a tab, red with white numerals. The same in both schemes, because the bar is dark in both |
 | `notice` | The saved-row dot. Brighter than `badge`, the same in both schemes. Nothing is set on it |
-| `caution` / `onCaution` | The unclaimed-shop badge. Yellow, with dark type, the same in both schemes. Not `brass`: that highlight is already the name |
+| `caution` / `onCaution` | The unclaimed-shop badge. Same `#BF9001` as `brass`, with dark type |
 | `raised` | The swipe card, which floats on `shadow.card` instead of stepping |
 
 `scrim` sits outside the table because it is not themed: it is the fade a caption sits on
@@ -151,7 +151,7 @@ Tracking small text is how an interface starts to look like a slide deck.
 
 | Style | Use |
 | --- | --- |
-| `wordmark` | `GRAHAM` on sign-in. Display bold, tracked at `tracking.wordmark`. The deck's title is `Graham` in `display` |
+| `wordmark` | `GRAHAM` on sign-in. Display bold, tracked at `tracking.wordmark`. Buy has no title |
 | `display` | Screen titles |
 | `title` | Watch model, section headings, empty-state headlines |
 | `editorial` | Short atmospheric copy, never paperwork |
@@ -186,7 +186,7 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 - Title case only for proper nouns and the words on our own chrome that are
   already names: tab names like "Search" and "Wishlist".
 - The wordmark on sign-in is the one string set in capitals, and the letters
-  are written that way. The deck's title is `Graham`. `textTransform` stays
+  are written that way. Buy has no title. `textTransform` stays
   banned, so nothing else can inherit the treatment.
 - The `eyebrow` separates itself from the title under it by weight and colour,
   not by capitals.
@@ -196,15 +196,17 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 
 ## Identity
 
-The deck's title is `Graham`, in `display`, the same size as Search, Wishlist,
-and the other headers. It wears no check. Sign-in is the one place the letters
+Buy has no title. The header is one row: the search door at
+`layout.deckHeaderSearchShare` (60%) of the width, undo, filters, and the view
+toggle grouped at the trailing edge with `space.xs` between them and
+`space.md` before the cluster. The count is the subtitle under that row. Sign-in is the one place the letters
 are `GRAHAM`, drawn by `Wordmark`, at the left of that column. Do not invent a
 crest, heritage date, or seal to imply history the product does not have.
 
 The mark — the launcher icon's gold `G` — stays on the launcher. It stood
 beside the word on sign-in for a while, and that made the screen a poster
 before it was a form. No screen wears the mark in its header either: a header
-holds a word, a count, and controls, and the word is the name.
+holds a title or that screen's own control, a count, and controls.
 
 On web, sign-in is a sheet over the deck. Guests land on Buy with **Log in**
 in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the sheet
@@ -261,10 +263,11 @@ when the account is created, and it does not move if someone else leaves.
 The slide starts `space.xl` below the top inset `Screen` already applied, so
 the question sits lower than a settings page. The footer stays at the bottom.
 
-Rows use `ChoiceRow`: a hairline list with the brass mark on the chosen row,
-not cards around every option. The label is `labelStrong`, the medium cut.
-A long set scrolls while the footer stays fixed.
-That preserves the same action position from Name through Notifications and
+Rows use `CheckRow`: label left, animated checkbox right, inside a `surface`
+group. The filter sheet adds a summary strip (match count, removable chips) and
+always-open groups; the footer says "Show N watches". Onboarding and filters
+share the same row. The label is `labelStrong`, not cards around every option.
+A long set scrolls while the footer stays fixed. That preserves the same action position from Name through Notifications and
 keeps the home indicator clear.
 
 When the keyboard is open the footer sits above it, with `inset.screen`
@@ -459,11 +462,13 @@ of the four durations.
   appears: you did not cause it.
 - **A Community view** enters on `FadeIn` at `motion.base`, the deck's rule.
   The moment it is for is the composer closing onto the post it just made.
-- **A chosen row** settles: the brass rule grows in from the row's middle, and
-  the fill and the label shift with it, `motion.fast`. In a list that takes
-  one answer the mark leaves one row as it arrives on the next, which reads
-  as the rule moving. Each row animates its own mark because `ChoiceRow` is
-  also a checkbox in the filters, where several are on at once.
+- **Search** opens as a sheet over Buy. The sheet slides up: that is the
+  platform modal. The door on Buy is measured and a copy of the bar flies into
+  the sheet's field on `motion.base` while the placeholder word fades out; there
+  is no "Search" title on the sheet. Closing it runs the same transition backward.
+- **A checkbox row** settles: the square fills and the check scales in on
+  `motion.smooth` with an ease-out curve. Chips in the filter summary fade in on
+  the same duration. Filters and onboarding share `CheckRow`.
 
 A control that mounts in its on state shows it and nothing moves. A turn, a
 rise, or a step on mount announces a change nobody made.
@@ -642,7 +647,7 @@ so a screen declares when it is not the one paying:
   leaves a dead band above the bar. On a wide layout the rail is at the left,
   so `Screen` restores its own bottom inset. The rail takes the top inset
   itself, since it stands beside the screen rather than under it.
-- A screen presented as a sheet (`presentation: 'modal'` — filters, inquiry,
+- A screen presented as a sheet (`presentation: 'modal'` — search, filters, inquiry,
   edit watch, new request, import inventory, settings) passes `inSheet`. iOS
   presents the card below the status bar, so a top inset inside it pads away
   from nothing.
@@ -765,8 +770,9 @@ fields with presets underneath, because a floor and a ceiling are amounts, not n
 Ranges are presets, not sliders. Dragging two handles to "36 to 39mm" is slow on a
 phone and the precision buys nothing — nobody wants a 37.5mm floor. Presets also keep
 filter state small enough to be a cache key. Every option toggles, including era,
-case size, and the price rows. Complications stay "all of these": a date and a
-chronograph means a watch that has both.
+case size, and the price rows. The sheet keeps price, era, case size, brand, and
+dealer (deck and search only). Style, case material, winding, and complications
+stay out of the panel so the first pass stays short.
 
 Only offer a filter something can match. Options come from `listing_facets`, so a brand
 appears once a visible listing is that brand. A filter that can only return nothing is a
@@ -797,8 +803,8 @@ approved somewhere else.
 
 ## Photo carousel
 
-Tap the right of a photo for the next, the left to go back. Paging never wraps: landing
-back on the first photo reads as a glitch, not as an end.
+Tap the right of a photo for the next, the left to go back. On a deck card the roll
+wraps at both ends. The full-screen viewer still stops at the first and last photo.
 
 On a card and on the detail hero the photograph fills its frame with `cover`,
 edge to edge. A watch floating in a band of matte reads as a broken image, and
@@ -816,7 +822,7 @@ top edge, the current one in `onOverlayAccent` and the rest at `onOverlayFaint`.
 already has for "there are more of these", and it reads without being read — a `1 / 3`
 plate is a thing you have to stop and parse on a card you are about to swipe.
 
-Tan for the current bar, white for the rest. Everything else on a photograph is white, so
+The current bar is `#BF9001`, the rest white at low opacity. Everything else on a photograph is white, so
 the one mark saying where you are in the roll is the one thing that is not, and it does
 that at three points tall where a brighter white could not. `brass` is the same idea on
 paper and cannot be used here: it is mixed against a warm page and goes to mud over a
@@ -827,12 +833,12 @@ watches are shot on white and a white rule on a white wall is not there. The fad
 weaker and shorter than the caption's at the bottom: it is holding up three-point rules,
 not a title, and a heavy band across the top of every photograph reads as a letterbox.
 
-The top edge means the photograph's, not the screen's. On a card the two are the same,
-because the plate fills the frame. The viewer shows the whole photograph on black, so
-one that is not the window's shape leaves a band above it, and bars floating in that
-band belong to nothing. The frame is measured with `onLayout`, and half the leftover
-height is where the bars go. They never go above the safe-area inset: a portrait
-photograph fills the window, and its top edge is under the Dynamic Island.
+On the buy deck the track sits between the catalogue count and the card stack.
+On the listing hero and in the full-screen viewer it is the same track — centered at
+`layout.photoRollTrackShare`, pills at `size.segmentDeck`, `radius.full`, inactive
+segments easing to `fill` and the current one to `brass` on `motion.fast`. The
+listing pins that track to the top of the photograph; the viewer pins it under the
+status bar on black. The old full-width white overlay bars on the listing are gone.
 
 The proportions are read before the photograph is shown, with `Image.loadAsync` on the
 one being looked at and the one after it. `onLoad` alone reports them a frame late, so
@@ -938,8 +944,8 @@ message about it, in `caption` and `textMuted`, and the day it was sent at
 the top right: Today, Yesterday, the weekday, or a date once a week has
 passed. A watch nobody has written about yet says "Tap to inquire about the
 watch" in that same place. It also carries a still `notice` dot, `size.unread`,
-centred on the photograph's top-right corner. It was `badge` at `size.iconSmall`
-in the middle of the row's right edge. No halo and no pulse. There is no Message capsule.
+on the row's top-trailing corner — past the type, not on the photograph. No
+halo and no pulse. There is no Message capsule.
 
 The photograph opens the listing. Everything else on the row — the name, the
 line, the price — opens the message, and so does the dot: the thread if one exists, a new
@@ -1026,18 +1032,13 @@ photograph.
 
 ## The card is the whole listing
 
-A card scrolls. Under the photograph sit the dealer's description, the
-specification table, who is selling it, and the button that writes to them — the same `ListingDetails` block the listing route renders.
-Deciding on a five-figure watch takes the reference and the caliber, and a card
-that made you leave to read them turned one decision into a navigation.
+A card scrolls. Under the photograph sit the dealer's description,
+who is selling it, and the button that writes to them — the same `ListingDetails`
+block the listing route renders.
 
 The block under the photograph opens on "About this watch" when the dealer wrote
-one, then the description. That heading, Specifications, and Condition are all
-`title`, the same face as the dealer name under them. The description stays at
-`label`. The specification rows stay `label`, 14pt, the labels in regular and
-the values in semibold. The description used to be `body` over specs at
-`label`, which made the dealer's sentence the loudest thing on a card whose
-facts are the reason to read it.
+one, then the description. That heading is `title`. The description stays at
+`label`.
 
 Both are full-strength `text` — white in the dark scheme — with nothing under
 the photograph in a muted tone, because a muted paragraph on a raised card
@@ -1092,62 +1093,17 @@ the object itself and has no column above it.
 
 ### The whole plate is on the photograph
 
-The plate is two lines over the bottom of the photo, in capitals. "ROLEX DATEJUST, 1968",
-then `$7,850 · VINTAGE VAULT`. It is the one place type is set in capitals: everywhere else
-stays sentence case, and dealer data elsewhere is printed as imported. Capitals at the
-face's own tracking touch, so the plate sets the tracking to `0`. A dating app puts the name and the age on the face, and this deck is the
-same act performed on watches. Everything a card exists to say now sits on the thing the
-eye is already looking at, and the block under the photograph opens on "About this watch"
-and then the dealer's own description, instead of repeating the facts above it.
+Two rows at the bottom left on `scrim`: the watch name (`formatName`, capitals on
+the plate only), then price in `Tag` `tone="money"` `size="plate"`, the year
+after a middot, and `fullscreen` at the trailing edge to open the viewer at the
+current index. The dealer stays in the scroll below the photograph. Tiles, rows,
+and listing headlines still use `formatTitle` with the year beside the name;
+only the deck plate splits them so the price can carry a chip.
 
-The year rides with the name everywhere, not in the specification line. It is the second
-thing anyone asks about a vintage watch, and "1601 · 1968 · 36mm" made a 1968 Datejust look
-like a 2015 one. `formatTitle` carries it on a tile, a row, and the listing headline;
-`formatSpecs` is the tile's one spec line — reference and case size.
-
-The reference and the case size stay off the plate. They are rows in the table the card
-scrolls to, a few lines down, and printing either one twice inside two inches reads as
-filler. The listing route drops them from its headline for the same reason.
-
-White type never sits straight on a photograph. It sits on `scrim`, a fade to a warm black
-that is the same in both schemes, because half these watches are shot on white and a
-photograph is not themed. A fade rather than a band: a hard edge across the frame crops
-the watch a second time. The type carries a soft shadow as well, for the top of the line
-where the fade is thinnest.
-
-The name and the year are one line of `formatTitle` when they fit. It reads the way it
-reads on a tile and in a search row, which is the point: one watch, one voice, wherever
-you meet it. "Rolex Datejust, 1968" stays on that line. "Omega Speedmaster Professional,
-1972" does not: the year leaves the name and joins the price and the dealer, so the plate
-stays two lines. The name is then one line, and it ellipsizes if it is longer than the
-card. Giving the year a line of its own on every card spent a line of photograph on the
-short names. Giving the price a third line on the long ones covers the watch the caption
-is there to name.
-
-One weight throughout, and one colour with two exceptions. On a photograph a change of
-weight or tone is a change the eye has to attribute either to the type or to the picture
-behind it, and it guesses wrong as often as not, so the hierarchy is size alone:
-`titleSmall` for the name and the year, `bodyStrong` for the price. The year keeps
-`titleSmall` after it moves down. The price does not grow to meet it. It does lean, ten
-degrees. This face ships no italic, and `fontStyle` on the roman file does nothing on
-iOS, so the price is sheared and the year and the dealer stay upright.
-
-The exception is the dealer's name, in `onOverlayAccent` — the same tan as the roll's
-current bar, so the two marks on a photograph are one colour rather than two accents
-arguing. It is the only word on the plate that names a party rather than the watch, and
-tan is what the app has always used to mean "a person is involved". On paper that is
-`brass`, which is mixed against a warm page and goes to mud over a dark scrim.
-
-Set tight: the lines lead at three points over their size rather than the token's leading,
-which is drawn for type with paper around it. The year's leading locks to the price line
-once it sits there, so the plate does not grow by a point. Two lines on a photograph have
-to read as one block, or the plate looks like two captions that landed together.
-
-The price and the dealer share the bottom line, split by a middot with air around it. When
-the year has moved down, it leads that line, and the same middot divides it from the price.
-Who is selling it is half of what a vintage watch costs you, so the two belong in one breath —
-but never in an outline beside the maker, because a box around a name makes it look like a
-control, and a dealer's name on a card is not something you press.
+White type never sits straight on a photograph. It sits on `scrim`, a fade to a
+warm black that is darker at the bottom than it was, because half these watches
+are shot on white. The type carries a soft shadow as well, for the top of the
+block where the fade is thinnest.
 
 A grid row keeps its own block beside the photograph, at `ListingSummary`. Three
 lines of type over a photograph that size is a stamp, not a caption.
@@ -1285,8 +1241,7 @@ shop, because it only counts a sale we watched happen, and a dash is a shrug
 where a number was promised. **"Stock checked against this shop's own site
 four days ago"** was a sentence about our importer printed on a page about a
 dealer — a buyer deciding whether to write to someone does not need our
-refresh schedule. What is left is one line: inquiries reach this shop by
-email.
+refresh schedule.
 
 It used to show a rating in brass stars, a review count, years trading and a
 reply time, all invented and seeded from the dealer id, behind a "Sample"
@@ -1372,13 +1327,14 @@ is not part of the button: a header that presses makes the name and the link
 the same control. It replaced a **More watches** ghost button under the
 links. The shop's own page shows neither: the list is already there.
 
-**Follow** sits on the name's line, a capsule as tall as the `body` line (24)
-with the word in `control`. That is a little taller than the letters. **Message** is the capsule beside it, outline in every
-state, because Follow is the loud one. When a long name pushes them to a row
-of their own, they stay side by side on that row. The panel measures the wrap
-rather than guessing from the name. Each capsule is shorter than `HIT_TARGET`,
-so `hitSlop` makes up the rest.
-Follow and Following are one capsule in two inks. Follow is solid `text` with
+**Follow** sits on the name's line, a rounded rectangle at `dealerSocial`
+(`minHeight` 36, `paddingX` `space.md`, `radius.lg`) with the word in
+`labelStrong` and the glyph at `size.icon`. **Message** is the same shape beside
+it, outline in every state, because Follow is the loud one. When a long name
+pushes them to a row of their own, they stay side by side on that row. The panel
+measures the wrap rather than guessing from the name. Each button is shorter than
+`HIT_TARGET`, so `hitSlop` makes up the rest.
+Follow and Following are one button in two inks. Follow is solid `text` with
 the word and glyph in `background`: white with black type on a dark page,
 near-black with paper type on a light one. It is the thing to do, so it is the
 loud one. Following turns it inside out: a `text` stroke, `text` type, and the
@@ -1410,7 +1366,9 @@ form, never the full address, even when the dealer typed it themselves.
 
 ## The deck says how much of the marketplace you are seeing
 
-Under the title, a line of `caption` in `textMuted`. Filtered, it is two numbers —
+The last line inside the card's scroll, centered, in `caption` and `textMuted`.
+You only see it after you scroll to the bottom; it is not pinned on screen.
+Filtered, it is two numbers —
 "12 of 148 watches available". Unfiltered, before a swipe, one: "148 watches available",
 the size of the catalogue. After a swipe the first number is what is left, so the line
 is "147 of 148 watches available".
@@ -1492,18 +1450,18 @@ card that holds still.
 This is the single outline in the app, and it is allowed because it is not a state. It
 exists while a thumb is down and is gone when the thumb lifts.
 
-## The tab bar is a dark floor
+## The tab bar is a glass dock
 
 `TabBar` draws the five tabs; the navigator only says which routes exist, what each is
 called, what count it carries, and which edge the bar sits on. Its own bar packs a glyph
 and a word into a fixed 49pt strip and exposes nothing else. A bar this permanent should
 not be a pile of overrides.
 
-It is the one surface that does not follow the scheme. `bar` is near-black on paper and
-darker still in the dark, with `onBar` glyphs at 55% white and an `onBarActive` full white
-for the tab you are on — the same three tones in both schemes. The app is pale, so the
-floor under it is dark, and a floor that changed colour with the page would stop reading
-as one thing.
+On a phone it is a `LiquidGlass` pill — `expo-blur` over the page, `glassFill` and
+`glassBorder`, `radius.full`, floated in the screen gutter above the home indicator. On a
+wide window the same material stacks in a rounded rail at the left. Glyphs still use
+`onBar` at 55% white and `onBarActive` at full white; the current tab gets a `glassWell`
+behind its icon. The page shows through the dock instead of meeting a solid `bar` floor.
 
 The tab you are on used to be brass, and the glyph used to fill in. On a black floor
 that is a third signal. The step from 55% to 100% white is the contrast the eye
@@ -1762,9 +1720,11 @@ slot holds controls that act on the screen.
 
 ## Search opens from the deck
 
-The bar has no Search glyph. Under the count on Buy — "12 of 148 watches available" —
-sits a bar reading "Search". It is a button, not a field: typing there would be
-thrown away when the screen changed. It is `SearchDoor`, and it looks the same as the
+Buy has no name in the header. The bar reading "Search" is 60% of that row; the
+deck controls sit on the rest. The count — "12 of 148 watches available" — is
+the last line in the card scroll, centered, and only visible at the bottom. The
+bar is a button, not a field: typing there would be thrown away
+when the screen changed. It is `SearchDoor`, and it looks the same as the
 `SearchField` it opens, so the door reads as the field.
 
 Every search bar — Buy, Search, Messages — is one of those two, from
@@ -1775,10 +1735,11 @@ is one word on every screen; the `accessibilityLabel` tells a screen reader what
 that screen searches. The bar is shorter than a `controlMin` field because on Buy
 it shares the screen with the card, and every point comes off the photograph.
 
-Pressing the door opens Search, which stays a route inside the tabs so the bar is
-still under it, and the real field takes focus. Coming back from a listing does not
-open the keyboard again. An X at the start of the title's line returns to the deck.
-Filters stay at the trailing edge.
+Pressing the door opens Search as a sheet over the deck. A tab switch cuts, and
+the bar you pressed would not read as the thing that opened. The sheet slides up
+(`presentation: 'modal'`, `animation: 'slide_from_bottom'`). The real field takes
+focus. Coming back from a listing does not open the keyboard again. An X at the
+start of the title's line dismisses the sheet. Filters stay at the trailing edge.
 
 Under the count, the matches are photographs and nothing else. Three across, square,
 `cover`, with `space.xs` between them and no corner radius: the cells tile into one

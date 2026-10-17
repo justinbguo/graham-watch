@@ -1,11 +1,24 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { Ref } from 'react';
-import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
+import type React from 'react';
+import {
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
 
-import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const PLACEHOLDER = 'Search';
+
+/** Single-line in `HIT_TARGET`. Not `type.body.lineHeight` — that misaligns placeholders on iOS. */
+const SEARCH_LINE = type.body.fontSize;
 
 type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -15,6 +28,17 @@ type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
  * The group name uses it with a pencil, so the two rows on New group chat
  * are the same height and the words start at the same place.
  */
+/** Shared chrome for the door, the field, and the launch morph. */
+export function SearchBarShell({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(searchStyles);
+  return (
+    <View style={styles.bar}>
+      <Glyph />
+      {children}
+    </View>
+  );
+}
+
 export function IconBar({
   ref,
   icon,
@@ -53,17 +77,24 @@ export function IconBar({
 export function SearchField({
   ref,
   accessibilityLabel = PLACEHOLDER,
+  placeholder = PLACEHOLDER,
+  style,
   ...props
-}: Omit<TextInputProps, 'placeholder' | 'style'> & { ref?: Ref<TextInput> }) {
+}: Omit<TextInputProps, 'style'> & {
+  ref?: Ref<TextInput>;
+  style?: StyleProp<ViewStyle>;
+}) {
   return (
-    <IconBar
-      ref={ref}
-      icon="magnify"
-      placeholder={PLACEHOLDER}
-      accessibilityLabel={accessibilityLabel}
-      returnKeyType="search"
-      {...props}
-    />
+    <View style={style}>
+      <IconBar
+        ref={ref}
+        icon="magnify"
+        placeholder={placeholder}
+        accessibilityLabel={accessibilityLabel}
+        returnKeyType="search"
+        {...props}
+      />
+    </View>
   );
 }
 
@@ -81,11 +112,12 @@ export function SearchDoor({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={({ pressed }) => [styles.bar, pressed && styles.pressed]}>
-      <Glyph />
-      <Text style={styles.label} numberOfLines={1}>
-        {PLACEHOLDER}
-      </Text>
+      style={({ pressed }) => [pressed && styles.pressed]}>
+      <SearchBarShell>
+        <Text style={styles.label} numberOfLines={1}>
+          {PLACEHOLDER}
+        </Text>
+      </SearchBarShell>
     </Pressable>
   );
 }
@@ -95,10 +127,21 @@ function Glyph() {
   return <MaterialCommunityIcons name="magnify" size={size.icon} color={theme.color.inkMuted} />;
 }
 
+/** Gutter for a search field under a `Screen` title. */
+export const searchFieldInset = {
+  paddingHorizontal: inset.screen,
+  paddingBottom: space.md,
+} as const;
+
 const searchStyles = (theme: Theme) => ({
   bar: {
     height: HIT_TARGET,
+    // A door in a header row otherwise stays as wide as the word "Search".
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border,
     backgroundColor: theme.color.surface,
     paddingHorizontal: space.sm,
     flexDirection: 'row' as const,
@@ -106,25 +149,25 @@ const searchStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   input: {
-    // Face and size only, as in `Field`: on iOS a single-line `lineHeight`
-    // offsets the value and not the placeholder.
     fontFamily: type.body.fontFamily,
-    fontSize: type.body.fontSize,
+    fontSize: SEARCH_LINE,
+    lineHeight: SEARCH_LINE,
     flex: 1,
-    // An <input> on web keeps an intrinsic ~20-character width otherwise.
     minWidth: 0,
-    height: '100%' as const,
-    padding: 0,
+    height: HIT_TARGET,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    // Same nudge as `Field`: this face sits slightly low in its box.
+    paddingBottom: Platform.OS === 'ios' ? space.xs / 2 : 0,
+    margin: 0,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
     includeFontPadding: false,
   },
-  // No line height and no bottom pad. `Field` pads its bottom to lift a face
-  // that sits low in a taller box; here that lift put the word above the bar's
-  // middle.
   label: {
     fontFamily: type.body.fontFamily,
-    fontSize: type.body.fontSize,
+    fontSize: SEARCH_LINE,
+    lineHeight: SEARCH_LINE,
     flexShrink: 1,
     color: theme.color.inkMuted,
     includeFontPadding: false,
