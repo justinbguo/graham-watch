@@ -11,6 +11,7 @@ import {
   useExchangePost,
   type ExchangeComment,
 } from '@/data/exchange';
+import { isExchangeShowcasePost } from '@/data/exchangeShowcase';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -59,7 +60,8 @@ export function Thread({
 
   const post = data.post;
   const photos = data.photos;
-  const mine = post.author_id === userId;
+  const showcase = isExchangeShowcasePost(postId);
+  const mine = !showcase && post.author_id === userId;
 
   function reply(item: ExchangeComment) {
     const next = mention(item.author.handle);
@@ -143,21 +145,27 @@ export function Thread({
           />
         )}
       />
-      <SendBar
-        placeholder={replyTo ? `Reply to ${atHandle(replyTo.handle) ?? 'them'}` : 'Write a comment'}
-        value={draft}
-        onChangeText={setDraft}
-        onSend={send}
-        busy={comment.isPending}
-        note={
-          <>
-            {replyTo ? (
-              <ReplyingTo name={atHandle(replyTo.handle) ?? 'them'} onCancel={() => setReplyTo(null)} />
-            ) : null}
-            {comment.error ? <Message text="That comment did not post." tone="error" /> : null}
-          </>
-        }
-      />
+      {showcase ? (
+        <View style={styles.showcaseNote}>
+          <Message text="Example post — read-only. Real comments go on live listings." tone="muted" />
+        </View>
+      ) : (
+        <SendBar
+          placeholder={replyTo ? `Reply to ${atHandle(replyTo.handle) ?? 'them'}` : 'Write a comment'}
+          value={draft}
+          onChangeText={setDraft}
+          onSend={send}
+          busy={comment.isPending}
+          note={
+            <>
+              {replyTo ? (
+                <ReplyingTo name={atHandle(replyTo.handle) ?? 'them'} onCancel={() => setReplyTo(null)} />
+              ) : null}
+              {comment.error ? <Message text="That comment did not post." tone="error" /> : null}
+            </>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -264,5 +272,11 @@ const threadStyles = (theme: Theme) => ({
   },
   pressed: {
     opacity: 0.72,
+  },
+  showcaseNote: {
+    paddingHorizontal: inset.screen,
+    paddingVertical: space.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
   },
 });

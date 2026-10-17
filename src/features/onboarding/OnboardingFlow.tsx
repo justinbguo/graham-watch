@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { useClaimUsername, useCompleteOnboarding, useProfile } from '@/data/profile';
+import { OnboardingPaywall } from '@/features/subscriptions/OnboardingPaywall';
+import { shouldShowOnboardingPaywall } from '@/lib/revenuecat';
 import { useSession } from '@/providers/session';
 
 import { BirthdayStep } from './BirthdayStep';
@@ -22,7 +24,8 @@ type Step =
   | 'size'
   | 'brands'
   | 'painPoints'
-  | 'notifications';
+  | 'notifications'
+  | 'paywall';
 
 /**
  * One pager after sign-in. Answers live here until the last step writes them
@@ -54,6 +57,7 @@ export function OnboardingFlow() {
   const [painPoints, setPainPoints] = useState<WatchSearchPain[]>([]);
   const [permissionPending, setPermissionPending] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [pendingNotifications, setPendingNotifications] = useState<boolean | null>(null);
 
   const finish = (notificationsEnabled: boolean) => {
     if (!dateOfBirth) return;
@@ -72,6 +76,15 @@ export function OnboardingFlow() {
     });
   };
 
+  const afterNotifications = (notificationsEnabled: boolean) => {
+    if (shouldShowOnboardingPaywall()) {
+      setPendingNotifications(notificationsEnabled);
+      setStep('paywall');
+      return;
+    }
+    finish(notificationsEnabled);
+  };
+
   const togglePainPoint = (value: WatchSearchPain) =>
     setPainPoints((current) =>
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
@@ -86,7 +99,7 @@ export function OnboardingFlow() {
     setPermissionPending(true);
     setPermissionError(null);
     try {
-      finish(await requestNotificationPermission());
+      afterNotifications(await requestNotificationPermission());
     } catch {
       setPermissionError('Your phone could not open notification settings. Try again or choose Not now.');
     } finally {
@@ -186,12 +199,23 @@ export function OnboardingFlow() {
     );
   }
 
+  if (step === 'paywall' && pendingNotifications !== null) {
+    return (
+      <OnboardingPaywall
+        error={complete.error?.message}
+        loading={complete.isPending}
+        onComplete={() => finish(pendingNotifications)}
+        onBack={() => setStep('notifications')}
+      />
+    );
+  }
+
   return (
     <NotifyStep
       error={permissionError ?? complete.error?.message}
       loading={permissionPending || complete.isPending}
       onContinue={() => void enableNotifications()}
-      onSkip={() => finish(false)}
+      onSkip={() => afterNotifications(false)}
       onBack={() => setStep('painPoints')}
     />
   );

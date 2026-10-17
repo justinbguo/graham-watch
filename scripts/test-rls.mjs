@@ -2674,6 +2674,43 @@ console.log('\nmessages');
   });
   check('the opener can write in the thread', sent.status < 300, JSON.stringify(sent.body));
 
+  const dealOffer = await api('/rest/v1/rpc/create_conversation_deal', {
+    token: importer.token,
+    method: 'POST',
+    body: {
+      p_conversation_id: opened.body,
+      p_amount_cents: 1250000,
+      p_currency: 'USD',
+      p_proposer_is_seller: false,
+    },
+  });
+  check(
+    'either side can offer a deal in a peer thread',
+    dealOffer.status < 300 && typeof dealOffer.body === 'string',
+    JSON.stringify(dealOffer.body),
+  );
+
+  const dealRead = await api(
+    `/rest/v1/conversation_deals?conversation_id=eq.${opened.body}&select=id,amount_cents,status`,
+    { token: buyer.token },
+  );
+  check(
+    'the other person can read the deal',
+    Array.isArray(dealRead.body) &&
+      dealRead.body.length === 1 &&
+      dealRead.body[0].amount_cents === 1250000,
+    JSON.stringify(dealRead.body),
+  );
+
+  const dealEavesdrop = await api(
+    `/rest/v1/conversation_deals?conversation_id=eq.${opened.body}&select=id`,
+    { token: dealerUser.token },
+  );
+  check(
+    'someone outside the thread cannot read the deal',
+    Array.isArray(dealEavesdrop.body) && dealEavesdrop.body.length === 0,
+    JSON.stringify(dealEavesdrop.body),
+  );
 
   const found = await api(
     `/rest/v1/messages?select=conversation_id&body=ilike.*${phrase}*`,

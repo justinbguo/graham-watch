@@ -186,12 +186,16 @@ is the username from slide 2: lowercase, unique, 3–20 characters, starting
 with a letter. `claim_username` reserves it there. A trigger refuses
 `onboarded_at` without either.
 
-The final onboarding slide calls `expo-notifications` for the OS permission.
+The final onboarding question calls `expo-notifications` for the OS permission.
 On Android it creates the `watch-updates` channel before the request; without a
 channel Android 13 does not show its prompt. The result is stored in
 `profiles.notifications_enabled`. That column is not a push token and no remote
 delivery exists yet. Push delivery requires a development build on Android;
 Expo Go cannot receive remote notifications there.
+
+When `EXPO_PUBLIC_REVENUECAT_*` keys are set on iOS or Android, the Graham Pro
+paywall screen runs next. `onboarded_at` is written after subscribe, restore, or
+Not now. See [REVENUECAT](REVENUECAT.md).
 
 ### The buyer path
 

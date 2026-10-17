@@ -16,6 +16,7 @@ import { FilterProvider } from '@/features/filters/provider';
 import { haasFonts } from '@/lib/fonts';
 import { applySystemChrome } from '@/lib/systemChrome';
 import { QueryProvider } from '@/providers/query';
+import { RevenueCatProvider } from '@/providers/revenuecat';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
 
@@ -33,12 +34,14 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <GuestProvider>
-              <FilterProvider>
-                <SplashScreenController />
-                <Chrome />
-              </FilterProvider>
-            </GuestProvider>
+            <RevenueCatProvider>
+              <GuestProvider>
+                <FilterProvider>
+                  <SplashScreenController />
+                  <Chrome />
+                </FilterProvider>
+              </GuestProvider>
+            </RevenueCatProvider>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>

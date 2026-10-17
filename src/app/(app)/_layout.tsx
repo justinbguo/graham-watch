@@ -56,6 +56,7 @@ export default function AppLayout() {
           <Stack.Screen name="import-inventory" options={{ presentation: 'modal' }} />
           <Stack.Screen name="apply" options={{ presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="graham-pro" options={{ presentation: 'modal' }} />
           <Stack.Screen name="filters/[surface]" options={{ presentation: 'modal' }} />
           {/* A tab switch cuts. The door on Buy should read as the thing that opened. */}
           <Stack.Screen

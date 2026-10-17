@@ -10,6 +10,8 @@ edge functions.
 - Shipping a change: [docs/DEVELOPING.md](docs/DEVELOPING.md)
 - Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
 - Product spec: [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)
+- Subscriptions (Graham Pro): [docs/REVENUECAT.md](docs/REVENUECAT.md)
+- Deals and fees: [docs/TRANSACTIONS.md](docs/TRANSACTIONS.md)
 - Design system: [docs/DESIGN.md](docs/DESIGN.md)
 - Scraper options: [docs/SCRAPING.md](docs/SCRAPING.md)
 

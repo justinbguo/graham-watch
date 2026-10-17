@@ -48,6 +48,12 @@ const ROTATION_DEGREES = 10;
 /** How much of the card the photograph takes, and how tall it may ever get. */
 const PHOTO_FRACTION = 0.58;
 const PHOTO_MAX_RATIO = 1.25;
+
+/** One height for every card in the stack, from the stage the pile shares. */
+export function deckPhotoHeight(frame: { width: number; height: number }) {
+  if (!frame.width || !frame.height) return null;
+  return Math.min(frame.height * PHOTO_FRACTION, frame.width * PHOTO_MAX_RATIO);
+}
 // Timing, not a spring: an overshoot past centre reads as the card rejecting
 // the drop rather than settling from it.
 const SETTLE = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
@@ -97,6 +103,8 @@ export const SwipeCard = forwardRef<
     onPhotoIndexChange?: (index: number) => void;
     /** Deck catalogue line under the card. Opacity follows scroll depth. */
     footerReveal?: SharedValue<number>;
+    /** From the deck stage so every card in the pile shares one photo height. */
+    plateHeight?: number | null;
   }
 >(function SwipeCard(
   {
@@ -109,6 +117,7 @@ export const SwipeCard = forwardRef<
     photoIndex: photoIndexProp,
     onPhotoIndexChange,
     footerReveal,
+    plateHeight: plateHeightProp,
   },
   ref
 ) {
@@ -128,9 +137,9 @@ export const SwipeCard = forwardRef<
   useEffect(() => {
     if (!photoControlled) setPhotoIndexLocal(0);
   }, [card.id, photoControlled]);
-  const photoHeight = frame.height
-    ? Math.min(frame.height * PHOTO_FRACTION, frame.width * PHOTO_MAX_RATIO)
-    : null;
+  const photoHeight =
+    plateHeightProp ??
+    (frame.height ? Math.min(frame.height * PHOTO_FRACTION, frame.width * PHOTO_MAX_RATIO) : null);
   // The card leaves the window, not just its own column, so this one is a
   // viewport question.
   const { width: windowWidth } = useWindowDimensions();
@@ -231,6 +240,14 @@ export const SwipeCard = forwardRef<
     },
     [scroller]
   );
+
+  // The card under the top one must not keep a scroll offset when it promotes.
+  useEffect(() => {
+    if (!isTop) return;
+    scrollY.value = 0;
+    if (web) applyWebScroll(0);
+    else scrollTo(scroller, 0, 0, false);
+  }, [isTop, card.id, applyWebScroll, scroller, scrollY, web]);
 
   // The scroll view ignores the wheel while scrolling is off, so the page
   // would scroll instead. This listener keeps the wheel on the card.

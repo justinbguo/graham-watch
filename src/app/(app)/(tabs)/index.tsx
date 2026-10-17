@@ -7,7 +7,7 @@ import { DeckGrid } from '@/components/DeckGrid';
 import { FilterButton } from '@/components/FilterButton';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
-import { SwipeCard, type SwipeCardHandle } from '@/components/SwipeCard';
+import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/SwipeCard';
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
@@ -22,7 +22,7 @@ import { useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 import { setSearchLaunchRect } from '@/lib/searchLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { GUEST_SWIPE_BUDGET, inset, layout, motion, space, type, type Theme } from '@/lib/theme';
+import { GUEST_SWIPE_BUDGET, inset, layout, motion, size, space, type, type Theme } from '@/lib/theme';
 import { useWebArrowSwipe } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -62,8 +62,7 @@ export default function Deck() {
 
   useEffect(() => {
     setPhotoIndex(0);
-    footerReveal.value = 0;
-  }, [topListing?.id, footerReveal]);
+  }, [topListing?.id]);
 
   const footerStyle = useAnimatedStyle(() => ({
     opacity: footerReveal.value,
@@ -75,6 +74,8 @@ export default function Deck() {
   const { launch } = useSaveFlight();
   const stage = useRef<View>(null);
   const stageRect = useRef<Rect | null>(null);
+  const [stageFrame, setStageFrame] = useState({ width: 0, height: 0 });
+  const plateHeight = deckPhotoHeight(stageFrame);
   const topCard = useRef<SwipeCardHandle>(null);
 
   const measureStage = useCallback(() => {
@@ -82,6 +83,15 @@ export default function Deck() {
       stageRect.current = { x, y, width, height };
     });
   }, []);
+
+  const onStageLayout = useCallback(() => {
+    measureStage();
+    stage.current?.measure((x, y, width, height) => {
+      setStageFrame((current) =>
+        current.width === width && current.height === height ? current : { width, height },
+      );
+    });
+  }, [measureStage]);
 
   // One step back, and only for a pass. A save is recoverable from the wishlist
   // tab, so a right swipe retires the offer instead of queueing behind it.
@@ -225,11 +235,13 @@ export default function Deck() {
     <Screen
       titleControl={<DeckHeader actions={actions} />}
       subhead={
-        topListing.photos.length > 1 ? (
-          <View style={styles.roll}>
+        <View style={styles.roll}>
+          {topListing.photos.length > 1 ? (
             <PhotoRollBars photos={topListing.photos} index={photoIndex} placement="deck" />
-          </View>
-        ) : undefined
+          ) : (
+            <View style={styles.rollStandIn} />
+          )}
+        </View>
       }
       width="card"
       inTabs>
@@ -239,7 +251,7 @@ export default function Deck() {
           corpse of the last one. */}
       <Animated.View key="cards" entering={FadeIn.duration(motion.base)} style={styles.view}>
         <View style={styles.deck}>
-          <View ref={stage} onLayout={measureStage} style={styles.stage}>
+          <View ref={stage} onLayout={onStageLayout} style={styles.stage}>
           {visible.map((card, index) => {
             const onTop = index === visible.length - 1;
             return (
@@ -262,6 +274,7 @@ export default function Deck() {
                   );
                 }}
                 footerReveal={onTop ? footerReveal : undefined}
+                plateHeight={plateHeight}
               />
             );
           })}
@@ -363,6 +376,10 @@ const deckStyles = (_theme: Theme) => ({
     alignItems: 'center' as const,
     // `Screen` headed padding is for the title block; tuck the roll toward the stack.
     marginBottom: -space.md,
+  },
+  rollStandIn: {
+    height: size.segmentDeck,
+    width: `${layout.photoRollTrackShare * 100}%` as const,
   },
   deck: {
     flex: 1,

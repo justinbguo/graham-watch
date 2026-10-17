@@ -3,12 +3,10 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { PhotoRollBars } from '@/components/PhotoRollBars';
 import type { DeckPhoto } from '@/lib/models';
 import { setPhotoLaunchRect } from '@/lib/photoLaunch';
-import { motion, space, type, type Theme } from '@/lib/theme';
+import { motion, size, space, type, type Theme } from '@/lib/theme';
 import { usePinchZoom } from '@/lib/zoom';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -22,8 +20,8 @@ import { useThemedStyles } from '@/providers/theme';
  * letterbox: dealers shoot the watch in the middle of the frame.
  *
  * `viewer` is the same paging on a black field with the whole photograph in
- * frame, centred in the space under the roll bars. Its roll bars match the deck
- * track above the card, not the overlay on a listing hero.
+ * frame. The roll sits on the photograph's top edge; equal flex above and
+ * below centres that pair in the viewport, with height capped so both fit.
  *
  * Either way a pinch magnifies the photograph — the dial's printing, the
  * crown, the stretch in a bracelet are what a buyer is looking for and they are
@@ -63,7 +61,6 @@ export function PhotoCarousel({
 }) {
   const styles = useThemedStyles(carouselStyles);
   const rootRef = useRef<View>(null);
-  const insets = useSafeAreaInsets();
   const [freeIndex, setFreeIndex] = useState(initialIndex);
   const index = controlledIndex ?? freeIndex;
 
@@ -108,13 +105,25 @@ export function PhotoCarousel({
   }, [isViewer, current?.id, current?.url, next?.id, next?.url]);
 
   const ratio = current ? shapes[current.id] : undefined;
+  const paged = photos.length > 1;
+  const barsVisible = showBars && paged && (!isViewer || frame.width > 0);
+  /** Roll plus the air between it and the photograph — reserved before sizing the image. */
+  const viewerRollBand = barsVisible ? size.segment + space.sm : 0;
+
   const shownHeight =
     isViewer && ratio && frame.width
-      ? Math.min(frame.height, frame.width / ratio)
+      ? Math.min(frame.height - viewerRollBand, frame.width / ratio)
       : ratio && frame.width
         ? Math.min(frame.height, frame.width / ratio)
         : 0;
-  const viewerPhotoHeight = shownHeight > 0 ? shownHeight : frame.height;
+  const viewerPhotoHeight =
+    isViewer && shownHeight > 0
+      ? shownHeight
+      : isViewer && frame.height > 0
+        ? Math.max(0, frame.height - viewerRollBand)
+        : shownHeight > 0
+          ? shownHeight
+          : frame.height;
 
   const zoom = usePinchZoom({
     frame,
@@ -156,9 +165,6 @@ export function PhotoCarousel({
         });
       }
     : undefined;
-
-  const paged = photos.length > 1;
-  const barsVisible = showBars && paged && (!isViewer || frame.width > 0);
 
   const image = (
     <Image
@@ -208,33 +214,36 @@ export function PhotoCarousel({
   if (isViewer) {
     return (
       <GestureDetector gesture={zoom.gesture}>
-        <View ref={rootRef} style={[styles.photo, styles.viewer, styles.viewerRoot]}>
-          {barsVisible ? (
-            <View style={[styles.viewerBars, { paddingTop: insets.top + space.sm }]}>
-              <PhotoRollBars photos={photos} index={index} placement="deck" />
+        <View
+          ref={rootRef}
+          style={[styles.photo, styles.viewer, styles.viewerRoot]}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setFrame((size) =>
+              size.width === width && size.height === height ? size : { width, height },
+            );
+          }}>
+          <View style={styles.viewerStack}>
+            <View style={styles.viewerSpacer} />
+            <View style={styles.viewerBlock}>
+              {barsVisible ? (
+                <PhotoRollBars photos={photos} index={index} placement="viewer" />
+              ) : null}
+              <Animated.View
+                style={[
+                  {
+                    width: frame.width || undefined,
+                    height: viewerPhotoHeight || undefined,
+                    alignSelf: 'center' as const,
+                  },
+                  zoom.style,
+                ]}>
+                {image}
+              </Animated.View>
             </View>
-          ) : null}
-          <View
-            style={styles.viewerStage}
-            onLayout={(event) => {
-              const { width, height } = event.nativeEvent.layout;
-              setFrame((size) =>
-                size.width === width && size.height === height ? size : { width, height },
-              );
-            }}>
-            <Animated.View
-              style={[
-                {
-                  width: frame.width || undefined,
-                  height: viewerPhotoHeight || undefined,
-                  alignSelf: 'center' as const,
-                },
-                zoom.style,
-              ]}>
-              {image}
-            </Animated.View>
-            {zones}
+            <View style={styles.viewerSpacer} />
           </View>
+          {zones}
         </View>
       </GestureDetector>
     );
@@ -275,15 +284,17 @@ const carouselStyles = (theme: Theme) => ({
   viewerRoot: {
     flex: 1,
   },
-  viewerBars: {
+  viewerStack: {
+    flex: 1,
+    flexDirection: 'column' as const,
+  },
+  viewerSpacer: {
+    flex: 1,
+    minHeight: 0,
+  },
+  viewerBlock: {
     width: '100%' as const,
     alignItems: 'center' as const,
-    paddingBottom: space.sm,
-  },
-  viewerStage: {
-    flex: 1,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
   },
   empty: {
     alignItems: 'center' as const,

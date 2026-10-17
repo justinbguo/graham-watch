@@ -4,7 +4,10 @@ Swipe-based discovery app for vintage watches. Buyers swipe a deck of listings a
 the ones they want, then contact the dealer directly. Inventory is imported from dealer
 websites by an AI scraper rather than typed in by hand.
 
-Graham never touches the money. It introduces a buyer to a dealer and gets out of the way.
+Graham does not run checkout for a watch sale today. It introduces a buyer to a dealer
+and gets out of the way. **Graham Pro** is a separate subscription for using the app
+(see [§16](#16-monetization)). **Marketplace fees** on completed deals through Graham
+are planned; they are not built yet.
 
 ## 1. Two sides, one app
 
@@ -30,8 +33,9 @@ In:
 1. Auth — email one-time codes. Apple and Google are built but disabled until
    someone creates the credentials; see `GOOGLE_SIGN_IN_ENABLED` in `src/lib/auth.ts`.
    First-run onboarding asks for a name, a username, an 18+ birthday,
-   collection size, favorite brands, vintage-search pain points, and one
-   notification permission. Push delivery is not wired yet.
+   collection size, favorite brands, vintage-search pain points, one
+   notification permission, then **Graham Pro** on iOS/Android when RevenueCat is
+   configured (subscribe, restore, or skip). Push delivery is not wired yet.
 2. Buy — swipe a deck of listings. Left passes, right saves. Dragging up on the
    photograph previews the next watch and returns. Cards on a phone, a grid on
    a wide window.
@@ -45,10 +49,30 @@ In:
    question, a watch to show), and comment on someone else's. A row under the
    title filters the feed to one kind, or All.
 9. Messages — a tab: one thread with a person, or with a shop you asked
-   about a watch.
+   about a watch. **Deals** — either side can propose a price in the thread
+   (peer or shop; not groups yet). Placeholder UI for Apple Pay hold; see
+   [TRANSACTIONS.md](TRANSACTIONS.md).
+10. **Graham Pro (subscriptions)** — RevenueCat on native iOS/Android: entitlement
+    `graham_pro`, monthly and yearly plans, custom paywall UI, restore, and
+    subscription management via the store sheet. Settings shows plan status.
+    **No feature gates yet** — the paywall is shown at the end of onboarding and
+    from Settings; the rest of the app does not require `graham_pro`. See
+    [REVENUECAT.md](REVENUECAT.md).
 
-Out, deliberately: payments and checkout, ratings and reviews, moderation and
-reports, shipping, analytics.
+**In progress / planned (monetization):**
+
+- **Feature gating** — decide which surfaces require `graham_pro` and enforce with
+  `useGrahamPro()` (not shipped).
+- **Deal payment** — Apple Pay hold on `conversation_deals` (schema and UI
+  placeholder shipped; payment not wired).
+- **Settlement and payouts** — release holds, pay sellers, ledger for Graham fees.
+
+Out, deliberately (for now): full **escrow** outside the deal hold, **payouts**
+automation to dealers without a claimed shop account, ratings and reviews,
+moderation and reports, shipping labels, product analytics. Off-thread email
+inquiries still bypass Graham money.
+
+Out for **group chats**: deals (for now).
 
 **Ratings and invented data are out, and that rule has teeth.** The dealer panel once
 showed a star rating seeded from the dealer id behind a "Sample" label, and a Source tab
@@ -78,7 +102,9 @@ Importing a shop is therefore safe to do early — nothing is public until someo
 approves it. Approval happens outside the phone app, through the operator UI or
 `npm run dealers -- approve`.
 
-The ask is one email: Graham sends buyers straight to the dealer, no fee, no commission.
+The ask is one email: Graham sends buyers straight to the dealer. There is **no
+marketplace fee** on that path today. A future fee applies only when Graham is the
+place the deal closes, not when the app only introduces the parties.
 
 ## 5. Claiming a shop
 
@@ -242,6 +268,10 @@ messages        id, conversation_id, sender_id, body, via, listing_id,
                 created_at
 conversation_reads
                 conversation_id, user_id, read_at
+conversation_deals
+                id, conversation_id, message_id, proposed_by, buyer_id, seller_id,
+                amount_cents, currency, listing_id, status, fee_bps, fee_cents,
+                payment_provider, payment_intent_id, created_at, updated_at
 dealer_claim_codes
                 id, dealer_id, requested_by, email, code_hash, salt, attempts,
                 created_at, expires_at, consumed_at
@@ -296,6 +326,10 @@ types are generated from the schema, never hand-written.
   when a message arrives. A person who does not open the app does not know.
 - There is no way to block or report someone, and anyone who has posted can be
   written to.
+- **Graham Pro** does not gate the deck, wishlist, or messages yet. Web and demo
+  mode skip RevenueCat entirely.
+- **Marketplace fees** are not implemented; Community and inquiries have no
+  take rate or settlement.
 
 ## 13. Community
 
@@ -303,9 +337,10 @@ The third tab, between Search and Wishlist. Signed-in people post a watch they w
 buy, or trade. Others comment on that post. The comment is the public record. The tab
 was named Exchange; the database tables, functions, and code keep that word.
 
-Graham is the board. It does not hold the money, hold the watch, or authenticate it.
-Payment and shipping stay between the two people. The author can edit or delete their
-own post. A deleted post takes its comments with it.
+Graham is the board. It does not hold the money, hold the watch, or authenticate it
+today. Payment and shipping stay between the two people until marketplace checkout
+and fees exist. The author can edit or delete their own post. A deleted post takes
+its comments with it.
 
 A selling post requires a price. Every post requires a photo, up to six. The description
 sits under the photo. Buying posts are pinned above
@@ -381,7 +416,54 @@ readable only by its owner. Tapping that photograph in the list or thread header
 opens the dealer's shop or the collector's profile; the rest of the row still
 opens the conversation.
 
-## 15. Next phase, in rough order
+## 15. Roadmap (rough order)
 
-Ratings, once a buyer can leave one. A dealer-facing view of their own leads. Payments,
-only if the introduction model turns out not to be enough.
+1. **Deal payment** — Apple Pay hold on in-thread deals; capture and fee at
+   settlement. See [TRANSACTIONS.md](TRANSACTIONS.md).
+2. **Graham Pro** — feature gates; production subscription keys and store review.
+3. **Deals in groups** — same offer flow when buyer/seller roles are defined for
+   multi-party threads.
+4. **Ratings** — only once a buyer can leave a real one.
+5. **Dealer leads** — claimed shop view of inquiries and threads.
+6. **Push** — permission stored; delivery not wired.
+
+## 16. Monetization
+
+### Graham Pro (shipped, native only)
+
+| Piece | Behavior |
+| --- | --- |
+| Billing | [RevenueCat](https://www.revenuecat.com/) + Apple/Google subscriptions |
+| Entitlement | `graham_pro` |
+| Plans | `monthly`, `yearly` (current offering in dashboard) |
+| Paywall | Graham UI (`GrahamPaywall`), end of onboarding + Settings → View plans |
+| Identity | `Purchases.logIn(supabaseUserId)` |
+| Docs | [REVENUECAT.md](REVENUECAT.md), [PHONE.md](PHONE.md#subscriptions-revenuecat) |
+
+Subscriptions are **for the app**, not for buying a watch from a dealer.
+
+### Transaction fees on deals (in progress)
+
+Graham charges a **transaction fee** when a buyer pays into an in-thread **deal**
+(`conversation_deals`). Default **5%** (`fee_bps = 500`), shown as an estimate on
+the offer. The fee is taken at payment/settlement, not when the message is sent.
+
+That is separate from **Graham Pro** and separate from **email introduction** to a
+dealer with no deal.
+
+**Shipped:** deal rows, offer/decline/cancel, thread UI, fee estimate. **Not shipped:**
+Apple Pay, holds, capture, payouts, ledger.
+
+Details: [TRANSACTIONS.md](TRANSACTIONS.md).
+
+## 17. Messages — deals
+
+Either party in a **writable** direct or **claimed shop** thread can tap **Offer
+deal**, name a USD amount, and post a `DealCard`. The buyer will pay with Apple Pay
+(placeholder). Group threads refuse deals until roles are defined.
+
+Shop threads: the buyer offers to buy or the shop offers to sell. Peer threads: pick
+sell or buy when offering.
+
+Statuses today: `proposed`, `declined`, `cancelled`. Future: `accepted`, `funded`,
+`completed`, `expired`.

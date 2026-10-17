@@ -3,7 +3,8 @@
 
 create extension if not exists pg_trgm with schema extensions;
 
-create table public.watch_models (
+-- Hosted projects may already have this catalog from an earlier manual apply.
+create table if not exists public.watch_models (
   id uuid primary key default gen_random_uuid(),
   dials_id text not null,
   brand_name text not null,
@@ -19,17 +20,17 @@ create table public.watch_models (
   constraint watch_models_brand_model_slug_key unique (brand_slug, model_slug)
 );
 
-create index watch_models_brand_slug_idx on public.watch_models (brand_slug);
-create index watch_models_brand_name_trgm_idx on public.watch_models
+create index if not exists watch_models_brand_slug_idx on public.watch_models (brand_slug);
+create index if not exists watch_models_brand_name_trgm_idx on public.watch_models
   using gin (brand_name extensions.gin_trgm_ops);
-create index watch_models_series_name_trgm_idx on public.watch_models
+create index if not exists watch_models_series_name_trgm_idx on public.watch_models
   using gin (series_name extensions.gin_trgm_ops);
-create index watch_models_name_trgm_idx on public.watch_models
+create index if not exists watch_models_name_trgm_idx on public.watch_models
   using gin (name extensions.gin_trgm_ops);
-create index watch_models_reference_trgm_idx on public.watch_models
+create index if not exists watch_models_reference_trgm_idx on public.watch_models
   using gin (reference_number extensions.gin_trgm_ops);
 
-create table public.watch_catalog_sync (
+create table if not exists public.watch_catalog_sync (
   id smallint primary key default 1 check (id = 1),
   source text not null default 'dials.co',
   models_synced integer not null default 0,
@@ -39,11 +40,13 @@ create table public.watch_catalog_sync (
   updated_at timestamptz not null default now()
 );
 
-insert into public.watch_catalog_sync (id) values (1);
+insert into public.watch_catalog_sync (id) values (1)
+on conflict (id) do nothing;
 
 alter table public.watch_models enable row level security;
 alter table public.watch_catalog_sync enable row level security;
 
+drop policy if exists "signed-in users read watch catalog" on public.watch_models;
 create policy "signed-in users read watch catalog"
   on public.watch_models
   for select
@@ -51,6 +54,7 @@ create policy "signed-in users read watch catalog"
   using (true);
 
 -- Sync metadata is operator-only; the app reads counts through suggest_watches.
+drop policy if exists "no direct client access to sync metadata" on public.watch_catalog_sync;
 create policy "no direct client access to sync metadata"
   on public.watch_catalog_sync
   for select
@@ -61,7 +65,7 @@ create policy "no direct client access to sync metadata"
  * Typeahead for brand, model, family, or reference while listing a watch.
  * Populated by scripts/sync-watch-catalog.mjs from dials.co.
  */
-create function public.suggest_watches(
+create or replace function public.suggest_watches(
   p_query text,
   p_brand text default null,
   p_limit integer default 12

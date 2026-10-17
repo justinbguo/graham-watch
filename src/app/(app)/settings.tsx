@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native
 
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
 import { useDeleteAccount, useProfile } from '@/data/profile';
+import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { useFacets } from '@/data/search';
 import { signOut } from '@/lib/auth';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
@@ -44,6 +45,8 @@ export default function SettingsScreen() {
             </View>
           </>
         ) : null}
+
+        <SubscriptionSettings />
 
         <Divider />
         <View style={styles.section}>

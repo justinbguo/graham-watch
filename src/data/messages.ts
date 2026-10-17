@@ -5,6 +5,7 @@ import { formatTitle } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { normalizeUsername } from '@/lib/username';
 
+import { mapDeal, type ConversationDeal } from './deals';
 import { keys } from './keys';
 import { listingPhotoUrl } from './listings';
 
@@ -45,6 +46,8 @@ export type ConversationHeader = {
   with: ConversationWith;
   /** False in a thread with a shop that has not claimed its account. */
   writable: boolean;
+  /** Set when the thread is with a shop, for either side. */
+  threadDealerId: string | null;
   /** The other people in a group. Empty for a direct thread. */
   members: GroupMember[];
 };
@@ -62,10 +65,20 @@ export type Message = {
   body: string;
   /** `email` is an inquiry that left Graham for a shop with no account here. */
   via: 'app' | 'email';
+  /** Set when the row names a watch, even if the listing row is no longer readable. */
+  listingId: string | null;
   /** The watch an inquiry named, when the listing is still readable. */
   listing: MessageListing | null;
+  deal: ConversationDeal | null;
   created_at: string;
 };
+
+/** True when the thread already contains a message about this watch. */
+export function threadNamesListing(messages: Message[], listingId: string): boolean {
+  return messages.some(
+    (message) => message.listingId === listingId || message.listing?.id === listingId,
+  );
+}
 
 type PartyColumns = {
   dealer_id: string | null;
@@ -188,13 +201,27 @@ export function useConversation(conversationId: string | null) {
           .from('messages')
           // The watch comes along for the ride: an inquiry names one, and a
           // buyer writes to the same shop about more than one.
-          .select('id, sender_id, body, via, created_at, listing_id, listings (brand, model, year)')
+          .select('id, sender_id, body, via, created_at, listing_id, deal_id, listings (brand, model, year)')
           .eq('conversation_id', conversationId)
           .order('created_at'),
       ]);
       if (header.error) throw header.error;
       if (messages.error) throw messages.error;
       const rows = messages.data ?? [];
+      const dealIds = [
+        ...new Set(rows.map((row) => row.deal_id).filter((id): id is string => Boolean(id))),
+      ];
+      const dealsById = new Map<string, ReturnType<typeof mapDeal>>();
+      if (dealIds.length > 0) {
+        const { data: deals, error: dealsError } = await supabase
+          .from('conversation_deals')
+          .select('*')
+          .in('id', dealIds);
+        if (dealsError) throw dealsError;
+        for (const deal of deals ?? []) {
+          dealsById.set(deal.id, mapDeal(deal));
+        }
+      }
       const covers = await coverPhotos(rows.flatMap((row) => (row.listing_id ? [row.listing_id] : [])));
       const head = header.data?.[0];
       return {
@@ -203,6 +230,7 @@ export function useConversation(conversationId: string | null) {
               id: head.id,
               with: party(head),
               writable: head.writable,
+              threadDealerId: head.thread_dealer_id ?? null,
               members: head.is_group ? membersOf(head.members) : [],
             }
           : null,
@@ -213,6 +241,7 @@ export function useConversation(conversationId: string | null) {
             sender_id: row.sender_id,
             body: row.body,
             via: row.via === 'email' ? ('email' as const) : ('app' as const),
+            listingId: row.listing_id,
             listing:
               row.listing_id && listing
                 ? {
@@ -221,6 +250,7 @@ export function useConversation(conversationId: string | null) {
                     photoUrl: covers.get(row.listing_id) ?? null,
                   }
                 : null,
+            deal: row.deal_id ? (dealsById.get(row.deal_id) ?? null) : null,
             created_at: row.created_at,
           };
         }),
@@ -292,9 +322,11 @@ export function useSendMessage(
         sender_id: userId,
         body: body.trim(),
         via: 'app',
+        listingId: about?.listingId ?? null,
         listing: about?.title
           ? { id: about.listingId, title: about.title, photoUrl: about.photoUrl }
           : null,
+        deal: null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<Thread>(queryKey, (thread) =>

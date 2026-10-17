@@ -4,19 +4,23 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 
 import { SendBar } from '@/components/SendBar';
-import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
-import { useListing, usePrimeListing } from '@/data/listings';
+import { useDealerInquiryListing, useListing, usePrimeListing } from '@/data/listings';
+import { useRespondToDeal } from '@/data/deals';
 import {
   isPending as isSending,
   useConversation,
   useMarkConversationRead,
   useRenameGroup,
+  threadNamesListing,
   useSendMessage,
   type Message as ChatMessage,
   type MessageListing,
 } from '@/data/messages';
+import { DealCard } from '@/features/messages/DealCard';
+import { OfferDealSheet } from '@/features/messages/OfferDealSheet';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { useOpenStack } from '@/lib/openStack';
@@ -54,9 +58,19 @@ export function ConversationScreen({
   // so clearing the sentence stays cleared.
   const [draft, setDraft] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [offerDeal, setOfferDeal] = useState(false);
 
   const { data, isPending, error } = useConversation(conversationId);
-  const { data: listing } = useListing(listingId ?? '');
+  const namedListingId =
+    listingId ?? data?.messages.find((message) => message.listing)?.listing?.id ?? null;
+  const { data: listing } = useListing(namedListingId ?? '');
+  const emailDealerId =
+    data?.header && !data.header.writable ? data.header.threadDealerId : null;
+  const needsEmailListing = Boolean(emailDealerId && !namedListingId);
+  const { data: dealerInquiryListing, isPending: dealerListingPending } = useDealerInquiryListing(
+    needsEmailListing ? emailDealerId : null,
+  );
+  const inquiryCard = listing ?? dealerInquiryListing ?? null;
   const primeListing = usePrimeListing();
   const open = useOpenStack();
   const openParty = useOpenParty();
@@ -69,11 +83,14 @@ export function ConversationScreen({
     : null;
   // Wishlist opens this thread with the watch still named. Once a message
   // already quotes it, the composer must not quote it again.
-  const asked = Boolean(
-    listingId && data?.messages.some((message) => message.listing?.id === listingId),
-  );
+  const messages = data?.messages ?? [];
+  const askedAboutQuote =
+    quote && messages.length > 0 ? threadNamesListing(messages, quote.id) : false;
+  const askedFromRoute =
+    listingId && messages.length > 0 ? threadNamesListing(messages, listingId) : false;
+  const asked = askedAboutQuote || askedFromRoute;
   const quoting = quote && !asked ? quote : null;
-  const value = draft ?? (listingId && data && !asked ? DEFAULT_INQUIRY : '');
+  const value = draft ?? (quoting && data ? DEFAULT_INQUIRY : '');
   const send = useSendMessage(
     conversationId,
     userId ?? '',
@@ -82,6 +99,7 @@ export function ConversationScreen({
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
   const rename = useRenameGroup(conversationId);
+  const respondDeal = useRespondToDeal(conversationId);
   const close = () => router.back();
 
   function openWatch(id: string) {
@@ -96,7 +114,7 @@ export function ConversationScreen({
     if (last) mark(conversationId);
   }, [conversationId, last, mark]);
 
-  if (isPending) {
+  if (isPending && !data) {
     return (
       <Screen action={<CloseButton onPress={close} />}>
         <Spinner />
@@ -114,24 +132,46 @@ export function ConversationScreen({
     );
   }
 
-  const { header, messages } = data;
+  const { header } = data;
   const who = header.with;
   // A shop with no account here cannot read the app. The same field writes
   // the email instead, and the inquiry lands back in this thread.
   const byEmail = !header.writable;
+  const shopThread = Boolean(header.threadDealerId);
+  const peerThread = who.kind === 'person' && !shopThread;
+  const allowSell =
+    header.writable &&
+    who.kind !== 'group' &&
+    (peerThread || (shopThread && who.kind === 'person'));
+  const allowBuy =
+    header.writable &&
+    who.kind !== 'group' &&
+    (peerThread || (shopThread && who.kind === 'dealer'));
+  const dealListingId =
+    listingId ?? messages.find((message) => message.listing)?.listing?.id ?? null;
+  const canOfferDeal = header.writable && who.kind !== 'group' && !byEmail && (allowSell || allowBuy);
 
   function submit() {
     const body = value.trim();
     if (!body) return;
 
     if (byEmail) {
-      if (!listing || mail.isPending) return;
+      if (!inquiryCard || mail.isPending) {
+        if (!inquiryCard && !dealerListingPending) {
+          Alert.alert(
+            'No watches listed',
+            'This shop has nothing for sale on Graham yet, so there is no inquiry to send.',
+          );
+        }
+        return;
+      }
       mail.mutate(
-        { card: listing, message: body },
+        { card: inquiryCard, message: body },
         {
           onSuccess: () => {
             setDraft('');
             void queryClient.invalidateQueries({ queryKey: keys.conversation(conversationId) });
+            void queryClient.invalidateQueries({ queryKey: keys.conversations });
           },
           onError: (error) => Alert.alert('Could not open Gmail', error.message),
         },
@@ -186,6 +226,7 @@ export function ConversationScreen({
       <View style={[styles.fill, { paddingBottom: lift }]}>
         <FlatList
           ref={list}
+          style={styles.listView}
           data={messages}
           keyExtractor={(message) => message.id}
           contentContainerStyle={styles.list}
@@ -196,6 +237,24 @@ export function ConversationScreen({
           renderItem={({ item, index }) => {
             const watchId = item.listing?.id;
             const mine = item.sender_id === userId;
+            if (item.deal && userId) {
+              return (
+                <DealCard
+                  deal={item.deal}
+                  mine={mine}
+                  viewerId={userId}
+                  listing={item.listing}
+                  onOpenListing={watchId ? () => openWatch(watchId) : undefined}
+                  busy={respondDeal.isPending}
+                  onDecline={() =>
+                    respondDeal.mutate({ dealId: item.deal!.id, action: 'decline' })
+                  }
+                  onCancel={() =>
+                    respondDeal.mutate({ dealId: item.deal!.id, action: 'cancel' })
+                  }
+                />
+              );
+            }
             return (
               <Bubble
                 body={item.body}
@@ -209,33 +268,50 @@ export function ConversationScreen({
                     : null
                 }
                 when={endOfRun(messages, index) ? formatRelativeTime(item.created_at) : null}
-                // The pending row is the one that rises. The server's copy of it
-                // takes its place without moving, so one send is one arrival.
                 sent={isSending(item)}
               />
             );
           }}
         />
-        {!byEmail || listing ? (
-          <SendBar
-            placeholder={quoting ? 'Write about this watch' : 'Write a message'}
-            value={value}
-            onChangeText={setDraft}
-            onSend={submit}
-            busy={byEmail ? mail.isPending : send.isPending}
-            sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
-            note={
-              quoting || send.error ? (
-                <View style={styles.note}>
-                  {quoting ? (
-                    <ListingQuote listing={quoting} onPress={() => openWatch(quoting.id)} />
-                  ) : null}
-                  {send.error ? <Message text="That message did not send." tone="error" /> : null}
-                </View>
-              ) : null
-            }
-          />
-        ) : null}
+        <SendBar
+          placeholder={quoting ? 'Write about this watch' : 'Write a message'}
+          value={value}
+          onChangeText={setDraft}
+          onSend={submit}
+          busy={byEmail ? mail.isPending || dealerListingPending : send.isPending}
+          sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
+          note={
+            quoting || send.error || canOfferDeal || (byEmail && !inquiryCard) ? (
+              <View style={styles.note}>
+                {quoting ? (
+                  <ListingQuote listing={quoting} onPress={() => openWatch(quoting.id)} />
+                ) : null}
+                {byEmail && !inquiryCard && !dealerListingPending ? (
+                  <Message
+                    text="This shop has no watches listed on Graham yet."
+                    tone="error"
+                  />
+                ) : null}
+                {canOfferDeal ? (
+                  <Button
+                    label="Offer deal"
+                    variant="ghost"
+                    onPress={() => setOfferDeal(true)}
+                  />
+                ) : null}
+                {send.error ? <Message text="That message did not send." tone="error" /> : null}
+              </View>
+            ) : null
+          }
+        />
+        <OfferDealSheet
+          visible={offerDeal}
+          conversationId={conversationId}
+          listingId={dealListingId}
+          allowSell={allowSell}
+          allowBuy={allowBuy}
+          onClose={() => setOfferDeal(false)}
+        />
       </View>
     </Screen>
   );
@@ -267,6 +343,7 @@ function endOfRun(messages: ChatMessage[], index: number) {
 
 const screenStyles = (theme: Theme) => ({
   fill: { flex: 1 },
+  listView: { flex: 1 },
   list: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.lg,
