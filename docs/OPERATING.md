@@ -674,6 +674,7 @@ column for the rest.
 | `ada@graham.test` | Ada Byron, `@ada` | Buyer. Messages Bea, and Mock Desk about its watch. | `npm run mock:users` |
 | `bea@graham.test` | Bea Cole, `@bea` | The second buyer, for a buyer-to-buyer thread. | `npm run mock:users` |
 | `dealer@graham.test` | Dana Hart, `@desk` | Dealer. Owns Mock Desk and answers Ada in the app. | `npm run mock:users` |
+| `gold@graham.test` | Max Goldfinger, `@goldfinger` | Dealer. Owns seeded **Goldfinger's Vintage** (full inventory, in-app messaging). | `npm run mock:users` |
 | `seed-shop@graham.test` | none | Added Goldfinger's Vintage. Never sign in as it: the deck hides a shop's watches from whoever added it, so it shows an empty deck. | `npm run db:reset` |
 | `operator@graham.local` | none | Operator UI sign-in, password `graham-operator`. The terminal scripts import as this account. | `npm run dealers:local -- operator` |
 
@@ -686,7 +687,7 @@ Two shops exist after both commands:
 
 | Shop | Contact | State | Walks |
 | --- | --- | --- | --- |
-| Goldfinger's Vintage | `sales@goldfingersvintage.com.test` | Unclaimed, 52 watches | **Email the shop** |
+| Goldfinger's Vintage | `gold@graham.test` | Claimed by Max (`@goldfinger`), 52 watches | Shop owner in the app |
 | Mock Desk, `mock-desk.graham.test` | `dealer@graham.test` | Claimed by Dana, one watch: Fixture Message Test, `MOCK-1` | A reply in the app |
 
 `mock:users` refuses to run against hosted and is safe to repeat. It finishes

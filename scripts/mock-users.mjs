@@ -5,8 +5,8 @@
  * Mailpit, so these accounts have no password you type. `npm run db:reset`
  * drops them with everything else; run this again afterwards.
  *
- * Goldfinger's stays unclaimed. Mock Desk is a second shop, so Email the shop
- * and an in-app reply can both be walked on the same database.
+ * Goldfinger's is claimed by gold@graham.test so you can run the shop in-app.
+ * Mock Desk is a second shop for buyer↔dealer message walks.
  *
  * Run with `npm run mock:users` while `supabase start` is up.
  */
@@ -25,6 +25,9 @@ if (!config().isLocal) {
 const URL = config().url;
 const ANON = config().anonKey;
 const SERVICE = serviceKey();
+
+/** Seeded in supabase/seed.sql — Goldfinger's Vintage inventory. */
+const GOLDFINGER_DEALER_ID = 'ad0d7d71-741a-4b65-9465-641ed9cc0199';
 
 const SHOP = {
   name: 'Mock Desk',
@@ -65,6 +68,14 @@ const PEOPLE = [
     handle: 'desk',
     account_type: 'dealer',
     role: 'dealer — owns Mock Desk',
+  },
+  {
+    email: 'gold@graham.test',
+    first_name: 'Max',
+    last_name: 'Goldfinger',
+    handle: 'goldfinger',
+    account_type: 'dealer',
+    role: "dealer — owns Goldfinger's Vintage (52 watches)",
   },
 ];
 
@@ -195,6 +206,29 @@ async function ensureShop(dealerId) {
   return shopId;
 }
 
+async function claimGoldfinger(ownerId) {
+  const listed = await admin(
+    `/rest/v1/dealers?id=eq.${GOLDFINGER_DEALER_ID}&select=id,name,claimed_by`
+  );
+  if (listed.status >= 400 || !listed.body?.[0]) {
+    throw new Error(
+      `Goldfinger's is not in the database. Run npm run db:reset first: ${listed.status} ${JSON.stringify(listed.body)}`
+    );
+  }
+  if (listed.body[0].claimed_by === ownerId) return listed.body[0].id;
+
+  const claimed = await admin(`/rest/v1/dealers?id=eq.${GOLDFINGER_DEALER_ID}`, {
+    method: 'PATCH',
+    body: { claimed_by: ownerId, permission: 'approved' },
+  });
+  if (claimed.status >= 400) {
+    throw new Error(
+      `could not claim Goldfinger's: ${claimed.status} ${JSON.stringify(claimed.body)}`
+    );
+  }
+  return GOLDFINGER_DEALER_ID;
+}
+
 const made = [];
 for (const person of PEOPLE) {
   const user = await ensureUser(person);
@@ -202,8 +236,10 @@ for (const person of PEOPLE) {
   made.push({ ...person, id: user.id });
 }
 
-const dealer = made.find((person) => person.account_type === 'dealer');
-const shopId = await ensureShop(dealer.id);
+const deskOwner = made.find((person) => person.handle === 'desk');
+const goldfingerOwner = made.find((person) => person.handle === 'goldfinger');
+const shopId = await ensureShop(deskOwner.id);
+await claimGoldfinger(goldfingerOwner.id);
 
 // The buyer has to be able to open the thread the shop page opens. Signing in
 // here is the same call the app makes, without going through Mailpit.
@@ -246,6 +282,6 @@ console.log('\nLocal accounts. Log in with email — the code fills in from Mail
 for (const person of made) {
   console.log(`  ${person.email.padEnd(22)} @${person.handle.padEnd(6)} ${person.role}`);
 }
-console.log('\n  Mock Desk is claimed, with one watch: Fixture Message Test.');
-console.log("  Goldfinger's is still unclaimed, so Email the shop still works there.");
+console.log('\n  Mock Desk is claimed by dealer@graham.test (Fixture Message Test).');
+console.log("  Goldfinger's is claimed by gold@graham.test — Profile shows the shop.");
 console.log('  npm run db:reset removes these. Run npm run mock:users again.\n');
