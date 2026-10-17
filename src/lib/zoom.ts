@@ -1,4 +1,4 @@
-import { type RefObject, useState } from 'react';
+import { type RefObject, useEffect, useState } from 'react';
 import { Gesture, type GestureType } from 'react-native-gesture-handler';
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -41,11 +41,14 @@ export function usePinchZoom({
   content,
   hold = false,
   alongside,
+  resetKey,
 }: {
   frame: Box;
   content?: Box;
   hold?: boolean;
   alongside?: RefObject<GestureType | undefined>;
+  /** When this changes the pinch returns to rest — a new photograph in the roll. */
+  resetKey?: string;
 }) {
   const scale = useSharedValue(1);
   const offsetX = useSharedValue(0);
@@ -95,6 +98,14 @@ export function usePinchZoom({
     offsetY.value = withTiming(0, settle);
     scheduleOnRN(setZoomed, false);
   };
+
+  useEffect(() => {
+    if (!resetKey) return;
+    scale.value = 1;
+    offsetX.value = 0;
+    offsetY.value = 0;
+    setZoomed(false);
+  }, [resetKey, offsetX, offsetY, scale]);
 
   const begin = (focalX: number, focalY: number) => {
     'worklet';

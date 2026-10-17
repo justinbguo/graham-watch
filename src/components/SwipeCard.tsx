@@ -7,9 +7,10 @@ import {
   useState,
 } from 'react';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
   interpolate,
   scrollTo,
   useAnimatedReaction,
@@ -17,6 +18,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -24,8 +26,9 @@ import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { impact, tick } from '@/lib/haptics';
+import { setPhotoLaunchRect } from '@/lib/photoLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, motion, radius, shadow, size, space, type Theme } from '@/lib/theme';
+import { inset, motion, radius, shadow, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const FLING_VELOCITY = 800;
@@ -89,9 +92,24 @@ export const SwipeCard = forwardRef<
     /** An undone pass. The card comes back in by the edge it left, rather than
         appearing on top of the pile as if it had never gone. */
     returning?: boolean;
+    /** The deck screen owns the roll bars above the stack; only the top card syncs. */
+    photoIndex?: number;
+    onPhotoIndexChange?: (index: number) => void;
+    /** Deck catalogue line under the card. Opacity follows scroll depth. */
+    footerReveal?: SharedValue<number>;
   }
 >(function SwipeCard(
-  { card, onSwipe, onExpandPhoto, isTop, nextPhoto, returning = false },
+  {
+    card,
+    onSwipe,
+    onExpandPhoto,
+    isTop,
+    nextPhoto,
+    returning = false,
+    photoIndex: photoIndexProp,
+    onPhotoIndexChange,
+    footerReveal,
+  },
   ref
 ) {
   const styles = useThemedStyles(cardStyles);
@@ -102,6 +120,14 @@ export const SwipeCard = forwardRef<
   // cut is what says the card keeps going. A fixed aspect ratio can only
   // promise that on the screen it was chosen on.
   const [frame, setFrame] = useState({ width: 0, height: 0 });
+  const [photoIndexLocal, setPhotoIndexLocal] = useState(0);
+  const photoControlled = photoIndexProp !== undefined && onPhotoIndexChange !== undefined;
+  const photoIndex = photoControlled ? photoIndexProp : photoIndexLocal;
+  const setPhotoIndex = photoControlled ? onPhotoIndexChange : setPhotoIndexLocal;
+
+  useEffect(() => {
+    if (!photoControlled) setPhotoIndexLocal(0);
+  }, [card.id, photoControlled]);
   const photoHeight = frame.height
     ? Math.min(frame.height * PHOTO_FRACTION, frame.width * PHOTO_MAX_RATIO)
     : null;
@@ -149,6 +175,16 @@ export const SwipeCard = forwardRef<
   }, [canPreview, nextPhoto]);
   // A key fling in flight. A second press must not stack two exits on one card.
   const leaving = useRef(false);
+  const photoPlateRef = useRef<ViewType>(null);
+  const openFullScreen = useCallback(
+    (at: number) => {
+      photoPlateRef.current?.measureInWindow((x, y, width, height) => {
+        setPhotoLaunchRect({ x, y, width, height });
+        onExpandPhoto(at);
+      });
+    },
+    [onExpandPhoto],
+  );
   useEffect(() => {
     leaving.current = false;
   }, [card.id]);
@@ -218,12 +254,37 @@ export const SwipeCard = forwardRef<
     return () => element.removeEventListener('wheel', onWheel);
   }, [web, portReady, scroller, portHeight, cardHeight, contentHeight, scrollY]);
 
+  function syncFooterReveal() {
+    'worklet';
+    if (!footerReveal) return;
+    const view = portHeight.value > 0 ? portHeight.value : cardHeight.value;
+    const max = Math.max(0, contentHeight.value - view);
+    if (max <= 8) {
+      footerReveal.value = 1;
+      return;
+    }
+    footerReveal.value = interpolate(
+      scrollY.value,
+      [max * 0.55, max],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+  }
+
+  useAnimatedReaction(
+    () => [scrollY.value, contentHeight.value, portHeight.value, cardHeight.value],
+    () => {
+      syncFooterReveal();
+    }
+  );
+
   // Reanimated's scrollTo is a no-op on web, and calling it warns every frame.
   function place(offset: number) {
     'worklet';
     const view = portHeight.value > 0 ? portHeight.value : cardHeight.value;
     const next = clampScroll(offset, contentHeight.value, view);
     scrollY.value = next;
+    syncFooterReveal();
     if (web) {
       scheduleOnRN(applyWebScroll, next);
       return;
@@ -452,14 +513,23 @@ export const SwipeCard = forwardRef<
             setPortReady(true);
           }}
           contentContainerStyle={styles.content}>
-          <View style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
+          <View
+            ref={photoPlateRef}
+            style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
             <PhotoCarousel
               photos={card.photos}
               active={isTop}
-              onExpand={onExpandPhoto}
+              index={photoIndex}
+              onIndexChange={setPhotoIndex}
+              showBars={false}
+              onExpand={openFullScreen}
+              measureRef={photoPlateRef}
               alongside={panRef}
             />
-            <PhotoCaption card={card} />
+            <PhotoCaption
+              card={card}
+              onExpand={isTop ? () => openFullScreen(photoIndex) : undefined}
+            />
           </View>
 
           <View style={styles.body}>
@@ -500,7 +570,7 @@ const cardStyles = (theme: Theme) => ({
     flex: 1,
   },
   content: {
-    paddingBottom: inset.card,
+    paddingBottom: space.sm,
   },
   // Full width of the card. The height cap must not narrow it: a square ratio
   // beside a shorter height leaves the card showing on the right.
@@ -514,7 +584,7 @@ const cardStyles = (theme: Theme) => ({
   },
   body: {
     paddingHorizontal: inset.card,
-    // The photograph now carries the name, the price and the dealer, so the
+    // The photograph now carries the name, price, and year, so the
     // description opens the block under it.
     paddingTop: space.md,
   },

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TextInput, View } from 'react-native';
 
-import { IconBar, SearchField } from '@/components/SearchBar';
+import { IconBar, SearchField, searchFieldInset } from '@/components/SearchBar';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { keys } from '@/data/keys';
 import { useCreateGroup, useSuggestPeople, type PersonSuggestion } from '@/data/messages';
@@ -11,7 +11,7 @@ import { useKeyboardLift } from '@/lib/keyboard';
 import { inset, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { ConversationRow } from './ConversationRow';
+import { PersonPickRow } from './PersonPickRow';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
 
@@ -98,6 +98,7 @@ export function CreateGroup() {
         <Button
           label="Create"
           variant="ghost"
+          compact
           onPress={createGroup}
           disabled={picked.length < 2}
           loading={create.isPending}
@@ -157,7 +158,7 @@ export function CreateGroup() {
             keyExtractor={(person) => person.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const on = picked.some((person) => person.id === item.id);
               const who = {
                 kind: 'person' as const,
@@ -169,12 +170,12 @@ export function CreateGroup() {
               };
               const label = item.name ?? `@${item.handle}`;
               return (
-                <ConversationRow
-                  conversation={{ id: item.id, with: who, last: null, unread: 0 }}
-                  detail={`@${item.handle}`}
-                  label={on ? `Remove ${label}` : `Add ${label}`}
+                <PersonPickRow
+                  who={who}
                   selected={on}
                   busy={create.isPending}
+                  divider={index < shown.length - 1}
+                  label={on ? `Remove ${label}` : `Add ${label}`}
                   onOpenParty={() => openParty(who)}
                   onPress={() => toggle(item)}
                 />
@@ -202,8 +203,9 @@ const groupStyles = (theme: Theme) => ({
     flex: 1,
   },
   form: {
+    ...searchFieldInset,
     marginTop: space.sm - space.lg,
-    paddingHorizontal: inset.screen,
+    paddingBottom: space.sm,
     gap: space.sm,
   },
   chosen: {

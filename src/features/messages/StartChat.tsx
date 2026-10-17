@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 
-import { SearchField } from '@/components/SearchBar';
+import { SearchField, searchFieldInset } from '@/components/SearchBar';
 import { Centered, Message, Spinner } from '@/components/ui';
 import { keys } from '@/data/keys';
 import { useMessagePerson, useSuggestPeople, type PersonSuggestion } from '@/data/messages';
@@ -127,8 +127,10 @@ const startStyles = (_theme: Theme) => ({
     flex: 1,
   },
   query: {
+    ...searchFieldInset,
+    // Header leaves `space.lg` under the title; tuck the field to `space.sm`.
     marginTop: space.sm - space.lg,
-    paddingHorizontal: inset.screen,
+    gap: space.sm,
   },
   list: {
     flex: 1,

@@ -11,9 +11,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { PILL_HIT_SLOP } from '@/components/ActionBar';
+import { ACTION_BAR_ICON, PILL_HIT_SLOP } from '@/components/ActionBar';
 import type { VoteValue } from '@/data/exchange';
-import { motion, radius, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, motion, radius, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -85,7 +85,7 @@ function Arrow({
   const styles = useThemedStyles(voteStyles);
   const chosen = mine === direction;
   const word = direction === 1 ? 'Upvote' : 'Downvote';
-  const glyph = direction === 1 ? 'arrow-up-thin' : 'arrow-down-thin';
+  const glyph = direction === 1 ? 'arrow-up' : 'arrow-down';
 
   const nudge = useSharedValue(0);
   const nudgeStyle = useAnimatedStyle(() => ({
@@ -113,7 +113,7 @@ function Arrow({
       }}
       style={({ pressed }) => [styles.arrow, pressed && styles.pressed]}>
       <Animated.View style={nudgeStyle}>
-        <MaterialCommunityIcons name={glyph} size={size.iconSmall} color={color} />
+        <MaterialCommunityIcons name={glyph} size={ACTION_BAR_ICON} color={color} />
       </Animated.View>
     </Pressable>
   );
@@ -152,10 +152,10 @@ const voteStyles = (theme: Theme) => ({
   row: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: space.xs,
+    gap: space.sm,
     alignSelf: 'flex-start' as const,
-    paddingVertical: space.xs,
-    paddingHorizontal: space.sm,
+    minHeight: HIT_TARGET,
+    paddingHorizontal: space.md,
     borderRadius: radius.full,
     // The first capsule in the action bar, filled like the rest of them.
     backgroundColor: theme.color.fill,
@@ -163,16 +163,18 @@ const voteStyles = (theme: Theme) => ({
   arrow: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    minWidth: HIT_TARGET,
+    minHeight: HIT_TARGET,
   },
   // Two digits and a minus sign without the arrows shifting as the score
   // changes under a press. Clipped, so the number steps in from inside the
   // capsule rather than from over the arrows.
   scoreWell: {
-    minWidth: space.lg,
+    minWidth: space.xl,
     overflow: 'hidden' as const,
   },
   score: {
-    ...type.control,
+    ...type.labelStrong,
     color: theme.color.ink,
     textAlign: 'center' as const,
   },

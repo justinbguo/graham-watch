@@ -1,6 +1,7 @@
 import { ScrollView, View } from 'react-native';
 
-import { Button, ChoiceRow, Message, Spinner } from '@/components/ui';
+import { CheckRow } from '@/components/CheckRow';
+import { Button, Message, Spinner } from '@/components/ui';
 import { useFacets } from '@/data/search';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -39,7 +40,7 @@ export function BrandsStep({
     list = (
       <ScrollView style={styles.fill} contentContainerStyle={styles.choices}>
         {brandFacets.map((facet) => (
-          <ChoiceRow
+          <CheckRow
             key={facet.value}
             label={facet.label}
             count={facet.count}

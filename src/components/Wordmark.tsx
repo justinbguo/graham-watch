@@ -4,8 +4,8 @@ import { type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * The name on sign-in. The deck's title is `Graham` in `display`, the same
- * size as the other headers, so this lockup stays on the sign-in screen.
+ * The name on sign-in. Buy's header is the search bar, so this lockup
+ * stays on the sign-in screen.
  */
 export function Wordmark() {
   const styles = useThemedStyles(wordmarkStyles);

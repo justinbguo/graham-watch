@@ -1119,6 +1119,78 @@ export type Database = {
           },
         ]
       }
+      watch_catalog_sync: {
+        Row: {
+          finished_at: string | null
+          id: number
+          last_page: number | null
+          models_synced: number
+          source: string
+          total_pages: number | null
+          updated_at: string
+        }
+        Insert: {
+          finished_at?: string | null
+          id?: number
+          last_page?: number | null
+          models_synced?: number
+          source?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Update: {
+          finished_at?: string | null
+          id?: number
+          last_page?: number | null
+          models_synced?: number
+          source?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      watch_models: {
+        Row: {
+          brand_name: string
+          brand_slug: string
+          dials_id: string
+          id: string
+          model_slug: string
+          name: string
+          reference_number: string | null
+          series_name: string
+          series_slug: string
+          synced_at: string
+          thumbnail_url: string | null
+        }
+        Insert: {
+          brand_name: string
+          brand_slug: string
+          dials_id: string
+          id?: string
+          model_slug: string
+          name: string
+          reference_number?: string | null
+          series_name: string
+          series_slug: string
+          synced_at?: string
+          thumbnail_url?: string | null
+        }
+        Update: {
+          brand_name?: string
+          brand_slug?: string
+          dials_id?: string
+          id?: string
+          model_slug?: string
+          name?: string
+          reference_number?: string | null
+          series_name?: string
+          series_slug?: string
+          synced_at?: string
+          thumbnail_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1680,6 +1752,18 @@ export type Database = {
           handle: string
           id: string
           name: string
+        }[]
+      }
+      suggest_watches: {
+        Args: { p_brand?: string; p_limit?: number; p_query: string }
+        Returns: {
+          brand_name: string
+          brand_slug: string
+          id: string
+          name: string
+          reference_number: string
+          series_name: string
+          thumbnail_url: string
         }[]
       }
       sync_source_availability: {

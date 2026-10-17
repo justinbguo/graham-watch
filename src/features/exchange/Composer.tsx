@@ -16,20 +16,18 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 
 import { BODY_PLACEHOLDER, hasPrice } from './copy';
 import { IntentSelect } from './IntentSelect';
+import { centsToPriceDigits, PostPriceField, priceDigitsToCents } from './PostPriceField';
 
 const PHOTO_LIMIT = 6;
 
-function dollarsToCents(text: string): number | null {
-  const digits = text.replace(/[^0-9]/g, '');
-  if (!digits) return null;
-  const dollars = Number(digits);
-  if (!Number.isFinite(dollars) || dollars <= 0) return null;
-  return dollars * 100;
-}
-
-function dollarsFromCents(cents: number | null) {
-  if (cents == null) return '';
-  return String(cents / 100);
+function postError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('needs a photo')) return 'Add a photo of the watch, then try again.';
+  if (message.includes('needs an intent')) return 'Choose what kind of post this is.';
+  if (message.includes('sign in')) return 'Sign in to post.';
+  if (message.includes('six photos')) return 'Six photos is the most.';
+  if (message) return message;
+  return 'That post did not go up. Check the title and try again.';
 }
 
 export function Composer({
@@ -59,16 +57,20 @@ export function Composer({
     setIntent(post.intent);
     setTitle(post.title);
     setBody(post.body);
-    setPrice(dollarsFromCents(post.price_cents));
+    setPrice(centsToPriceDigits(post.price_cents));
     setPhotos(existing.data.photos.map((photo) => ({ kind: 'remote', ...photo })));
     setFilled(true);
   }, [postId, filled, existing.data]);
 
   const titleOk = title.trim().length >= 3 && title.trim().length <= 80;
   const bodyOk = body.trim().length >= 1 && body.trim().length <= 4000;
-  const cents = dollarsToCents(price);
-  const priceOk = intent === 'sell' ? cents != null : price.trim() === '' || cents != null;
-  const photosOk = photos.length > 0;
+  const cents = priceDigitsToCents(price);
+  const budgetDigits = price.trim();
+  const priceOk =
+    intent === 'sell'
+      ? cents != null
+      : !budgetDigits || cents != null; // buying budget is optional; "0" is not a budget
+  const photosOk = intent === 'buy' || photos.length > 0;
   const ready = titleOk && bodyOk && priceOk && photosOk && !save.isPending && filled;
 
   async function addPhotos() {
@@ -96,12 +98,13 @@ export function Composer({
   async function submit() {
     if (!ready) return;
     try {
+      const budget = cents != null && cents > 0 ? cents : null;
       const id = await save.mutateAsync({
         postId,
         intent,
         title,
         body,
-        priceCents: hasPrice(intent) ? cents : null,
+        priceCents: intent === 'sell' ? cents : intent === 'buy' ? budget : null,
         photos,
         removedPaths: removed,
       });
@@ -130,12 +133,7 @@ export function Composer({
           maxLength={80}
         />
         {!hasPrice(intent) ? null : (
-          <Field
-            placeholder={intent === 'buy' ? 'Budget, if you have one' : 'Price'}
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="number-pad"
-          />
+          <PostPriceField intent={intent} digits={price} onChangeDigits={setPrice} />
         )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photos}>
           {photos.map((photo, index) => (
@@ -163,7 +161,12 @@ export function Composer({
           disabled={photos.length >= PHOTO_LIMIT}
           onPress={() => void addPhotos()}
         />
-        {photos.length === 0 ? <Message text="A post needs a photo of the watch." /> : null}
+        {photos.length === 0 && intent !== 'buy' ? (
+          <Message text="A post needs a photo of the watch." />
+        ) : null}
+        {photos.length === 0 && intent === 'buy' ? (
+          <Message text="A reference photo is optional on a buying post." tone="muted" />
+        ) : null}
         <Field
           placeholder={BODY_PLACEHOLDER[intent]}
           value={body}
@@ -174,10 +177,7 @@ export function Composer({
           maxLength={4000}
         />
         {save.error ? (
-          <Message
-            text="That post did not go up. Check the title, the price, and the photos, then try again."
-            tone="error"
-          />
+          <Message text={postError(save.error)} tone="error" />
         ) : null}
         <Button
           label={postId ? 'Save' : 'Post'}

@@ -11,12 +11,29 @@ import { useThemedStyles } from '@/providers/theme';
  * the sides. Only the fill differs, so a price and an intent read as the same
  * kind of mark under the name.
  */
-export function Tag({ label, tone = 'plain' }: { label: string; tone?: 'plain' | 'money' }) {
+export function Tag({
+  label,
+  tone = 'plain',
+  size = 'default',
+}: {
+  label: string;
+  tone?: 'plain' | 'money';
+  /** `plate` matches the year line on a deck card (`titleSmall`). */
+  size?: 'default' | 'plate';
+}) {
   const styles = useThemedStyles(tagStyles);
   const money = tone === 'money';
+  const plate = size === 'plate';
   return (
-    <View style={[styles.tag, money && styles.money]}>
-      <Text style={[styles.label, money && styles.moneyLabel]}>{label}</Text>
+    <View style={[styles.tag, money && styles.money, plate && styles.plate]}>
+      <Text
+        style={[
+          styles.label,
+          money && styles.moneyLabel,
+          plate && styles.plateLabel,
+        ]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -35,6 +52,14 @@ const tagStyles = (theme: Theme) => ({
     backgroundColor: theme.color.money,
   },
   moneyLabel: {
+    color: theme.color.onMoney,
+  },
+  plate: {
+    paddingHorizontal: space.sm,
+  },
+  plateLabel: {
+    ...type.titleSmall,
+    lineHeight: type.titleSmall.fontSize + 3,
     color: theme.color.onMoney,
   },
 });

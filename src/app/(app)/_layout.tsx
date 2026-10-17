@@ -45,7 +45,10 @@ export default function AppLayout() {
             name="conversation/[conversationId]"
             options={{ presentation: 'fullScreenModal' }}
           />
-          <Stack.Screen name="photos/[listingId]" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen
+            name="photos/[listingId]"
+            options={{ presentation: 'fullScreenModal', animation: 'none' }}
+          />
           <Stack.Screen name="inquiry/[listingId]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="new-message" options={{ presentation: 'modal' }} />
           <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
@@ -54,6 +57,11 @@ export default function AppLayout() {
           <Stack.Screen name="apply" options={{ presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
           <Stack.Screen name="filters/[surface]" options={{ presentation: 'modal' }} />
+          {/* A tab switch cuts. The door on Buy should read as the thing that opened. */}
+          <Stack.Screen
+            name="search"
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
           <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
         </Stack>
       </SaveFlightProvider>

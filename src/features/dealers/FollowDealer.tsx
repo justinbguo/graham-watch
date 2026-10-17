@@ -3,16 +3,18 @@ import { Pressable, Text } from 'react-native';
 import { GlyphTurn } from '@/components/GlyphTurn';
 import { useFollows, useToggleFollow } from '@/data/follows';
 import { tick } from '@/lib/haptics';
-import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
+import { size, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+import { dealerSocialButtonStyles, dealerSocialHitSlop } from './socialButton';
+
 /**
- * One capsule, two inks. Follow is solid `text` with the word and glyph in
- * `background` — white with black type on a dark page — because it is the
- * thing to do. Following is the same shape turned inside out: a `text`
- * stroke and type on the page colour, because it is done. Same size, same
- * stroke, so the press swaps the ink and the capsule does not move.
+ * One rounded rectangle, two inks. Follow is solid `text` with the word and
+ * glyph in `background` because it is the thing to do. Following is the same
+ * shape turned inside out: a `text` stroke and type on the page colour,
+ * because it is done. Same size, same stroke, so the press swaps the ink and
+ * the button does not move.
  *
  * The answer is on the capsule you pressed: the plus turns into the check and
  * the word changes with it, on the frame the write starts. Nothing flies to
@@ -42,7 +44,7 @@ export function FollowDealer({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: following }}
-      hitSlop={(HIT_TARGET - type.body.lineHeight) / 2}
+      hitSlop={dealerSocialHitSlop()}
       onPress={() => {
         tick();
         toggle.mutate({
@@ -62,47 +64,14 @@ export function FollowDealer({
         on={following}
         from="account-plus-outline"
         to="account-check-outline"
-        size={size.iconSmall}
+        size={size.icon}
         color={following ? theme.color.text : theme.color.background}
       />
-      <Text style={[styles.label, !following && styles.solidLabel]}>{label}</Text>
+      <Text style={[styles.label, !following && styles.solidLabel]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-const followStyles = (theme: Theme) => ({
-  button: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    alignSelf: 'flex-start' as const,
-    gap: space.xs,
-    // The name beside it is `body`. The line is a little taller than the
-    // letters, which is the height the capsule should be.
-    height: type.body.lineHeight,
-    // Half the height, or the rounded end covers the word and iOS clips it.
-    paddingHorizontal: type.body.lineHeight / 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: theme.color.text,
-    backgroundColor: theme.color.background,
-  },
-  // Full width when it has a row of its own, at the same height. A
-  // `controlMin` bar was the heaviest thing on the card.
-  block: {
-    alignSelf: 'stretch' as const,
-    justifyContent: 'center' as const,
-  },
-  solid: {
-    backgroundColor: theme.color.text,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  label: {
-    ...type.control,
-    color: theme.color.text,
-  },
-  solidLabel: {
-    color: theme.color.background,
-  },
-});
+const followStyles = (theme: Theme) => dealerSocialButtonStyles(theme);

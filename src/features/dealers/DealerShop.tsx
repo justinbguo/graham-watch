@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { FilterButton } from '@/components/FilterButton';
 import { ListingRow } from '@/components/ListingRow';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { dealerPicture } from '@/features/dealers/picture';
 import { useDealerShop } from '@/data/dealers';
 import { usePrimeListing } from '@/data/listings';
 import { useOpenFilters } from '@/features/filters/open';
@@ -12,12 +14,10 @@ import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useOpenStack } from '@/lib/openStack';
-import { inset, space, type, type Theme } from '@/lib/theme';
+import { inset, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { DealerPanel } from './DealerPanel';
-import { FollowDealer } from './FollowDealer';
-import { MessageDealer } from './MessageDealer';
 
 export function DealerShop({ dealerId }: { dealerId: string }) {
   const styles = useThemedStyles(shopStyles);
@@ -56,22 +56,20 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
 
   return (
     <Screen
-      title={dealer.name}
-      titleSize="title"
-      titleExtra={
-        <View style={styles.actions}>
-          <FollowDealer dealer={dealer} />
-          <MessageDealer dealer={dealer} />
+      titleControl={
+        <View style={styles.shopTitle}>
+          <Avatar
+            url={dealer.logo_url ?? null}
+            px={size.icon}
+            fit="contain"
+            fallback={dealerPicture}
+          />
+          <Text style={styles.shopName} numberOfLines={2}>
+            {dealer.name}
+          </Text>
         </View>
       }
-      action={
-        <View style={styles.headerActions}>
-          {listings.length > 0 ? (
-            <FilterButton count={chosen} onPress={() => openFilters('shop', dealer.id)} />
-          ) : null}
-          <CloseButton onPress={close} />
-        </View>
-      }>
+      action={<CloseButton onPress={close} />}>
       <FlatList
         data={shown}
         keyExtractor={(card) => card.id}
@@ -79,7 +77,13 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.header}>
-            <DealerPanel dealer={dealer} named={false} />
+            <DealerPanel dealer={dealer} follow named={false} />
+            <View style={styles.inventoryHead}>
+              <Text style={styles.inventoryTitle}>Inventory</Text>
+              {listings.length > 0 ? (
+                <FilterButton count={chosen} onPress={() => openFilters('shop', dealer.id)} />
+              ) : null}
+            </View>
             {chosen > 0 ? (
               <Text style={styles.matched}>
                 {shown.length} of {listings.length} watches
@@ -123,17 +127,30 @@ const shopStyles = (theme: Theme) => ({
     paddingBottom: space.lg,
     gap: space.md,
   },
-  matched: {
-    ...type.caption,
-    color: theme.color.textMuted,
-  },
-  headerActions: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-  },
-  actions: {
+  shopTitle: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+    flex: 1,
+    minWidth: 0,
+  },
+  shopName: {
+    ...type.title,
+    color: theme.color.text,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  inventoryHead: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+  },
+  inventoryTitle: {
+    ...type.title,
+    color: theme.color.text,
+  },
+  matched: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
 });

@@ -73,7 +73,13 @@ export function ListingRow({
   const guard = useSwipeGuard();
 
   return (
-    <View style={[styles.row, compact && styles.rowCompact, selected && styles.rowSelected]}>
+    <View
+      style={[
+        styles.row,
+        compact && styles.rowCompact,
+        selected && styles.rowSelected,
+        compact && attention && styles.rowMarked,
+      ]}>
       {/* Gesture Handler's pressable. Wishlist rows sit under a pan, and React
           Native's Pressable never hears that tap. The photograph and the type
           open the watch separately so the action beside them can be a button
@@ -99,14 +105,6 @@ export function ListingRow({
             )}
           </Pressable>
         )}
-        {compact && attention && onMessage ? (
-          <InquireMark
-            label={`Inquire about ${formatTitle(card)}`}
-            onPress={() => {
-              if (!messagePending) guard(onMessage)?.();
-            }}
-          />
-        ) : null}
       </View>
 
       <View style={styles.details}>
@@ -165,6 +163,16 @@ export function ListingRow({
           </Pressable>
         ) : null}
       </View>
+
+      {compact && attention && onMessage ? (
+        <InquireMark
+          anchor="row"
+          label={`Inquire about ${formatTitle(card)}`}
+          onPress={() => {
+            if (!messagePending) guard(onMessage)?.();
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -195,6 +203,10 @@ const rowStyles = (theme: Theme) => ({
     paddingVertical: space.md,
     overflow: 'visible' as const,
   },
+  rowMarked: {
+    position: 'relative' as const,
+    paddingRight: size.unread + space.sm,
+  },
   // A fixed shape, close to what dealers shoot: a watch photographed upright,
   // about five by seven. The height used to come from the type beside it, so a
   // name that wrapped made the frame taller, and the same photograph was
@@ -214,7 +226,6 @@ const rowStyles = (theme: Theme) => ({
     alignSelf: 'center' as const,
     backgroundColor: theme.color.surfaceSunken,
   },
-  // The dot is positioned against this, not against the row.
   photoSlot: {
     position: 'relative' as const,
   },

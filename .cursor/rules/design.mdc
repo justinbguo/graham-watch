@@ -104,24 +104,26 @@ nobody follows.
   exist. The panel is the wordmark, one `body`/`textMuted` sentence, and the
   doors — never a second headline or a card around the doors. The doors name
   the mode: `Create account with` or `Log in with`. No heading does. A header
-  holds a word, a count, and controls; the word is already the name. `Screen`
+  holds a title or that screen's own control, a count, and controls. `Screen`
   has no slot for a mark.
-- The deck's name in capitals, or larger than the other headers. The title is
-  `Graham` in `type.display`, the same size as Search and Profile. Sign-in is
-  the one `Wordmark`: the letters `GRAHAM` in `type.wordmark`.
+- The name Graham on Buy, in capitals or otherwise. Buy's header is the search
+  bar, with the count as the subtitle. Sign-in is the one `Wordmark`: the
+  letters `GRAHAM` in `type.wordmark`.
 - A second line of header type laid under `Screen`'s title. That is its
   `subtitle`, which keeps the header's controls on the title's line.
 - A glyph beside a word that stands for the word rather than naming the same
   thing literally. Outside the tab bar and the brass check after a dealer in
   a list, a glyph belongs to a control.
 - A second type size under a card's photograph, or muted type there. About
-  this watch, Specifications, and Condition are `title` on `text`. The
-  description and the specification labels are `label`. A specification value
-  is `labelStrong`. Weight is the only difference among the rows.
-- A glyph in the specification table. A row is the label, at `size.specLabel`,
-  and the value. Reference, condition, and box and papers stay when empty and
-  read "Not stated". Case joins size and metal. Movement joins winding and
-  caliber. The year stays in the name.
+  this watch and Condition are `title` on `text`. The description and the
+  condition labels are `label`. A condition value is `labelStrong`. Weight is
+  the only difference among the rows.
+- A condition block or box-and-papers rows on the card scroll. Condition stays
+  in dealer data and the listing editor, not under the photograph on the card.
+  The year stays in the name. No specification table on the card.
+- A follow or message control on a shop that is not `dealerSocial` in
+  `src/lib/design.ts` and `socialButton.ts`. Same shape everywhere: `radius.lg`,
+  not `radius.full`.
 - A word under a tab glyph, or a tab glyph that is not `MaterialCommunityIcons`
   outline at `size.tabIcon`, except Buy (`assets/watch.svg` at that size) and
   Profile (the photograph). The current tab does not fill its glyph in.
@@ -183,17 +185,15 @@ nobody follows.
 - A badge around data. A box around a name makes it look like a control, so a
   dealer's name on a card is type and colour, not a box.
 - `brass` on a photograph. It is mixed for a warm page and muddies over a
-  scrim; the tan that marks the roll's current bar and the dealer's name on a
-  card is `onOverlayAccent`, and it is the only accent a photograph carries.
+  scrim; the roll's current bar is `onOverlayAccent`. The deck plate is white
+  type on `scrim` only.
 - Type laid straight on a photograph. It goes in `PhotoCaption`, on `scrim`.
   Half the watches are shot on white and white type vanishes on them.
 - The year in a specification line. It belongs to the name — `formatTitle`
   gives "Datejust, 1968", `formatSpecs` gives what the name did not say.
-- A third line on the card's plate. The plate is two lines. The name and the
-  year share the first when they fit; the price and the dealer are the second.
-  When the year would wrap, it leaves the name and joins that second line. The
-  year stays `titleSmall`. The price stays `bodyStrong`. The name ellipsizes
-  rather than taking a second line of its own.
+- A sheared price on the deck plate. The price is `Tag` `tone="money"` `size="plate"`
+  beside the year with a middot between them, and `fullscreen` at the end of
+  that line. Two tight rows: name, then price, year, and expand.
 - A capsule padded by less than half its height. The rounded end covers the
   label, and iOS clips it. Horizontal padding is `size.controlMin / 2`.
 - A step count on an onboarding slide. The heading is the question. The
@@ -208,7 +208,7 @@ nobody follows.
   The first slide and the age-blocked slide have no arrow.
 - **Skip for now** on an onboarding question. Continue stays off until a row
   is chosen.
-- A `ChoiceRow` label in the regular cut. It is `labelStrong`, the medium cut.
+- A `CheckRow` label in the regular cut. It is `labelStrong`, the medium cut.
 - A filled field for a name or a username on onboarding. That answer is a
   line at `type.title`, with no fill. The shop claim stays `Field`. The
   username's @ is drawn beside the line, not typed, on the same baseline, with
@@ -276,10 +276,10 @@ nobody follows.
 - Pad safe-area insets from `useSafeAreaInsets`. `SafeAreaView` reads its own
   position on screen and reports nothing for the top inside a `fullScreenModal`.
 - Give every gesture a keyboard or pointer equivalent. A mouse has no thumb.
-- Use `ChoiceRow` for selectable lists. Selection is a brass left rule and
-  quiet surface shift, never a filled pill cloud. A form field with a handful
-  of mutually exclusive answers is one dropdown, the way the composer names
-  selling, buying, or trading — not a list of rows.
+- Use `CheckRow` for multi-select lists. Selection is a trailing checkbox on
+  `motion.fast`, not a brass left rule. A form field with a handful of mutually
+  exclusive answers is one dropdown, the way the composer names selling, buying,
+  or trading — not a list of rows.
 - Render everything below a watch's price from `ListingDetails`. The deck card
   and the listing route are two frames on one block, and the frame passes in its
   own buttons.

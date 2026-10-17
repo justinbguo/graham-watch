@@ -4,8 +4,11 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Field, Message } from '@/components/ui';
 import { useUpdateDealerListing, type ListingEdits } from '@/data/dealers';
+import type { WatchCatalogHit } from '@/data/watchCatalog';
 import { Constants } from '@/lib/database';
 import { humanize } from '@/lib/format';
+
+import { WatchModelSuggest } from './WatchModelSuggest';
 import type {
   CaseMaterial,
   Complication,
@@ -139,6 +142,17 @@ export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () =
         : [...draft.complications, value]
     );
 
+  function applyCatalog(hit: WatchCatalogHit) {
+    setDraft((current) => ({
+      ...current,
+      brand: hit.brand_name,
+      model: hit.series_name,
+      reference: hit.reference_number ?? '',
+    }));
+  }
+
+  const catalogQuery = draft.reference.trim() || draft.model.trim();
+
   const currencies = CURRENCIES.includes(draft.currency)
     ? CURRENCIES
     : [draft.currency, ...CURRENCIES];
@@ -189,6 +203,7 @@ export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () =
             placeholder="1016"
           />
         </Labelled>
+        <WatchModelSuggest query={catalogQuery} brand={draft.brand} onPick={applyCatalog} />
         <View style={styles.pair}>
           <Labelled label="Year">
             <Field

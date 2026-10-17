@@ -21,7 +21,6 @@ export function ConversationRow({
   detail,
   label,
   busy = false,
-  selected,
   onOpenParty,
 }: {
   conversation: ConversationSummary;
@@ -30,8 +29,6 @@ export function ConversationRow({
   detail?: string;
   label?: string;
   busy?: boolean;
-  /** Set when this row is a choice. The brass rule is the selection. */
-  selected?: boolean;
   onOpenParty?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
@@ -39,22 +36,20 @@ export function ConversationRow({
   const name = partyName(who);
   const unread = !detail && conversation.unread > 0;
   const preview = detail ?? lastLine(conversation);
-  const choosing = selected !== undefined;
 
   return (
-    <View style={[styles.row, choosing && styles.choosing, busy && styles.busy]}>
-      {selected ? <View style={styles.rule} /> : null}
+    <View style={[styles.row, busy && styles.busy]}>
       <PartyAvatar who={who} onPress={onOpenParty} />
       <Pressable
-        accessibilityRole={choosing ? 'checkbox' : 'button'}
+        accessibilityRole="button"
         accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
-        accessibilityState={{ disabled: busy, busy, checked: selected }}
+        accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={onPress}
         style={({ pressed }) => [styles.rowPress, pressed && !busy && styles.pressed]}>
         <View style={styles.copy}>
           <View style={styles.line}>
-            <Text style={[styles.name, selected && styles.chosen]} numberOfLines={1}>
+            <Text style={styles.name} numberOfLines={1}>
               {name}
             </Text>
             {!detail && conversation.last ? (
@@ -90,17 +85,6 @@ const rowStyles = (theme: Theme) => ({
     gap: space.md,
     paddingVertical: space.md,
   },
-  choosing: {
-    paddingLeft: space.sm,
-  },
-  rule: {
-    position: 'absolute' as const,
-    left: 0,
-    top: space.sm,
-    bottom: space.sm,
-    width: size.rule,
-    backgroundColor: theme.color.brass,
-  },
   rowPress: {
     flex: 1,
     minWidth: 0,
@@ -125,9 +109,6 @@ const rowStyles = (theme: Theme) => ({
     ...type.labelStrong,
     color: theme.color.text,
     flexShrink: 1,
-  },
-  chosen: {
-    color: theme.color.brass,
   },
   when: {
     ...type.caption,

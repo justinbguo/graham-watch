@@ -1,11 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
-import { router, usePathname } from 'expo-router';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Platform, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
+import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
 import { FilterButton } from '@/components/FilterButton';
 import { SearchDoor } from '@/components/SearchBar';
+import { PhotoRollBars } from '@/components/PhotoRollBars';
 import { SwipeCard, type SwipeCardHandle } from '@/components/SwipeCard';
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
@@ -19,8 +20,9 @@ import { activeCount } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
+import { setSearchLaunchRect } from '@/lib/searchLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { GUEST_SWIPE_BUDGET, inset, motion, space, type Theme } from '@/lib/theme';
+import { GUEST_SWIPE_BUDGET, inset, layout, motion, space, type, type Theme } from '@/lib/theme';
 import { useWebArrowSwipe } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -54,6 +56,18 @@ export default function Deck() {
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
   // The card an undo just put back, so it can come in by the edge it left.
   const [returning, setReturning] = useState<string | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const topListing = cards[0];
+  const footerReveal = useSharedValue(0);
+
+  useEffect(() => {
+    setPhotoIndex(0);
+    footerReveal.value = 0;
+  }, [topListing?.id, footerReveal]);
+
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: footerReveal.value,
+  }));
 
   // Where the card is on screen, which is the stage it fills. Measured here
   // rather than in the card: the card is mid-gesture and about to unmount, and
@@ -134,7 +148,7 @@ export default function Deck() {
 
   if (isPending) {
     return (
-      <Screen title="Graham" inTabs>
+      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
         <Spinner />
       </Screen>
     );
@@ -142,8 +156,7 @@ export default function Deck() {
 
   if (error) {
     return (
-      <Screen title="Graham" action={actions} inTabs>
-        <DeckSearch />
+      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
@@ -154,8 +167,7 @@ export default function Deck() {
 
   if (cards.length === 0) {
     return (
-      <Screen title="Graham" action={actions} inTabs>
-        <DeckSearch />
+      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -190,8 +202,7 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen title="Graham" subtitle={remaining} action={actions} width="grid" inTabs>
-        <DeckSearch />
+      <Screen titleControl={<DeckHeader actions={actions} />} width="grid" inTabs>
         <Animated.View key="grid" entering={FadeIn.duration(motion.base)} style={styles.view}>
           <DeckGrid
             cards={cards}
@@ -201,6 +212,7 @@ export default function Deck() {
               open('listing/[listingId]', { listingId: card.id }, `/listing/${card.id}`);
             }}
           />
+          {remaining ? <Text style={styles.deckFooter}>{remaining}</Text> : null}
         </Animated.View>
       </Screen>
     );
@@ -210,14 +222,24 @@ export default function Deck() {
   const visible = cards.slice(0, 3).reverse();
 
   return (
-    <Screen title="Graham" subtitle={remaining} action={actions} width="card" inTabs>
-      <DeckSearch />
+    <Screen
+      titleControl={<DeckHeader actions={actions} />}
+      subhead={
+        topListing.photos.length > 1 ? (
+          <View style={styles.roll}>
+            <PhotoRollBars photos={topListing.photos} index={photoIndex} placement="deck" />
+          </View>
+        ) : undefined
+      }
+      width="card"
+      inTabs>
       {/* The two views trade places rather than cutting. Entering only: the
           old view is gone the frame the state changes, so there is nothing to
           fade out, and the new one arrives over the page rather than over a
           corpse of the last one. */}
       <Animated.View key="cards" entering={FadeIn.duration(motion.base)} style={styles.view}>
-        <View ref={stage} onLayout={measureStage} style={styles.stage}>
+        <View style={styles.deck}>
+          <View ref={stage} onLayout={measureStage} style={styles.stage}>
           {visible.map((card, index) => {
             const onTop = index === visible.length - 1;
             return (
@@ -226,6 +248,8 @@ export default function Deck() {
                 ref={onTop ? topCard : undefined}
                 card={card}
                 isTop={onTop}
+                photoIndex={onTop ? photoIndex : undefined}
+                onPhotoIndexChange={onTop ? setPhotoIndex : undefined}
                 returning={card.id === returning}
                 nextPhoto={onTop ? cards[1]?.photos[0]?.url : undefined}
                 onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
@@ -237,9 +261,16 @@ export default function Deck() {
                     `/photos/${card.id}?index=${photoIndex}`
                   );
                 }}
+                footerReveal={onTop ? footerReveal : undefined}
               />
             );
           })}
+          </View>
+          {remaining ? (
+            <Animated.Text pointerEvents="none" style={[styles.deckFooter, styles.deckFooterFloat, footerStyle]}>
+              {remaining}
+            </Animated.Text>
+          ) : null}
         </View>
       </Animated.View>
     </Screen>
@@ -255,22 +286,36 @@ export default function Deck() {
  * line is the catalogue alone. A swipe drops the first number in the same
  * moment the card leaves, and the line becomes "147 of 148". The brass count
  * on the Filters button beside it says how many choices made a filtered
- * first number small; naming the filters here as well wrapped to two lines
- * for a fact already on screen.
+ * first number small. The line sits under the card stack and fades in near
+ * the bottom of the scroll; it is hidden until then.
  *
  * Nothing until the count lands. The old line counted the deck in hand, which
  * capped at `DECK_LIMIT` and said "20+" — a number that was never the answer
  * to either question.
  */
-/** Opens Search with its field focused. */
-function DeckSearch() {
+/** Search and deck controls on one row so the split stays 60 / 40. */
+function DeckHeader({ actions }: { actions: ReactNode }) {
+  const open = useOpenStack();
   const styles = useThemedStyles(deckStyles);
+  const door = useRef<View>(null);
+  const searchWidth = `${layout.deckHeaderSearchShare * 100}%` as const;
   return (
-    <View style={styles.search}>
-      <SearchDoor
-        accessibilityLabel="Search brand, model or reference"
-        onPress={() => router.navigate({ pathname: '/search', params: { compose: '1' } })}
-      />
+    <View style={styles.headerBar}>
+      <View
+        ref={door}
+        collapsable={false}
+        style={[styles.searchSlot, { width: searchWidth }]}>
+        <SearchDoor
+          accessibilityLabel="Search brand, model or reference"
+          onPress={() => {
+            door.current?.measureInWindow((x, y, width, height) => {
+              setSearchLaunchRect({ x, y, width, height });
+              open('search', { compose: '1' }, '/search?compose=1');
+            });
+          }}
+        />
+      </View>
+      <View style={styles.actionsSlot}>{actions}</View>
     </View>
   );
 }
@@ -286,25 +331,59 @@ function tally(counts: ListingCounts | undefined, filtered: boolean) {
 }
 
 const deckStyles = (_theme: Theme) => ({
+  headerBar: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    width: '100%' as const,
+    gap: space.md,
+    marginBottom: space.sm,
+  },
+  searchSlot: {
+    flexShrink: 0,
+    minWidth: 0,
+  },
+  actionsSlot: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-end' as const,
+    gap: space.xs,
+    minWidth: 0,
+  },
   actions: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: space.sm,
-  },
-  // The header already pads `space.lg` under the count. Pull up so the door
-  // sits one `space.sm` under "N watches available", the way the real field
-  // sits under the Search title.
-  search: {
-    marginTop: space.sm - space.lg,
-    marginHorizontal: inset.screen,
-    marginBottom: space.md,
+    gap: space.xs,
   },
   view: {
     flex: 1,
   },
+  roll: {
+    paddingHorizontal: inset.screen,
+    alignItems: 'center' as const,
+    // `Screen` headed padding is for the title block; tuck the roll toward the stack.
+    marginBottom: -space.md,
+  },
+  deck: {
+    flex: 1,
+    paddingBottom: layout.deckTallyBand,
+  },
   stage: {
     flex: 1,
     marginHorizontal: inset.screen,
-    marginBottom: inset.screen,
+  },
+  deckFooter: {
+    ...type.caption,
+    color: _theme.color.textMuted,
+    textAlign: 'center' as const,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
+    marginHorizontal: inset.screen,
+  },
+  deckFooterFloat: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
