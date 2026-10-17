@@ -289,10 +289,15 @@ indicator: a bar between the columns would read as a seam, and the center row
 is the position.
 
 The notification slide is the one exception in behavior, not shape. Continue
-opens the OS permission prompt on iOS and Android, then finishes onboarding;
-Not now finishes without it. Android creates its notification channel before
-requesting permission, because Android 13 will not show the prompt otherwise.
-Web records no permission because `expo-notifications` has no browser API.
+opens the OS permission prompt on iOS and Android; Not now records no
+permission. Android creates its notification channel before requesting
+permission, because Android 13 will not show the prompt otherwise. Web records
+no permission because `expo-notifications` has no browser API.
+
+On native builds with RevenueCat configured, the notification answer is held
+until the Graham Pro paywall screen completes (subscribe, restore, or Not now);
+then onboarding writes `onboarded_at`. Without RevenueCat keys, web, or demo,
+the same slide still finishes onboarding immediately after the notification choice.
 
 ### Sign-in is a page with doors on it
 

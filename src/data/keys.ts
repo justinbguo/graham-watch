@@ -28,6 +28,8 @@ export const keys = {
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,
   dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
+  /** One live watch for emailing an unclaimed shop when the thread names none yet. */
+  dealerInquiryListing: (dealerId: string) => ['dealer-inquiry-listing', dealerId] as const,
   dealerPreview: (dealerId: string) => ['dealer-preview', dealerId] as const,
   exchange: ['exchange'] as const,
   exchangePost: (postId: string) => ['exchange-post', postId] as const,
@@ -44,4 +46,7 @@ export const keys = {
   conversation: (conversationId: string) => ['conversation', conversationId] as const,
   sourcing: ['sourcing'] as const,
   sourcingRequest: (requestId: string) => ['sourcing-request', requestId] as const,
+  subscription: () => ['subscription'] as const,
+  customerInfo: () => ['customer-info'] as const,
+  offerings: () => ['offerings'] as const,
 };

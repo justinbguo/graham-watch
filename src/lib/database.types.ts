@@ -34,6 +34,106 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_deals: {
+        Row: {
+          amount_cents: number
+          buyer_id: string
+          conversation_id: string
+          created_at: string
+          currency: string
+          fee_bps: number
+          fee_cents: number | null
+          id: string
+          listing_id: string | null
+          message_id: string | null
+          payment_intent_id: string | null
+          payment_provider: string | null
+          proposed_by: string
+          seller_id: string
+          status: Database["public"]["Enums"]["deal_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          buyer_id: string
+          conversation_id: string
+          created_at?: string
+          currency?: string
+          fee_bps?: number
+          fee_cents?: number | null
+          id?: string
+          listing_id?: string | null
+          message_id?: string | null
+          payment_intent_id?: string | null
+          payment_provider?: string | null
+          proposed_by: string
+          seller_id: string
+          status?: Database["public"]["Enums"]["deal_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          buyer_id?: string
+          conversation_id?: string
+          created_at?: string
+          currency?: string
+          fee_bps?: number
+          fee_cents?: number | null
+          id?: string
+          listing_id?: string | null
+          message_id?: string | null
+          payment_intent_id?: string | null
+          payment_provider?: string | null
+          proposed_by?: string
+          seller_id?: string
+          status?: Database["public"]["Enums"]["deal_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_deals_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_deals_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_deals_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_deals_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_deals_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_deals_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_members: {
         Row: {
           conversation_id: string
@@ -853,6 +953,7 @@ export type Database = {
           body: string
           conversation_id: string
           created_at: string
+          deal_id: string | null
           id: string
           listing_id: string | null
           sender_id: string
@@ -862,6 +963,7 @@ export type Database = {
           body: string
           conversation_id: string
           created_at?: string
+          deal_id?: string | null
           id?: string
           listing_id?: string | null
           sender_id: string
@@ -871,6 +973,7 @@ export type Database = {
           body?: string
           conversation_id?: string
           created_at?: string
+          deal_id?: string | null
           id?: string
           listing_id?: string | null
           sender_id?: string
@@ -882,6 +985,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_deals"
             referencedColumns: ["id"]
           },
           {
@@ -1270,6 +1380,7 @@ export type Database = {
           person_id: string
           person_name: string
           person_number: number
+          thread_dealer_id: string
           writable: boolean
         }[]
       }
@@ -1308,9 +1419,23 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      create_conversation_deal: {
+        Args: {
+          p_amount_cents: number
+          p_conversation_id: string
+          p_currency?: string
+          p_listing_id?: string
+          p_proposer_is_seller?: boolean
+        }
+        Returns: string
+      }
       create_group: {
         Args: { p_member_ids: string[]; p_title?: string }
         Returns: string
+      }
+      deal_fee_cents: {
+        Args: { p_amount_cents: number; p_fee_bps: number }
+        Returns: number
       }
       dealer_accounts: {
         Args: never
@@ -1409,6 +1534,10 @@ export type Database = {
       exchange_vote: {
         Args: { p_comment_id: string; p_post_id: string; p_value: number }
         Returns: undefined
+      }
+      format_deal_amount: {
+        Args: { p_amount_cents: number; p_currency: string }
+        Returns: string
       }
       get_deck: {
         Args: { p_limit?: number }
@@ -1648,6 +1777,10 @@ export type Database = {
         Returns: number
       }
       require_operator: { Args: never; Returns: undefined }
+      respond_to_conversation_deal: {
+        Args: { p_action: string; p_deal_id: string }
+        Returns: undefined
+      }
       save_exchange_post: {
         Args: {
           p_body?: string
@@ -1832,6 +1965,14 @@ export type Database = {
         | "minute_repeater"
         | "jump_hour"
         | "skeleton"
+      deal_status:
+        | "proposed"
+        | "accepted"
+        | "funded"
+        | "completed"
+        | "declined"
+        | "cancelled"
+        | "expired"
       dealer_permission: "pending" | "approved" | "revoked"
       dial_color:
         | "black"
@@ -2053,6 +2194,15 @@ export const Constants = {
         "minute_repeater",
         "jump_hour",
         "skeleton",
+      ],
+      deal_status: [
+        "proposed",
+        "accepted",
+        "funded",
+        "completed",
+        "declined",
+        "cancelled",
+        "expired",
       ],
       dealer_permission: ["pending", "approved", "revoked"],
       dial_color: [

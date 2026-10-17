@@ -59,7 +59,7 @@ const tagStyles = (theme: Theme) => ({
   },
   plateLabel: {
     ...type.titleSmall,
-    lineHeight: type.titleSmall.fontSize + 3,
+    lineHeight: type.titleSmall.lineHeight,
     color: theme.color.onMoney,
   },
 });

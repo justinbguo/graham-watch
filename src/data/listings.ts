@@ -215,3 +215,25 @@ export function useListing(listingId: string) {
     enabled: Boolean(listingId),
   });
 }
+
+/** Unclaimed shops only accept email about a specific watch. This picks one when the thread has none yet. */
+export function useDealerInquiryListing(dealerId: string | null) {
+  return useQuery({
+    queryKey: keys.dealerInquiryListing(dealerId ?? 'none'),
+    enabled: Boolean(dealerId),
+    queryFn: async (): Promise<DeckCard | null> => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('dealer_id', dealerId!)
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const [card] = await hydrate([data]);
+      return card ?? null;
+    },
+  });
+}

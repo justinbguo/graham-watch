@@ -48,6 +48,11 @@ try {
 // deck looks the same either way — so the answer belongs here, on every start.
 function announce(where) {
   console.log(`  app → ${where}`);
+  if (env.EXPO_PUBLIC_REVENUECAT_API_KEY) {
+    console.log('  subscriptions → RevenueCat (Test Store key)');
+  } else if (env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY || env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY) {
+    console.log('  subscriptions → RevenueCat (store keys)');
+  }
 }
 
 if (!LOCAL_HOSTS.has(host)) {

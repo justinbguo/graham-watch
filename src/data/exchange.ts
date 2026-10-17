@@ -4,6 +4,13 @@ import type { Database } from '@/lib/database';
 import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
+import {
+  exchangeShowcaseAuthor,
+  exchangeShowcaseCollectorPosts,
+  exchangeShowcasePosts,
+  exchangeShowcaseThread,
+  isExchangeShowcasePost,
+} from './exchangeShowcase';
 import { keys } from './keys';
 
 export type ExchangeIntent = Database['public']['Enums']['exchange_intent'];
@@ -96,7 +103,10 @@ export function useCollectorProfile(userId: string | null) {
     queryKey: keys.collectorProfile(userId ?? 'none'),
     enabled: Boolean(userId),
     queryFn: async (): Promise<ExchangeAuthor | null> => {
-      if (isDemo || !userId) return null;
+      if (!userId) return null;
+      const showcase = exchangeShowcaseAuthor(userId);
+      if (showcase) return showcase;
+      if (isDemo) return null;
       const { data, error } = await supabase.rpc('collector_profile', { p_user_id: userId });
       if (error) throw error;
       const row = data?.[0];
@@ -158,7 +168,10 @@ export function useCollectorPosts(userId: string | null) {
     queryKey: keys.collectorPosts(userId ?? 'none'),
     enabled: Boolean(userId),
     queryFn: async (): Promise<CollectorPost[]> => {
-      if (isDemo || !userId) return [];
+      if (!userId) return [];
+      const showcase = exchangeShowcaseCollectorPosts(userId);
+      if (showcase.length) return showcase;
+      if (isDemo) return [];
       const posts = await supabase
         .from('exchange_posts')
         .select('id, intent, title, price_cents, currency, body, created_at')
@@ -203,10 +216,10 @@ export function useExchangeFeed() {
   return useQuery({
     queryKey: keys.exchange,
     queryFn: async (): Promise<ExchangePost[]> => {
-      if (isDemo) return [];
+      if (isDemo) return exchangeShowcasePosts();
       const { data, error } = await supabase.rpc('exchange_feed');
       if (error) throw error;
-      return (data ?? []).map((row) => ({
+      const live = (data ?? []).map((row) => ({
         id: row.id,
         intent: row.intent,
         title: row.title,
@@ -220,6 +233,10 @@ export function useExchangeFeed() {
         my_vote: Number(row.my_vote) as VoteValue,
         cover_url: row.cover_path ? exchangePhotoUrl(row.cover_path) : null,
       }));
+      const examples = exchangeShowcasePosts().filter(
+        (post) => !live.some((row) => row.id === post.id),
+      );
+      return [...live, ...examples];
     },
   });
 }
@@ -238,7 +255,10 @@ export function useExchangePost(postId: string | null) {
     queryKey: keys.exchangePost(postId ?? 'none'),
     enabled: Boolean(postId),
     queryFn: async (): Promise<ExchangeThread> => {
-      if (isDemo || !postId) return EMPTY_THREAD;
+      if (!postId) return EMPTY_THREAD;
+      const showcase = exchangeShowcaseThread(postId);
+      if (showcase) return showcase;
+      if (isDemo) return EMPTY_THREAD;
       const [post, author_, comments, photos] = await Promise.all([
         supabase.from('exchange_posts').select('*').eq('id', postId).maybeSingle(),
         // The post's row is readable; its author's profile is not. The
@@ -371,6 +391,7 @@ export function useCastExchangeVote() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { postId: string; commentId?: string; value: VoteValue }) => {
+      if (isExchangeShowcasePost(input.postId)) return;
       if (isDemo) throw new Error('Exchange needs a signed-in account.');
       // A function, not a write: changing direction has to upsert against a
       // partial unique index, which the client cannot name.
@@ -418,6 +439,7 @@ export function useCreateExchangeComment(userId: string, postId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { body: string; parentId: string | null }) => {
+      if (isExchangeShowcasePost(postId)) return;
       if (isDemo) throw new Error('Exchange needs a signed-in account.');
       const { error } = await supabase.from('exchange_comments').insert({
         post_id: postId,

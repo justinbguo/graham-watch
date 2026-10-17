@@ -24,7 +24,7 @@ export function PhotoCaption({
 
   return (
     <View pointerEvents="box-none" style={[styles.caption, gradient]}>
-      <View pointerEvents="none" style={styles.stack}>
+      <View pointerEvents="none" style={styles.namePlate}>
         <Text style={styles.name} numberOfLines={2}>
           {name}
         </Text>
@@ -39,20 +39,22 @@ export function PhotoCaption({
             </>
           ) : null}
         </View>
-        {onExpand ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View photos full screen"
-            hitSlop={space.sm}
-            onPress={onExpand}
-            style={({ pressed }) => [styles.expand, pressed && styles.expandPressed]}>
-            <MaterialCommunityIcons
-              name="fullscreen"
-              size={size.icon}
-              color={theme.color.onOverlay}
-            />
-          </Pressable>
-        ) : null}
+        <View style={styles.expandSlot}>
+          {onExpand ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View photos full screen"
+              hitSlop={space.sm}
+              onPress={onExpand}
+              style={({ pressed }) => [styles.expand, pressed && styles.expandPressed]}>
+              <MaterialCommunityIcons
+                name="fullscreen"
+                size={size.icon}
+                color={theme.color.onOverlay}
+              />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -60,10 +62,11 @@ export function PhotoCaption({
 
 const caps = {
   textTransform: 'uppercase' as const,
-  letterSpacing: 0,
 };
 
-const tightLine = (fontSize: number) => fontSize + 2;
+/** One line on the plate. Fixed multiples keep the block from jumping between watches. */
+const titleLine = type.plateTitle.lineHeight;
+const metaLine = type.titleSmall.lineHeight;
 
 const gradient = Platform.select<ViewStyle>({
   web: { backgroundImage: scrim } as ViewStyle,
@@ -81,11 +84,13 @@ const captionStyles = (theme: Theme) => ({
     paddingBottom: space.md,
     zIndex: 2,
     alignItems: 'flex-start' as const,
-  },
-  stack: {
-    alignItems: 'flex-start' as const,
     gap: stack.tight,
+  },
+  /** Two lines tall; single-line names sit on the bottom line above the price. */
+  namePlate: {
     alignSelf: 'stretch' as const,
+    minHeight: titleLine * 2,
+    justifyContent: 'flex-end' as const,
   },
   meta: {
     flexDirection: 'row' as const,
@@ -93,6 +98,7 @@ const captionStyles = (theme: Theme) => ({
     alignSelf: 'stretch' as const,
     justifyContent: 'space-between' as const,
     gap: space.sm,
+    minHeight: metaLine,
   },
   metaStart: {
     flexDirection: 'row' as const,
@@ -100,6 +106,11 @@ const captionStyles = (theme: Theme) => ({
     flexWrap: 'wrap' as const,
     flex: 1,
     minWidth: 0,
+  },
+  expandSlot: {
+    width: HIT_TARGET,
+    height: HIT_TARGET,
+    flexShrink: 0,
   },
   expand: {
     width: HIT_TARGET,
@@ -115,14 +126,13 @@ const captionStyles = (theme: Theme) => ({
   name: {
     ...type.plateTitle,
     ...caps,
-    lineHeight: tightLine(type.plateTitle.fontSize),
     color: theme.color.onOverlay,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,
   },
   sep: {
     ...type.titleSmall,
-    lineHeight: tightLine(type.titleSmall.fontSize),
+    lineHeight: metaLine,
     color: theme.color.onOverlayFaint,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,
@@ -130,7 +140,7 @@ const captionStyles = (theme: Theme) => ({
   year: {
     ...type.titleSmall,
     ...caps,
-    lineHeight: tightLine(type.titleSmall.fontSize),
+    lineHeight: metaLine,
     color: theme.color.onOverlay,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,

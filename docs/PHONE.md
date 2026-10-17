@@ -64,6 +64,31 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 
 Do **not** set `EXPO_PUBLIC_DEMO` on `production`. Then:
 
+### Subscriptions (RevenueCat)
+
+In-app purchases need a **development build** (`npm run start:dev` or an EAS
+build). Expo Go runs RevenueCat in preview mode only; real purchases need a dev
+client or store binary.
+
+1. Create a RevenueCat project and add the iOS and Android apps (bundle id
+   `com.grahamwatch.app`).
+2. In RevenueCat Test Store (or App Store Connect / Play later), add products
+   `monthly` and `yearly`, attach them to entitlement **`graham_pro`**, and set a
+   **current** offering with a paywall.
+3. Set keys on EAS or `.env.local`:
+
+   ```
+   EXPO_PUBLIC_REVENUECAT_API_KEY=test_...   # Test Store
+   # or production:
+   EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=appl_...
+   EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=goog_...
+   ```
+
+   See [REVENUECAT](REVENUECAT.md).
+
+Without those keys, onboarding skips the paywall and finishes after
+notifications (same as web).
+
 ```
 npx eas-cli@latest build --profile production --platform all
 npx eas-cli@latest submit --platform ios    # TestFlight

@@ -13,8 +13,9 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
  * One pill per photograph. On the buy deck the track is narrower than the card
- * column and sits between the catalogue count and the stack. On a photograph
- * the track is full width on `scrimTop`.
+ * column and sits between the catalogue count and the stack. On a listing hero
+ * the track is full width on `scrimTop`. In the full-screen viewer it uses the
+ * same track width as the deck and sits in the layout row above the image.
  */
 export function PhotoRollBars({
   photos,
@@ -24,19 +25,20 @@ export function PhotoRollBars({
 }: {
   photos: DeckPhoto[];
   index: number;
-  placement: 'deck' | 'overlay';
+  placement: 'deck' | 'overlay' | 'viewer';
   overlayTop?: number;
 }) {
   const styles = useThemedStyles(barStyles);
   if (photos.length <= 1) return null;
 
   const overlay = placement === 'overlay';
+  const viewer = placement === 'viewer';
 
   return (
     <View
       style={[
         styles.row,
-        overlay ? styles.rowOverlay : styles.rowDeck,
+        overlay ? styles.rowOverlay : viewer ? styles.rowViewer : styles.rowDeck,
         overlay && overlayTop != null ? { top: overlayTop } : null,
         overlay ? topFade : null,
       ]}
@@ -48,7 +50,13 @@ export function PhotoRollBars({
   );
 }
 
-function RollSegment({ active, placement }: { active: boolean; placement: 'deck' | 'overlay' }) {
+function RollSegment({
+  active,
+  placement,
+}: {
+  active: boolean;
+  placement: 'deck' | 'overlay' | 'viewer';
+}) {
   const theme = useTheme();
   const styles = useThemedStyles(barStyles);
   const deck = placement === 'deck';
@@ -101,6 +109,14 @@ const barStyles = (theme: Theme) => ({
     width: `${layout.photoRollTrackShare * 100}%` as const,
     paddingHorizontal: 0,
     gap: space.sm,
+  },
+  /** Full-screen viewer: deck track width, overlay inks, glued above the photograph. */
+  rowViewer: {
+    alignSelf: 'center' as const,
+    width: `${layout.photoRollTrackShare * 100}%` as const,
+    paddingHorizontal: 0,
+    gap: space.sm,
+    paddingBottom: space.sm,
   },
   rowOverlay: {
     position: 'absolute' as const,
