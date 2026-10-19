@@ -1,49 +1,91 @@
-import { useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CheckRow } from '@/components/CheckRow';
-import { Button, Field, Message } from '@/components/ui';
-import { useCreateDeal } from '@/data/deals';
-import { feeCentsFromBps, formatCents, parseDollarsToCents } from '@/lib/money';
+import { SocialButton } from '@/components/SocialButton';
+import { Message } from '@/components/ui';
+import { useCreateDeal, useReviseDeal } from '@/data/deals';
+import type { MessageListing } from '@/data/messages';
+import {
+  centsToPriceDigits,
+  PostPriceField,
+  priceDigitsToCents,
+} from '@/features/exchange/PostPriceField';
+import { feeCentsFromBps, formatCents } from '@/lib/money';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
+
+import { DealListingDelta } from './DealListingDelta';
+import { ListingQuote } from './ListingQuote';
+
+const FEE_BPS = 500;
 
 export function OfferDealSheet({
   visible,
   conversationId,
-  listingId,
-  allowSell,
-  allowBuy,
+  listing,
+  editDeal,
+  onOpenListing,
   onClose,
 }: {
   visible: boolean;
   conversationId: string;
-  listingId?: string | null;
-  allowSell: boolean;
-  allowBuy: boolean;
+  listing: MessageListing;
+  /** When set, Confirm updates this open offer instead of creating a new deal. */
+  editDeal?: { id: string; amountCents: number } | null;
+  onOpenListing: () => void;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(sheetStyles);
   const create = useCreateDeal(conversationId);
-  const [amount, setAmount] = useState('');
-  const [role, setRole] = useState<'sell' | 'buy'>(allowSell ? 'sell' : 'buy');
+  const revise = useReviseDeal(conversationId);
+  const [digits, setDigits] = useState('');
+  const editing = Boolean(editDeal);
 
-  const cents = parseDollarsToCents(amount);
-  const fee = cents ? feeCentsFromBps(cents, 500) : null;
+  useEffect(() => {
+    if (!visible) {
+      setDigits('');
+      return;
+    }
+    const seed = editDeal?.amountCents ?? listing.priceCents ?? null;
+    setDigits(centsToPriceDigits(seed));
+  }, [visible, listing.priceCents, editDeal?.amountCents, editDeal?.id]);
 
-  const submit = () => {
-    if (!cents) return;
-    const proposerIsSeller = role === 'sell';
-    create.mutate(
-      { amountCents: cents, proposerIsSeller, listingId },
-      {
-        onSuccess: () => {
-          setAmount('');
-          onClose();
+  const cents = priceDigitsToCents(digits);
+  const fee = cents ? feeCentsFromBps(cents, FEE_BPS) : null;
+  const net = cents && fee !== null ? cents - fee : null;
+
+  const saving = create.isPending || revise.isPending;
+  const saveError = create.error ?? revise.error;
+
+  const confirmSend = () => {
+    if (!cents || fee === null || net === null) return;
+    const title = editing ? 'Update this offer?' : 'Send this offer?';
+    const confirmLabel = editing ? 'Update offer' : 'Send offer';
+    Alert.alert(
+      title,
+      `${formatCents(cents)} on ${listing.title}.\nYou receive ${formatCents(net)} after ${formatCents(fee)} commission.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: confirmLabel,
+          onPress: () => {
+            const onSuccess = () => {
+              setDigits('');
+              onClose();
+            };
+            if (editing && editDeal) {
+              revise.mutate({ dealId: editDeal.id, amountCents: cents }, { onSuccess });
+            } else {
+              create.mutate(
+                { amountCents: cents, proposerIsSeller: true, listingId: listing.id },
+                { onSuccess },
+              );
+            }
+          },
         },
-      },
+      ],
     );
   };
 
@@ -51,53 +93,69 @@ export function OfferDealSheet({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + inset.screen }]}>
-        <Text style={styles.heading}>Offer a deal</Text>
-        <Message
-          text="Name a price. The buyer pays into the deal with Apple Pay when that ships; Graham takes a fee at settlement."
-        />
-        {allowSell ? (
-          <CheckRow
-            label="I am offering to sell"
-            selected={role === 'sell'}
-            onPress={() => setRole('sell')}
-          />
-        ) : null}
-        {allowBuy ? (
-          <CheckRow
-            label="I am offering to buy"
-            selected={role === 'buy'}
-            onPress={() => setRole('buy')}
-          />
-        ) : null}
-        <Text style={styles.fieldLabel}>Amount (USD)</Text>
-        <Field
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-          placeholder="12500"
-        />
-        {fee !== null && cents ? (
-          <Text style={styles.fee}>
-            Estimated Graham fee (5%): {formatCents(fee)}
+        <Text style={styles.heading}>{editing ? 'Edit offer' : 'Offer a deal'}</Text>
+        <ListingQuote listing={listing} onPress={onOpenListing} layout="card" />
+
+        <PostPriceField intent="sell" digits={digits} onChangeDigits={setDigits} showKicker={false} />
+
+        {cents ? (
+          <DealListingDelta offerCents={cents} listPriceCents={listing.priceCents} />
+        ) : listing.priceCents ? (
+          <Text style={styles.listedOnly}>
+            Listed {formatCents(listing.priceCents)}
           </Text>
         ) : null}
-        {create.error ? <Message text={create.error.message} tone="error" /> : null}
+
+        {cents && fee !== null && net !== null ? (
+          <View style={styles.expenses}>
+            <ExpenseLine label="Offer" amount={formatCents(cents)} />
+            <ExpenseLine label="Graham commission (5%)" amount={formatCents(fee)} />
+            <ExpenseLine label="You receive" amount={formatCents(net)} strong />
+          </View>
+        ) : null}
+
+        {saveError ? <Message text={saveError.message} tone="error" /> : null}
         <View style={styles.actions}>
-          <Button label="Send offer" loading={create.isPending} disabled={!cents} onPress={submit} />
-          <Button label="Cancel" variant="ghost" disabled={create.isPending} onPress={onClose} />
+          <SocialButton
+            label="Confirm"
+            solid
+            block
+            busy={saving}
+            disabled={!cents}
+            onPress={confirmSend}
+          />
+          <SocialButton label="Cancel" block disabled={saving} onPress={onClose} />
         </View>
       </View>
     </Modal>
   );
 }
 
-const sheetStyles = (theme: Theme) => ({
+function ExpenseLine({
+  label,
+  amount,
+  strong = false,
+}: {
+  label: string;
+  amount: string;
+  strong?: boolean;
+}) {
+  const styles = useThemedStyles(expenseStyles);
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.label, strong && styles.strong]}>{label}</Text>
+      <Text style={[styles.amount, strong && styles.strong]}>{amount}</Text>
+    </View>
+  );
+}
+
+const sheetStyles = (_theme: Theme) => ({
   scrim: {
     flex: 1,
-    backgroundColor: theme.color.overlay,
+    backgroundColor: _theme.color.overlay,
   },
   sheet: {
-    backgroundColor: theme.color.background,
+    backgroundColor: _theme.color.background,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     paddingHorizontal: inset.screen,
@@ -106,17 +164,39 @@ const sheetStyles = (theme: Theme) => ({
   },
   heading: {
     ...type.title,
-    color: theme.color.text,
+    color: _theme.color.text,
   },
-  fieldLabel: {
-    ...type.label,
-    color: theme.color.textMuted,
-  },
-  fee: {
+  listedOnly: {
     ...type.caption,
-    color: theme.color.textMuted,
+    color: _theme.color.textMuted,
+  },
+  expenses: {
+    gap: stack.tight,
+    paddingTop: space.sm,
   },
   actions: {
     gap: space.sm,
+  },
+});
+
+const expenseStyles = (theme: Theme) => ({
+  row: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'baseline' as const,
+    gap: space.md,
+  },
+  label: {
+    ...type.body,
+    color: theme.color.text,
+    flex: 1,
+  },
+  amount: {
+    ...type.body,
+    color: theme.color.money,
+  },
+  strong: {
+    ...type.bodyStrong,
+    color: theme.color.text,
   },
 });

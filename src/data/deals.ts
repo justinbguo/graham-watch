@@ -92,6 +92,26 @@ export function useCreateDeal(conversationId: string) {
   });
 }
 
+export function useReviseDeal(conversationId: string) {
+  const queryClient = useQueryClient();
+  const queryKey = keys.conversation(conversationId);
+
+  return useMutation({
+    mutationFn: async (input: { dealId: string; amountCents: number }) => {
+      if (isDemo) throw new Error('Deals need a signed-in account.');
+      const { error } = await supabase.rpc('revise_conversation_deal', {
+        p_deal_id: input.dealId,
+        p_amount_cents: input.amountCents,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: keys.conversations });
+    },
+  });
+}
+
 export function useRespondToDeal(conversationId: string) {
   const queryClient = useQueryClient();
   const queryKey = keys.conversation(conversationId);

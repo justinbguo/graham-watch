@@ -21,3 +21,23 @@ export function formatCents(cents: number, currency = 'USD'): string {
 export function feeCentsFromBps(amountCents: number, feeBps: number): number {
   return Math.floor((amountCents * feeBps + 4999) / 10000);
 }
+
+export type ListingOfferDelta =
+  | { kind: 'discount'; amountCents: number; percent: number }
+  | { kind: 'premium'; amountCents: number; percent: number }
+  | { kind: 'at_list' };
+
+/** Offer vs listing ask. Positive savings when the offer is below list. */
+export function listingOfferDelta(
+  offerCents: number,
+  listPriceCents: number | null | undefined,
+): ListingOfferDelta | null {
+  if (listPriceCents == null || listPriceCents <= 0 || offerCents <= 0) return null;
+  const savingsCents = listPriceCents - offerCents;
+  if (savingsCents === 0) return { kind: 'at_list' };
+  const percent = Math.round((Math.abs(savingsCents) / listPriceCents) * 100);
+  if (savingsCents > 0) {
+    return { kind: 'discount', amountCents: savingsCents, percent };
+  }
+  return { kind: 'premium', amountCents: -savingsCents, percent };
+}
