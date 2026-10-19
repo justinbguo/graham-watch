@@ -4,14 +4,20 @@ import { useOpenStack } from '@/lib/openStack';
 
 import { ConversationList } from './ConversationList';
 
-/** The Messages tab. The plus opens New message as a sheet over it. */
-export function MessagesScreen({ userId }: { userId: string }) {
+type MessagesScreenProps = {
+  userId: string;
+  back?: { label: string; onPress: () => void };
+};
+
+/** The Messages tab, or the same list pushed from Seller Hub. */
+export function MessagesScreen({ userId, back }: MessagesScreenProps) {
   const open = useOpenStack();
 
   return (
     <Screen
       title="Messages"
-      inTabs
+      inTabs={!back}
+      back={back}
       action={
         <HeaderIcon
           label="New message"

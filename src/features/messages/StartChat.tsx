@@ -103,7 +103,13 @@ export function StartChat() {
               };
               return (
                 <ConversationRow
-                  conversation={{ id: item.id, with: who, last: null, unread: 0 }}
+                  conversation={{
+                    id: item.id,
+                    with: who,
+                    last: null,
+                    unread: 0,
+                    threadDealerId: null,
+                  }}
                   detail={`@${item.handle}`}
                   label={item.name ? `Message ${item.name}` : `Message @${item.handle}`}
                   busy={start.isPending && start.variables === item.id}
