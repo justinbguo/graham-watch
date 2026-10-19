@@ -38,10 +38,12 @@ export function PostPriceField({
   intent,
   digits,
   onChangeDigits,
+  showKicker = true,
 }: {
   intent: ExchangeIntent;
   digits: string;
   onChangeDigits: (next: string) => void;
+  showKicker?: boolean;
 }) {
   const styles = useThemedStyles(fieldStyles);
   const theme = useTheme();
@@ -61,7 +63,7 @@ export function PostPriceField({
 
   return (
     <View style={styles.block}>
-      <Text style={styles.kicker}>{kicker}</Text>
+      {showKicker ? <Text style={styles.kicker}>{kicker}</Text> : null}
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"

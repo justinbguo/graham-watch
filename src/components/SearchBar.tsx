@@ -12,28 +12,34 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
+import { dealerSocial } from '@/lib/design';
+import {
+  controlText,
+  HIT_TARGET,
+  inset,
+  radius,
+  size,
+  space,
+  type Theme,
+} from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const PLACEHOLDER = 'Search';
 
-/** Single-line in `HIT_TARGET`. Not `type.body.lineHeight` — that misaligns placeholders on iOS. */
-const SEARCH_LINE = type.body.fontSize;
+/** iOS placeholders sit a hair high next to a centred glyph. */
+const INPUT_IOS_NUDGE = Platform.OS === 'ios' ? 1 : 0;
 
 type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 /**
- * The bar under a title: `surface`, `HIT_TARGET` tall, `radius.md`, a glyph
- * at `size.icon`, then the words. Search uses it with a magnifying glass.
- * The group name uses it with a pencil, so the two rows on New group chat
- * are the same height and the words start at the same place.
+ * Capsule search chrome: magnify, then words. The deck door, the Messages
+ * field, and the morph between them share this shell.
  */
-/** Shared chrome for the door, the field, and the launch morph. */
 export function SearchBarShell({ children }: { children: React.ReactNode }) {
   const styles = useThemedStyles(searchStyles);
   return (
     <View style={styles.bar}>
-      <Glyph />
+      <SearchGlyph compact={false} />
       {children}
     </View>
   );
@@ -44,17 +50,22 @@ export function IconBar({
   icon,
   placeholder,
   accessibilityLabel,
+  compact = false,
   ...props
 }: Omit<TextInputProps, 'style'> & {
   ref?: Ref<TextInput>;
   icon: GlyphName;
   placeholder: string;
+  compact?: boolean;
 }) {
   const styles = useThemedStyles(searchStyles);
   const theme = useTheme();
+  const glyph = compact ? size.iconSmall : size.icon;
   return (
-    <View style={styles.bar}>
-      <MaterialCommunityIcons name={icon} size={size.icon} color={theme.color.inkMuted} />
+    <View style={[styles.bar, compact && styles.barCompact]}>
+      <View style={[styles.glyphSlot, compact && styles.glyphSlotCompact]}>
+        <MaterialCommunityIcons name={icon} size={glyph} color={theme.color.inkMuted} />
+      </View>
       <TextInput
         ref={ref}
         placeholder={placeholder}
@@ -63,7 +74,7 @@ export function IconBar({
         autoCapitalize="none"
         autoCorrect={false}
         {...props}
-        style={styles.input}
+        style={[styles.input, compact && styles.inputCompact]}
       />
     </View>
   );
@@ -79,10 +90,12 @@ export function SearchField({
   accessibilityLabel = PLACEHOLDER,
   placeholder = PLACEHOLDER,
   style,
+  compact = false,
   ...props
 }: Omit<TextInputProps, 'style'> & {
   ref?: Ref<TextInput>;
   style?: StyleProp<ViewStyle>;
+  compact?: boolean;
 }) {
   return (
     <View style={style}>
@@ -92,6 +105,7 @@ export function SearchField({
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel}
         returnKeyType="search"
+        compact={compact}
         {...props}
       />
     </View>
@@ -122,9 +136,15 @@ export function SearchDoor({
   );
 }
 
-function Glyph() {
+function SearchGlyph({ compact }: { compact: boolean }) {
+  const styles = useThemedStyles(searchStyles);
   const theme = useTheme();
-  return <MaterialCommunityIcons name="magnify" size={size.icon} color={theme.color.inkMuted} />;
+  const glyph = compact ? size.iconSmall : size.icon;
+  return (
+    <View style={[styles.glyphSlot, compact && styles.glyphSlotCompact]}>
+      <MaterialCommunityIcons name="magnify" size={glyph} color={theme.color.inkMuted} />
+    </View>
+  );
 }
 
 /** Gutter for a search field under a `Screen` title. */
@@ -134,12 +154,17 @@ export const searchFieldInset = {
 } as const;
 
 const searchStyles = (theme: Theme) => ({
+  barCompact: {
+    height: dealerSocial.minHeight,
+  },
+  inputCompact: {
+    paddingTop: INPUT_IOS_NUDGE,
+  },
   bar: {
     height: HIT_TARGET,
-    // A door in a header row otherwise stays as wide as the word "Search".
     alignSelf: 'stretch' as const,
     width: '100%' as const,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     borderWidth: 1,
     borderColor: theme.color.border,
     backgroundColor: theme.color.surface,
@@ -148,29 +173,33 @@ const searchStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.sm,
   },
+  glyphSlot: {
+    width: size.icon,
+    height: size.icon,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  glyphSlotCompact: {
+    width: size.iconSmall,
+    height: size.iconSmall,
+  },
   input: {
-    fontFamily: type.body.fontFamily,
-    fontSize: SEARCH_LINE,
-    lineHeight: SEARCH_LINE,
+    ...controlText.body,
     flex: 1,
     minWidth: 0,
-    height: HIT_TARGET,
     paddingHorizontal: 0,
-    paddingTop: 0,
-    // Same nudge as `Field`: this face sits slightly low in its box.
-    paddingBottom: Platform.OS === 'ios' ? space.xs / 2 : 0,
+    paddingTop: INPUT_IOS_NUDGE,
+    paddingBottom: 0,
     margin: 0,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
-    includeFontPadding: false,
   },
   label: {
-    fontFamily: type.body.fontFamily,
-    fontSize: SEARCH_LINE,
-    lineHeight: SEARCH_LINE,
+    ...controlText.body,
+    flex: 1,
     flexShrink: 1,
+    paddingTop: INPUT_IOS_NUDGE,
     color: theme.color.inkMuted,
-    includeFontPadding: false,
   },
   pressed: {
     opacity: 0.72,

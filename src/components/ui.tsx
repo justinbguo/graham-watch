@@ -11,6 +11,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  controlText,
+  controlTextNudge,
   HIT_TARGET,
   inset,
   layout,
@@ -450,7 +452,7 @@ const buttonStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   label: {
-    ...type.labelStrong,
+    ...controlText.label,
     flexShrink: 1,
     maxWidth: '100%' as const,
     textAlign: 'center' as const,
@@ -466,44 +468,31 @@ const buttonStyles = (theme: Theme) => ({
 
 const fieldStyles = (theme: Theme) => ({
   field: {
-    // Face and size only. `type.body`'s line height is a paragraph measure;
-    // on a single line iOS applies it as a baseline offset to the value and
-    // not the placeholder, so the two do not share a line.
-    fontFamily: type.body.fontFamily,
-    fontSize: type.body.fontSize,
-    // A field stays `fill`. A button is `accent`, and a black field would
-    // read as a second button.
+    ...controlText.body,
     backgroundColor: theme.color.fill,
-    // An <input> on web carries an intrinsic width of about 20 characters, and
-    // `min-width: auto` makes a flex row refuse to shrink past it. Two fields
-    // side by side then run off the screen edge.
     minWidth: 0,
     height: size.controlMin,
     borderRadius: radius.md,
     paddingHorizontal: inset.controlX,
-    // This face's x-height sits about 2px low in its box. Padding on the
-    // bottom only moves the centred line up by half of `space.xs`.
     paddingTop: 0,
-    paddingBottom: space.xs,
+    ...controlTextNudge,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
-    // Android adds the font's extra ascent above the letters.
-    includeFontPadding: false,
   },
   compact: {
-    fontFamily: type.body.fontFamily,
+    fontFamily: type.caption.fontFamily,
     fontSize: type.caption.fontSize,
-    lineHeight: type.caption.lineHeight,
+    lineHeight: type.caption.fontSize,
+    includeFontPadding: false,
     backgroundColor: theme.color.fill,
     minWidth: 0,
     height: 36,
     borderRadius: radius.md,
     paddingHorizontal: space.sm,
     paddingTop: 0,
-    paddingBottom: 0,
+    ...controlTextNudge,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
-    includeFontPadding: false,
   },
   multiline: {
     ...type.body,
