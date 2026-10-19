@@ -50,8 +50,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Graham uses a photo you pick as your profile picture.",
-          "cameraPermission": false,
+          "photosPermission": "Graham uses a photo you choose for your profile, a post, or a message.",
+          "cameraPermission": "Graham uses the camera so you can take a photo for a message.",
           "microphonePermission": false
         }
       ]
