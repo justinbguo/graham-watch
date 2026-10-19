@@ -3,6 +3,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
+import { backendInfo } from './backend';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -45,7 +46,10 @@ export async function sendEmailCode(email: string, { createAccount }: { createAc
   });
   if (!error) return;
   if (!createAccount && /signups not allowed/i.test(error.message)) {
-    throw new Error('No account uses that address yet. Create one instead.');
+    const { shortLabel } = backendInfo();
+    throw new Error(
+      `No account uses that address on ${shortLabel}. Create an account instead, or check Settings → Backend.`,
+    );
   }
   throw error;
 }

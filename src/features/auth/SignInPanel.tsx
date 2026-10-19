@@ -8,6 +8,8 @@ import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
+import { BackendEnvironment } from '@/features/dev/BackendEnvironment';
+import { isDemo } from '@/lib/demo';
 import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -47,6 +49,7 @@ export function SignInPanel({
             ? 'Sign in to keep swiping, save watches, and message dealers.'
             : 'The best vintage dealers and the most passionate collectors.'}
         </Text>
+        {!isDemo ? <BackendEnvironment compact /> : null}
       </View>
 
       <SignInDoors signIn={signIn} />
