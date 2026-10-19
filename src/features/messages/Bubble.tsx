@@ -1,8 +1,9 @@
+import { Image } from 'expo-image';
 import { Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import type { MessageListing } from '@/data/messages';
-import { motion, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { ListingQuote } from './ListingQuote';
@@ -29,6 +30,7 @@ export function Bubble({
   onOpenListing,
   /** How it left, when that is not obvious: "Sent by email". */
   caption,
+  photoUrl,
   when,
   sent = false,
   speaker,
@@ -38,6 +40,7 @@ export function Bubble({
   listing?: MessageListing | null;
   onOpenListing?: () => void;
   caption?: string | null;
+  photoUrl?: string | null;
   when?: string | null;
   /** Just sent from this screen, so it arrives rather than being there. */
   sent?: boolean;
@@ -56,7 +59,15 @@ export function Bubble({
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
         ) : null}
-        <Text style={[styles.body, mine && styles.bodyMine]}>{body}</Text>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={styles.photo}
+            contentFit="cover"
+            accessibilityLabel="Photo"
+          />
+        ) : null}
+        {body.trim() ? <Text style={[styles.body, mine && styles.bodyMine]}>{body}</Text> : null}
       </View>
       {when ? <Text style={styles.when}>{when}</Text> : null}
     </Animated.View>
@@ -92,6 +103,12 @@ const bubbleStyles = (theme: Theme) => ({
   },
   bodyMine: {
     color: theme.color.onAccent,
+  },
+  photo: {
+    width: size.messagePhoto,
+    height: size.messagePhoto,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surfaceSunken,
   },
   caption: {
     ...type.caption,

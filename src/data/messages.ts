@@ -39,6 +39,8 @@ export type ConversationSummary = {
   with: ConversationWith;
   last: { body: string; at: string; mine: boolean; senderName: string | null } | null;
   unread: number;
+  /** Set on shop threads so a claimed owner can filter buyer inbox. */
+  threadDealerId: string | null;
 };
 
 export type ConversationHeader = {
@@ -57,6 +59,7 @@ export type MessageListing = {
   id: string;
   title: string;
   photoUrl: string | null;
+  priceCents?: number | null;
 };
 
 export type Message = {
@@ -70,7 +73,15 @@ export type Message = {
   /** The watch an inquiry named, when the listing is still readable. */
   listing: MessageListing | null;
   deal: ConversationDeal | null;
+  /** A photograph sent with the message. A local file while it is still sending. */
+  photoUrl: string | null;
   created_at: string;
+};
+
+/** One photograph attached to the message about to be sent. */
+export type MessagePhoto = {
+  uri: string;
+  mimeType: string;
 };
 
 /** True when the thread already contains a message about this watch. */
@@ -176,53 +187,39 @@ export function useConversations(userId: string | null) {
         with: party(row),
         last: row.last_at
           ? {
-              body: row.last_body ?? '',
+              body: row.last_body?.trim() ? row.last_body : 'Photo',
               at: row.last_at,
               mine: Boolean(row.last_mine),
               senderName: row.is_group && !row.last_mine ? row.last_sender_name : null,
             }
           : null,
         unread: Number(row.unread),
+        threadDealerId: row.thread_dealer_id ?? null,
       }));
     },
   });
 }
 
-export function useConversation(conversationId: string | null) {
+export function useConversation(conversationId: string | null, userId: string | null) {
   return useQuery({
     queryKey: keys.conversation(conversationId ?? 'none'),
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId && userId),
     refetchInterval: THREAD_INTERVAL,
     queryFn: async (): Promise<{ header: ConversationHeader | null; messages: Message[] }> => {
-      if (isDemo || !conversationId) return { header: null, messages: [] };
-      const [header, messages] = await Promise.all([
+      if (isDemo || !conversationId || !userId) return { header: null, messages: [] };
+      const [header, rows] = await Promise.all([
         supabase.rpc('conversation_header', { p_conversation_id: conversationId }),
-        supabase
-          .from('messages')
-          // The watch comes along for the ride: an inquiry names one, and a
-          // buyer writes to the same shop about more than one.
-          .select('id, sender_id, body, via, created_at, listing_id, deal_id, listings (brand, model, year)')
-          .eq('conversation_id', conversationId)
-          .order('created_at'),
+        loadConversationMessages(conversationId),
       ]);
       if (header.error) throw header.error;
-      if (messages.error) throw messages.error;
-      const rows = messages.data ?? [];
       const dealIds = [
         ...new Set(rows.map((row) => row.deal_id).filter((id): id is string => Boolean(id))),
       ];
-      const dealsById = new Map<string, ReturnType<typeof mapDeal>>();
-      if (dealIds.length > 0) {
-        const { data: deals, error: dealsError } = await supabase
-          .from('conversation_deals')
-          .select('*')
-          .in('id', dealIds);
-        if (dealsError) throw dealsError;
-        for (const deal of deals ?? []) {
-          dealsById.set(deal.id, mapDeal(deal));
-        }
-      }
+      const dealsById = await loadConversationDeals(dealIds);
       const covers = await coverPhotos(rows.flatMap((row) => (row.listing_id ? [row.listing_id] : [])));
+      const photos = await messagePhotoUrls(
+        rows.flatMap((row) => (row.photo_path ? [row.photo_path] : [])),
+      );
       const head = header.data?.[0];
       return {
         header: head
@@ -248,15 +245,142 @@ export function useConversation(conversationId: string | null) {
                     id: row.listing_id,
                     title: formatTitle(listing),
                     photoUrl: covers.get(row.listing_id) ?? null,
+                    priceCents: listing.price_cents ?? null,
                   }
                 : null,
             deal: row.deal_id ? (dealsById.get(row.deal_id) ?? null) : null,
+            photoUrl: row.photo_path ? (photos.get(row.photo_path) ?? null) : null,
             created_at: row.created_at,
           };
         }),
       };
     },
   });
+}
+
+type MessageRow = {
+  id: string;
+  sender_id: string;
+  body: string;
+  via: string;
+  created_at: string;
+  listing_id: string | null;
+  deal_id?: string | null;
+  photo_path?: string | null;
+  listings:
+    | { brand: string; model: string; year: number | null; price_cents: number | null }
+    | { brand: string; model: string; year: number | null; price_cents: number | null }[]
+    | null;
+};
+
+const MESSAGE_SELECT_FULL =
+  'id, sender_id, body, via, created_at, photo_path, listing_id, deal_id, listings (brand, model, year, price_cents)';
+const MESSAGE_SELECT_LEGACY =
+  'id, sender_id, body, via, created_at, listing_id, listings (brand, model, year, price_cents)';
+
+function schemaMissing(error: { message?: string; code?: string }, hint: string) {
+  const message = error.message ?? '';
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    message.includes(hint) ||
+    message.includes('does not exist')
+  );
+}
+
+async function loadConversationMessages(conversationId: string): Promise<MessageRow[]> {
+  const full = await supabase
+    .from('messages')
+    .select(MESSAGE_SELECT_FULL)
+    .eq('conversation_id', conversationId)
+    .order('created_at');
+
+  if (!full.error) return (full.data ?? []) as MessageRow[];
+
+  if (schemaMissing(full.error, 'photo_path') || schemaMissing(full.error, 'deal_id')) {
+    const legacy = await supabase
+      .from('messages')
+      .select(MESSAGE_SELECT_LEGACY)
+      .eq('conversation_id', conversationId)
+      .order('created_at');
+    if (legacy.error) throw legacy.error;
+    return (legacy.data ?? []) as MessageRow[];
+  }
+
+  throw full.error;
+}
+
+async function loadConversationDeals(dealIds: string[]) {
+  const dealsById = new Map<string, ReturnType<typeof mapDeal>>();
+  if (dealIds.length === 0) return dealsById;
+
+  const { data: deals, error: dealsError } = await supabase
+    .from('conversation_deals')
+    .select('*')
+    .in('id', dealIds);
+
+  if (dealsError) {
+    if (schemaMissing(dealsError, 'conversation_deals')) return dealsById;
+    throw dealsError;
+  }
+  for (const deal of deals ?? []) {
+    dealsById.set(deal.id, mapDeal(deal));
+  }
+  return dealsById;
+}
+
+const MESSAGE_PHOTOS = 'message-photos';
+
+/** A version-4 id. Hermes has no `crypto.randomUUID`. */
+function messageId() {
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+const MESSAGE_PHOTO_TYPES: Record<string, { ext: string; contentType: string }> = {
+  'image/jpeg': { ext: 'jpg', contentType: 'image/jpeg' },
+  'image/jpg': { ext: 'jpg', contentType: 'image/jpeg' },
+  'image/png': { ext: 'png', contentType: 'image/png' },
+  'image/webp': { ext: 'webp', contentType: 'image/webp' },
+};
+
+const PHOTO_URL_SECONDS = 60 * 60;
+
+async function messagePhotoUrls(paths: string[]): Promise<Map<string, string>> {
+  const urls = new Map<string, string>();
+  const unique = [...new Set(paths)];
+  if (unique.length === 0) return urls;
+
+  const { data, error } = await supabase.storage
+    .from(MESSAGE_PHOTOS)
+    .createSignedUrls(unique, PHOTO_URL_SECONDS);
+  if (error) return urls;
+  for (const row of data ?? []) {
+    if (row.path && row.signedUrl) urls.set(row.path, row.signedUrl);
+  }
+  return urls;
+}
+
+async function uploadMessagePhoto(
+  conversationId: string,
+  userId: string,
+  id: string,
+  file: MessagePhoto,
+) {
+  const kind = MESSAGE_PHOTO_TYPES[file.mimeType];
+  if (!kind) throw new Error('Use a jpeg, png, or webp photo.');
+
+  const path = `${conversationId}/${userId}/${id}.${kind.ext}`;
+  const body = await fetch(file.uri).then((response) => response.arrayBuffer());
+  const { error } = await supabase.storage.from(MESSAGE_PHOTOS).upload(path, body, {
+    contentType: kind.contentType,
+  });
+  if (error) throw error;
+  return path;
 }
 
 /** The first photograph of each watch, in the order the dealer arranged them. */
@@ -302,17 +426,31 @@ export function useSendMessage(
   const queryClient = useQueryClient();
   const queryKey = keys.conversation(conversationId);
   return useMutation({
-    mutationFn: async (body: string) => {
+    mutationFn: async ({ body, photo }: { body: string; photo: MessagePhoto | null }) => {
       if (isDemo) throw new Error('Messages need a signed-in account.');
+      const text = body.trim();
+      if (!text && !photo) throw new Error('Write a message or add a photo.');
+
+      const id = photo ? messageId() : null;
+      let photoPath: string | null = null;
+      if (photo && id) {
+        photoPath = await uploadMessagePhoto(conversationId, userId, id, photo);
+      }
+
       const { error } = await supabase.from('messages').insert({
+        ...(id ? { id } : {}),
         conversation_id: conversationId,
         sender_id: userId,
-        body: body.trim(),
+        body: text,
+        ...(photoPath ? { photo_path: photoPath } : {}),
         ...(about ? { listing_id: about.listingId } : {}),
       });
-      if (error) throw error;
+      if (error) {
+        if (photoPath) await supabase.storage.from(MESSAGE_PHOTOS).remove([photoPath]);
+        throw error;
+      }
     },
-    onMutate: async (body) => {
+    onMutate: async ({ body, photo }) => {
       // A poll landing mid-send would overwrite the pending row with a list
       // that does not have it yet.
       await queryClient.cancelQueries({ queryKey });
@@ -327,6 +465,7 @@ export function useSendMessage(
           ? { id: about.listingId, title: about.title, photoUrl: about.photoUrl }
           : null,
         deal: null,
+        photoUrl: photo?.uri ?? null,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<Thread>(queryKey, (thread) =>

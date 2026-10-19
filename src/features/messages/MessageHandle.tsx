@@ -27,6 +27,7 @@ export function MessageHandle({
         },
         last: null,
         unread: 0,
+        threadDealerId: null,
       }}
       detail="New message"
       label={`New message to @${handle}`}

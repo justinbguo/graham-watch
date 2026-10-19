@@ -1,14 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 
 import { SendBar } from '@/components/SendBar';
-import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
 import { useDealerInquiryListing, useListing, usePrimeListing } from '@/data/listings';
-import { useRespondToDeal } from '@/data/deals';
+import { useRespondToDeal, type ConversationDeal } from '@/data/deals';
 import {
   isPending as isSending,
   useConversation,
@@ -18,8 +19,10 @@ import {
   useSendMessage,
   type Message as ChatMessage,
   type MessageListing,
+  type MessagePhoto,
 } from '@/data/messages';
 import { DealCard } from '@/features/messages/DealCard';
+import { OfferDealButton } from '@/features/messages/OfferDealButton';
 import { OfferDealSheet } from '@/features/messages/OfferDealSheet';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
@@ -28,6 +31,7 @@ import { inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
+import { AttachPhoto } from './AttachPhoto';
 import { Bubble } from './Bubble';
 import { GroupTitle } from './GroupTitle';
 import { ListingQuote } from './ListingQuote';
@@ -57,10 +61,12 @@ export function ConversationScreen({
   // Null until they edit. The default below is what an untouched field shows,
   // so clearing the sentence stays cleared.
   const [draft, setDraft] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<MessagePhoto | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [offerDeal, setOfferDeal] = useState(false);
+  const [editDeal, setEditDeal] = useState<ConversationDeal | null>(null);
 
-  const { data, isPending, error } = useConversation(conversationId);
+  const { data, isPending, error, isFetching } = useConversation(conversationId, userId);
   const namedListingId =
     listingId ?? data?.messages.find((message) => message.listing)?.listing?.id ?? null;
   const { data: listing } = useListing(namedListingId ?? '');
@@ -79,6 +85,7 @@ export function ConversationScreen({
         id: listing.id,
         title: formatTitle(listing),
         photoUrl: listing.photos[0]?.url ?? null,
+        priceCents: listing.price_cents,
       }
     : null;
   // Wishlist opens this thread with the watch still named. Once a message
@@ -114,7 +121,7 @@ export function ConversationScreen({
     if (last) mark(conversationId);
   }, [conversationId, last, mark]);
 
-  if (isPending && !data) {
+  if (!userId || ((isPending || isFetching) && !data)) {
     return (
       <Screen action={<CloseButton onPress={close} />}>
         <Spinner />
@@ -139,24 +146,36 @@ export function ConversationScreen({
   const byEmail = !header.writable;
   const shopThread = Boolean(header.threadDealerId);
   const peerThread = who.kind === 'person' && !shopThread;
-  const allowSell =
+  const sellerCanOffer =
     header.writable &&
     who.kind !== 'group' &&
+    !byEmail &&
     (peerThread || (shopThread && who.kind === 'person'));
-  const allowBuy =
-    header.writable &&
-    who.kind !== 'group' &&
-    (peerThread || (shopThread && who.kind === 'dealer'));
   const dealListingId =
     listingId ?? messages.find((message) => message.listing)?.listing?.id ?? null;
-  const canOfferDeal = header.writable && who.kind !== 'group' && !byEmail && (allowSell || allowBuy);
+  const dealListing: MessageListing | null =
+    quote ??
+    (() => {
+      const fromThread = messages.find((message) => message.listing)?.listing;
+      if (fromThread) return fromThread;
+      if (inquiryCard && dealListingId) {
+        return {
+          id: dealListingId,
+          title: formatTitle(inquiryCard),
+          photoUrl: inquiryCard.photos[0]?.url ?? null,
+          priceCents: inquiryCard.price_cents,
+        };
+      }
+      return null;
+    })();
+  const canOfferDeal = sellerCanOffer && dealListing !== null;
 
   function submit() {
     const body = value.trim();
-    if (!body) return;
+    if (!body && !photo) return;
 
     if (byEmail) {
-      if (!inquiryCard || mail.isPending) {
+      if (!body || !inquiryCard || mail.isPending) {
         if (!inquiryCard && !dealerListingPending) {
           Alert.alert(
             'No watches listed',
@@ -180,12 +199,20 @@ export function ConversationScreen({
     }
 
     if (send.isPending) return;
+    const sending = photo;
     // The field clears as the bubble rises. If the write fails the words come
     // back to the field, unless something new has been typed over them.
     setDraft('');
-    send.mutate(body, {
-      onError: () => setDraft((current) => current || body),
-    });
+    setPhoto(null);
+    send.mutate(
+      { body, photo: sending },
+      {
+        onError: () => {
+          setDraft((current) => current || body);
+          setPhoto((current) => current ?? sending);
+        },
+      },
+    );
   }
 
   return (
@@ -243,7 +270,12 @@ export function ConversationScreen({
                   deal={item.deal}
                   mine={mine}
                   viewerId={userId}
-                  listing={item.listing}
+                  listing={
+                    item.listing ??
+                    (item.deal.listingId && dealListing?.id === item.deal.listingId
+                      ? dealListing
+                      : null)
+                  }
                   onOpenListing={watchId ? () => openWatch(watchId) : undefined}
                   busy={respondDeal.isPending}
                   onDecline={() =>
@@ -252,6 +284,10 @@ export function ConversationScreen({
                   onCancel={() =>
                     respondDeal.mutate({ dealId: item.deal!.id, action: 'cancel' })
                   }
+                  onEdit={() => {
+                    setEditDeal(item.deal!);
+                    setOfferDeal(true);
+                  }}
                 />
               );
             }
@@ -262,6 +298,7 @@ export function ConversationScreen({
                 listing={item.listing}
                 onOpenListing={watchId ? () => openWatch(watchId) : undefined}
                 caption={item.via === 'email' ? 'Sent by email' : null}
+                photoUrl={item.photoUrl}
                 speaker={
                   who.kind === 'group' && !mine && startOfRun(messages, index)
                     ? memberLabel(header.members, item.sender_id)
@@ -275,13 +312,37 @@ export function ConversationScreen({
         />
         <SendBar
           placeholder={quoting ? 'Write about this watch' : 'Write a message'}
+          multiline
           value={value}
           onChangeText={setDraft}
           onSend={submit}
           busy={byEmail ? mail.isPending || dealerListingPending : send.isPending}
           sendLabel={byEmail ? `Email ${partyName(who)}` : undefined}
+          canSend={value.trim().length > 0 || Boolean(photo)}
+          leading={
+            byEmail
+              ? undefined
+              : (
+                  <AttachPhoto
+                    disabled={send.isPending}
+                    onPick={setPhoto}
+                    onError={(message) => Alert.alert('Could not add that photo', message)}
+                  />
+                )
+          }
+          trailing={
+            canOfferDeal ? (
+              <OfferDealButton
+                disabled={send.isPending}
+                onPress={() => {
+                  setEditDeal(null);
+                  setOfferDeal(true);
+                }}
+              />
+            ) : undefined
+          }
           note={
-            quoting || send.error || canOfferDeal || (byEmail && !inquiryCard) ? (
+            quoting || photo || send.error || (byEmail && !inquiryCard) ? (
               <View style={styles.note}>
                 {quoting ? (
                   <ListingQuote listing={quoting} onPress={() => openWatch(quoting.id)} />
@@ -292,26 +353,45 @@ export function ConversationScreen({
                     tone="error"
                   />
                 ) : null}
-                {canOfferDeal ? (
-                  <Button
-                    label="Offer deal"
-                    variant="ghost"
-                    onPress={() => setOfferDeal(true)}
-                  />
+                {photo ? (
+                  <View style={styles.draft}>
+                    <Image
+                      source={{ uri: photo.uri }}
+                      style={styles.draftPhoto}
+                      contentFit="cover"
+                      accessibilityLabel="Photo to send"
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove photo"
+                      onPress={() => setPhoto(null)}
+                      style={styles.remove}>
+                      <Text style={styles.removeLabel}>Remove</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
                 {send.error ? <Message text="That message did not send." tone="error" /> : null}
               </View>
             ) : null
           }
         />
-        <OfferDealSheet
-          visible={offerDeal}
-          conversationId={conversationId}
-          listingId={dealListingId}
-          allowSell={allowSell}
-          allowBuy={allowBuy}
-          onClose={() => setOfferDeal(false)}
-        />
+        {dealListing ? (
+          <OfferDealSheet
+            visible={offerDeal}
+            conversationId={conversationId}
+            listing={dealListing}
+            editDeal={
+              editDeal
+                ? { id: editDeal.id, amountCents: editDeal.amountCents }
+                : null
+            }
+            onOpenListing={() => openWatch(dealListing.id)}
+            onClose={() => {
+              setOfferDeal(false);
+              setEditDeal(null);
+            }}
+          />
+        ) : null}
       </View>
     </Screen>
   );
@@ -353,6 +433,23 @@ const screenStyles = (theme: Theme) => ({
   },
   note: {
     gap: space.xs,
+  },
+  draft: {
+    alignSelf: 'flex-end' as const,
+    gap: space.xs,
+  },
+  draftPhoto: {
+    width: size.messagePhoto,
+    height: size.messagePhoto,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surfaceSunken,
+  },
+  remove: {
+    alignSelf: 'flex-end' as const,
+  },
+  removeLabel: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
   // On the subtitle's line, so it starts under the name rather than under the logo.
   unclaimed: {
