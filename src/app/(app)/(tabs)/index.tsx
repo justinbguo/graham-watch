@@ -243,7 +243,7 @@ export default function Deck() {
           )}
         </View>
       }
-      width="card"
+      width={Platform.OS === 'web' ? 'cardWeb' : 'card'}
       inTabs>
       {/* The two views trade places rather than cutting. Entering only: the
           old view is gone the frame the state changes, so there is nothing to
