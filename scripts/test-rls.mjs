@@ -333,6 +333,12 @@ console.log('\nafter approval');
   const importerDeck = await api('/rest/v1/rpc/get_deck', { token: importer.token, method: 'POST', body: { p_limit: 50 } });
   check('the deck never shows you your own import', !importerDeck.body?.some((row) => row.id === listingId));
 
+  const ownerDeck = await api('/rest/v1/rpc/get_deck', { token: dealerUser.token, method: 'POST', body: { p_limit: 50 } });
+  check(
+    'the deck hides listings from a shop you claimed',
+    !ownerDeck.body?.some((row) => row.id === listingId)
+  );
+
   const buyerSearch = await api('/rest/v1/rpc/search_listings', {
     token: buyer.token,
     method: 'POST',
