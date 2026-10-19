@@ -4,6 +4,7 @@ import { Tabs } from 'expo-router';
 import { BuyTabIcon } from '@/components/BuyTabIcon';
 import { TabBar } from '@/components/TabBar';
 import { useUnreadCount } from '@/features/messages/count';
+import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
 import { ProfileTabIcon } from '@/features/profile/ProfileTabIcon';
 import { SaveTargetIcon } from '@/features/saved/flight';
 import { useSavedCount } from '@/features/saved/count';
@@ -30,6 +31,8 @@ export default function TabsLayout() {
   const isWide = useIsWide();
   const saved = useSavedCount();
   const unread = useUnreadCount();
+  const { shop, ready } = useClaimedDealerShop();
+  const sellerHub = ready && shop;
   const theme = useTheme();
 
   return (
@@ -58,8 +61,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
+          title: sellerHub ? 'Your Shop' : 'Messages',
+          tabBarAccessibilityLabel: sellerHub ? 'Your Shop' : 'Messages',
           tabBarBadge: unread || undefined,
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name={sellerHub ? 'storefront-outline' : 'chat-outline'}
+              size={size.tabIcon}
+              color={color}
+            />
+          ),
         }}
       />
       <Tabs.Screen
