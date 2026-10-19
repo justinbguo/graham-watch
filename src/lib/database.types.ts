@@ -956,6 +956,7 @@ export type Database = {
           deal_id: string | null
           id: string
           listing_id: string | null
+          photo_path: string | null
           sender_id: string
           via: string
         }
@@ -966,6 +967,7 @@ export type Database = {
           deal_id?: string | null
           id?: string
           listing_id?: string | null
+          photo_path?: string | null
           sender_id: string
           via?: string
         }
@@ -976,6 +978,7 @@ export type Database = {
           deal_id?: string | null
           id?: string
           listing_id?: string | null
+          photo_path?: string | null
           sender_id?: string
           via?: string
         }
@@ -1406,6 +1409,7 @@ export type Database = {
           person_id: string
           person_name: string
           person_number: number
+          thread_dealer_id: string
           unread: number
         }[]
       }
@@ -1779,6 +1783,10 @@ export type Database = {
       require_operator: { Args: never; Returns: undefined }
       respond_to_conversation_deal: {
         Args: { p_action: string; p_deal_id: string }
+        Returns: undefined
+      }
+      revise_conversation_deal: {
+        Args: { p_amount_cents: number; p_deal_id: string }
         Returns: undefined
       }
       save_exchange_post: {
