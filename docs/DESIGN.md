@@ -592,6 +592,8 @@ Every screen is a centred column with a ceiling, from `layout`:
 | --- | --- | --- |
 | `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
 | `layout.card` | 480 | The swipe stage. |
+| `layout.cardWeb` | 960 | Web swipe stage with photo and copy side by side. |
+| `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
 | `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
@@ -599,7 +601,7 @@ Every screen is a centred column with a ceiling, from `layout`:
 `Screen` applies the cap and centres the column in the window, so a new screen
 is capped without doing anything. The type inside that column aligns left.
 Pass `width` only to leave the default: the deck asks for `card` in swipe
-view and `grid` in grid view.
+view on native, `cardWeb` on web, and `grid` in grid view.
 
 A phone is narrower than all three, so these values change nothing on a phone.
 They exist for the case the app already supports and nobody looks at.

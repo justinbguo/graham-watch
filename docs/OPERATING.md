@@ -225,8 +225,9 @@ A verified application grants nothing. It is a request with a proved return
 address, waiting for an operator. That ordering is the point: prove the mailbox,
 then a human decides.
 
-Once a shop is claimed, Profile becomes a workspace — inventory, listing edits,
-photo management, and `import-inventory` to re-read their own site.
+Once a shop is claimed, the **Hub** tab replaces Messages — seller sections for
+buyer threads, listings, and placeholders for payments and customers. Profile
+stays the workspace for catalogue refresh and claim flow.
 
 ### The operator path
 
@@ -665,16 +666,19 @@ there is no Mailpit to read.
 
 ### Test accounts
 
-Every one is local. None exists on hosted, and `npm run db:reset` deletes them
-all. The seed account comes back with the reset; run the command in the last
-column for the rest.
+**Local:** `npm run db:reset` deletes fixture users; run `npm run mock:users`
+again. Codes auto-fill from Mailpit.
+
+**Hosted:** fixtures are created with the service role (`scripts/.env.operator.local`).
+They do not receive email. Use `npm run mock:signin -- gold@graham.test` for a
+one-time code after `npm run mock:users -- --yes --gold-only`.
 
 | Address | Name | What it is for | Made by |
 | --- | --- | --- | --- |
 | `ada@graham.test` | Ada Byron, `@ada` | Buyer. Messages Bea, and Mock Desk about its watch. | `npm run mock:users` |
 | `bea@graham.test` | Bea Cole, `@bea` | The second buyer, for a buyer-to-buyer thread. | `npm run mock:users` |
 | `dealer@graham.test` | Dana Hart, `@desk` | Dealer. Owns Mock Desk and answers Ada in the app. | `npm run mock:users` |
-| `gold@graham.test` | Max Goldfinger, `@goldfinger` | Dealer. Owns seeded **Goldfinger's Vintage** (full inventory, in-app messaging). | `npm run mock:users` |
+| `gold@graham.test` | Max Goldfinger, `@goldfinger` | Dealer. Owns **Goldfinger's Vintage** (claim via script). | `npm run mock:users` (local) or `npm run mock:users -- --yes --gold-only` (hosted) |
 | `seed-shop@graham.test` | none | Added Goldfinger's Vintage. Never sign in as it: the deck hides a shop's watches from whoever added it, so it shows an empty deck. | `npm run db:reset` |
 | `operator@graham.local` | none | Operator UI sign-in, password `graham-operator`. The terminal scripts import as this account. | `npm run dealers:local -- operator` |
 
@@ -690,9 +694,19 @@ Two shops exist after both commands:
 | Goldfinger's Vintage | `gold@graham.test` | Claimed by Max (`@goldfinger`), 52 watches | Shop owner in the app |
 | Mock Desk, `mock-desk.graham.test` | `dealer@graham.test` | Claimed by Dana, one watch: Fixture Message Test, `MOCK-1` | A reply in the app |
 
-`mock:users` refuses to run against hosted and is safe to repeat. It finishes
-each profile (name, handle, birthday, onboarded), so these accounts skip
-onboarding. To walk onboarding, sign in with a new address.
+`mock:users` is safe to repeat. It finishes each profile (name, handle,
+birthday, onboarded), so these accounts skip onboarding. To walk onboarding,
+sign in with a new address.
+
+Hosted Goldfinger only (no Mock Desk):
+
+```
+npm run env -- hosted
+npm run mock:users -- --yes --gold-only
+npm run mock:signin -- gold@graham.test
+```
+
+Use **Log in with email** in the app and paste the printed code.
 
 `npm run test:rls` makes its own accounts, such as `buyer-<timestamp>@example.com`
 and `claimer-<timestamp>@personal.test`, with password `password123`. It deletes

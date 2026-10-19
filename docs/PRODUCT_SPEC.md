@@ -44,7 +44,7 @@ In:
 5. Inquiry — from a watch on the wishlist, deliberately contact the dealer.
 6. Profile — your name, an optional picture, the posts you have written,
    watches on your wishlist, and the shop you have claimed if you have one.
-7. Dealer workspace — claim a shop, edit its listings, refresh its catalogue.
+7. Dealer workspace — claim a shop; **Seller hub** tab when claimed; edit listings on Profile or Hub.
 8. Community — post a watch to sell, buy, or trade, or a random post (a find, a
    question, a watch to show), and comment on someone else's. A row under the
    title filters the feed to one kind, or All.
@@ -416,16 +416,19 @@ readable only by its owner. Tapping that photograph in the list or thread header
 opens the dealer's shop or the collector's profile; the rest of the row still
 opens the conversation.
 
-## 15. Roadmap (rough order)
+## 15. Roadmap (claimed-shop marketplace)
 
-1. **Deal payment** — Apple Pay hold on in-thread deals; capture and fee at
-   settlement. See [TRANSACTIONS.md](TRANSACTIONS.md).
-2. **Graham Pro** — feature gates; production subscription keys and store review.
-3. **Deals in groups** — same offer flow when buyer/seller roles are defined for
-   multi-party threads.
-4. **Ratings** — only once a buyer can leave a real one.
-5. **Dealer leads** — claimed shop view of inquiries and threads.
-6. **Push** — permission stored; delivery not wired.
+See [MARKETPLACE.md](MARKETPLACE.md).
+
+1. **Shop inbox** — buyer threads for a claimed shop (shipped).
+2. **Deal workflow** — accept, then pay; statuses beyond propose/decline/cancel.
+3. **Deal payment** — Apple Pay hold; capture, fee, seller payout. See
+   [TRANSACTIONS.md](TRANSACTIONS.md).
+4. **Push** — message, inquiry, and deal events.
+5. **Shop profile** — edit description, socials, and logo in-app.
+6. **Graham Pro** — collector feature gates; store review.
+7. **Deals in groups** — when buyer/seller roles exist for multi-party threads.
+8. **Ratings** — only after a buyer can complete a real transaction on Graham.
 
 ## 16. Monetization
 
