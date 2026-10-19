@@ -184,11 +184,21 @@ export function useDealerInventory(dealerId: string | null) {
     queryKey: keys.dealerInventory(dealerId ?? 'none'),
     queryFn: () => fetchDealerInventory(dealerId!),
     enabled: Boolean(dealerId),
+    staleTime: 30_000,
   });
+}
+
+function patchInventoryItem(
+  items: DealerInventoryItem[],
+  listingId: string,
+  changes: ListingEdits,
+): DealerInventoryItem[] {
+  return items.map((item) => (item.id === listingId ? { ...item, ...changes } : item));
 }
 
 export function useUpdateDealerListing(dealerId: string | null) {
   const queryClient = useQueryClient();
+  const inventoryKey = keys.dealerInventory(dealerId ?? 'none');
 
   return useMutation({
     mutationFn: async ({
@@ -201,12 +211,63 @@ export function useUpdateDealerListing(dealerId: string | null) {
       const { error } = await supabase.from('listings').update(changes).eq('id', listingId);
       if (error) throw error;
     },
+    onMutate: async ({ listingId, changes }) => {
+      if (!dealerId) return;
+      await queryClient.cancelQueries({ queryKey: inventoryKey });
+      const previous = queryClient.getQueryData<DealerInventoryItem[]>(inventoryKey);
+      if (previous) {
+        queryClient.setQueryData(inventoryKey, patchInventoryItem(previous, listingId, changes));
+      }
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (dealerId && context?.previous) {
+        queryClient.setQueryData(inventoryKey, context.previous);
+      }
+    },
     onSuccess: (_result, { listingId }) => {
       if (dealerId) {
-        queryClient.invalidateQueries({ queryKey: keys.dealerInventory(dealerId) });
+        void queryClient.invalidateQueries({ queryKey: keys.dealerInventory(dealerId) });
       }
-      // An edited brand moves the watch between facet counts, and the detail
-      // screen and deck both hold their own copy of the row.
+      queryClient.invalidateQueries({ queryKey: keys.listing(listingId) });
+      queryClient.invalidateQueries({ queryKey: ['deck'] });
+      queryClient.invalidateQueries({ queryKey: ['search'] });
+      queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
+      queryClient.invalidateQueries({ queryKey: keys.facets });
+    },
+  });
+}
+
+export function useDeleteDealerListing(dealerId: string | null) {
+  const queryClient = useQueryClient();
+  const inventoryKey = keys.dealerInventory(dealerId ?? 'none');
+
+  return useMutation({
+    mutationFn: async (listingId: string) => {
+      const { error } = await supabase.from('listings').delete().eq('id', listingId);
+      if (error) throw error;
+    },
+    onMutate: async (listingId) => {
+      if (!dealerId) return;
+      await queryClient.cancelQueries({ queryKey: inventoryKey });
+      const previous = queryClient.getQueryData<DealerInventoryItem[]>(inventoryKey);
+      if (previous) {
+        queryClient.setQueryData(
+          inventoryKey,
+          previous.filter((item) => item.id !== listingId),
+        );
+      }
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (dealerId && context?.previous) {
+        queryClient.setQueryData(inventoryKey, context.previous);
+      }
+    },
+    onSuccess: (_result, listingId) => {
+      if (dealerId) {
+        void queryClient.invalidateQueries({ queryKey: keys.dealerInventory(dealerId) });
+      }
       queryClient.invalidateQueries({ queryKey: keys.listing(listingId) });
       queryClient.invalidateQueries({ queryKey: ['deck'] });
       queryClient.invalidateQueries({ queryKey: ['search'] });
