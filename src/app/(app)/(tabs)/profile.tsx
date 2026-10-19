@@ -2,7 +2,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from 'expo-router';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
-import { Button, Eyebrow, Heading, Message, Screen } from '@/components/ui';
+import { SocialButton } from '@/components/SocialButton';
+import { Eyebrow, Heading, Message, Screen } from '@/components/ui';
 import { GuestGate } from '@/features/auth/GuestGate';
 import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
 import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
@@ -65,7 +66,7 @@ export default function Profile() {
           {shop.error ? <Message text={shop.error.message} tone="error" /> : null}
           <View style={styles.listHeading}>
             <Text style={styles.listTitle}>Listings</Text>
-            <Button label="Reload" variant="ghost" onPress={() => shop.reload()} />
+            <SocialButton label="Reload" onPress={() => shop.reload()} />
           </View>
         </View>
       ) : shop.claimable ? (
