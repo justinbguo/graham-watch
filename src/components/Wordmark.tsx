@@ -1,22 +1,32 @@
-import { Text } from 'react-native';
+import { Image } from 'expo-image';
+import { View } from 'react-native';
 
-import { type, type Theme } from '@/lib/theme';
+import { radius, size, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+const LOGO = require('../../assets/logo.png');
+
 /**
- * The name on sign-in. Buy's header is the search bar, so this lockup
- * stays on the sign-in screen.
+ * Brand lockup on sign-in. Buy uses the search bar; this is the gold G mark.
  */
 export function Wordmark() {
   const styles = useThemedStyles(wordmarkStyles);
 
-  return <Text style={styles.mark}>GRAHAM</Text>;
+  return (
+    <View style={styles.frame}>
+      <Image source={LOGO} style={styles.logo} contentFit="contain" accessible accessibilityLabel="Graham" />
+    </View>
+  );
 }
 
-const wordmarkStyles = (theme: Theme) => ({
-  mark: {
-    ...type.wordmark,
-    flexShrink: 1,
-    color: theme.color.text,
+const wordmarkStyles = (_theme: Theme) => ({
+  frame: {
+    alignSelf: 'flex-start' as const,
+  },
+  logo: {
+    width: size.wordmarkLogo,
+    height: size.wordmarkLogo,
+    borderRadius: radius.md,
+    overflow: 'hidden' as const,
   },
 });

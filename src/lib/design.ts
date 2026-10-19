@@ -532,6 +532,8 @@ export const WIDE_BREAKPOINT = 900;
 export const GUEST_SWIPE_BUDGET = 10;
 
 export const size = {
+  /** Sign-in brand mark. Square lockup from `assets/logo.png`. */
+  wordmarkLogo: 80,
   thumb: 72,
   /**
    * The profile photograph. The four lines beside it — name, handle,
