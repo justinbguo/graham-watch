@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
@@ -70,6 +70,24 @@ export default function ListingScreen() {
   // about a watch you have kept, so saving is the only verdict it offers.
   const fromSearch = from === 'search';
 
+  const verdictActions =
+    isSaved ? null : (
+      <View style={styles.verdictRow}>
+        {fromSearch || card?.sold_at ? null : (
+          <PassWatch
+            block
+            loading={save.isPending && save.variables?.direction === 'left'}
+            onPress={() => judge('left', () => router.back())}
+          />
+        )}
+        <AddToWishlist
+          block
+          loading={save.isPending && save.variables?.direction === 'right'}
+          onPress={() => judge('right')}
+        />
+      </View>
+    );
+
   if (isPending) {
     return (
       <Screen action={<CloseButton onPress={() => router.back()} />}>
@@ -90,7 +108,7 @@ export default function ListingScreen() {
   }
 
   return (
-    <Screen>
+    <Screen width={Platform.OS === 'web' ? 'cardWeb' : 'reading'}>
       {/* Outside the scroll, on the close button's line. A name that leaves
           with the photograph is gone by the time you reach the caliber. */}
       <View style={styles.headline}>
@@ -100,48 +118,48 @@ export default function ListingScreen() {
           <CloseButton onPress={() => router.back()} />
         </View>
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
-        <View ref={photoRef} style={styles.photo}>
-          <PhotoCarousel
-            photos={card.photos}
-            active
-            showBars
-            measureRef={photoRef}
-            onExpand={(index) =>
-              open(
-                'photos/[listingId]',
-                { listingId: card.id, index: String(index) },
-                `/photos/${card.id}?index=${index}`
-              )
-            }
-          />
+      {Platform.OS === 'web' ? (
+        <View style={styles.webRow}>
+          <View ref={photoRef} style={styles.webPhoto}>
+            <PhotoCarousel
+              photos={card.photos}
+              active
+              showBars
+              measureRef={photoRef}
+              onExpand={(index) =>
+                open(
+                  'photos/[listingId]',
+                  { listingId: card.id, index: String(index) },
+                  `/photos/${card.id}?index=${index}`
+                )
+              }
+            />
+          </View>
+          <ScrollView style={styles.webDetailScroll} contentContainerStyle={styles.webDetailBody}>
+            <ListingDetails card={card} actions={verdictActions} />
+          </ScrollView>
         </View>
+      ) : (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+          <View ref={photoRef} style={styles.photo}>
+            <PhotoCarousel
+              photos={card.photos}
+              active
+              showBars
+              measureRef={photoRef}
+              onExpand={(index) =>
+                open(
+                  'photos/[listingId]',
+                  { listingId: card.id, index: String(index) },
+                  `/photos/${card.id}?index=${index}`
+                )
+              }
+            />
+          </View>
 
-        <ListingDetails
-          card={card}
-          // A watch already on the wishlist has nothing left to decide here. The row
-          // carries Message and slides left to remove, so repeating both
-          // on the page put a verdict in front of a watch already chosen.
-          actions={
-            isSaved ? null : (
-              <View style={styles.verdictRow}>
-                {fromSearch || card.sold_at ? null : (
-                  <PassWatch
-                    block
-                    loading={save.isPending && save.variables?.direction === 'left'}
-                    onPress={() => judge('left', () => router.back())}
-                  />
-                )}
-                <AddToWishlist
-                  block
-                  loading={save.isPending && save.variables?.direction === 'right'}
-                  onPress={() => judge('right')}
-                />
-              </View>
-            )
-          }
-        />
-      </ScrollView>
+          <ListingDetails card={card} actions={verdictActions} />
+        </ScrollView>
+      )}
     </Screen>
   );
 }
@@ -194,5 +212,26 @@ const detailStyles = (theme: Theme) => ({
     alignItems: 'stretch' as const,
     gap: space.sm,
     width: '100%' as const,
+  },
+  webRow: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    gap: stack.group,
+    paddingHorizontal: inset.screen,
+    minHeight: 0,
+  },
+  webPhoto: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: radius.lg,
+    overflow: 'hidden' as const,
+  },
+  webDetailScroll: {
+    flex: 1,
+    minWidth: 0,
+  },
+  webDetailBody: {
+    paddingBottom: space.xxl,
+    gap: stack.group,
   },
 });
