@@ -428,8 +428,51 @@ export const motion = {
   rotate: 2400,
 } as const;
 
+/** Pass and keyboard fling off the deck. Web cards are wider, so time scales with width. */
+export function cardDismissDuration(cardWidth: number, web: boolean) {
+  if (!web) return motion.fast;
+  const width = cardWidth > 0 ? cardWidth : layout.cardWeb;
+  return Math.min(560, Math.max(340, Math.round((width / layout.card) * motion.smooth)));
+}
+
+export function cardSettleDuration(web: boolean) {
+  return web ? motion.smooth : motion.settle;
+}
+
+/** Save flight to the Wishlist tab. Web origins are wider than a phone card. */
+export function saveFlightDuration(originWidth: number, web: boolean) {
+  if (!web) return motion.flight;
+  const width = originWidth > 0 ? originWidth : layout.cardWeb;
+  return Math.min(600, Math.max(motion.flight, Math.round((width / layout.card) * motion.flight)));
+}
+
 /** Minimum tappable area. Anything smaller needs hitSlop to reach it. */
 export const HIT_TARGET = 44;
+
+/**
+ * Single-line controls share one vertical center line: icon, placeholder, and
+ * typed text. Paragraph `lineHeight` on a one-line `TextInput` lifts the
+ * placeholder on iOS while the value sits lower.
+ */
+export const controlText = {
+  body: {
+    fontFamily: type.body.fontFamily,
+    fontSize: type.body.fontSize,
+    lineHeight: type.body.fontSize,
+    includeFontPadding: false,
+  } satisfies TextStyle,
+  label: {
+    fontFamily: type.labelStrong.fontFamily,
+    fontSize: type.labelStrong.fontSize,
+    lineHeight: type.labelStrong.fontSize,
+    includeFontPadding: false,
+  } satisfies TextStyle,
+};
+
+/** This face sits slightly low in its box on iOS inputs. */
+export const controlTextNudge = {
+  paddingBottom: Platform.OS === 'ios' ? space.xs / 2 : 0,
+} as const;
 
 /**
  * Maximum content widths. A phone is narrower than every value here, so these
@@ -444,8 +487,15 @@ export const layout = {
   reading: 560,
   /** The swipe stage. A card should stay hand-sized at any window width. */
   card: 480,
+  /**
+   * Web card view with the photograph beside the copy. Twice `card` so each
+   * column keeps the hand-sized width the vertical stack used to give the photo.
+   */
+  cardWeb: 960,
   /** The browse grid, which spends width on columns rather than line length. */
   grid: 1280,
+  /** Seller Hub on web: inventory rows need room; not as wide as the home grid. */
+  hub: 960,
   /** The glyph column on a wide window: one tab wide, plus air either side. */
   rail: 88,
   /**
@@ -522,6 +572,8 @@ export const size = {
    * above the keyboard.
    */
   quotePhoto: 160,
+  /** A photograph sent in a message thread. */
+  messagePhoto: 200,
   /**
    * The same frame on the home grid and the wishlist. Shorter, so a scan of
    * the deck or a saved list is a list. A shop keeps `gridPhoto`. Search is a

@@ -10,7 +10,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { StyleSheet, View, type ColorValue } from 'react-native';
+import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -23,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { motion, radius, size, type Theme } from '@/lib/theme';
+import { motion, radius, saveFlightDuration, size, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -136,9 +136,10 @@ function FlyingCard({
   const endScale = Math.max(flight.to.width / flight.from.width, MIN_SCALE);
 
   useEffect(() => {
+    const web = Platform.OS === 'web';
     progress.value = withTiming(
       1,
-      { duration: motion.flight, easing: Easing.out(Easing.cubic) },
+      { duration: saveFlightDuration(flight.from.width, web), easing: Easing.out(Easing.cubic) },
       (finished) => {
         if (!finished) return;
         arrivals.value += 1;
