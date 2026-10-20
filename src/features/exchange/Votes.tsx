@@ -3,8 +3,6 @@ import { useEffect, useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, {
   Easing,
-  FadeInDown,
-  FadeInUp,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -13,7 +11,7 @@ import Animated, {
 
 import { ACTION_BAR_ICON, PILL_HIT_SLOP } from '@/components/ActionBar';
 import type { VoteValue } from '@/data/exchange';
-import { HIT_TARGET, motion, radius, space, type, type Theme } from '@/lib/theme';
+import { actionPillChrome, HIT_TARGET, motion, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -119,31 +117,31 @@ function Arrow({
   );
 }
 
-/**
- * The number rolls: a rise comes up from below, a fall comes down from above,
- * `motion.fast`. Only on a change — a score that mounts with the feed holds
- * still, or every card on the board would twitch as it loaded.
- */
+/** Nudges one step when the score changes. The digit stays mounted so it cannot vanish mid-enter. */
 function Score({ score, on }: { score: number; on: boolean }) {
   const styles = useThemedStyles(voteStyles);
-  const previous = useRef(score);
-  const delta = Math.sign(score - previous.current);
-  useEffect(() => {
-    previous.current = score;
-  }, [score]);
+  const shown = Number.isFinite(score) ? score : 0;
+  const previous = useRef(shown);
+  const nudge = useSharedValue(0);
+  const nudgeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: nudge.value }],
+  }));
 
-  const entering =
-    delta > 0
-      ? FadeInDown.duration(motion.fast).withInitialValues({ transform: [{ translateY: STEP }] })
-      : delta < 0
-        ? FadeInUp.duration(motion.fast).withInitialValues({ transform: [{ translateY: -STEP }] })
-        : undefined;
+  useEffect(() => {
+    const delta = shown - previous.current;
+    if (delta !== 0) {
+      const toward = delta > 0 ? STEP : -STEP;
+      nudge.value = withSequence(
+        withTiming(toward, { duration: motion.fast / 2, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: motion.fast / 2, easing: Easing.out(Easing.cubic) }),
+      );
+    }
+    previous.current = shown;
+  }, [shown, nudge]);
 
   return (
     <View style={styles.scoreWell}>
-      <Animated.Text key={score} entering={entering} style={[styles.score, on && styles.scoreOn]}>
-        {score}
-      </Animated.Text>
+      <Animated.Text style={[styles.score, on && styles.scoreOn, nudgeStyle]}>{shown}</Animated.Text>
     </View>
   );
 }
@@ -156,9 +154,7 @@ const voteStyles = (theme: Theme) => ({
     alignSelf: 'flex-start' as const,
     minHeight: HIT_TARGET,
     paddingHorizontal: space.md,
-    borderRadius: radius.full,
-    // The first capsule in the action bar, filled like the rest of them.
-    backgroundColor: theme.color.fill,
+    ...actionPillChrome(theme),
   },
   arrow: {
     alignItems: 'center' as const,

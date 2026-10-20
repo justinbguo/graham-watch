@@ -18,7 +18,7 @@ export function Tag({
 }: {
   label: string;
   tone?: 'plain' | 'money';
-  /** `plate` matches the year line on a deck card (`titleSmall`). */
+  /** `plate` matches the year line on a deck card (`plateMeta`). */
   size?: 'default' | 'plate';
 }) {
   const styles = useThemedStyles(tagStyles);
@@ -58,8 +58,7 @@ const tagStyles = (theme: Theme) => ({
     paddingHorizontal: space.sm,
   },
   plateLabel: {
-    ...type.titleSmall,
-    lineHeight: type.titleSmall.lineHeight,
+    ...type.plateMeta,
     color: theme.color.onMoney,
   },
 });

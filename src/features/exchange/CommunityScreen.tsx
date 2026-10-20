@@ -3,9 +3,13 @@ import { Alert, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
+import { DeckRailButton } from '@/components/DeckRailButton';
+import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
 import { HeaderIcon } from '@/components/HeaderIcon';
 import { Screen, Message } from '@/components/ui';
 import type { ExchangeAuthor } from '@/data/exchange';
+import { useIsDesktopWeb } from '@/lib/layout';
 import { inset, motion, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
@@ -32,6 +36,7 @@ function explainDeal() {
 
 export function CommunityScreen() {
   const { userId } = useSession();
+  const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(screenStyles);
   const [stack, setStack] = useState<Place[]>([{ kind: 'feed' }]);
   // Held here, not in the feed, so a thread opened and closed comes back to
@@ -119,7 +124,7 @@ export function CommunityScreen() {
   if (mode.kind === 'post') {
     return (
       <Screen
-        title="Community"
+        title={isDesktopWeb ? undefined : 'Community'}
         inTabs
         back={{ label: 'Back to posts', onPress: back }}>
         <Animated.View key={mode.id} entering={arrive} style={styles.view}>
@@ -135,24 +140,55 @@ export function CommunityScreen() {
     );
   }
 
+  const headerActions = (
+    <View style={styles.actions}>
+      <HeaderIcon label="How a deal works" name="information-outline" onPress={explainDeal} />
+      <HeaderIcon label="New post" name="plus" onPress={() => push({ kind: 'new' })} />
+    </View>
+  );
+
+  const desktopRail = (
+    <DeckToolRail>
+      <DeckRailTools>
+        <DeckRailButton
+          variant="primary"
+          label="New post"
+          icon="plus"
+          onPress={() => push({ kind: 'new' })}
+        />
+        <IntentFilter value={filter} onChange={setFilter} variant="rail" />
+        <DeckRailButton
+          label="How deals work"
+          icon="information-outline"
+          onPress={explainDeal}
+          accessibilityLabel="How a deal works"
+        />
+      </DeckRailTools>
+    </DeckToolRail>
+  );
+
+  const feed = (
+    <Animated.View key="feed" entering={arrive} style={styles.view}>
+      <Feed
+        filter={filter}
+        onOpen={(id) => push({ kind: 'post', id })}
+        onOpenAuthor={openAuthor}
+        flush={isDesktopWeb}
+      />
+    </Animated.View>
+  );
+
   return (
     <Screen
       title="Community"
       inTabs
-      subhead={<IntentFilter value={filter} onChange={setFilter} />}
-      action={
-        <View style={styles.actions}>
-          <HeaderIcon label="How a deal works" name="information-outline" onPress={explainDeal} />
-          <HeaderIcon label="New post" name="plus" onPress={() => push({ kind: 'new' })} />
-        </View>
-      }>
-      <Animated.View key="feed" entering={arrive} style={styles.view}>
-        <Feed
-          filter={filter}
-          onOpen={(id) => push({ kind: 'post', id })}
-          onOpenAuthor={openAuthor}
-        />
-      </Animated.View>
+      width={isDesktopWeb ? 'deckFrameWeb' : 'reading'}
+      desktopBleed={isDesktopWeb}
+      subhead={
+        isDesktopWeb ? undefined : <IntentFilter value={filter} onChange={setFilter} />
+      }
+      action={isDesktopWeb ? undefined : headerActions}>
+      {isDesktopWeb ? <DeckDesktopFrame rail={desktopRail}>{feed}</DeckDesktopFrame> : feed}
     </Screen>
   );
 }

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 
-import { space, tracking, type, type Theme } from '@/lib/theme';
+import { fieldChrome, inset, radius, space, tracking, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 import type { ExchangeIntent } from '@/data/exchange';
@@ -64,6 +64,7 @@ export function PostPriceField({
   return (
     <View style={styles.block}>
       {showKicker ? <Text style={styles.kicker}>{kicker}</Text> : null}
+      <View style={styles.shell}>
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"
@@ -84,6 +85,7 @@ export function PostPriceField({
           selectTextOnFocus
         />
       </View>
+      </View>
     </View>
   );
 }
@@ -91,6 +93,12 @@ export function PostPriceField({
 const fieldStyles = (theme: Theme) => ({
   block: {
     gap: space.xs,
+  },
+  shell: {
+    ...fieldChrome(theme),
+    borderRadius: radius.md,
+    paddingHorizontal: inset.controlX,
+    paddingVertical: space.sm,
   },
   kicker: {
     ...type.caption,

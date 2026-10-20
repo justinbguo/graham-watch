@@ -3,15 +3,15 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { intentLabel, type ExchangeIntent } from '@/data/exchange';
-import { HIT_TARGET, inset, radius, size, type, type Theme } from '@/lib/theme';
+import { fieldChrome, HIT_TARGET, inset, radius, size, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 import { INTENT_OPTIONS } from './copy';
 
 /**
  * Selling, buying, trading, or random, as one field. A row each spent the top
- * of the form on one small choice. It opens in place: a menu floating over the
- * title would need a border, and this app does not outline a control.
+ * of the form on one small choice. It opens in place under the same field
+ * chrome as the title and body fields beside it.
  */
 export function IntentSelect({
   value,
@@ -64,7 +64,7 @@ export function IntentSelect({
 
 const selectStyles = (theme: Theme) => ({
   block: {
-    backgroundColor: theme.color.fill,
+    ...fieldChrome(theme),
     borderRadius: radius.md,
     overflow: 'hidden' as const,
   },
