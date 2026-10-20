@@ -76,10 +76,16 @@ run them deliberately, and take a dump first if the data matters:
 
 ```
 npx supabase db dump --linked --data-only -f ~/graham-backups/data-$(date +%F).sql
-npx supabase db push
+npm run db:push:dry
+npm run db:push
 npx supabase functions deploy send-inquiry
 npx supabase functions deploy inquiry-draft
 ```
+
+Run those as separate lines. A `#` comment on the same line as `npm run db:push`
+is not a comment to npm — everything after `--` is forwarded to the Supabase CLI,
+which then errors with `Unexpected positional arguments: "#", "list"`. Use
+`npm run db:push:dry` instead of `npm run db:push -- --dry-run`.
 
 An operator on hosted is a row in `operators` there, and `npm run db:reset`
 cannot reach it. Grant one with `npm run dealers -- operator you@example.com`
@@ -556,8 +562,14 @@ schema.
 `npm run` puts `node_modules/.bin` at the front of `PATH`, so every `db:*` script
 uses the pinned binary no matter what `supabase` means in your shell. A bare
 `supabase db reset` in a terminal does not: that is whatever Homebrew installed.
+Homebrew 2.100 rejects `[local_smtp]` in `supabase/config.toml` with
+`invalid keys: local_smtp`; use `npm run db:push`, not `supabase db push`.
 Check with `npm exec -- supabase --version` against `supabase --version`; if they
 disagree, run schema commands through `npm run`.
+Do not paste shell comments on the same line as `npm run db:*` when you pass flags
+after `--` — npm forwards the `#` and the words after it to the Supabase CLI,
+which prints help instead of running. Same failure mode as `npm run db:start`
+with a trailing comment.
 
 None of them proves the app works. The one test above the database covers a feed
 parser; there is nothing exercising the buyer or dealer flows, so those are

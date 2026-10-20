@@ -7,9 +7,31 @@
  */
 import { config, describeTarget, serviceKey } from './_supabase.mjs';
 
-const email = process.argv[2]?.trim().toLowerCase();
-if (!email?.includes('@')) {
-  console.error('\n  Usage: npm run mock:signin -- <email>\n');
+const FIXTURE_ALIASES = {
+  ada: 'ada@graham.test',
+  bea: 'bea@graham.test',
+  dealer: 'dealer@graham.test',
+  desk: 'dealer@graham.test',
+  gold: 'gold@graham.test',
+  goldfinger: 'gold@graham.test',
+};
+
+function resolveEmail(raw) {
+  const token = raw?.trim().toLowerCase();
+  if (!token) return null;
+  if (token.includes('@')) return token;
+  return FIXTURE_ALIASES[token] ?? null;
+}
+
+const email = resolveEmail(process.argv[2]);
+if (!email) {
+  console.error(
+    '\n  Usage: npm run mock:signin -- <email>\n' +
+      '         npm run mock:signin -- gold\n' +
+      '\n' +
+      '  Put `--` before the address so npm passes it to the script.\n' +
+      '  Short names: ada, bea, dealer, gold\n'
+  );
   process.exit(1);
 }
 if (!email.endsWith('@graham.test')) {
