@@ -14,6 +14,7 @@ import { ConversationRow } from './ConversationRow';
 import { GroupDoor } from './GroupDoor';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
+import { useOpenConversation } from './useOpenConversation';
 
 /** Each letter is not a search. Suggestions are asked once typing pauses. */
 const SUGGEST_PAUSE = 300;
@@ -36,6 +37,7 @@ export function StartChat() {
   const debounced = useDebounced(term, SUGGEST_PAUSE);
   const suggestions = useSuggestPeople(debounced);
   const start = useMessagePerson();
+  const openConversation = useOpenConversation();
   const ready = debounced === term;
   const people = ready ? (suggestions.data ?? []) : [];
 
@@ -49,7 +51,7 @@ export function StartChat() {
     start.mutate(person.id, {
       onSuccess: (conversationId) => {
         void queryClient.invalidateQueries({ queryKey: keys.conversations });
-        router.replace(`/conversation/${conversationId}`);
+        openConversation({ conversationId }, { replace: true });
       },
       onError: () => setFailure('Could not open that conversation.'),
     });

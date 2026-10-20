@@ -1,6 +1,6 @@
 import { ActionPill } from '@/components/ActionBar';
 import { useMessagePerson } from '@/data/messages';
-import { useOpenStack } from '@/lib/openStack';
+import { useOpenConversation } from '@/features/messages/useOpenConversation';
 
 /**
  * Write to whoever wrote this. The thread is found, not created, when one
@@ -9,7 +9,7 @@ import { useOpenStack } from '@/lib/openStack';
  * the same thread.
  */
 export function MessagePerson({ userId, name }: { userId: string; name: string }) {
-  const open = useOpenStack();
+  const openConversation = useOpenConversation();
   const start = useMessagePerson();
 
   return (
@@ -20,12 +20,7 @@ export function MessagePerson({ userId, name }: { userId: string; name: string }
       busy={start.isPending}
       onPress={() =>
         start.mutate(userId, {
-          onSuccess: (conversationId) =>
-            open(
-              'conversation/[conversationId]',
-              { conversationId },
-              `/conversation/${conversationId}`
-            ),
+          onSuccess: (conversationId) => openConversation({ conversationId }),
         })
       }
     />

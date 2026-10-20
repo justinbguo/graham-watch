@@ -25,6 +25,8 @@ const rise = FadeInDown.duration(motion.base).withInitialValues({
 export function Bubble({
   body,
   mine,
+  /** Desktop split: bubbles sit on `surfaceSunken`, not the page. */
+  inPane = false,
   /** The watch this message answers. Sits above the words. */
   listing,
   onOpenListing,
@@ -37,6 +39,7 @@ export function Bubble({
 }: {
   body: string;
   mine: boolean;
+  inPane?: boolean;
   listing?: MessageListing | null;
   onOpenListing?: () => void;
   caption?: string | null;
@@ -55,7 +58,11 @@ export function Bubble({
         <ListingQuote listing={listing} onPress={onOpenListing} mine={mine} />
       ) : null}
       {speaker ? <Text style={styles.speaker}>{speaker}</Text> : null}
-      <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+      <View
+        style={[
+          styles.bubble,
+          mine ? [styles.mine, inPane && styles.minePane] : inPane ? styles.theirsPane : styles.theirs,
+        ]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
         ) : null}
@@ -96,6 +103,13 @@ const bubbleStyles = (theme: Theme) => ({
   },
   theirs: {
     backgroundColor: theme.color.fill,
+  },
+  theirsPane: {
+    backgroundColor: theme.color.messageIncoming,
+    maxWidth: '75%' as const,
+  },
+  minePane: {
+    maxWidth: '75%' as const,
   },
   body: {
     ...type.body,

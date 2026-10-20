@@ -1,9 +1,10 @@
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { SocialButton } from '@/components/SocialButton';
 import type { ConversationDeal } from '@/data/deals';
-import { estimatedFeeCents } from '@/data/deals';
+import { dealIsOpen, estimatedFeeCents, isDealExpired } from '@/data/deals';
 import type { MessageListing } from '@/data/messages';
+import { formatShortDate, formatTimeLeft } from '@/lib/format';
 import { formatCents } from '@/lib/money';
 import { radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -11,14 +12,16 @@ import { useThemedStyles } from '@/providers/theme';
 import { DealListingDelta } from './DealListingDelta';
 import { ListingQuote } from './ListingQuote';
 
-const STATUS_LABEL: Record<ConversationDeal['status'], string> = {
-  proposed: 'Awaiting payment',
-  accepted: 'Accepted',
-  funded: 'Payment held',
-  completed: 'Completed',
-  declined: 'Declined',
-  cancelled: 'Cancelled',
-  expired: 'Expired',
+export type DealCardActions = {
+  onAccept?: () => void;
+  onDecline: () => void;
+  onCancel: () => void;
+  onEdit?: () => void;
+  onCounter?: () => void;
+  onCheckout?: () => void;
+  onShip?: () => void;
+  onConfirmReceipt?: () => void;
+  onReview?: () => void;
 };
 
 export function DealCard({
@@ -27,34 +30,24 @@ export function DealCard({
   viewerId,
   listing,
   onOpenListing,
-  onDecline,
-  onCancel,
-  onEdit,
   busy,
-}: {
+  ...actions
+}: DealCardActions & {
   deal: ConversationDeal;
   mine: boolean;
   viewerId: string;
   listing?: MessageListing | null;
   onOpenListing?: () => void;
-  onDecline: () => void;
-  onCancel: () => void;
-  onEdit?: () => void;
   busy?: boolean;
 }) {
   const styles = useThemedStyles(dealStyles);
   const fee = estimatedFeeCents(deal);
   const isBuyer = viewerId === deal.buyerId;
   const isSeller = viewerId === deal.sellerId;
-  const open = deal.status === 'proposed';
+  const open = dealIsOpen(deal);
   const accentCard = mine;
-
-  const pay = () => {
-    Alert.alert(
-      'Apple Pay coming soon',
-      'You pay into this deal with Apple Pay. The seller is paid after you confirm receipt; Graham keeps a transaction fee.',
-    );
-  };
+  const ink = accentCard ? styles.onAccent : undefined;
+  const inkMuted = accentCard ? styles.onAccentMuted : undefined;
 
   return (
     <View
@@ -63,7 +56,7 @@ export function DealCard({
         mine ? styles.cardMine : styles.cardTheirs,
         accentCard && styles.cardAccent,
       ]}>
-      <Text style={[styles.eyebrow, accentCard && styles.onAccentMuted]}>Deal</Text>
+      <Text style={[styles.eyebrow, inkMuted]}>Deal</Text>
       {listing && onOpenListing ? (
         <ListingQuote
           listing={listing}
@@ -72,16 +65,15 @@ export function DealCard({
           inverse={accentCard}
         />
       ) : null}
-      <Text style={[styles.amount, accentCard && styles.onAccent]}>
-        {formatCents(deal.amountCents, deal.currency)}
-      </Text>
+      <Text style={[styles.amount, ink]}>{formatCents(deal.amountCents, deal.currency)}</Text>
       <DealListingDelta
         offerCents={deal.amountCents}
         listPriceCents={listing?.priceCents}
         currency={deal.currency}
         onAccent={accentCard}
       />
-      <Text style={[styles.status, accentCard && styles.onAccent]}>{STATUS_LABEL[deal.status]}</Text>
+      <Text style={[styles.status, ink]}>{statusLabel(deal, isBuyer)}</Text>
+      <DealTimeline deal={deal} isBuyer={isBuyer} onAccent={accentCard} />
       <View style={styles.expenses}>
         <DealExpense
           label="Offer"
@@ -103,32 +95,196 @@ export function DealCard({
           onAccent={accentCard}
         />
       </View>
-      {open ? (
-        <View style={styles.actions}>
-          {isBuyer && deal.proposedBy !== viewerId ? (
-            <>
-              <SocialButton label="Pay with Apple Pay" solid block onPress={pay} disabled={busy} />
-              <SocialButton label="Decline" block disabled={busy} onPress={onDecline} />
-            </>
-          ) : null}
-          {isSeller && deal.proposedBy === viewerId ? (
-            <View style={styles.actionRow}>
-              <SocialButton
-                label="Edit offer"
-                rowItem
-                disabled={busy || !onEdit}
-                onPress={() => onEdit?.()}
-              />
-              <SocialButton label="Cancel" rowItem disabled={busy} onPress={onCancel} />
-            </View>
-          ) : null}
-          {isSeller && deal.proposedBy !== viewerId ? (
-            <SocialButton label="Decline" block disabled={busy} onPress={onDecline} />
-          ) : null}
-        </View>
-      ) : null}
+      <DealActions
+        deal={deal}
+        open={open}
+        isBuyer={isBuyer}
+        isSeller={isSeller}
+        viewerId={viewerId}
+        busy={busy}
+        actions={actions}
+      />
     </View>
   );
+}
+
+function statusLabel(deal: ConversationDeal, isBuyer: boolean): string {
+  if (isDealExpired(deal)) return 'Expired';
+  switch (deal.status) {
+    case 'proposed':
+      return 'Awaiting response';
+    case 'accepted':
+      return isBuyer ? 'Accepted — ready to pay' : 'Accepted — awaiting payment';
+    case 'funded':
+      return isBuyer ? 'Paid — awaiting shipment' : 'Paid — ship it';
+    case 'shipped':
+      return isBuyer ? 'Shipped — confirm when it arrives' : 'Shipped';
+    case 'completed':
+      return 'Completed';
+    case 'declined':
+      return 'Declined';
+    case 'cancelled':
+      return deal.cancelledReason === 'listing_reserved'
+        ? 'Closed — another offer was accepted'
+        : 'Cancelled';
+    case 'expired':
+      return 'Expired';
+  }
+}
+
+/** One line of context under the status: clock, ship-by, tracking. */
+function DealTimeline({
+  deal,
+  isBuyer,
+  onAccent,
+}: {
+  deal: ConversationDeal;
+  isBuyer: boolean;
+  onAccent: boolean;
+}) {
+  const styles = useThemedStyles(dealStyles);
+  const line = timelineLine(deal, isBuyer);
+  if (!line) return null;
+  return (
+    <Text style={[styles.timeline, onAccent && styles.onAccentMuted]} selectable>
+      {line}
+    </Text>
+  );
+}
+
+function timelineLine(deal: ConversationDeal, isBuyer: boolean): string | null {
+  if (deal.status === 'proposed' && deal.expiresAt) {
+    const left = formatTimeLeft(deal.expiresAt);
+    return left ? `Expires in ${left}` : 'This offer has expired.';
+  }
+  if (deal.status === 'funded' && deal.shipBy) {
+    return isBuyer
+      ? `Seller ships by ${formatShortDate(deal.shipBy)}.`
+      : `Ship by ${formatShortDate(deal.shipBy)}. Add tracking when it leaves.`;
+  }
+  if ((deal.status === 'shipped' || deal.status === 'completed') && deal.trackingNumber) {
+    return `${deal.trackingCarrier ?? 'Tracking'} ${deal.trackingNumber}`;
+  }
+  return null;
+}
+
+function DealActions({
+  deal,
+  open,
+  isBuyer,
+  isSeller,
+  viewerId,
+  busy,
+  actions,
+}: {
+  deal: ConversationDeal;
+  open: boolean;
+  isBuyer: boolean;
+  isSeller: boolean;
+  viewerId: string;
+  busy?: boolean;
+  actions: DealCardActions;
+}) {
+  const styles = useThemedStyles(dealStyles);
+
+  if (open) {
+    const theirs = deal.proposedBy !== viewerId;
+    if (theirs && (isBuyer || isSeller)) {
+      return (
+        <View style={styles.actions}>
+          <SocialButton
+            label="Accept offer"
+            solid
+            block
+            disabled={busy || !actions.onAccept}
+            onPress={() => actions.onAccept?.()}
+          />
+          <View style={styles.actionRow}>
+            <SocialButton
+              label="Counteroffer"
+              rowItem
+              disabled={busy || !actions.onCounter}
+              onPress={() => actions.onCounter?.()}
+            />
+            <SocialButton label="Decline" rowItem disabled={busy} onPress={actions.onDecline} />
+          </View>
+        </View>
+      );
+    }
+    if (isSeller) {
+      return (
+        <View style={styles.actions}>
+          <View style={styles.actionRow}>
+            <SocialButton
+              label="Edit offer"
+              rowItem
+              disabled={busy || !actions.onEdit}
+              onPress={() => actions.onEdit?.()}
+            />
+            <SocialButton label="Cancel" rowItem disabled={busy} onPress={actions.onCancel} />
+          </View>
+        </View>
+      );
+    }
+    return null;
+  }
+
+  if (deal.status === 'accepted' && isBuyer) {
+    return (
+      <View style={styles.actions}>
+        <SocialButton
+          label="Continue to checkout"
+          solid
+          block
+          disabled={busy || !actions.onCheckout}
+          onPress={() => actions.onCheckout?.()}
+        />
+      </View>
+    );
+  }
+
+  if (deal.status === 'funded' && isSeller) {
+    return (
+      <View style={styles.actions}>
+        <SocialButton
+          label="Mark shipped"
+          solid
+          block
+          disabled={busy || !actions.onShip}
+          onPress={() => actions.onShip?.()}
+        />
+      </View>
+    );
+  }
+
+  if (deal.status === 'shipped' && isBuyer) {
+    return (
+      <View style={styles.actions}>
+        <SocialButton
+          label="Confirm receipt"
+          solid
+          block
+          disabled={busy || !actions.onConfirmReceipt}
+          onPress={() => actions.onConfirmReceipt?.()}
+        />
+      </View>
+    );
+  }
+
+  if (deal.status === 'completed' && isBuyer && !deal.reviewedAt) {
+    return (
+      <View style={styles.actions}>
+        <SocialButton
+          label="Rate the seller"
+          block
+          disabled={busy || !actions.onReview}
+          onPress={() => actions.onReview?.()}
+        />
+      </View>
+    );
+  }
+
+  return null;
 }
 
 function DealExpense({
@@ -236,6 +392,10 @@ const dealStyles = (theme: Theme) => ({
   status: {
     ...type.labelStrong,
     color: theme.color.text,
+  },
+  timeline: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
   expenses: {
     gap: stack.tight,

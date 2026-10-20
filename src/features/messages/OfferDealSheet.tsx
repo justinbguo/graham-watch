@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
 
+import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { SocialButton } from '@/components/SocialButton';
-import { Message } from '@/components/ui';
-import { useCreateDeal, useReviseDeal } from '@/data/deals';
+import { Eyebrow, Message } from '@/components/ui';
+import {
+  DEFAULT_OFFER_EXPIRY_HOURS,
+  OFFER_EXPIRY_CHOICES,
+  useCreateDeal,
+  useReviseDeal,
+} from '@/data/deals';
+import { useListing } from '@/data/listings';
 import type { MessageListing } from '@/data/messages';
 import {
   centsToPriceDigits,
@@ -12,18 +18,29 @@ import {
   priceDigitsToCents,
 } from '@/features/exchange/PostPriceField';
 import { feeCentsFromBps, formatCents } from '@/lib/money';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+import { DealListingPhotoStrip } from './DealListingPhotoStrip';
 import { DealListingDelta } from './DealListingDelta';
-import { ListingQuote } from './ListingQuote';
+import { DealOfferFinalWarning } from './DealOfferFinalWarning';
+import { DealOfferSummary } from './DealOfferSummary';
+import { DealSheetShell, dealSheetActionStyles } from './DealSheetShell';
 
 const FEE_BPS = 500;
+
+const EXPIRY_OPTIONS = OFFER_EXPIRY_CHOICES.map((choice) => ({
+  value: choice.hours,
+  label: choice.label,
+}));
+
+type Step = 'compose' | 'review';
 
 export function OfferDealSheet({
   visible,
   conversationId,
   listing,
+  intent = 'create',
   editDeal,
   onOpenListing,
   onClose,
@@ -31,21 +48,34 @@ export function OfferDealSheet({
   visible: boolean;
   conversationId: string;
   listing: MessageListing;
-  /** When set, Confirm updates this open offer instead of creating a new deal. */
+  intent?: 'create' | 'edit' | 'counter';
+  /** When set, the review step updates this open offer instead of creating a new deal. */
   editDeal?: { id: string; amountCents: number } | null;
   onOpenListing: () => void;
   onClose: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(sheetStyles);
   const create = useCreateDeal(conversationId);
   const revise = useReviseDeal(conversationId);
+  const { data: listingCard } = useListing(listing.id);
   const [digits, setDigits] = useState('');
-  const editing = Boolean(editDeal);
+  const [expiresInHours, setExpiresInHours] = useState(DEFAULT_OFFER_EXPIRY_HOURS);
+  const [step, setStep] = useState<Step>('compose');
+  const editing = intent === 'edit' && Boolean(editDeal);
+  const countering = intent === 'counter' && Boolean(editDeal);
+  const revising = editing || countering;
+
+  const photoUrls = useMemo(() => {
+    const fromListing = listingCard?.photos.map((photo) => photo.url) ?? [];
+    if (fromListing.length > 0) return fromListing;
+    return listing.photoUrl ? [listing.photoUrl] : [];
+  }, [listing.photoUrl, listingCard?.photos]);
 
   useEffect(() => {
     if (!visible) {
       setDigits('');
+      setStep('compose');
+      setExpiresInHours(DEFAULT_OFFER_EXPIRY_HOURS);
       return;
     }
     const seed = editDeal?.amountCents ?? listing.priceCents ?? null;
@@ -59,144 +89,159 @@ export function OfferDealSheet({
   const saving = create.isPending || revise.isPending;
   const saveError = create.error ?? revise.error;
 
-  const confirmSend = () => {
-    if (!cents || fee === null || net === null) return;
-    const title = editing ? 'Update this offer?' : 'Send this offer?';
-    const confirmLabel = editing ? 'Update offer' : 'Send offer';
-    Alert.alert(
-      title,
-      `${formatCents(cents)} on ${listing.title}.\nYou receive ${formatCents(net)} after ${formatCents(fee)} commission.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: confirmLabel,
-          onPress: () => {
-            const onSuccess = () => {
-              setDigits('');
-              onClose();
-            };
-            if (editing && editDeal) {
-              revise.mutate({ dealId: editDeal.id, amountCents: cents }, { onSuccess });
-            } else {
-              create.mutate(
-                { amountCents: cents, proposerIsSeller: true, listingId: listing.id },
-                { onSuccess },
-              );
-            }
-          },
-        },
-      ],
-    );
+  const composeTitle = countering ? 'Counteroffer' : editing ? 'Edit offer' : 'Offer a deal';
+  const reviewTitle = countering ? 'Review counteroffer' : editing ? 'Review changes' : 'Review offer';
+  const sendLabel = countering ? 'Send counteroffer' : editing ? 'Update offer' : 'Send offer';
+  const expiryLabel =
+    OFFER_EXPIRY_CHOICES.find((choice) => choice.hours === expiresInHours)?.label ?? '3 days';
+
+  const sendOffer = () => {
+    if (!cents) return;
+    const onSuccess = () => {
+      setDigits('');
+      setStep('compose');
+      onClose();
+    };
+    if (revising && editDeal) {
+      revise.mutate({ dealId: editDeal.id, amountCents: cents }, { onSuccess });
+    } else {
+      create.mutate(
+        { amountCents: cents, proposerIsSeller: true, listingId: listing.id, expiresInHours },
+        { onSuccess },
+      );
+    }
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + inset.screen }]}>
-        <Text style={styles.heading}>{editing ? 'Edit offer' : 'Offer a deal'}</Text>
-        <ListingQuote listing={listing} onPress={onOpenListing} layout="card" />
-
-        <PostPriceField intent="sell" digits={digits} onChangeDigits={setDigits} showKicker={false} />
-
-        {cents ? (
-          <DealListingDelta offerCents={cents} listPriceCents={listing.priceCents} />
-        ) : listing.priceCents ? (
-          <Text style={styles.listedOnly}>
-            Listed {formatCents(listing.priceCents)}
-          </Text>
-        ) : null}
-
-        {cents && fee !== null && net !== null ? (
-          <View style={styles.expenses}>
-            <ExpenseLine label="Offer" amount={formatCents(cents)} />
-            <ExpenseLine label="Graham commission (5%)" amount={formatCents(fee)} />
-            <ExpenseLine label="You receive" amount={formatCents(net)} strong />
-          </View>
-        ) : null}
-
-        {saveError ? <Message text={saveError.message} tone="error" /> : null}
-        <View style={styles.actions}>
-          <SocialButton
-            label="Confirm"
-            solid
-            block
-            busy={saving}
-            disabled={!cents}
-            onPress={confirmSend}
-          />
-          <SocialButton label="Cancel" block disabled={saving} onPress={onClose} />
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function ExpenseLine({
-  label,
-  amount,
-  strong = false,
-}: {
-  label: string;
-  amount: string;
-  strong?: boolean;
-}) {
-  const styles = useThemedStyles(expenseStyles);
-  return (
-    <View style={styles.row}>
-      <Text style={[styles.label, strong && styles.strong]}>{label}</Text>
-      <Text style={[styles.amount, strong && styles.strong]}>{amount}</Text>
+  const listingPreview = (
+    <View style={styles.preview}>
+      <DealListingPhotoStrip urls={photoUrls} onPress={onOpenListing} />
+      <Text style={styles.listingTitle} numberOfLines={2} ellipsizeMode="tail">
+        {listing.title}
+      </Text>
     </View>
   );
+
+  return (
+    <DealSheetShell
+      visible={visible}
+      title={step === 'compose' ? composeTitle : reviewTitle}
+      closeLabel="Close offer sheet"
+      onClose={onClose}>
+      {step === 'compose' ? (
+        <>
+          {listingPreview}
+          <PostPriceField
+            intent="sell"
+            digits={digits}
+            onChangeDigits={setDigits}
+            showKicker={false}
+          />
+          {cents ? (
+            <DealListingDelta offerCents={cents} listPriceCents={listing.priceCents} />
+          ) : listing.priceCents ? (
+            <Text style={styles.listedOnly}>Listed {formatCents(listing.priceCents)}</Text>
+          ) : null}
+          {cents && fee !== null && net !== null ? (
+            <DealOfferSummary
+              cents={cents}
+              fee={fee}
+              net={net}
+              listPriceCents={listing.priceCents}
+              countering={countering}
+            />
+          ) : null}
+          {!revising ? (
+            <View style={styles.expiry}>
+              <Eyebrow>Offer expires in</Eyebrow>
+              <SegmentedChoice
+                label="Offer expires in"
+                value={expiresInHours}
+                options={EXPIRY_OPTIONS}
+                onChange={setExpiresInHours}
+              />
+              <Text style={styles.expiryNote}>
+                After that the buyer can no longer accept. A counteroffer restarts the clock at 3
+                days.
+              </Text>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {listingPreview}
+          {cents && fee !== null && net !== null ? (
+            <DealOfferSummary
+              cents={cents}
+              fee={fee}
+              net={net}
+              listPriceCents={listing.priceCents}
+              countering={countering}
+            />
+          ) : null}
+          {!revising ? <Text style={styles.expiryNote}>Open for {expiryLabel}.</Text> : null}
+          <DealOfferFinalWarning />
+        </>
+      )}
+
+      {saveError ? <Message text={saveError.message} tone="error" /> : null}
+
+      <View style={dealSheetActionStyles.actions}>
+        {step === 'compose' ? (
+          <>
+            <SocialButton
+              label="Continue"
+              solid
+              block
+              disabled={!cents}
+              onPress={() => setStep('review')}
+            />
+            <SocialButton label="Cancel" block disabled={saving} onPress={onClose} />
+          </>
+        ) : (
+          <>
+            <SocialButton
+              label={sendLabel}
+              solid
+              block
+              busy={saving}
+              disabled={!cents}
+              onPress={sendOffer}
+            />
+            <View style={dealSheetActionStyles.row}>
+              <SocialButton
+                label="Edit"
+                rowItem
+                disabled={saving}
+                onPress={() => setStep('compose')}
+              />
+              <SocialButton label="Cancel" rowItem disabled={saving} onPress={onClose} />
+            </View>
+          </>
+        )}
+      </View>
+    </DealSheetShell>
+  );
 }
 
-const sheetStyles = (_theme: Theme) => ({
-  scrim: {
-    flex: 1,
-    backgroundColor: _theme.color.overlay,
+const sheetStyles = (theme: Theme) => ({
+  preview: {
+    gap: stack.tight,
+    alignSelf: 'stretch' as const,
   },
-  sheet: {
-    backgroundColor: _theme.color.background,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingHorizontal: inset.screen,
-    paddingTop: space.lg,
-    gap: stack.related,
-  },
-  heading: {
+  listingTitle: {
     ...type.title,
-    color: _theme.color.text,
+    color: theme.color.text,
   },
   listedOnly: {
     ...type.caption,
-    color: _theme.color.textMuted,
+    color: theme.color.textMuted,
   },
-  expenses: {
+  expiry: {
     gap: stack.tight,
-    paddingTop: space.sm,
+    paddingTop: stack.tight,
   },
-  actions: {
-    gap: space.sm,
-  },
-});
-
-const expenseStyles = (theme: Theme) => ({
-  row: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'baseline' as const,
-    gap: space.md,
-  },
-  label: {
-    ...type.body,
-    color: theme.color.text,
-    flex: 1,
-  },
-  amount: {
-    ...type.body,
-    color: theme.color.money,
-  },
-  strong: {
-    ...type.bodyStrong,
-    color: theme.color.text,
+  expiryNote: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
 });

@@ -9,7 +9,6 @@ import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
 import { useDealerInquiryListing, useListing, usePrimeListing } from '@/data/listings';
-import { useRespondToDeal, type ConversationDeal } from '@/data/deals';
 import {
   isPending as isSending,
   useConversation,
@@ -22,8 +21,10 @@ import {
   type MessagePhoto,
 } from '@/data/messages';
 import { DealCard } from '@/features/messages/DealCard';
+import { DealSheetPortals } from '@/features/messages/DealSheetPortals';
+import { useDealSheets } from '@/features/messages/DealSheets';
 import { OfferDealButton } from '@/features/messages/OfferDealButton';
-import { OfferDealSheet } from '@/features/messages/OfferDealSheet';
+import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { useOpenStack } from '@/lib/openStack';
@@ -48,12 +49,18 @@ const RUN = 60 * 60 * 1000;
 export function ConversationScreen({
   conversationId,
   listingId = null,
+  layout = 'screen',
+  onLeaveThread,
 }: {
   conversationId: string;
   /** Set when this visit is a reply to one watch. The sent message names it. */
   listingId?: string | null;
+  /** Desktop split: thread in the right pane, not a stack sheet. */
+  layout?: 'screen' | 'pane';
+  onLeaveThread?: () => void;
 }) {
   const { userId } = useSession();
+  const { shop } = useClaimedDealerShop();
   const queryClient = useQueryClient();
   const styles = useThemedStyles(screenStyles);
   const lift = useKeyboardLift();
@@ -63,8 +70,6 @@ export function ConversationScreen({
   const [draft, setDraft] = useState<string | null>(null);
   const [photo, setPhoto] = useState<MessagePhoto | null>(null);
   const [renaming, setRenaming] = useState(false);
-  const [offerDeal, setOfferDeal] = useState(false);
-  const [editDeal, setEditDeal] = useState<ConversationDeal | null>(null);
 
   const { data, isPending, error, isFetching } = useConversation(conversationId, userId);
   const namedListingId =
@@ -106,13 +111,38 @@ export function ConversationScreen({
   const mail = useOpenMailDraft(userId);
   const mark = useMarkConversationRead().mutate;
   const rename = useRenameGroup(conversationId);
-  const respondDeal = useRespondToDeal(conversationId);
-  const close = () => router.back();
+  const pane = layout === 'pane';
+  const close = () => {
+    if (pane && onLeaveThread) {
+      onLeaveThread();
+      return;
+    }
+    router.back();
+  };
 
   function openWatch(id: string) {
     if (listing?.id === id) primeListing(listing);
     open('listing/[listingId]', { listingId: id }, `/listing/${id}`);
   }
+
+  const listingFromThread = messages.find((message) => message.listing)?.listing ?? null;
+  const offerListing: MessageListing | null =
+    quote ??
+    listingFromThread ??
+    (listing && listingId
+      ? {
+          id: listing.id,
+          title: formatTitle(listing),
+          photoUrl: listing.photos[0]?.url ?? null,
+          priceCents: listing.price_cents,
+        }
+      : null);
+  const dealSheets = useDealSheets({
+    conversationId,
+    offerListing,
+    sellerName: data?.header ? partyName(data.header.with) : 'the seller',
+    onOpenListing: openWatch,
+  });
 
   const last = data?.messages.at(-1)?.id;
   useEffect(() => {
@@ -122,7 +152,11 @@ export function ConversationScreen({
   }, [conversationId, last, mark]);
 
   if (!userId || ((isPending || isFetching) && !data)) {
-    return (
+    return pane ? (
+      <View style={styles.fill}>
+        <Spinner />
+      </View>
+    ) : (
       <Screen action={<CloseButton onPress={close} />}>
         <Spinner />
       </Screen>
@@ -130,7 +164,13 @@ export function ConversationScreen({
   }
 
   if (error || !data?.header) {
-    return (
+    return pane ? (
+      <View style={styles.fill}>
+        <Centered>
+          <Message text="That conversation is not there." tone="error" />
+        </Centered>
+      </View>
+    ) : (
       <Screen action={<CloseButton onPress={close} />}>
         <Centered>
           <Message text="That conversation is not there." tone="error" />
@@ -144,13 +184,6 @@ export function ConversationScreen({
   // A shop with no account here cannot read the app. The same field writes
   // the email instead, and the inquiry lands back in this thread.
   const byEmail = !header.writable;
-  const shopThread = Boolean(header.threadDealerId);
-  const peerThread = who.kind === 'person' && !shopThread;
-  const sellerCanOffer =
-    header.writable &&
-    who.kind !== 'group' &&
-    !byEmail &&
-    (peerThread || (shopThread && who.kind === 'person'));
   const dealListingId =
     listingId ?? messages.find((message) => message.listing)?.listing?.id ?? null;
   const dealListing: MessageListing | null =
@@ -168,7 +201,12 @@ export function ConversationScreen({
       }
       return null;
     })();
-  const canOfferDeal = sellerCanOffer && dealListing !== null;
+  // Composer offer is seller-only: claimed shop owner, buyer on the other end, watch named in thread.
+  const isShopSeller = Boolean(
+    shop && header.threadDealerId === shop.id && who.kind === 'person',
+  );
+  const canOfferDeal =
+    header.writable && !byEmail && isShopSeller && offerListing !== null;
 
   function submit() {
     const body = value.trim();
@@ -215,48 +253,40 @@ export function ConversationScreen({
     );
   }
 
-  return (
-    <Screen
-      title={who.kind === 'group' ? undefined : partyName(who)}
-      titleControl={
-        who.kind === 'group' ? (
-          <GroupTitle
-            name={partyName(who)}
-            givenName={who.givenName}
-            editing={renaming}
-            onStart={() => setRenaming(true)}
-            onClose={() => setRenaming(false)}
-            onCommit={(title) => {
-              setRenaming(false);
-              rename.mutate(title, {
-                onError: (error) => Alert.alert('Could not rename the group', renameError(error)),
-              });
-            }}
-          />
-        ) : undefined
-      }
-      titleSize="title"
-      subtitle={
-        byEmail ? (
-          <View style={styles.unclaimed}>
-            <Text style={styles.unclaimedLabel}>
-              Not claimed on Graham yet. Your inquiry goes to their email until they claim their
-              profile.
-            </Text>
-          </View>
-        ) : (
-          (partyLine(who) ?? undefined)
-        )
-      }
-      leading={<PartyAvatar who={who} px={size.avatarHeader} onPress={() => openParty(who)} />}
-      action={<CloseButton onPress={close} />}>
-      <View style={[styles.fill, { paddingBottom: lift }]}>
+  const titleControl =
+    who.kind === 'group' ? (
+      <GroupTitle
+        name={partyName(who)}
+        givenName={who.givenName}
+        editing={renaming}
+        onStart={() => setRenaming(true)}
+        onClose={() => setRenaming(false)}
+        onCommit={(title) => {
+          setRenaming(false);
+          rename.mutate(title, {
+            onError: (error) => Alert.alert('Could not rename the group', renameError(error)),
+          });
+        }}
+      />
+    ) : undefined;
+
+  const subtitle = byEmail ? (
+    <View style={styles.unclaimed}>
+      <Text style={styles.unclaimedLabel}>
+        Not claimed on Graham yet. Your inquiry goes to their email until they claim their profile.
+      </Text>
+    </View>
+  ) : (
+    (partyLine(who) ?? undefined)
+  );
+
+  const messageList = (
         <FlatList
           ref={list}
           style={styles.listView}
           data={messages}
           keyExtractor={(message) => message.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={pane ? styles.listPane : styles.list}
           keyboardShouldPersistTaps="handled"
           // The bottom of a conversation is the live end of it, so a thread
           // opens there and stays there as messages arrive.
@@ -277,24 +307,18 @@ export function ConversationScreen({
                       : null)
                   }
                   onOpenListing={watchId ? () => openWatch(watchId) : undefined}
-                  busy={respondDeal.isPending}
-                  onDecline={() =>
-                    respondDeal.mutate({ dealId: item.deal!.id, action: 'decline' })
-                  }
-                  onCancel={() =>
-                    respondDeal.mutate({ dealId: item.deal!.id, action: 'cancel' })
-                  }
-                  onEdit={() => {
-                    setEditDeal(item.deal!);
-                    setOfferDeal(true);
-                  }}
+                  busy={dealSheets.busy}
+                  {...dealSheets.actionsFor(item.deal)}
                 />
               );
             }
-            return (
+            const peerMark =
+              pane && !mine && who.kind !== 'group' && startOfRun(messages, index);
+            const bubble = (
               <Bubble
                 body={item.body}
                 mine={mine}
+                inPane={pane}
                 listing={item.listing}
                 onOpenListing={watchId ? () => openWatch(watchId) : undefined}
                 caption={item.via === 'email' ? 'Sent by email' : null}
@@ -308,11 +332,28 @@ export function ConversationScreen({
                 sent={isSending(item)}
               />
             );
+            if (!pane || mine) {
+              return bubble;
+            }
+            return (
+              <View style={styles.paneMessageRow}>
+                {peerMark ? (
+                  <PartyAvatar who={who} px={size.avatarSmall} onPress={() => openParty(who)} />
+                ) : (
+                  <View style={styles.paneMessageGutter} />
+                )}
+                <View style={styles.paneMessageBody}>{bubble}</View>
+              </View>
+            );
           }}
         />
+  );
+
+  const composer = (
         <SendBar
-          placeholder={quoting ? 'Write about this watch' : 'Write a message'}
+          placeholder={quoting ? 'Write about this watch' : pane ? 'Message…' : 'Write a message'}
           multiline
+          chrome={pane ? 'pane' : 'screen'}
           value={value}
           onChangeText={setDraft}
           onSend={submit}
@@ -332,13 +373,7 @@ export function ConversationScreen({
           }
           trailing={
             canOfferDeal ? (
-              <OfferDealButton
-                disabled={send.isPending}
-                onPress={() => {
-                  setEditDeal(null);
-                  setOfferDeal(true);
-                }}
-              />
+              <OfferDealButton disabled={send.isPending} onPress={dealSheets.openOffer} />
             ) : undefined
           }
           note={
@@ -370,28 +405,68 @@ export function ConversationScreen({
                     </Pressable>
                   </View>
                 ) : null}
-                {send.error ? <Message text="That message did not send." tone="error" /> : null}
+                {send.error ? (
+                  <Message
+                    text={send.error.message || 'That message did not send.'}
+                    tone="error"
+                  />
+                ) : null}
               </View>
             ) : null
           }
         />
-        {dealListing ? (
-          <OfferDealSheet
-            visible={offerDeal}
-            conversationId={conversationId}
-            listing={dealListing}
-            editDeal={
-              editDeal
-                ? { id: editDeal.id, amountCents: editDeal.amountCents }
-                : null
-            }
-            onOpenListing={() => openWatch(dealListing.id)}
-            onClose={() => {
-              setOfferDeal(false);
-              setEditDeal(null);
-            }}
-          />
-        ) : null}
+  );
+
+  const dealPortals = (
+    <DealSheetPortals
+      sheet={dealSheets.sheet}
+      conversationId={dealSheets.conversationId}
+      offerListing={dealSheets.offerListing}
+      sellerName={dealSheets.sellerName}
+      onOpenListing={dealSheets.onOpenListing}
+      onClose={dealSheets.close}
+    />
+  );
+
+  if (pane) {
+    return (
+      <View style={styles.pane}>
+        <View style={styles.paneHeaderBar}>
+          <PartyAvatar who={who} px={size.avatarHeader} onPress={() => openParty(who)} />
+          <View style={styles.paneHeading}>
+            {titleControl ?? (
+              <Text style={styles.paneTitle} numberOfLines={1}>
+                {partyName(who)}
+              </Text>
+            )}
+            {typeof subtitle === 'string' ? (
+              <Text style={styles.paneSubtitle} numberOfLines={1}>{subtitle}</Text>
+            ) : (
+              subtitle
+            )}
+          </View>
+        </View>
+        <View style={styles.paneWell}>{messageList}</View>
+        <View style={[styles.paneComposer, { paddingBottom: lift }]}>
+          {composer}
+          {dealPortals}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Screen
+      title={who.kind === 'group' ? undefined : partyName(who)}
+      titleControl={titleControl}
+      titleSize="title"
+      subtitle={subtitle}
+      leading={<PartyAvatar who={who} px={size.avatarHeader} onPress={() => openParty(who)} />}
+      action={<CloseButton onPress={close} />}>
+      <View style={[styles.fill, { paddingBottom: lift }]}>
+        {messageList}
+        {composer}
+        {dealPortals}
       </View>
     </Screen>
   );
@@ -423,11 +498,68 @@ function endOfRun(messages: ChatMessage[], index: number) {
 
 const screenStyles = (theme: Theme) => ({
   fill: { flex: 1 },
+  pane: {
+    flex: 1,
+    minHeight: 0,
+  },
+  paneHeaderBar: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    backgroundColor: theme.color.background,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.border,
+  },
+  paneWell: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: theme.color.background,
+  },
+  paneComposer: {
+    backgroundColor: theme.color.background,
+  },
+  paneMessageRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end' as const,
+    gap: space.sm,
+    width: '100%' as const,
+  },
+  paneMessageGutter: {
+    width: size.avatarSmall,
+    flexShrink: 0,
+  },
+  paneMessageBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  paneHeading: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.xs,
+  },
+  paneTitle: {
+    ...type.title,
+    color: theme.color.text,
+  },
+  paneSubtitle: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
   listView: { flex: 1 },
   list: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.lg,
     gap: space.sm,
+    flexGrow: 1,
+    justifyContent: 'flex-end' as const,
+  },
+  listPane: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.lg,
+    paddingBottom: space.md,
+    gap: space.md,
     flexGrow: 1,
     justifyContent: 'flex-end' as const,
   },

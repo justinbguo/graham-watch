@@ -10,16 +10,19 @@ import {
   useMessagesMatching,
   type ConversationSummary,
 } from '@/data/messages';
-import { useOpenStack } from '@/lib/openStack';
+import { useFollows } from '@/data/follows';
 import { inset, space, type Theme } from '@/lib/theme';
 import { normalizeUsername, usernameIsValid } from '@/lib/username';
 import { useThemedStyles } from '@/providers/theme';
 
 import { ConversationRow } from './ConversationRow';
+import { InboxFilterBar } from './InboxFilterBar';
+import { inboxFilterEmptyMessage, passesInboxFilter, type InboxFilter } from './inboxFilter';
 import { MessageHandle } from './MessageHandle';
 import { hasHandle, visibleConversations } from './match';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
+import { useOpenConversation } from './useOpenConversation';
 
 /** Each letter is not a search. Older lines are asked once typing pauses. */
 const BODY_SEARCH_PAUSE = 300;
@@ -37,6 +40,11 @@ export function ConversationList({
   threadFilter,
   embedded = false,
   toolbarTrailing,
+  selectedConversationId = null,
+  desktopInbox = false,
+  hideInboxFilterBar = false,
+  inboxFilter: inboxFilterProp,
+  onInboxFilterChange,
 }: {
   userId: string;
   threadFilter?: (conversation: ConversationSummary) => boolean;
@@ -44,12 +52,28 @@ export function ConversationList({
   embedded?: boolean;
   /** e.g. Seller Hub "New" pill beside search */
   toolbarTrailing?: ReactNode;
+  /** Desktop split: highlight the open thread. */
+  selectedConversationId?: string | null;
+  /** Desktop split: full-bleed rows and search under the tab header. */
+  desktopInbox?: boolean;
+  /** When filters live in the desktop tool rail. */
+  hideInboxFilterBar?: boolean;
+  inboxFilter?: InboxFilter;
+  onInboxFilterChange?: (next: InboxFilter) => void;
 }) {
   const styles = useThemedStyles(listStyles);
-  const open = useOpenStack();
+  const openConversation = useOpenConversation();
   const openParty = useOpenParty();
   const { data: conversations = [], isPending, error } = useConversations(userId);
-  const threads = threadFilter ? conversations.filter(threadFilter) : conversations;
+  const { data: follows = [] } = useFollows(userId);
+  const followedDealerIds = new Set(follows.map((shop) => shop.id));
+  const [internalInboxFilter, setInternalInboxFilter] = useState<InboxFilter>('all');
+  const inboxFilter = inboxFilterProp ?? internalInboxFilter;
+  const setInboxFilter = onInboxFilterChange ?? setInternalInboxFilter;
+  const baseThreads = threadFilter ? conversations.filter(threadFilter) : conversations;
+  const threads = baseThreads.filter((conversation) =>
+    passesInboxFilter(conversation, inboxFilter, followedDealerIds),
+  );
   const [query, setQuery] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
   const term = query.trim();
@@ -69,35 +93,48 @@ export function ConversationList({
       onSuccess: (conversationId) => {
         setQuery('');
         setFailure(null);
-        open(
-          'conversation/[conversationId]',
-          { conversationId },
-          `/conversation/${conversationId}`,
-        );
+        openConversation({ conversationId });
       },
       onError: (err) => setFailure(said(err)),
     });
   }
 
-  const layout = embedded ? embeddedLayout : screenLayout;
+  const layout = desktopInbox
+    ? desktopInboxLayout
+    : embedded
+      ? embeddedLayout
+      : screenLayout;
 
   return (
     <View style={styles.root}>
-      <View style={[styles.query, layout.query, embedded && toolbarTrailing && styles.toolbar]}>
-        <SearchField
-          accessibilityLabel="Search messages or a username"
-          placeholder="Search"
-          value={query}
-          onChangeText={(text) => {
-            setQuery(text);
-            setFailure(null);
-          }}
-          onSubmitEditing={sendToHandle}
-          autoComplete="off"
-          compact={embedded}
-          style={embedded ? styles.searchInToolbar : undefined}
-        />
-        {embedded && toolbarTrailing ? toolbarTrailing : null}
+      <View style={[styles.searchBlock, layout.searchBlock, desktopInbox && styles.inboxSearchBlock]}>
+        <View
+          style={[
+            styles.query,
+            layout.query,
+            (embedded && toolbarTrailing) || desktopInbox ? styles.toolbar : undefined,
+          ]}>
+          <SearchField
+            accessibilityLabel="Search messages"
+            placeholder="Search"
+            value={query}
+            onChangeText={(text) => {
+              setQuery(text);
+              setFailure(null);
+            }}
+            onSubmitEditing={sendToHandle}
+            autoComplete="off"
+            compact={embedded || desktopInbox}
+            inbox={embedded || desktopInbox}
+            style={embedded || desktopInbox ? styles.searchInToolbar : undefined}
+          />
+          {toolbarTrailing ?? null}
+        </View>
+        {!hideInboxFilterBar ? (
+          <View style={[styles.filters, layout.filters]}>
+            <InboxFilterBar value={inboxFilter} onChange={setInboxFilter} />
+          </View>
+        ) : null}
       </View>
       {failure ? (
         <View style={[styles.note, layout.note]}>
@@ -111,7 +148,12 @@ export function ConversationList({
       ) : null}
       {canMessage ? (
         <View style={[styles.compose, layout.compose]}>
-          <MessageHandle handle={handle} busy={start.isPending} onPress={sendToHandle} />
+          <MessageHandle
+            handle={handle}
+            busy={start.isPending}
+            desktop={desktopInbox}
+            onPress={sendToHandle}
+          />
         </View>
       ) : null}
       {isPending ? (
@@ -131,9 +173,11 @@ export function ConversationList({
               : [styles.list, layout.list]
           }
           ListEmptyComponent={
-            canMessage ? null : term ? (
+            canMessage ? null : term || inboxFilter !== 'all' ? (
               <Centered>
-                <Message text="No messages match." />
+                <Message
+                  text={term ? 'No messages match.' : inboxFilterEmptyMessage(inboxFilter)}
+                />
               </Centered>
             ) : (
               <Centered>
@@ -151,14 +195,10 @@ export function ConversationList({
           renderItem={({ item }) => (
             <ConversationRow
               conversation={item}
+              selected={item.id === selectedConversationId}
+              desktop={desktopInbox}
               onOpenParty={() => openParty(item.with)}
-              onPress={() =>
-                open(
-                  'conversation/[conversationId]',
-                  { conversationId: item.id },
-                  `/conversation/${item.id}`,
-                )
-              }
+              onPress={() => openConversation({ conversationId: item.id })}
             />
           )}
         />
@@ -177,19 +217,48 @@ function said(error: unknown): string {
 }
 
 const screenLayout = {
-  query: {
+  searchBlock: {
     ...searchFieldInset,
     marginTop: space.sm - space.lg,
+    gap: space.sm,
   },
+  query: {},
+  filters: {},
   compose: {},
   list: {},
   note: {},
 };
 
-const embeddedLayout = {
-  query: {
-    paddingBottom: space.md,
+const desktopInboxLayout = {
+  searchBlock: {
+    paddingHorizontal: space.md,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+    gap: space.sm,
   },
+  query: {},
+  filters: {
+    paddingHorizontal: space.xs,
+  },
+  compose: {
+    paddingHorizontal: space.md,
+  },
+  list: {
+    paddingHorizontal: 0,
+    paddingBottom: space.lg,
+  },
+  note: {
+    paddingHorizontal: space.md,
+  },
+};
+
+const embeddedLayout = {
+  searchBlock: {
+    paddingBottom: space.md,
+    gap: space.sm,
+  },
+  query: {},
+  filters: {},
   compose: {
     paddingHorizontal: 0,
   },
@@ -202,10 +271,19 @@ const embeddedLayout = {
   },
 };
 
-const listStyles = (_theme: Theme) => ({
+const listStyles = (theme: Theme) => ({
   root: {
     flex: 1,
   },
+  inboxSearchBlock: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.border,
+    marginBottom: space.xs,
+  },
+  searchBlock: {
+    gap: space.sm,
+  },
+  filters: {},
   query: {},
   toolbar: {
     flexDirection: 'row' as const,
