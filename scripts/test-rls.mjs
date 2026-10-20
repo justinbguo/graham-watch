@@ -979,6 +979,33 @@ console.log('\ndealer contact and stats');
     body: { p_dealer_id: dealerId },
   });
   check('a signed-out visitor cannot read stats', signedOut.status >= 400, `got ${signedOut.status}`);
+
+  const top = await api('/rest/v1/rpc/dealer_top_customers', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'an importer sees top customers for their dealer',
+    top.status === 200,
+    `got ${top.status} ${JSON.stringify(top.body)}`,
+  );
+  check(
+    'top customers name the buyer who saved',
+    Array.isArray(top.body) && top.body.some((row) => row.buyer_id === buyer.id && row.saves >= 1),
+    JSON.stringify(top.body),
+  );
+
+  const topStranger = await api('/rest/v1/rpc/dealer_top_customers', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    "a user cannot read top customers for someone else's dealer",
+    topStranger.status >= 400,
+    `got ${topStranger.status}`
+  );
 }
 
 console.log('\nclaiming by code');
@@ -3062,6 +3089,377 @@ console.log('\nmessages');
 
   } finally {
     await fetch(`${URL}/auth/v1/admin/users/${outsider.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    });
+  }
+}
+
+console.log('\nlisting inquiry messages');
+{
+  const thread = await api('/rest/v1/rpc/conversation_about_listing', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_listing_id: listingId },
+  });
+  check(
+    'a buyer can open the shop thread from a watch',
+    thread.status < 300 && typeof thread.body === 'string',
+    JSON.stringify(thread.body),
+  );
+
+  const inquiry = await api('/rest/v1/messages', {
+    token: buyer.token,
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: {
+      conversation_id: thread.body,
+      sender_id: buyer.id,
+      body: `still available-${stamp}`,
+      listing_id: listingId,
+    },
+  });
+  check(
+    'the buyer can name the watch on the first message',
+    inquiry.status < 300,
+    JSON.stringify(inquiry.body),
+  );
+
+  const forged = await api('/rest/v1/messages', {
+    token: dealerUser.token,
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: {
+      conversation_id: thread.body,
+      sender_id: dealerUser.id,
+      body: 'wrong listing',
+      listing_id: listingId,
+    },
+  });
+  check(
+    'the dealer cannot attach a listing_id on send',
+    forged.status >= 400,
+    JSON.stringify(forged.body),
+  );
+}
+
+console.log('\ndeal flow: offer → accept → pay → ship → receive → review');
+{
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
+  const rival = await createUser(`rival-${stamp}@example.com`);
+  const dealRow = (id, token) =>
+    api(
+      `/rest/v1/conversation_deals?id=eq.${id}&select=id,status,expires_at,accepted_at,funded_at,ship_by,shipped_at,completed_at,reviewed_at,ship_to,tracking_carrier,tracking_number,cancelled_reason,payment_provider`,
+      { token },
+    ).then((res) => res.body?.[0] ?? null);
+  const rpc = (name, token, body) => api(`/rest/v1/rpc/${name}`, { token, method: 'POST', body });
+
+  try {
+    const buyerThread = await rpc('conversation_about_listing', buyer.token, { p_listing_id: listingId });
+    const rivalThread = await rpc('conversation_about_listing', rival.token, { p_listing_id: listingId });
+    check(
+      'two buyers each get their own shop thread for the same watch',
+      typeof buyerThread.body === 'string' &&
+        typeof rivalThread.body === 'string' &&
+        buyerThread.body !== rivalThread.body,
+    );
+
+    const tooShort = await rpc('create_conversation_deal', dealerUser.token, {
+      p_conversation_id: buyerThread.body,
+      p_amount_cents: 1100000,
+      p_currency: 'USD',
+      p_listing_id: listingId,
+      p_proposer_is_seller: true,
+      p_expires_in_hours: 0,
+    });
+    check(
+      'an offer must last at least an hour',
+      tooShort.status >= 400 && String(tooShort.body?.message ?? '').includes('1 hour'),
+      JSON.stringify(tooShort.body),
+    );
+
+    const offered = await rpc('create_conversation_deal', dealerUser.token, {
+      p_conversation_id: buyerThread.body,
+      p_amount_cents: 1100000,
+      p_currency: 'USD',
+      p_listing_id: listingId,
+      p_proposer_is_seller: true,
+      p_expires_in_hours: 24,
+    });
+    check('the shop offers the buyer a deal with a 24h clock', offered.status < 300, JSON.stringify(offered.body));
+    const dealId = offered.body;
+
+    const fresh = await dealRow(dealId, buyer.token);
+    const hoursLeft = fresh?.expires_at ? (new Date(fresh.expires_at) - Date.now()) / 3_600_000 : 0;
+    check(
+      'the buyer sees the expiry about a day out',
+      hoursLeft > 23 && hoursLeft < 24.1,
+      `hours left ${hoursLeft.toFixed(2)}`,
+    );
+
+    const rivalOffer = await rpc('create_conversation_deal', dealerUser.token, {
+      p_conversation_id: rivalThread.body,
+      p_amount_cents: 1150000,
+      p_currency: 'USD',
+      p_listing_id: listingId,
+      p_proposer_is_seller: true,
+    });
+    check('the shop can offer the same watch to a second buyer', rivalOffer.status < 300, JSON.stringify(rivalOffer.body));
+    const rivalDealId = rivalOffer.body;
+
+    const shipTo = {
+      name: 'Ada Byron',
+      line1: '1 Analytical Way',
+      line2: '',
+      city: 'London',
+      region: 'LDN',
+      postal_code: 'W1 1AA',
+      country: 'GB',
+      phone: '',
+    };
+
+    const payEarly = await rpc('fund_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_ship_to: shipTo,
+      p_payment_label: 'Test card',
+    });
+    check('a buyer cannot pay before accepting', payEarly.status >= 400, JSON.stringify(payEarly.body));
+
+    const sellerAccept = await rpc('respond_to_conversation_deal', dealerUser.token, {
+      p_deal_id: dealId,
+      p_action: 'accept',
+    });
+    check('the proposer cannot accept their own offer', sellerAccept.status >= 400, JSON.stringify(sellerAccept.body));
+
+    const accepted = await rpc('respond_to_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_action: 'accept',
+    });
+    check('the buyer accepts the offer', accepted.status < 300, JSON.stringify(accepted.body));
+
+    const afterAccept = await dealRow(dealId, buyer.token);
+    check(
+      'accepting stamps accepted_at',
+      afterAccept?.status === 'accepted' && afterAccept.accepted_at !== null,
+      JSON.stringify(afterAccept),
+    );
+
+    const rivalAfter = await dealRow(rivalDealId, rival.token);
+    check(
+      "accepting closes the shop's other open offer on that watch",
+      rivalAfter?.status === 'cancelled' && rivalAfter.cancelled_reason === 'listing_reserved',
+      JSON.stringify(rivalAfter),
+    );
+    const rivalNote = await api(
+      `/rest/v1/messages?conversation_id=eq.${rivalThread.body}&deal_id=eq.${rivalDealId}&select=body&order=created_at.desc&limit=1`,
+      { token: rival.token },
+    );
+    check(
+      'the other buyer is told the watch was reserved',
+      String(rivalNote.body?.[0]?.body ?? '').includes('reserved'),
+      JSON.stringify(rivalNote.body),
+    );
+
+    const payIncomplete = await rpc('fund_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_ship_to: { name: 'Ada', line1: '1 Analytical Way' },
+      p_payment_label: 'Test card',
+    });
+    check(
+      'payment needs a full shipping address',
+      payIncomplete.status >= 400 && String(payIncomplete.body?.message ?? '').includes('address'),
+      JSON.stringify(payIncomplete.body),
+    );
+
+    const sellerPays = await rpc('fund_conversation_deal', dealerUser.token, {
+      p_deal_id: dealId,
+      p_ship_to: shipTo,
+      p_payment_label: 'Test card',
+    });
+    check('the seller cannot pay for the buyer', sellerPays.status >= 400, JSON.stringify(sellerPays.body));
+
+    const paid = await rpc('fund_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_ship_to: shipTo,
+      p_payment_label: 'Test card •••• 4242',
+    });
+    check('the buyer pays (test hold) with an address', paid.status < 300, JSON.stringify(paid.body));
+
+    const afterPay = await dealRow(dealId, dealerUser.token);
+    const shipByDays = afterPay?.ship_by ? (new Date(afterPay.ship_by) - Date.now()) / 86_400_000 : 0;
+    check(
+      'payment starts a five-day shipping clock and stores a dev hold',
+      afterPay?.status === 'funded' &&
+        afterPay.funded_at !== null &&
+        afterPay.payment_provider === 'dev_hold' &&
+        shipByDays > 4.9 &&
+        shipByDays < 5.1,
+      JSON.stringify(afterPay),
+    );
+    check(
+      'the seller reads the ship-to block, nothing more',
+      afterPay?.ship_to?.line1 === shipTo.line1 && afterPay.ship_to.country === 'GB',
+      JSON.stringify(afterPay?.ship_to),
+    );
+
+    const completeEarly = await rpc('complete_conversation_deal', buyer.token, { p_deal_id: dealId });
+    check(
+      'the buyer cannot confirm receipt before it ships',
+      completeEarly.status >= 400 && String(completeEarly.body?.message ?? '').includes('ship'),
+      JSON.stringify(completeEarly.body),
+    );
+
+    const buyerShips = await rpc('ship_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_carrier: 'UPS',
+      p_tracking_number: '1Z999AA10123456784',
+    });
+    check('only the seller can mark it shipped', buyerShips.status >= 400, JSON.stringify(buyerShips.body));
+
+    const shipped = await rpc('ship_conversation_deal', dealerUser.token, {
+      p_deal_id: dealId,
+      p_carrier: 'UPS',
+      p_tracking_number: '1Z999AA10123456784',
+    });
+    check('the seller enters carrier and tracking from their own label', shipped.status < 300, JSON.stringify(shipped.body));
+
+    const afterShip = await dealRow(dealId, buyer.token);
+    check(
+      'the buyer sees the tracking in the deal',
+      afterShip?.status === 'shipped' &&
+        afterShip.tracking_carrier === 'UPS' &&
+        afterShip.tracking_number === '1Z999AA10123456784' &&
+        afterShip.shipped_at !== null,
+      JSON.stringify(afterShip),
+    );
+
+    const reviewEarly = await rpc('review_conversation_deal', buyer.token, { p_deal_id: dealId, p_rating: 5 });
+    check('no review before the deal completes', reviewEarly.status >= 400, JSON.stringify(reviewEarly.body));
+
+    const sellerCompletes = await rpc('complete_conversation_deal', dealerUser.token, { p_deal_id: dealId });
+    check('the seller cannot confirm receipt for the buyer', sellerCompletes.status >= 400, JSON.stringify(sellerCompletes.body));
+
+    const completed = await rpc('complete_conversation_deal', buyer.token, { p_deal_id: dealId });
+    check('the buyer confirms receipt', completed.status < 300, JSON.stringify(completed.body));
+
+    const afterComplete = await dealRow(dealId, buyer.token);
+    const soldListing = await api(`/rest/v1/listings?id=eq.${listingId}&select=sold_at`, { token: buyer.token });
+    check(
+      'completion stamps the deal and marks the watch sold',
+      afterComplete?.status === 'completed' &&
+        afterComplete.completed_at !== null &&
+        soldListing.body?.[0]?.sold_at !== null,
+      JSON.stringify({ deal: afterComplete, listing: soldListing.body }),
+    );
+
+    const sellerReviews = await rpc('review_conversation_deal', dealerUser.token, { p_deal_id: dealId, p_rating: 5 });
+    check('the seller cannot review their own sale', sellerReviews.status >= 400, JSON.stringify(sellerReviews.body));
+
+    const badRating = await rpc('review_conversation_deal', buyer.token, { p_deal_id: dealId, p_rating: 6 });
+    check('a rating is 1 to 5', badRating.status >= 400, JSON.stringify(badRating.body));
+
+    const reviewed = await rpc('review_conversation_deal', buyer.token, {
+      p_deal_id: dealId,
+      p_rating: 5,
+      p_body: 'Packed well, shipped fast.',
+    });
+    check('the buyer rates the seller once', reviewed.status < 300, JSON.stringify(reviewed.body));
+
+    const reviewRows = await api(
+      `/rest/v1/deal_reviews?deal_id=eq.${dealId}&select=rating,body,reviewer_id,subject_id,dealer_id`,
+      { token: rival.token },
+    );
+    check(
+      'anyone signed in can read the review on the shop',
+      reviewRows.body?.length === 1 &&
+        reviewRows.body[0].rating === 5 &&
+        reviewRows.body[0].reviewer_id === buyer.id &&
+        reviewRows.body[0].subject_id === dealerUser.id &&
+        reviewRows.body[0].dealer_id === dealerId,
+      JSON.stringify(reviewRows.body),
+    );
+    const afterReview = await dealRow(dealId, buyer.token);
+    check('the deal remembers it was reviewed', afterReview?.reviewed_at !== null, JSON.stringify(afterReview));
+
+    const twice = await rpc('review_conversation_deal', buyer.token, { p_deal_id: dealId, p_rating: 1 });
+    check('a second review on the same deal is refused', twice.status >= 400, JSON.stringify(twice.body));
+
+    // Saved checkout details belong to one person. Another buyer, or the shop,
+    // must not be able to read where somebody lives.
+    const saved = await api('/rest/v1/checkout_defaults', {
+      token: buyer.token,
+      method: 'POST',
+      prefer: 'return=minimal,resolution=merge-duplicates',
+      body: { user_id: buyer.id, ship_to: shipTo, payment_label: 'Test card •••• 4242' },
+    });
+    check('a buyer saves their address and payment stand-in', saved.status < 300, JSON.stringify(saved.body));
+    const ownDefaults = await api(`/rest/v1/checkout_defaults?user_id=eq.${buyer.id}&select=ship_to,payment_label`, {
+      token: buyer.token,
+    });
+    check(
+      'the buyer reads their own saved details',
+      ownDefaults.body?.length === 1 && ownDefaults.body[0].ship_to?.city === 'London',
+      JSON.stringify(ownDefaults.body),
+    );
+    const peek = await api(`/rest/v1/checkout_defaults?user_id=eq.${buyer.id}&select=ship_to`, {
+      token: dealerUser.token,
+    });
+    check('the shop cannot read a buyer\'s saved address', Array.isArray(peek.body) && peek.body.length === 0, JSON.stringify(peek.body));
+    const forgeDefaults = await api('/rest/v1/checkout_defaults', {
+      token: rival.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { user_id: buyer.id, ship_to: shipTo },
+    });
+    check('nobody writes another person\'s checkout details', forgeDefaults.status >= 400, JSON.stringify(forgeDefaults.body));
+
+    // An expired offer cannot be accepted. The clock is moved by hand with the
+    // service key; waiting an hour in a test is not an option.
+    const second = await api('/rest/v1/listings', {
+      token: importer.token,
+      method: 'POST',
+      prefer: 'return=representation',
+      body: { dealer_id: dealerId, imported_by: importer.id, brand: 'Tudor', model: 'Black Bay', price_cents: 400000 },
+    });
+    const secondId = second.body?.[0]?.id;
+    const lateOffer = await rpc('create_conversation_deal', dealerUser.token, {
+      p_conversation_id: buyerThread.body,
+      p_amount_cents: 380000,
+      p_currency: 'USD',
+      p_listing_id: secondId,
+      p_proposer_is_seller: true,
+      p_expires_in_hours: 1,
+    });
+    check('a new offer opens once the last deal completed', lateOffer.status < 300, JSON.stringify(lateOffer.body));
+    await fetch(`${URL}/rest/v1/conversation_deals?id=eq.${lateOffer.body}`, {
+      method: 'PATCH',
+      headers: admin,
+      body: JSON.stringify({ expires_at: new Date(Date.now() - 60_000).toISOString() }),
+    });
+    const acceptLate = await rpc('respond_to_conversation_deal', buyer.token, {
+      p_deal_id: lateOffer.body,
+      p_action: 'accept',
+    });
+    check(
+      'an expired offer cannot be accepted',
+      acceptLate.status >= 400 && String(acceptLate.body?.message ?? '').includes('expired'),
+      JSON.stringify(acceptLate.body),
+    );
+    const reoffer = await rpc('create_conversation_deal', dealerUser.token, {
+      p_conversation_id: buyerThread.body,
+      p_amount_cents: 370000,
+      p_currency: 'USD',
+      p_listing_id: secondId,
+      p_proposer_is_seller: true,
+    });
+    const swept = await dealRow(lateOffer.body, buyer.token);
+    check(
+      'the next offer sweeps the expired one out of the way',
+      reoffer.status < 300 && swept?.status === 'expired',
+      JSON.stringify({ reoffer: reoffer.body, swept }),
+    );
+  } finally {
+    await fetch(`${URL}/auth/v1/admin/users/${rival.id}`, {
       method: 'DELETE',
       headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
     });
