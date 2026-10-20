@@ -4,7 +4,12 @@ import { usePathname } from 'expo-router';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
-import { FilterButton } from '@/components/FilterButton';
+import { DeckRailButton } from '@/components/DeckRailButton';
+import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
+import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
+import { DeckCoach } from '@/features/deck/DeckCoach';
+import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
+import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
 import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/SwipeCard';
@@ -14,16 +19,15 @@ import { Button, Centered, Heading, Message, Screen, Spinner } from '@/component
 import { useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
-import { useOpenFilters } from '@/features/filters/open';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
-import { useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 import { setSearchLaunchRect } from '@/lib/searchLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { GUEST_SWIPE_BUDGET, inset, layout, motion, size, space, type, type Theme } from '@/lib/theme';
 import { useWebArrowSwipe } from '@/lib/webKeys';
+import { GUEST_SWIPE_BUDGET, inset, layout, motion, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -42,11 +46,11 @@ export default function Deck() {
   const startOver = useStartOver(userId);
   const undoPass = useUndoPass(userId);
   const isWide = useIsWide();
+  const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(deckStyles);
   const open = useOpenStack();
   const pathname = usePathname();
   const { filters, clear } = useFilters('deck');
-  const openFilters = useOpenFilters();
   const count = activeCount(filters);
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
@@ -122,17 +126,46 @@ export default function Deck() {
     setReturning(null);
   };
 
+  const multiPhoto = (topListing?.photos.length ?? 0) > 1;
+  const { active: tutorialStep, finishListings } = useDeckTutorial({
+    multiPhoto,
+    photoIndex,
+  });
+
   const judgeCard = (card: DeckCard, direction: SwipeDirection, releaseX: number) => {
+    if (tutorialStep === 'listings') finishListings();
     const from = stageRect.current;
     judge(card, direction, from ? { ...from, x: from.x + releaseX } : undefined);
   };
 
-  // Desktop: left passes, right saves. The top card flings the same way a
-  // committed drag would. Ignored while the grid is up — that view owns keys.
+  const stepPhoto = useCallback(
+    (by: number) => {
+      const count = topListing?.photos.length ?? 0;
+      if (count <= 1) return;
+      setPhotoIndex((current) => {
+        const next = current + by;
+        if (next < 0) return count - 1;
+        if (next >= count) return 0;
+        return next;
+      });
+    },
+    [topListing?.photos.length],
+  );
+
+  const toggleView = useCallback(() => {
+    setView((current) => (current === 'cards' ? 'grid' : 'cards'));
+  }, []);
+
+  const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0;
+  const cardSwipeKeysOn = deckKeysOn && view === 'cards';
+
   useWebArrowSwipe(
-    () => topCard.current?.fling('left'),
-    () => topCard.current?.fling('right'),
-    deckOnTop && view === 'cards' && cards.length > 0
+    cardSwipeKeysOn ? () => topCard.current?.fling('left') : undefined,
+    cardSwipeKeysOn ? () => topCard.current?.fling('right') : undefined,
+    deckKeysOn,
+    cardSwipeKeysOn && multiPhoto ? () => stepPhoto(-1) : undefined,
+    cardSwipeKeysOn && multiPhoto ? () => stepPhoto(1) : undefined,
+    deckKeysOn ? toggleView : undefined,
   );
 
   const undo = lastPass
@@ -143,41 +176,75 @@ export default function Deck() {
       }
     : undefined;
 
-  const actions = (
-    <View style={styles.actions}>
-      {/* Web only. On iOS the unsigned app is the sign-in wall, and this
-          slot is already undo, filters, and the view toggle. */}
+  const deckToolsMobile = (
+    <>
       {Platform.OS !== 'ios' && !isSignedIn ? (
         <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
       ) : null}
       <UndoButton onPress={undo} />
-      <FilterButton count={count} onPress={() => openFilters('deck')} />
+      <FilterMenu surface="deck" count={count} />
       <ViewToggle value={view} onChange={setView} />
-    </View>
+    </>
+  );
+
+  const deckToolsDesktop = (
+    <>
+      {Platform.OS !== 'ios' && !isSignedIn ? (
+        <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
+      ) : null}
+      <DeckRailButton
+        label="Rewind"
+        icon="undo-variant"
+        onPress={undo}
+        disabled={!undo}
+        accessibilityLabel="Undo, bring back the watch you passed on"
+      />
+      <FilterMenu surface="deck" count={count} triggerVariant="text" />
+      <ViewToggle value={view} onChange={setView} variant="text" />
+    </>
+  );
+
+  const deckTools = isDesktopWeb ? deckToolsDesktop : deckToolsMobile;
+
+  const desktopRail = isDesktopWeb ? (
+    <DeckToolRail>
+      <DeckRailTools>{deckTools}</DeckRailTools>
+    </DeckToolRail>
+  ) : null;
+  const frameDesktop = (content: ReactNode) =>
+    desktopRail ? <DeckDesktopFrame rail={desktopRail}>{content}</DeckDesktopFrame> : content;
+
+  const titleControl = isDesktopWeb ? undefined : (
+    <DeckHeader>
+      <View style={styles.actions}>{deckToolsMobile}</View>
+    </DeckHeader>
   );
 
   if (isPending) {
     return (
-      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
-        <Spinner />
+      <Screen titleControl={titleControl} inTabs>
+        {frameDesktop(<Spinner />)}
       </Screen>
     );
   }
 
   if (error) {
     return (
-      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
+      <Screen titleControl={titleControl} inTabs>
+        {frameDesktop(
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
         </Centered>
+        )}
       </Screen>
     );
   }
 
   if (cards.length === 0) {
     return (
-      <Screen titleControl={<DeckHeader actions={actions} />} inTabs>
+      <Screen titleControl={titleControl} inTabs>
+        {frameDesktop(
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -204,6 +271,7 @@ export default function Deck() {
             <Button label="Refresh" variant="outline" onPress={() => refetch()} />
           )}
         </Centered>
+        )}
       </Screen>
     );
   }
@@ -212,18 +280,29 @@ export default function Deck() {
 
   if (view === 'grid') {
     return (
-      <Screen titleControl={<DeckHeader actions={actions} />} width="grid" inTabs>
-        <Animated.View key="grid" entering={FadeIn.duration(motion.base)} style={styles.view}>
-          <DeckGrid
-            cards={cards}
-            active={deckOnTop}
-            onOpen={(card) => {
-              primeListing(card);
-              open('listing/[listingId]', { listingId: card.id }, `/listing/${card.id}`);
-            }}
-          />
-          {remaining ? <Text style={styles.deckFooter}>{remaining}</Text> : null}
-        </Animated.View>
+      <Screen
+        titleControl={titleControl}
+        width={isDesktopWeb ? 'deckFrameWeb' : 'grid'}
+        desktopBleed={isDesktopWeb}
+        inTabs>
+        {frameDesktop(
+          <Animated.View
+            key="grid"
+            entering={FadeIn.duration(motion.base)}
+            style={styles.view}>
+            <DeckGrid
+              cards={cards}
+              active={deckOnTop}
+              onOpen={(card) => {
+                primeListing(card);
+                open('listing/[listingId]', { listingId: card.id }, `/listing/${card.id}`);
+              }}
+            />
+            {remaining ? (
+              <Text style={[styles.deckFooter, isDesktopWeb && styles.deckFooterGrid]}>{remaining}</Text>
+            ) : null}
+          </Animated.View>
+        )}
       </Screen>
     );
   }
@@ -231,27 +310,36 @@ export default function Deck() {
   // Render a few cards deep so the next one shows under the top card.
   const visible = cards.slice(0, 3).reverse();
 
+  const roll = (
+    <View style={[styles.roll, isDesktopWeb && styles.rollDesktop]}>
+      {topListing.photos.length > 1 ? (
+        <PhotoRollBars photos={topListing.photos} index={photoIndex} placement="deck" />
+      ) : (
+        <View style={styles.rollStandIn} />
+      )}
+    </View>
+  );
+
   return (
     <Screen
-      titleControl={<DeckHeader actions={actions} />}
-      subhead={
-        <View style={styles.roll}>
-          {topListing.photos.length > 1 ? (
-            <PhotoRollBars photos={topListing.photos} index={photoIndex} placement="deck" />
-          ) : (
-            <View style={styles.rollStandIn} />
-          )}
-        </View>
-      }
-      width={Platform.OS === 'web' ? 'cardWeb' : 'card'}
+      titleControl={titleControl}
+      desktopBleed
+      subhead={isDesktopWeb ? undefined : roll}
+      width={isDesktopWeb ? 'deckFrameWeb' : Platform.OS === 'web' ? 'cardWeb' : 'card'}
       inTabs>
-      {/* The two views trade places rather than cutting. Entering only: the
-          old view is gone the frame the state changes, so there is nothing to
-          fade out, and the new one arrives over the page rather than over a
-          corpse of the last one. */}
-      <Animated.View key="cards" entering={FadeIn.duration(motion.base)} style={styles.view}>
-        <View style={styles.deck}>
-          <View ref={stage} onLayout={onStageLayout} style={styles.stage}>
+      {frameDesktop(
+        <View style={styles.desktopDeck}>
+          {isDesktopWeb ? roll : null}
+          {/* The two views trade places rather than cutting. Entering only: the
+              old view is gone the frame the state changes, so there is nothing to
+              fade out, and the new one arrives over the page rather than over a
+              corpse of the last one. */}
+          <Animated.View key="cards" entering={FadeIn.duration(motion.base)} style={styles.view}>
+            <View style={[styles.deck, isDesktopWeb && styles.deckDesktop]}>
+              <View
+                ref={stage}
+                onLayout={onStageLayout}
+                style={[styles.stage, isDesktopWeb && styles.stageDesktop]}>
           {visible.map((card, index) => {
             const onTop = index === visible.length - 1;
             return (
@@ -284,8 +372,11 @@ export default function Deck() {
               {remaining}
             </Animated.Text>
           ) : null}
+              {deckOnTop && tutorialStep ? <DeckCoach step={tutorialStep} /> : null}
+            </View>
+          </Animated.View>
         </View>
-      </Animated.View>
+      )}
     </Screen>
   );
 }
@@ -307,7 +398,7 @@ export default function Deck() {
  * to either question.
  */
 /** Search and deck controls on one row so the split stays 60 / 40. */
-function DeckHeader({ actions }: { actions: ReactNode }) {
+function DeckHeader({ children }: { children: ReactNode }) {
   const open = useOpenStack();
   const styles = useThemedStyles(deckStyles);
   const door = useRef<View>(null);
@@ -328,7 +419,7 @@ function DeckHeader({ actions }: { actions: ReactNode }) {
           }}
         />
       </View>
-      <View style={styles.actionsSlot}>{actions}</View>
+      <View style={styles.actionsSlot}>{children}</View>
     </View>
   );
 }
@@ -371,6 +462,10 @@ const deckStyles = (_theme: Theme) => ({
   view: {
     flex: 1,
   },
+  desktopDeck: {
+    flex: 1,
+    minHeight: 0,
+  },
   roll: {
     paddingHorizontal: inset.screen,
     alignItems: 'center' as const,
@@ -381,13 +476,28 @@ const deckStyles = (_theme: Theme) => ({
     height: size.segmentDeck,
     width: `${layout.photoRollTrackShare * 100}%` as const,
   },
+  rollDesktop: {
+    width: '100%' as const,
+    paddingHorizontal: 0,
+    alignItems: 'center' as const,
+    marginBottom: space.sm,
+    gap: space.xs,
+  },
   deck: {
     flex: 1,
+    position: 'relative' as const,
     paddingBottom: layout.deckTallyBand,
+  },
+  deckDesktop: {
+    paddingBottom: space.md,
   },
   stage: {
     flex: 1,
     marginHorizontal: inset.screen,
+  },
+  stageDesktop: {
+    marginLeft: 0,
+    marginRight: 0,
   },
   deckFooter: {
     ...type.caption,
@@ -396,6 +506,10 @@ const deckStyles = (_theme: Theme) => ({
     paddingTop: space.sm,
     paddingBottom: space.sm,
     marginHorizontal: inset.screen,
+  },
+  deckFooterGrid: {
+    paddingBottom: 0,
+    marginHorizontal: 0,
   },
   deckFooterFloat: {
     position: 'absolute' as const,

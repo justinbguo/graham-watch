@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, ScrollView, Text, View } from 'react-native';
 
+import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
 import { useDeleteAccount, useProfile } from '@/data/profile';
+import { CheckoutDefaultsSettings } from '@/features/checkout/CheckoutDefaultsSettings';
 import { BackendEnvironment } from '@/features/dev/BackendEnvironment';
 import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { useFacets } from '@/data/search';
 import { signOut } from '@/lib/auth';
-import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemeContext, useThemedStyles, type ThemePreference } from '@/providers/theme';
 
@@ -51,6 +53,12 @@ export default function SettingsScreen() {
 
         <Divider />
         <View style={styles.section}>
+          <Eyebrow>Payment &amp; shipping</Eyebrow>
+          <CheckoutDefaultsSettings />
+        </View>
+
+        <Divider />
+        <View style={styles.section}>
           <Eyebrow>Backend</Eyebrow>
           <BackendEnvironment />
         </View>
@@ -58,23 +66,12 @@ export default function SettingsScreen() {
         <Divider />
         <View style={styles.section}>
           <Eyebrow>Appearance</Eyebrow>
-          <View style={styles.segmented}>
-            {APPEARANCE.map((option) => {
-              const selected = preference === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setPreference(option.value)}
-                  style={[styles.segment, selected && styles.segmentActive]}>
-                  <Text style={[styles.segmentLabel, selected && styles.segmentLabelActive]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedChoice
+            label="Appearance"
+            value={preference}
+            options={APPEARANCE}
+            onChange={setPreference}
+          />
         </View>
 
         <Divider />
@@ -117,28 +114,5 @@ const settingsStyles = (theme: Theme) => ({
   favorites: {
     ...type.body,
     color: theme.color.textMuted,
-  },
-  segmented: {
-    flexDirection: 'row' as const,
-    backgroundColor: theme.color.fill,
-    borderRadius: radius.full,
-    padding: space.xs,
-    gap: space.xs,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center' as const,
-    paddingVertical: space.md,
-    borderRadius: radius.full,
-  },
-  segmentActive: {
-    backgroundColor: theme.color.surface,
-  },
-  segmentLabel: {
-    ...type.label,
-    color: theme.color.textMuted,
-  },
-  segmentLabelActive: {
-    color: theme.color.text,
   },
 });

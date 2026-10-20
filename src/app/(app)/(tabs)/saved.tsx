@@ -9,6 +9,8 @@ import { usePrimeListing, useSaved } from '@/data/listings';
 import { useListingThreads, useMessageAboutListing } from '@/data/messages';
 import { useUnsave } from '@/data/swipes';
 import { GuestGate } from '@/features/auth/GuestGate';
+import { WishlistSummaryChip } from '@/features/saved/WishlistSummaryChip';
+import { useOpenConversation } from '@/features/messages/useOpenConversation';
 import { useOpenStack } from '@/lib/openStack';
 import { formatMessageDay, formatTitle, totalPrice } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
@@ -26,6 +28,7 @@ export default function Saved() {
     return (
       <GuestGate
         title="Wishlist"
+        width="wishlist"
         message="Sign in to keep the watches you save and message the dealers who have them."
       />
     );
@@ -35,6 +38,7 @@ export default function Saved() {
   const message = useMessageAboutListing();
   const primeListing = usePrimeListing();
   const open = useOpenStack();
+  const openConversation = useOpenConversation();
   const styles = useThemedStyles(savedStyles);
   const refetchThreads = threads.refetch;
   // The thread is a screen on top of this one. Coming back is the moment a
@@ -53,20 +57,13 @@ export default function Saved() {
   if (inConversation.length) sections.push({ key: 'talking', data: inConversation });
   if (rest.length) sections.push({ key: 'rest', data: rest });
 
-  // Nothing saved, nothing to add up. An empty list with "$0" beside it reads
-  // like a price rather than an absence.
-  const action = cards.length ? (
-    <View style={styles.total}>
-      <Text style={styles.totalValue}>
-        {total ?? `${cards.length} watch${cards.length === 1 ? '' : 'es'}`}
-      </Text>
-      {onRequest ? <Text style={styles.totalNote}>{onRequest} on request</Text> : null}
-    </View>
-  ) : undefined;
+  const summaryChip = cards.length
+    ? <WishlistSummaryChip count={cards.length} total={total} onRequest={onRequest} />
+    : null;
 
   if (isPending || threads.isPending) {
     return (
-      <Screen title="Wishlist" inTabs action={action}>
+      <Screen title="Wishlist" inTabs width="wishlist">
         <Spinner />
       </Screen>
     );
@@ -74,7 +71,7 @@ export default function Saved() {
 
   if (error) {
     return (
-      <Screen title="Wishlist" inTabs action={action}>
+      <Screen title="Wishlist" inTabs width="wishlist">
         <Centered>
           <Message text={error.message} tone="error" />
         </Centered>
@@ -85,28 +82,47 @@ export default function Saved() {
   const writeAbout = (item: DeckCard) => {
     message.mutate(item.id, {
       onSuccess: (conversationId) =>
-        open(
-          'conversation/[conversationId]',
-          { conversationId, listingId: item.id },
-          `/conversation/${conversationId}?listingId=${item.id}`,
-        ),
+        openConversation({ conversationId, listingId: item.id }),
       onError: (error) => Alert.alert('Could not open that message', error.message),
     });
   };
 
   return (
-    <Screen title="Wishlist" action={action} inTabs>
+    <Screen title="Wishlist" width="wishlist" inTabs>
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderSectionHeader={({ section }) => (
-          <Text style={[styles.section, section.key === 'rest' && inConversation.length > 0 && styles.sectionNext]}>
-            {section.key === 'talking' ? 'Pending watches' : 'Saved watches'}
-          </Text>
-        )}
+        renderSectionHeader={({ section }) => {
+          const label = section.key === 'talking' ? 'Pending watches' : 'Saved watches';
+          const chipSection = rest.length > 0 ? 'rest' : 'talking';
+          const showChip = summaryChip && section.key === chipSection;
+
+          if (showChip) {
+            return (
+              <View
+                style={[
+                  styles.sectionRow,
+                  section.key === 'rest' && inConversation.length > 0 && styles.sectionNext,
+                ]}>
+                <Text style={styles.sectionTitle}>{label}</Text>
+                {summaryChip}
+              </View>
+            );
+          }
+
+          return (
+            <Text
+              style={[
+                styles.section,
+                section.key === 'rest' && inConversation.length > 0 && styles.sectionNext,
+              ]}>
+              {label}
+            </Text>
+          );
+        }}
         renderItem={({ item }) => (
           <SwipeToRemove
             accessibilityLabel={`Remove ${formatTitle(item)} from wishlist`}
@@ -145,17 +161,6 @@ export default function Saved() {
 }
 
 const savedStyles = (theme: Theme) => ({
-  total: {
-    alignItems: 'flex-end' as const,
-  },
-  totalValue: {
-    ...type.price,
-    color: theme.color.text,
-  },
-  totalNote: {
-    ...type.caption,
-    color: theme.color.textFaint,
-  },
   list: {
     paddingHorizontal: inset.screen,
     paddingBottom: space.xxxl,
@@ -173,6 +178,21 @@ const savedStyles = (theme: Theme) => ({
     color: theme.color.text,
     backgroundColor: theme.color.background,
     paddingBottom: space.xs,
+  },
+  sectionRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    gap: space.sm,
+    minHeight: type.title.lineHeight,
+    backgroundColor: theme.color.background,
+    paddingBottom: space.xs,
+  },
+  sectionTitle: {
+    ...type.title,
+    color: theme.color.text,
+    flexShrink: 1,
+    minWidth: 0,
   },
   sectionNext: {
     paddingTop: space.lg,

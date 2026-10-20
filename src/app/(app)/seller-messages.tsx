@@ -14,7 +14,7 @@ export default function SellerMessagesRoute() {
   return (
     <MessagesScreen
       userId={userId}
-      back={{ label: 'Your Shop', onPress: () => router.back() }}
+      back={{ label: 'Deal', onPress: () => router.back() }}
     />
   );
 }

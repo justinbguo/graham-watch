@@ -64,7 +64,15 @@ export default function AppLayout() {
             name="search"
             options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
           />
-          <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="sign-in"
+            options={{
+              presentation: 'modal',
+              ...(Platform.OS === 'web'
+                ? { animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }
+                : {}),
+            }}
+          />
         </Stack>
       </SaveFlightProvider>
     </FilterProvider>

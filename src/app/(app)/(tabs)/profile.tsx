@@ -1,24 +1,22 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from 'expo-router';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
-import { SocialButton } from '@/components/SocialButton';
-import { Eyebrow, Heading, Message, Screen } from '@/components/ui';
+import { Eyebrow, Message, Screen } from '@/components/ui';
 import { GuestGate } from '@/features/auth/GuestGate';
 import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
-import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
 import {
   ClaimByCodeCard,
   ClaimDealerCard,
-  DealerShopCard,
 } from '@/features/dealers/DealerShopCard';
+import { DealerShopEditor } from '@/features/dealers/DealerShopEditor';
 import { useDealerWorkspace } from '@/features/dealers/workspace';
 import { ProfileHeader } from '@/features/profile/ProfileHeader';
 import { SavedStrip } from '@/features/profile/SavedStrip';
 import { FollowingList } from '@/features/profile/FollowingList';
 import { Posts } from '@/features/profile/Posts';
 import { useOpenStack } from '@/lib/openStack';
-import { HIT_TARGET, inset, size, space, stack, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, inset, size, space, stack, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -40,87 +38,45 @@ export default function Profile() {
   const open = useOpenStack();
   const styles = useThemedStyles(profileStyles);
 
-  const header = (
-    <View style={styles.header}>
-      <ProfileHeader />
-      <Posts
-        onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })}
-        onCreate={() => router.navigate({ pathname: '/community', params: { compose: '1' } })}
-      />
-      <SavedStrip />
-      <FollowingList />
-      {claimed ? (
-        <View style={styles.section}>
-          <Eyebrow>Your shop</Eyebrow>
-          <DealerShopCard
-            shop={claimed}
-            totals={shop.totals}
-            onFindWatches={(sourceUrl) =>
-              open(
-                'import-inventory',
-                { dealerId: claimed.id, sourceUrl },
-                { pathname: '/import-inventory', params: { dealerId: claimed.id, sourceUrl } }
-              )
-            }
-          />
-          {shop.error ? <Message text={shop.error.message} tone="error" /> : null}
-          <View style={styles.listHeading}>
-            <Text style={styles.listTitle}>Listings</Text>
-            <SocialButton label="Reload" onPress={() => shop.reload()} />
-          </View>
-        </View>
-      ) : shop.claimable ? (
-        <View style={styles.section}>
-          <Eyebrow>Your shop</Eyebrow>
-          <ClaimDealerCard dealer={shop.claimable} />
-        </View>
-      ) : shop.application ? (
-        <View style={styles.section}>
-          <Eyebrow>Your application</Eyebrow>
-          <ApplicationStatusCard
-            application={shop.application}
-            onFinishVerifying={() => open('apply', undefined, '/apply')}
-          />
-        </View>
-      ) : (
-        <ClaimByCodeCard onStart={() => open('apply', undefined, '/apply')} />
-      )}
-    </View>
-  );
-
   return (
     <Screen
       title="Profile"
       action={<SettingsButton onPress={() => open('settings', undefined, '/settings')} />}
-      width={claimed ? 'grid' : 'reading'}
+      width="dealSheet"
       inTabs>
-      <FlatList
-        data={shop.inventory}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => (
-          <DealerInventoryRow
-            item={item}
-            busy={shop.isSaving}
-            onEdit={() =>
-              open('edit-listing/[listingId]', { listingId: item.id }, `/edit-listing/${item.id}`)
-            }
-            onTogglePublished={() => shop.togglePublished(item)}
-            onToggleSold={() => shop.toggleSold(item)}
-          />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled">
+        <ProfileHeader />
+        {claimed ? (
+          <View style={styles.section}>
+            <DealerShopEditor dealerId={claimed.id} totals={shop.totals} />
+            {shop.error ? <Message text={shop.error.message} tone="error" /> : null}
+          </View>
+        ) : shop.claimable ? (
+          <View style={styles.section}>
+            <Eyebrow>Your shop</Eyebrow>
+            <ClaimDealerCard dealer={shop.claimable} />
+          </View>
+        ) : shop.application ? (
+          <View style={styles.section}>
+            <Eyebrow>Your application</Eyebrow>
+            <ApplicationStatusCard
+              application={shop.application}
+              onFinishVerifying={() => open('apply', undefined, '/apply')}
+            />
+          </View>
+        ) : (
+          <ClaimByCodeCard onStart={() => open('apply', undefined, '/apply')} />
         )}
-        ListEmptyComponent={
-          claimed && !shop.isLoading ? (
-            <View style={styles.empty}>
-              <Heading>No listings yet</Heading>
-              <Message text="Add a product or catalogue URL above." />
-            </View>
-          ) : null
-        }
-      />
+        <Posts
+          onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })}
+          onCreate={() => router.navigate({ pathname: '/community', params: { compose: '1' } })}
+        />
+        <SavedStrip />
+        <FollowingList />
+      </ScrollView>
     </Screen>
   );
 }
@@ -141,47 +97,22 @@ function SettingsButton({ onPress }: { onPress: () => void }) {
 }
 
 const profileStyles = (theme: Theme) => ({
-  list: {
-    flexGrow: 1,
-    // The header leaves `space.lg` under every title. The person is the page,
-    // so the photograph sits `space.md` under "Profile". The margin is on the
-    // list, not its content: the header is the list's sibling, and a margin
-    // inside the scroll view cannot climb into it.
+  scroll: {
+    flex: 1,
     marginTop: space.md - space.lg,
   },
-  listContent: {
+  content: {
     paddingHorizontal: inset.screen,
     paddingBottom: inset.screen,
-    flexGrow: 1,
-  },
-  header: {
-    // One person, so the blocks are groups on a page, not separate pages.
     gap: stack.group,
   },
   section: {
     gap: stack.related,
   },
-  listHeading: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-  },
-  listTitle: {
-    ...type.title,
-    color: theme.color.text,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.color.border,
-  },
-  empty: {
-    paddingVertical: space.xxl,
-    gap: stack.related,
-  },
   settingsButton: {
     minWidth: HIT_TARGET,
     minHeight: HIT_TARGET,
-    alignItems: 'flex-end' as const,
+    alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
   pressed: {
