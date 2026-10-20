@@ -8,8 +8,9 @@ import type { HubSectionId } from './HubSection';
 const TABS: { id: HubSectionId; label: string }[] = [
   { id: 'messages', label: 'Messages' },
   { id: 'payments', label: 'Payments' },
-  { id: 'customers', label: 'Customers' },
+  { id: 'analytics', label: 'Analytics' },
   { id: 'listings', label: 'Listings' },
+  { id: 'support', label: 'Support' },
 ];
 
 export function HubTabBar({

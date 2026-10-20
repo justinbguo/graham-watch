@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { SearchField } from '@/components/SearchBar';
 import { Heading, Message, Spinner } from '@/components/ui';
-import { DealerInventoryRow } from '@/features/dealers/DealerInventoryRow';
+import { useDealerShop, useUpdateDealerListing } from '@/data/dealers';
 import { useDealerWorkspace } from '@/features/dealers/workspace';
 import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+import { CatalogueImportSheet } from './CatalogueImportSheet';
 import {
   filterDealerInventory,
   type ListingInventoryFilter,
 } from './listingInventoryFilter';
+import { SellerListingTableHeader, SellerListingTableRow } from './SellerListingTableRow';
 
 const FILTERS: { id: ListingInventoryFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -22,23 +24,31 @@ const FILTERS: { id: ListingInventoryFilter; label: string }[] = [
   { id: 'sold', label: 'Sold' },
 ];
 
-/** Inventory controls for the hub Listings section. */
+/** Deal tab Listings: searchable table with multi-select and inline edits. */
 export function SellerListingsPanel({
   active = true,
 }: {
-  /** Hub tab is visible — refetch saves and inquiry counts. */
   active?: boolean;
 }) {
   const styles = useThemedStyles(panelStyles);
   const theme = useTheme();
   const open = useOpenStack();
   const shop = useDealerWorkspace();
+  const dealerProfile = useDealerShop(shop.shop?.id ?? '');
+  const updateListing = useUpdateDealerListing(shop.shop?.id ?? null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ListingInventoryFilter>('all');
+  const [importOpen, setImportOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   const shown = useMemo(
     () => filterDealerInventory(shop.inventory, statusFilter, query),
     [shop.inventory, statusFilter, query],
+  );
+
+  const selectedItems = useMemo(
+    () => shop.inventory.filter((item) => selected.has(item.id)),
+    [shop.inventory, selected],
   );
 
   useEffect(() => {
@@ -50,53 +60,73 @@ export function SellerListingsPanel({
     return <Message text="Claim a shop on Profile to manage listings here." />;
   }
 
-  const { inventory, togglePublished, toggleSold, deleteListing, isSaving, reload, isReloading } =
-    shop;
-  const dealer = shop.shop!;
+  const { inventory, togglePublished, toggleSold, deleteListing, isSaving } = shop;
+  const dealer = shop.shop;
 
-  const openCatalogImport = () => {
-    const sourceUrl = dealer.website?.trim();
-    if (!sourceUrl) {
-      Alert.alert(
-        'Catalogue URL needed',
-        'On Profile, under your shop, enter the page where your watches are listed. We read that page to find new products.',
-      );
+  const allSelected = shown.length > 0 && shown.every((item) => selected.has(item.id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
       return;
     }
-    open(
-      'import-inventory',
-      { dealerId: dealer.id, sourceUrl },
-      { pathname: '/import-inventory', params: { dealerId: dealer.id, sourceUrl } },
-    );
+    setSelected(new Set(shown.map((item) => item.id)));
   };
 
-  const confirmDelete = (item: (typeof inventory)[number]) => {
-    const saves = item.saves;
-    const inquiries = item.inquiries;
-    const cost =
-      saves || inquiries
-        ? `\n\nThis removes ${saves} save${saves === 1 ? '' : 's'} and ${inquiries} inquir${inquiries === 1 ? 'y' : 'ies'} permanently.`
-        : '';
+  const toggleOne = (id: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
+  const confirmDelete = (items: typeof inventory) => {
+    const count = items.length;
     Alert.alert(
-      'Delete this listing?',
-      `${item.brand} ${item.model ?? ''} will leave your catalogue and the buyer deck.${cost}`,
+      count === 1 ? 'Delete this listing?' : `Delete ${count} listings?`,
+      'They leave your catalogue and the buyer deck.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteListing(item),
+          onPress: () => {
+            for (const item of items) deleteListing(item);
+            setSelected(new Set());
+          },
         },
       ],
     );
+  };
+
+  const bulkHide = () => {
+    for (const item of selectedItems) {
+      if (item.status !== 'hidden' && !item.sold_at) togglePublished(item);
+    }
+    setSelected(new Set());
+  };
+
+  const bulkShow = () => {
+    for (const item of selectedItems) {
+      if (item.status === 'hidden' && !item.sold_at) togglePublished(item);
+    }
+    setSelected(new Set());
+  };
+
+  const bulkSold = () => {
+    for (const item of selectedItems) {
+      if (!item.sold_at) toggleSold(item);
+    }
+    setSelected(new Set());
   };
 
   const emptyCopy =
     inventory.length === 0
       ? {
           title: 'No listings yet',
-          body: 'Refresh your catalogue from Profile, or edit watches after import.',
+          body: 'Use Import next to search to refresh from your site.',
         }
       : {
           title: 'No matches',
@@ -116,77 +146,87 @@ export function SellerListingsPanel({
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Refresh listings"
-          disabled={isReloading}
-          onPress={() => reload()}
+          accessibilityLabel="Import from your website"
+          onPress={() => setImportOpen(true)}
           style={({ pressed }) => [styles.iconHit, pressed && styles.pressed]}>
-          {isReloading ? (
-            <ActivityIndicator size="small" color={theme.color.text} />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={size.icon} color={theme.color.text} />
-          )}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add listings from your website"
-          onPress={openCatalogImport}
-          style={({ pressed }) => [styles.iconHit, pressed && styles.pressed]}>
-          <MaterialCommunityIcons name="plus" size={size.icon} color={theme.color.text} />
+          <MaterialCommunityIcons name="cloud-download-outline" size={size.icon} color={theme.color.text} />
         </Pressable>
       </View>
 
       <View style={styles.filters} accessibilityRole="tablist">
         {FILTERS.map((chip) => {
-          const selected = statusFilter === chip.id;
+          const on = statusFilter === chip.id;
           return (
             <Pressable
               key={chip.id}
               accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              accessibilityState={{ selected: on }}
               onPress={() => setStatusFilter(chip.id)}
-              style={({ pressed }) => [
-                styles.chip,
-                selected && styles.chipSelected,
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-                {chip.label}
-              </Text>
+              style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}>
+              <Text style={[styles.chipLabel, on && styles.chipLabelOn]}>{chip.label}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      <FlatList
-        data={shown}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={shown.length === 0 ? styles.empty : styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.divider} />}
-        ListEmptyComponent={
-          <View style={styles.emptyCopy}>
-            <Heading>{emptyCopy.title}</Heading>
-            <Message text={emptyCopy.body} />
-          </View>
-        }
-        renderItem={({ item }) => (
-          <DealerInventoryRow
-            item={item}
-            layout="shop"
-            busy={isSaving}
-            onEdit={() =>
-              open(
-                'edit-listing/[listingId]',
-                { listingId: item.id },
-                `/edit-listing/${item.id}`,
-              )
-            }
-            onTogglePublished={() => togglePublished(item)}
-            onToggleSold={() => toggleSold(item)}
-            onDelete={() => confirmDelete(item)}
-          />
-        )}
+      {selectedItems.length > 0 ? (
+        <View style={styles.bulk}>
+          <Text style={styles.bulkCount}>{selectedItems.length} selected</Text>
+          <Pressable accessibilityRole="button" onPress={bulkHide} style={styles.bulkAction}>
+            <Text style={styles.bulkActionLabel}>Hide</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={bulkShow} style={styles.bulkAction}>
+            <Text style={styles.bulkActionLabel}>Show</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={bulkSold} style={styles.bulkAction}>
+            <Text style={styles.bulkActionLabel}>Mark sold</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => confirmDelete(selectedItems)}
+            style={styles.bulkAction}>
+            <Text style={styles.bulkActionLabel}>Delete</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      <View style={styles.table}>
+        <SellerListingTableHeader allSelected={allSelected} onToggleAll={toggleAll} />
+        <FlatList
+          data={shown}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={shown.length === 0 ? styles.empty : styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyCopy}>
+              <Heading>{emptyCopy.title}</Heading>
+              <Message text={emptyCopy.body} />
+            </View>
+          }
+          renderItem={({ item }) => (
+            <SellerListingTableRow
+              item={item}
+              selected={selected.has(item.id)}
+              busy={isSaving || updateListing.isPending}
+              onToggleSelect={() => toggleOne(item.id)}
+              onSave={(changes) => updateListing.mutate({ listingId: item.id, changes })}
+              onEdit={() =>
+                open('edit-listing/[listingId]', { listingId: item.id }, `/edit-listing/${item.id}`)
+              }
+              onTogglePublished={() => togglePublished(item)}
+              onToggleSold={() => toggleSold(item)}
+              onDelete={() => confirmDelete([item])}
+            />
+          )}
+        />
+      </View>
+
+      <CatalogueImportSheet
+        visible={importOpen}
+        dealerId={dealer.id}
+        website={dealerProfile.data?.dealer?.website ?? dealer.website}
+        onClose={() => setImportOpen(false)}
       />
     </View>
   );
@@ -224,18 +264,49 @@ const panelStyles = (theme: Theme) => ({
     borderRadius: radius.full,
     backgroundColor: theme.color.fill,
   },
-  chipSelected: {
+  chipOn: {
     backgroundColor: theme.color.text,
   },
   chipLabel: {
     ...type.control,
     color: theme.color.text,
   },
-  chipLabelSelected: {
+  chipLabelOn: {
     color: theme.color.background,
   },
   pressed: {
     opacity: 0.72,
+  },
+  bulk: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    alignItems: 'center' as const,
+    gap: space.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    backgroundColor: theme.color.surface,
+    borderRadius: radius.md,
+  },
+  bulkCount: {
+    ...type.labelStrong,
+    color: theme.color.text,
+    marginRight: space.sm,
+  },
+  bulkAction: {
+    paddingVertical: space.xs,
+  },
+  bulkActionLabel: {
+    ...type.control,
+    color: theme.color.text,
+  },
+  table: {
+    flex: 1,
+    minHeight: 0,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderRadius: radius.md,
+    overflow: 'hidden' as const,
+    backgroundColor: theme.color.background,
   },
   list: {
     flex: 1,
@@ -248,10 +319,6 @@ const panelStyles = (theme: Theme) => ({
   },
   emptyCopy: {
     gap: stack.related,
-    paddingTop: space.xl,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.color.border,
+    padding: space.xl,
   },
 });

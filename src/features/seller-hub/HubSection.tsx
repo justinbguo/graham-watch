@@ -1,1 +1,6 @@
-export type HubSectionId = 'messages' | 'payments' | 'customers' | 'listings';
+export type HubSectionId =
+  | 'messages'
+  | 'payments'
+  | 'analytics'
+  | 'listings'
+  | 'support';
