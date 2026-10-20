@@ -23,6 +23,9 @@ const SWITCH: Record<SignInMode, string> = {
   login: 'New to Graham? Create an account',
 };
 
+const TAGLINE =
+  'The best vintage watch dealers and the most passionate collectors.';
+
 /**
  * The doors themselves. Used as a sheet over the deck (guest browsing) and as
  * the full sign-in surface when the stack still needs one.
@@ -30,43 +33,65 @@ const SWITCH: Record<SignInMode, string> = {
 export function SignInPanel({
   reason,
   footer,
+  presentation = 'default',
 }: {
   /** Why the sheet opened — budget is the ten-swipe gate. */
   reason?: 'budget' | 'action';
   footer?: ReactNode;
+  /** Web modal: centered lockup and larger tagline; shell owns the close control. */
+  presentation?: 'default' | 'modal';
 }) {
   const signIn = useSignIn();
   const styles = useThemedStyles(panelStyles);
+  const modal = presentation === 'modal';
+  const tagline =
+    reason === 'budget'
+      ? 'Sign in to keep swiping, save watches, and message dealers.'
+      : TAGLINE;
+
+  const body = (
+    <>
+      <View style={[styles.copy, modal && styles.copyModal]}>
+        <Wordmark variant={modal ? 'header' : 'signIn'} />
+        <Text style={[styles.tagline, modal && styles.taglineModal]}>{tagline}</Text>
+        {!isDemo ? <BackendEnvironment compact /> : null}
+      </View>
+
+      <SignInDoors signIn={signIn} modal={modal} />
+      {footer}
+    </>
+  );
+
+  if (modal) {
+    return <View style={styles.modalBody}>{body}</View>;
+  }
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.copy}>
-        <Wordmark />
-        <Text style={styles.tagline}>
-          {reason === 'budget'
-            ? 'Sign in to keep swiping, save watches, and message dealers.'
-            : 'The best vintage dealers and the most passionate collectors.'}
-        </Text>
-        {!isDemo ? <BackendEnvironment compact /> : null}
-      </View>
-
-      <SignInDoors signIn={signIn} />
-      {footer}
+      {body}
     </KeyboardAvoidingView>
   );
 }
 
-function SignInDoors({ signIn }: { signIn: ReturnType<typeof useSignIn> }) {
+function SignInDoors({
+  signIn,
+  modal,
+}: {
+  signIn: ReturnType<typeof useSignIn>;
+  modal: boolean;
+}) {
   const styles = useThemedStyles(panelStyles);
   const theme = useTheme();
+  const web = Platform.OS === 'web';
+  const doorPrefix = web ? 'Continue with' : DOOR[signIn.mode];
 
   return (
     <>
       {signIn.stage === 'method' ? (
         <View style={styles.doors}>
-          {signIn.appleAvailable ? (
+          {!web && signIn.appleAvailable ? (
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={
                 signIn.mode === 'create'
@@ -82,18 +107,20 @@ function SignInDoors({ signIn }: { signIn: ReturnType<typeof useSignIn> }) {
               style={styles.apple}
               onPress={signIn.signInWithApple}
             />
-          ) : (
+          ) : null}
+
+          {!web && !signIn.appleAvailable ? (
             <SignInOption
               label={`${DOOR[signIn.mode]} Apple`}
               disabled={signIn.busy}
               onPress={signIn.signInWithAppleWeb}
               mark={<DoorMark name="apple" color={theme.color.onAccent} />}
             />
-          )}
+          ) : null}
 
           {signIn.googleEnabled ? (
             <GoogleButton
-              label={`${DOOR[signIn.mode]} Google`}
+              label={`${doorPrefix} Google`}
               disabled={signIn.busy}
               onPress={signIn.signInWithGoogle}
             />
@@ -106,7 +133,7 @@ function SignInDoors({ signIn }: { signIn: ReturnType<typeof useSignIn> }) {
           </View>
 
           <SignInOption
-            label={`${DOOR[signIn.mode]} email`}
+            label={`${doorPrefix} email`}
             disabled={signIn.busy}
             onPress={signIn.chooseEmail}
             mark={<DoorMark name="email-outline" color={theme.color.onAccent} />}
@@ -163,7 +190,7 @@ function SignInDoors({ signIn }: { signIn: ReturnType<typeof useSignIn> }) {
 
       {signIn.error ? <Message text={signIn.error} tone="error" /> : null}
 
-      {signIn.stage !== 'code' ? (
+      {!web && signIn.stage !== 'code' ? (
         <Button label={SWITCH[signIn.mode]} variant="ghost" onPress={signIn.switchMode} />
       ) : null}
     </>
@@ -188,18 +215,28 @@ const panelStyles = (theme: Theme) => ({
     flex: 1,
     justifyContent: 'center' as const,
     gap: stack.group,
-    // Screen pads a header, not its body. Without this the wordmark and the
-    // capsule ends run off the glass.
     paddingHorizontal: inset.screen,
+  },
+  modalBody: {
+    gap: stack.group,
   },
   copy: {
     alignItems: 'flex-start' as const,
     gap: stack.tight,
   },
+  copyModal: {
+    alignItems: 'center' as const,
+    alignSelf: 'stretch' as const,
+  },
   tagline: {
     ...type.body,
     alignSelf: 'stretch' as const,
     color: theme.color.textMuted,
+  },
+  taglineModal: {
+    ...type.title,
+    color: theme.color.text,
+    textAlign: 'center' as const,
   },
   doors: {
     gap: stack.related,

@@ -1,11 +1,15 @@
 import * as Linking from 'expo-linking';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import {
   GOOGLE_SIGN_IN_ENABLED,
   callbackFailure,
+  emailOtpResendCooldownMs,
+  humanizeAuthError,
   isAppleSignInAvailable,
   sendEmailCode,
+  sendEmailCodeAdaptive,
   signInWithApple,
   signInWithGoogle,
   signInWithProvider,
@@ -27,7 +31,7 @@ function messageOf(error: unknown): string {
   if (/could not connect|network request failed|failed to connect/i.test(text)) {
     return 'Could not reach the database on this Mac. Stay on the same Wi-Fi and reload the app.';
   }
-  return text;
+  return humanizeAuthError(text);
 }
 
 export function useSignIn() {
@@ -40,6 +44,7 @@ export function useSignIn() {
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const generation = useRef(0);
+  const lastCodeSentAt = useRef<number | null>(null);
   const incoming = Linking.useLinkingURL();
 
   useEffect(() => {
@@ -74,10 +79,24 @@ export function useSignIn() {
   const sendCode = useCallback(() => {
     const address = email.trim();
     if (!address.includes('@')) return;
+    const resendCooldownMs = isLocalInbox() ? 2_000 : emailOtpResendCooldownMs;
+    const sentAt = lastCodeSentAt.current;
+    if (sentAt !== null && Date.now() - sentAt < resendCooldownMs) {
+      setError(
+        'We already sent a code. Check your email, or wait a minute before asking for another.',
+      );
+      setStage('code');
+      return;
+    }
     void run(async () => {
       const mine = ++generation.current;
       const since = Date.now();
-      await sendEmailCode(address, { createAccount: mode === 'create' });
+      if (Platform.OS === 'web') {
+        await sendEmailCodeAdaptive(address);
+      } else {
+        await sendEmailCode(address, { createAccount: mode === 'create' });
+      }
+      lastCodeSentAt.current = Date.now();
       if (mine !== generation.current) return;
       setStage('code');
       setCode('');
