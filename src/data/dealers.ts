@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { NO_FILTERS } from '@/features/filters/types';
 import { demo, isDemo } from '@/lib/demo';
 import type { Database } from '@/lib/database';
-import type { DeckCard, Listing } from '@/lib/models';
+import type { Dealer, DeckCard, Listing } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
 
@@ -29,6 +29,11 @@ export type DealerInventoryItem = DeckCard & {
  * `imported_by` are absent on purpose: the update policy would reject a move to
  * another shop anyway, and nothing in the app has a reason to try.
  */
+/** Columns a claimed shop may edit on Profile. */
+export type DealerShopEdits = Partial<
+  Pick<Dealer, 'name' | 'description' | 'instagram' | 'logo_url' | 'website'>
+>;
+
 export type ListingEdits = Partial<
   Pick<
     Listing,
@@ -185,6 +190,64 @@ export function useDealerInventory(dealerId: string | null) {
     queryFn: () => fetchDealerInventory(dealerId!),
     enabled: Boolean(dealerId),
     staleTime: 30_000,
+  });
+}
+
+function normalizeInstagram(handle: string): string | null {
+  const trimmed = handle.trim().replace(/^@/, '');
+  if (!trimmed) return null;
+  if (!/^[A-Za-z0-9_.]{1,30}$/.test(trimmed)) {
+    throw new Error('Instagram handles use letters, numbers, underscores, and periods.');
+  }
+  return trimmed;
+}
+
+function normalizeLogoUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  if (!/^https:\/\/.+/i.test(href)) {
+    throw new Error('Logo links must start with https://');
+  }
+  return href;
+}
+
+export function useUpdateDealerShop(dealerId: string | null) {
+  const queryClient = useQueryClient();
+  const { userId } = useSession();
+
+  return useMutation({
+    mutationFn: async (edits: DealerShopEdits) => {
+      if (isDemo || !dealerId) throw new Error('Sign in to edit your shop.');
+      const patch: DealerShopEdits = { ...edits };
+      if (patch.instagram !== undefined) {
+        patch.instagram = normalizeInstagram(patch.instagram ?? '');
+      }
+      if (patch.logo_url !== undefined) {
+        patch.logo_url = normalizeLogoUrl(patch.logo_url ?? '');
+      }
+      if (patch.description !== undefined) {
+        const text = patch.description?.trim() ?? '';
+        if (text.length > 500) throw new Error('Bio is at most 500 characters.');
+        patch.description = text || null;
+      }
+      if (patch.name !== undefined) {
+        const name = patch.name.trim();
+        if (!name) throw new Error('Shop name cannot be empty.');
+        patch.name = name;
+      }
+      if (patch.website !== undefined) {
+        const site = patch.website?.trim() ?? '';
+        patch.website = site || null;
+      }
+      const { error } = await supabase.from('dealers').update(patch).eq('id', dealerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (!dealerId) return;
+      void queryClient.invalidateQueries({ queryKey: keys.dealerShop(dealerId) });
+      if (userId) void queryClient.invalidateQueries({ queryKey: keys.dealerAccounts(userId) });
+    },
   });
 }
 
