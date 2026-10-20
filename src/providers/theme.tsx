@@ -27,9 +27,9 @@ const ThemeContext = createContext<ThemeState | null>(null);
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
-  // Dark until someone chooses otherwise. A stored choice still wins, so
+  // Light until someone chooses otherwise. A stored choice still wins, so
   // Settings is not reset on the next launch.
-  const [preference, setPreferenceState] = useState<ThemePreference>('dark');
+  const [preference, setPreferenceState] = useState<ThemePreference>('light');
 
   useEffect(() => {
     // secureStorage rather than a separate key-value dependency: it already

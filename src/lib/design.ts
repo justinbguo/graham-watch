@@ -1,4 +1,4 @@
-import { Platform, type TextStyle } from 'react-native';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
  * Live design tokens. docs/DESIGN.md is the why; this file is the numbers the
@@ -37,6 +37,11 @@ export const color = {
     background: '#FBF9F5',
     surface: '#F3EDE3',
     surfaceSunken: '#E8E0D2',
+    /**
+     * Matte behind a `contain` watch photograph on the page. Cooler and lighter
+     * than `surfaceSunken`, which reads warm beside a white product shot.
+     */
+    photoMat: '#F0EFEC',
     fill: '#E6DECF',
     border: '#DFD7C8',
     text: '#17140F',
@@ -89,11 +94,19 @@ export const color = {
     glassFill: 'rgba(22, 20, 17, 0.52)',
     glassBorder: 'rgba(255, 255, 255, 0.16)',
     glassWell: 'rgba(255, 255, 255, 0.12)',
+    /** Desktop messages inbox column. */
+    messageInbox: '#FFFFFF',
+    messageIncoming: '#F0F0F0',
+    /** Search capsule fill. White in light mode so it reads on the page, not in a gray well. */
+    searchFill: '#FFFFFF',
+    /** Text fields, selects, and outlined action capsules on the page. */
+    field: '#FFFFFF',
   },
   dark: {
     background: '#121110',
     surface: '#1E1B18',
     surfaceSunken: '#0D0C0B',
+    photoMat: '#1C1B19',
     fill: '#302C27',
     border: '#2E2A26',
     text: '#F3EFE8',
@@ -130,8 +143,31 @@ export const color = {
     glassFill: 'rgba(22, 20, 17, 0.58)',
     glassBorder: 'rgba(255, 255, 255, 0.14)',
     glassWell: 'rgba(255, 255, 255, 0.1)',
+    messageInbox: '#1A1816',
+    messageIncoming: '#302C27',
+    searchFill: '#1E1B18',
+    field: '#262320',
   },
 } as const;
+
+/** Hairline around a field or action pill — not `size.rule`, which is for selection marks. */
+export const fieldOutline = 1;
+
+/** White (or lifted) fill plus a border. Fields, selects, and community action pills. */
+export function fieldChrome(theme: Theme): ViewStyle {
+  return {
+    backgroundColor: theme.color.field,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.border,
+  };
+}
+
+export function actionPillChrome(theme: Theme): ViewStyle {
+  return {
+    ...fieldChrome(theme),
+    borderRadius: radius.full,
+  };
+}
 
 /** Native blur strength and web fallback for `LiquidGlass`. */
 export const glass = {
@@ -223,6 +259,8 @@ function cut(family: string, weight?: '500' | '700'): TextStyle {
 export const tracking = {
   /** Capitals at 44pt. About a tenth of the size, which is as tight as this cut stays open. */
   wordmark: -2.2,
+  /** Nav lockup at 22pt. Same cut, slightly more air than `wordmark` at this size. */
+  wordmarkHeader: -0.8,
   display: -0.8,
   title: -0.4,
 } as const;
@@ -233,6 +271,14 @@ export const type = {
     fontSize: 44,
     lineHeight: 48,
     letterSpacing: tracking.wordmark,
+  },
+  /** Beside `size.headerLogo` in the desktop nav. Display bold; line height matches the logo. */
+  wordmarkHeader: {
+    ...cut(face.display.bold, '700'),
+    fontSize: 22,
+    lineHeight: 36,
+    letterSpacing: tracking.wordmarkHeader,
+    includeFontPadding: false,
   },
   display: {
     ...cut(face.display.bold, '700'),
@@ -253,9 +299,16 @@ export const type = {
     lineHeight: 22,
     letterSpacing: tracking.title,
   },
-  /** Deck photo plate name: under the listing headline, above `titleSmall`. */
+  /** Watch name on the swipe-card photograph plate. */
   plateTitle: {
     ...cut(face.display.medium, '500'),
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: tracking.title,
+  },
+  /** Price and year on the same plate as `plateTitle`. */
+  plateMeta: {
+    ...cut(face.text.medium, '500'),
     fontSize: 19,
     lineHeight: 24,
     letterSpacing: tracking.title,
@@ -485,6 +538,10 @@ export const controlTextNudge = {
 export const layout = {
   /** Prose, forms, lists, detail screens. About 64 characters of `type.body`. */
   reading: 560,
+  /** Offer-deal sheet: price field, listing quote, and expense rows need a little more than prose. */
+  dealSheet: 640,
+  /** Wishlist rows: narrow list centred on desktop web. */
+  wishlist: 520,
   /** The swipe stage. A card should stay hand-sized at any window width. */
   card: 480,
   /**
@@ -496,15 +553,38 @@ export const layout = {
   grid: 1280,
   /** Seller Hub on web: inventory rows need room; not as wide as the home grid. */
   hub: 960,
+  /**
+   * Community feed column on desktop web. The tool rail uses `deckToolRail`;
+   * the centred cap matches Buy via `deckFrameWeb`.
+   */
+  community: 960,
+  /** Desktop messages: inbox width as a share of the split (thread gets the rest). */
+  messagesPaneShare: 0.26,
   /** The glyph column on a wide window: one tab wide, plus air either side. */
   rail: 88,
+  /** Buy screen on desktop web: tools and the keyboard guide stacked at the left. */
+  deckToolRail: 112,
+  /**
+   * Desktop Buy `Screen` cap: `cardWeb` plus the tool rail and the air between
+   * them, so the swipe card keeps `cardWeb` after the rail.
+   */
+  deckFrameWeb: 960 + 112 + space.lg + space.xs,
   /**
    * Columns on the wide home grid. Photograph above the copy, so a desktop
    * window fills with watches rather than one tall row each.
    */
   gridColumns: 4,
+  /** Desktop web home grid: two swipe-photo columns across `cardWeb`. */
+  gridColumnsWeb: 2,
+  /**
+   * Grid photograph frame matches the web swipe card's left column (half of
+   * `cardWeb`, a little taller than wide).
+   */
+  deckGridPhotoAspect: 0.76,
   /** Buy header: search door width as a share of the title row (icons take the rest). */
   deckHeaderSearchShare: 0.6,
+  /** Desktop web: header and tab content share one centred column (swipe deck excepted). */
+  desktopColumnShare: 0.75,
   /** Photo roll track width as a share of the card column (centered over the stack). */
   photoRollTrackShare: 0.62,
   /**
@@ -512,11 +592,29 @@ export const layout = {
    * One caption line plus a little air above the dock.
    */
   deckTallyBand: type.caption.lineHeight + space.sm + space.sm,
+  /** Desktop web marketplace header. Nav pill row plus the bottom rule. */
+  desktopHeader: 32 + space.sm + space.md + 2,
+  /** Marketplace header search door. Shorter than the flex slot so nav pills fit. */
+  desktopHeaderSearchMax: 320,
+  /** Search column width as a share of the desktop header row. */
+  desktopHeaderSearchShare: 0.28,
 } as const;
 
 export type LayoutWidth = Exclude<
   keyof typeof layout,
-  'rail' | 'gridColumns' | 'deckHeaderSearchShare' | 'photoRollTrackShare' | 'deckTallyBand'
+  | 'rail'
+  | 'gridColumns'
+  | 'gridColumnsWeb'
+  | 'deckGridPhotoAspect'
+  | 'deckHeaderSearchShare'
+  | 'desktopColumnShare'
+  | 'photoRollTrackShare'
+  | 'deckTallyBand'
+  | 'desktopHeader'
+  | 'desktopHeaderSearchMax'
+  | 'desktopHeaderSearchShare'
+  | 'deckToolRail'
+  | 'messagesPaneShare'
 >;
 
 /**
@@ -534,6 +632,14 @@ export const GUEST_SWIPE_BUDGET = 10;
 export const size = {
   /** Sign-in brand mark. Square lockup from `assets/logo.png`. */
   wordmarkLogo: 80,
+  /** Logo in the desktop web header beside the nav pills. */
+  headerLogo: 36,
+  /** Desktop web header nav pill height. Below `controlMin` so the row stays light. */
+  desktopNavPill: 32,
+  /** Key cap in the Buy rail keyboard guide. */
+  keyCap: 28,
+  /** Header search capsule. Thinner than `HIT_TARGET`, aligned to nav pills. */
+  searchBar: 36,
   thumb: 72,
   /**
    * The profile photograph. The four lines beside it — name, handle,
