@@ -3,14 +3,13 @@ import { FlatList, Platform, View } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
 import { ListingTile } from '@/components/ListingTile';
-import { useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
 import { layout, space } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 
 const GAP = space.md;
-const COLUMNS = layout.gridColumns;
 
 /**
  * The scanning half of the deck. On a wide window it is a tile grid —
@@ -32,10 +31,11 @@ export function DeckGrid({
   active?: boolean;
 }) {
   const wide = useIsWide();
+  const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(gridStyles);
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
-  const columns = wide ? COLUMNS : 1;
+  const columns = wide ? (isDesktopWeb ? layout.gridColumnsWeb : layout.gridColumns) : 1;
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !active) return;
@@ -95,15 +95,17 @@ export function DeckGrid({
 
   return (
     <FlatList
+      key={`deck-grid-${columns}`}
       data={cards}
       keyExtractor={(card) => card.id}
-      numColumns={COLUMNS}
+      numColumns={columns}
       columnWrapperStyle={styles.row}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}
       renderItem={({ item, index }) => (
-        <View style={styles.cell}>
+        <View style={[styles.cell, { maxWidth: `${100 / columns}%` as const }]}>
           <ListingTile
             card={item}
+            photoShape={isDesktopWeb ? 'swipe' : 'square'}
             selected={Platform.OS === 'web' && index === selectedIndex}
             onPress={() => {
               setSelected(index);
@@ -122,13 +124,14 @@ const gridStyles = () => ({
     paddingBottom: space.md,
     gap: GAP,
   },
+  contentDesktop: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+  },
   row: {
     gap: GAP,
   },
   cell: {
     flex: 1,
-    // FlatList still lays out a short last row. Cap each cell so four equal
-    // tiles stay the same width when the row is incomplete.
-    maxWidth: `${100 / COLUMNS}%` as const,
   },
 });

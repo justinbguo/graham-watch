@@ -14,8 +14,9 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DesktopTabHeader } from '@/components/DesktopTabHeader';
 import { LiquidGlass } from '@/components/LiquidGlass';
-import { deckContentWidth, useIsWide } from '@/lib/layout';
+import { deckContentWidth, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import {
   barChrome,
   layout,
@@ -32,12 +33,14 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
-type Tab = {
+export type Tab = {
   key: string;
   label: string;
   focused: boolean;
   badge?: number;
   accessibilityLabel?: string;
+  /** Save-flight lands on the Wishlist control. */
+  flightTarget?: boolean;
   renderIcon: (color: string) => ReactNode;
   onPress: () => void;
   onLongPress: () => void;
@@ -49,6 +52,7 @@ const PRESS_DURATION = 90;
 const TAB_SLOT = size.tabBar - space.md;
 
 export function TabBar({ state, descriptors, navigation }: TabBarProps) {
+  const isDesktopWeb = useIsDesktopWeb();
   const isWide = useIsWide();
 
   const tabs: Tab[] = state.routes.flatMap((route, index) => {
@@ -66,6 +70,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
       focused,
       badge: typeof options.tabBarBadge === 'number' ? options.tabBarBadge : undefined,
       accessibilityLabel: options.tabBarAccessibilityLabel,
+      flightTarget: route.name === 'saved',
       renderIcon: (color) => options.tabBarIcon?.({ focused, color, size: size.tabIcon }) ?? null,
       onPress: () => {
         const event = navigation.emit({
@@ -81,6 +86,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
     };
   });
 
+  if (isDesktopWeb) return <DesktopTabHeader tabs={tabs} />;
   return isWide ? <Rail tabs={tabs} /> : <Bar tabs={tabs} />;
 }
 

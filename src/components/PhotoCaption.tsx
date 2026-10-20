@@ -66,7 +66,7 @@ const caps = {
 
 /** One line on the plate. Fixed multiples keep the block from jumping between watches. */
 const titleLine = type.plateTitle.lineHeight;
-const metaLine = type.titleSmall.lineHeight;
+const metaLine = type.plateMeta.lineHeight;
 
 const gradient = Platform.select<ViewStyle>({
   web: { backgroundImage: scrim } as ViewStyle,
@@ -131,14 +131,14 @@ const captionStyles = (theme: Theme) => ({
     textShadowRadius: 12,
   },
   sep: {
-    ...type.titleSmall,
+    ...type.plateMeta,
     lineHeight: metaLine,
     color: theme.color.onOverlayFaint,
     textShadowColor: theme.color.overlay,
     textShadowRadius: 12,
   },
   year: {
-    ...type.titleSmall,
+    ...type.plateMeta,
     ...caps,
     lineHeight: metaLine,
     color: theme.color.onOverlay,

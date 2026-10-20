@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type PropsWithChildren,
+  type ReactNode,
 } from 'react';
 import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
 import Animated, {
@@ -179,12 +180,11 @@ function FlyingCard({
 }
 
 /**
- * The Wishlist tab's bookmark, which also reports where it is and takes the
- * landing. Measured rather than worked out from the tab count: the bar is the
- * navigator's to lay out, it moves to the left rail on a wide window, and its
- * height differs per device.
+ * Reports where the Wishlist tab sits so a save can fly there. The desktop
+ * header uses text pills instead of `SaveTargetIcon`, but the flight still
+ * needs a measured target.
  */
-export function SaveTargetIcon({ color }: { color: ColorValue }) {
+export function SaveFlightTarget({ children }: { children: ReactNode }) {
   const { registerTarget, arrivals } = useSaveFlight();
   const frame = useRef<View>(null);
   const pulse = useSharedValue(0);
@@ -197,8 +197,6 @@ export function SaveTargetIcon({ color }: { color: ColorValue }) {
   }, [registerTarget]);
 
   useEffect(() => {
-    // The first layout pass can report an empty frame, and on a phone nothing
-    // else will make the tab bar lay out again.
     const handle = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(handle);
   }, [measure]);
@@ -220,8 +218,17 @@ export function SaveTargetIcon({ color }: { color: ColorValue }) {
 
   return (
     <Animated.View ref={frame} collapsable={false} onLayout={measure} style={pulseStyle}>
-      <MaterialCommunityIcons name="bookmark-outline" size={size.tabIcon} color={color} />
+      {children}
     </Animated.View>
+  );
+}
+
+/** Bottom or side tab bar: bookmark glyph that registers the flight target. */
+export function SaveTargetIcon({ color }: { color: ColorValue }) {
+  return (
+    <SaveFlightTarget>
+      <MaterialCommunityIcons name="bookmark-outline" size={size.tabIcon} color={color} />
+    </SaveFlightTarget>
   );
 }
 

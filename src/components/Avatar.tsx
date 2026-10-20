@@ -1,10 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image, type ImageSource } from 'expo-image';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { avatarUrl } from '@/lib/avatarUrl';
-import { radius, size, type Theme } from '@/lib/theme';
+import { avatarMonogramColor } from '@/lib/avatarMonogram';
+import { radius, size, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -13,8 +14,8 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  *
  * Square with a small radius, not a circle: the app's photographs are all
  * rectangles, and one round one in a column of them reads as a different kind
- * of thing. The glyph is the empty state for a person, in place of initials.
- * A shop passes `fallback` instead: a picture, not a symbol.
+ * of thing. Without a photo, a person gets a stable color and initial; a shop
+ * passes `fallback` instead.
  */
 export function Avatar({
   url,
@@ -22,6 +23,7 @@ export function Avatar({
   glyph = 'account-outline',
   fit = 'cover',
   fallback,
+  monogram,
 }: {
   url: string | null;
   px?: number;
@@ -30,6 +32,8 @@ export function Avatar({
   fit?: 'cover' | 'contain';
   /** Shown when `url` is missing or fails. A shop's default picture. */
   fallback?: ImageSource;
+  /** Empty person state: one letter on a seed-stable fill. */
+  monogram?: { letter: string; seed: string };
 }) {
   const styles = useThemedStyles(avatarStyles);
   const theme = useTheme();
@@ -62,12 +66,26 @@ export function Avatar({
     );
   }
 
+  if (monogram) {
+    return (
+      <View
+        style={[
+          styles.photo,
+          styles.monogram,
+          box,
+          { backgroundColor: avatarMonogramColor(monogram.seed, theme.scheme) },
+        ]}>
+        <Text style={[styles.monogramLetter, { fontSize: Math.round(px * 0.42) }]}>
+          {monogram.letter}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.photo, styles.empty, box]}>
       <MaterialCommunityIcons
         name={glyph}
-        // Half the box, so the glyph reads as a mark inside a frame rather
-        // than a picture that happens to be a glyph.
         size={Math.round(px / 2)}
         color={theme.color.textMuted}
       />
@@ -83,5 +101,13 @@ const avatarStyles = (theme: Theme) => ({
   empty: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  monogram: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  monogramLetter: {
+    ...type.labelStrong,
+    color: theme.color.text,
   },
 });

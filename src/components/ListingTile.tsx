@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Pressable as FramePressable,
   ScrollView,
@@ -9,9 +9,12 @@ import {
 } from 'react-native';
 import { Pressable } from 'react-native-gesture-handler';
 
+import { Avatar } from '@/components/Avatar';
+import { dealerPicture } from '@/features/dealers/picture';
 import { formatPrice, formatSpecs, formatTitle } from '@/lib/format';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { photoScrollPage } from '@/lib/photoPager';
+import { layout, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -24,17 +27,25 @@ export function ListingTile({
   card,
   onPress,
   selected = false,
+  photoShape = 'square',
 }: {
   card: DeckCard;
   onPress?: () => void;
   /** The grid's keyboard cursor on the web. */
   selected?: boolean;
+  /** Desktop web grid: same photograph proportion as the swipe card. */
+  photoShape?: 'square' | 'swipe';
 }) {
   const styles = useThemedStyles(tileStyles);
 
   return (
     <View style={styles.tile}>
-      <TilePhotos photos={card.photos} selected={selected} onPress={onPress} />
+      <TilePhotos
+        photos={card.photos}
+        selected={selected}
+        photoShape={photoShape}
+        onPress={onPress}
+      />
       {/* Photograph and type open the listing separately so a sideways page
           on the frame is not also a tap on a parent pressable. */}
       <Pressable
@@ -53,9 +64,17 @@ export function ListingTile({
             {card.sold_at ? 'Sold' : formatPrice(card)}
           </Text>
           {card.dealer ? (
-            <Text style={styles.dealer} numberOfLines={1}>
-              {card.dealer.name}
-            </Text>
+            <View style={styles.dealerRow}>
+              <Avatar
+                url={card.dealer.logo_url}
+                px={size.iconSmall}
+                fit="contain"
+                fallback={dealerPicture}
+              />
+              <Text style={styles.dealer} numberOfLines={1}>
+                {card.dealer.name}
+              </Text>
+            </View>
           ) : null}
         </View>
       </Pressable>
@@ -71,14 +90,19 @@ export function ListingTile({
 function TilePhotos({
   photos,
   selected,
+  photoShape,
   onPress,
 }: {
   photos: DeckPhoto[];
   selected: boolean;
+  photoShape: 'square' | 'swipe';
   onPress?: () => void;
 }) {
   const styles = useThemedStyles(tileStyles);
+  const frameStyle = photoShape === 'swipe' ? styles.frameSwipe : styles.frame;
   const [width, setWidth] = useState(0);
+  const frameHeight =
+    width > 0 && photoShape === 'swipe' ? width / layout.deckGridPhotoAspect : width;
   const [page, setPage] = useState(0);
   const [dragged, setDragged] = useState(false);
 
@@ -87,6 +111,16 @@ function TilePhotos({
     if (next) void Image.prefetch(next.url);
   }, [photos, page]);
 
+  const syncPage = useCallback(
+    (offsetX: number) => {
+      setPage((current) => {
+        const next = photoScrollPage(offsetX, width, photos.length);
+        return current === next ? current : next;
+      });
+    },
+    [photos.length, width],
+  );
+
   const onLayout = (event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
     setWidth((current) => (Math.abs(current - next) < 1 ? current : next));
@@ -94,7 +128,7 @@ function TilePhotos({
 
   if (photos.length === 0) {
     return (
-      <View style={[styles.frame, selected && styles.frameSelected]} onLayout={onLayout}>
+      <View style={frameStyle} onLayout={onLayout}>
         <View style={styles.photoEmpty}>
           <Text style={styles.photoEmptyLabel}>No photograph</Text>
         </View>
@@ -109,11 +143,11 @@ function TilePhotos({
         accessibilityLabel="Open listing"
         onPress={onPress}
         onLayout={onLayout}
-        style={[styles.frame, selected && styles.frameSelected]}>
+        style={frameStyle}>
         <Image
           source={{ uri: photos[0].url }}
+          contentFit={photoShape === 'swipe' ? 'cover' : 'contain'}
           style={styles.fill}
-          contentFit="contain"
           accessible={false}
         />
       </FramePressable>
@@ -121,7 +155,7 @@ function TilePhotos({
   }
 
   return (
-    <View style={[styles.frame, selected && styles.frameSelected]} onLayout={onLayout}>
+    <View style={frameStyle} onLayout={onLayout}>
       <ScrollView
         horizontal
         pagingEnabled
@@ -129,10 +163,17 @@ function TilePhotos({
         directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         style={styles.fill}
+        scrollEventThrottle={16}
         onScrollBeginDrag={() => setDragged(true)}
+        onScroll={(event) => syncPage(event.nativeEvent.contentOffset.x)}
         onMomentumScrollEnd={(event) => {
-          const next = Math.round(event.nativeEvent.contentOffset.x / width);
-          setPage(Math.min(Math.max(next, 0), photos.length - 1));
+          syncPage(event.nativeEvent.contentOffset.x);
+          setDragged(false);
+        }}
+        onScrollEndDrag={(event) => {
+          syncPage(event.nativeEvent.contentOffset.x);
+          const vx = event.nativeEvent.velocity?.x ?? 0;
+          if (vx === 0) setDragged(false);
         }}>
         {photos.map((photo) => (
           <FramePressable
@@ -146,8 +187,12 @@ function TilePhotos({
               }
               onPress?.();
             }}
-            style={{ width, height: width }}>
-            <Image source={{ uri: photo.url }} style={styles.fill} contentFit="contain" />
+            style={{ width, height: photoShape === 'swipe' ? frameHeight : width }}>
+            <Image
+              source={{ uri: photo.url }}
+              style={styles.fill}
+              contentFit={photoShape === 'swipe' ? 'cover' : 'contain'}
+            />
           </FramePressable>
         ))}
       </ScrollView>
@@ -170,14 +215,16 @@ const tileStyles = (theme: Theme) => ({
     aspectRatio: 1,
     borderRadius: radius.md,
     overflow: 'hidden' as const,
-    backgroundColor: theme.color.surfaceSunken,
-    // Transparent rather than absent: a border that appears only once selected
-    // would move the frame by a pixel as the cursor lands on it.
-    borderWidth: size.rule,
-    borderColor: 'transparent',
+    backgroundColor: theme.color.photoMat,
+    borderWidth: 0,
   },
-  frameSelected: {
-    borderColor: theme.color.brass,
+  frameSwipe: {
+    width: '100%' as const,
+    aspectRatio: layout.deckGridPhotoAspect,
+    borderRadius: radius.lg,
+    overflow: 'hidden' as const,
+    backgroundColor: theme.color.background,
+    borderWidth: 0,
   },
   fill: {
     width: '100%' as const,
@@ -222,10 +269,11 @@ const tileStyles = (theme: Theme) => ({
   },
   priceRow: {
     flexDirection: 'row' as const,
-    alignItems: 'baseline' as const,
-    justifyContent: 'space-between' as const,
+    flexWrap: 'nowrap' as const,
+    alignItems: 'center' as const,
     gap: space.sm,
     paddingTop: space.xs,
+    width: '100%' as const,
   },
   price: {
     ...type.priceSmall,
@@ -237,11 +285,19 @@ const tileStyles = (theme: Theme) => ({
     color: theme.color.textFaint,
     flexShrink: 0,
   },
+  dealerRow: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-end' as const,
+    gap: space.xs,
+    minWidth: 0,
+  },
   dealer: {
     ...type.control,
-    color: theme.color.brass,
+    color: theme.color.text,
     flexShrink: 1,
-    textAlign: 'right' as const,
+    minWidth: 0,
   },
   pressed: {
     opacity: 0.72,

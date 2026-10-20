@@ -20,6 +20,7 @@ import {
   radius,
   size,
   space,
+  type,
   type Theme,
 } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -31,15 +32,24 @@ const INPUT_IOS_NUDGE = Platform.OS === 'ios' ? 1 : 0;
 
 type GlyphName = keyof typeof MaterialCommunityIcons.glyphMap;
 
+export type SearchBarVariant = 'default' | 'header';
+
 /**
  * Capsule search chrome: magnify, then words. The deck door, the Messages
  * field, and the morph between them share this shell.
  */
-export function SearchBarShell({ children }: { children: React.ReactNode }) {
+export function SearchBarShell({
+  children,
+  variant = 'default',
+}: {
+  children: React.ReactNode;
+  variant?: SearchBarVariant;
+}) {
   const styles = useThemedStyles(searchStyles);
+  const header = variant === 'header';
   return (
-    <View style={styles.bar}>
-      <SearchGlyph compact={false} />
+    <View style={[styles.bar, header && styles.barHeader]}>
+      <SearchGlyph compact={header} />
       {children}
     </View>
   );
@@ -51,12 +61,15 @@ export function IconBar({
   placeholder,
   accessibilityLabel,
   compact = false,
+  inbox = false,
   ...props
 }: Omit<TextInputProps, 'style'> & {
   ref?: Ref<TextInput>;
   icon: GlyphName;
   placeholder: string;
   compact?: boolean;
+  /** Messages inbox: smaller type in the search capsule. */
+  inbox?: boolean;
 }) {
   const styles = useThemedStyles(searchStyles);
   const theme = useTheme();
@@ -74,7 +87,7 @@ export function IconBar({
         autoCapitalize="none"
         autoCorrect={false}
         {...props}
-        style={[styles.input, compact && styles.inputCompact]}
+        style={[styles.input, inbox && styles.inputInbox, compact && styles.inputCompact]}
       />
     </View>
   );
@@ -91,11 +104,13 @@ export function SearchField({
   placeholder = PLACEHOLDER,
   style,
   compact = false,
+  inbox = false,
   ...props
 }: Omit<TextInputProps, 'style'> & {
   ref?: Ref<TextInput>;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
+  inbox?: boolean;
 }) {
   return (
     <View style={style}>
@@ -106,6 +121,7 @@ export function SearchField({
         accessibilityLabel={accessibilityLabel}
         returnKeyType="search"
         compact={compact}
+        inbox={inbox}
         {...props}
       />
     </View>
@@ -116,19 +132,27 @@ export function SearchField({
 export function SearchDoor({
   onPress,
   accessibilityLabel = PLACEHOLDER,
+  variant = 'default',
 }: {
   onPress: () => void;
   accessibilityLabel?: string;
+  variant?: SearchBarVariant;
 }) {
   const styles = useThemedStyles(searchStyles);
+  const header = variant === 'header';
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={({ pressed }) => [pressed && styles.pressed]}>
-      <SearchBarShell>
-        <Text style={styles.label} numberOfLines={1}>
+      style={({ pressed }) => [
+        header && styles.doorHeader,
+        pressed && styles.pressed,
+      ]}>
+      <SearchBarShell variant={variant}>
+        <Text
+          style={[styles.label, header && styles.labelHeader]}
+          numberOfLines={1}>
           {PLACEHOLDER}
         </Text>
       </SearchBarShell>
@@ -160,6 +184,11 @@ const searchStyles = (theme: Theme) => ({
   inputCompact: {
     paddingTop: INPUT_IOS_NUDGE,
   },
+  inputInbox: {
+    fontFamily: type.control.fontFamily,
+    fontSize: type.control.fontSize,
+    lineHeight: type.control.fontSize,
+  },
   bar: {
     height: HIT_TARGET,
     alignSelf: 'stretch' as const,
@@ -167,11 +196,21 @@ const searchStyles = (theme: Theme) => ({
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: theme.color.border,
-    backgroundColor: theme.color.surface,
+    backgroundColor: theme.color.searchFill,
     paddingHorizontal: space.sm,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+  },
+  barHeader: {
+    height: size.searchBar,
+    paddingHorizontal: space.md,
+    gap: space.xs,
+  },
+  doorHeader: {
+    minHeight: HIT_TARGET,
+    width: '100%' as const,
+    justifyContent: 'center' as const,
   },
   glyphSlot: {
     width: size.icon,
@@ -200,6 +239,13 @@ const searchStyles = (theme: Theme) => ({
     flexShrink: 1,
     paddingTop: INPUT_IOS_NUDGE,
     color: theme.color.inkMuted,
+  },
+  labelHeader: {
+    paddingTop: 0,
+    ...Platform.select({
+      web: { lineHeight: size.searchBar - 2 },
+      default: { paddingTop: INPUT_IOS_NUDGE },
+    }),
   },
   pressed: {
     opacity: 0.72,

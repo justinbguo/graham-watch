@@ -53,6 +53,7 @@ export function SendBar({
    * that bar is a sentence, and return still sends.
    */
   multiline = false,
+  chrome = 'screen',
 }: {
   placeholder: string;
   value: string;
@@ -65,8 +66,11 @@ export function SendBar({
   leading?: ReactNode;
   trailing?: ReactNode;
   multiline?: boolean;
+  /** Desktop message pane: composer strip on `surface`, not the page. */
+  chrome?: 'screen' | 'pane';
 }) {
   const styles = useThemedStyles(sendStyles);
+  const barStyle = chrome === 'pane' ? styles.barPane : styles.bar;
   const theme = useTheme();
   const sendable = (canSend ?? value.trim().length > 0) && !busy;
   const [grown, setGrown] = useState(HIT_TARGET);
@@ -78,11 +82,11 @@ export function SendBar({
   const singleLine = !tall;
 
   return (
-    <View style={styles.bar}>
+    <View style={barStyle}>
       {note}
-      <View style={[leading || trailing ? styles.compose : undefined, tall ? styles.composeTall : styles.composeCenter]}>
+      <View style={[styles.compose, tall ? styles.composeTall : styles.composeCenter]}>
         {leading ? <View style={styles.side}>{leading}</View> : null}
-        <View style={leading || trailing ? styles.field : undefined}>
+        <View style={styles.field}>
           <Field
             placeholder={placeholder}
             value={value}
@@ -91,9 +95,10 @@ export function SendBar({
             autoCorrect
             maxLength={2000}
             multiline={multiline}
-            submitBehavior={multiline ? 'submit' : undefined}
-            returnKeyType="send"
-            onSubmitEditing={() => sendable && onSend()}
+            blurOnSubmit={!multiline}
+            submitBehavior={multiline ? 'newline' : 'submit'}
+            returnKeyType={multiline ? 'default' : 'send'}
+            onSubmitEditing={multiline ? undefined : () => sendable && onSend()}
             onContentSizeChange={
               multiline
                 ? (event) => setGrown(event.nativeEvent.contentSize.height)
@@ -108,7 +113,7 @@ export function SendBar({
                 height,
                 minHeight: HIT_TARGET,
                 maxHeight: MESSAGE_MAX,
-                backgroundColor: theme.color.surface,
+                borderRadius: tall ? radius.lg : radius.full,
                 paddingTop: singleLine ? MESSAGE_PAD : space.sm,
                 paddingBottom: singleLine ? MESSAGE_PAD : space.sm,
                 textAlignVertical: singleLine ? ('center' as const) : ('top' as const),
@@ -137,14 +142,29 @@ export function SendBar({
 
 const sendStyles = (theme: Theme) => ({
   bar: {
+    width: '100%' as const,
+    alignSelf: 'stretch' as const,
     paddingHorizontal: inset.screen,
     paddingTop: space.sm,
     paddingBottom: space.md,
     gap: space.sm,
     backgroundColor: theme.color.background,
   },
+  barPane: {
+    width: '100%' as const,
+    alignSelf: 'stretch' as const,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.lg,
+    gap: space.sm,
+    backgroundColor: theme.color.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
+  },
   compose: {
     flexDirection: 'row' as const,
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
     gap: space.xs,
   },
   composeCenter: {
@@ -163,13 +183,15 @@ const sendStyles = (theme: Theme) => ({
   field: {
     flex: 1,
     minWidth: 0,
+    alignSelf: 'stretch' as const,
   },
   input: {
+    width: '100%' as const,
     height: HIT_TARGET,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: theme.color.border,
-    backgroundColor: theme.color.surface,
+    backgroundColor: theme.color.field,
     paddingLeft: space.md,
     paddingRight: HIT_TARGET,
   },

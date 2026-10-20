@@ -66,24 +66,23 @@ function RollSegment({
     on.value = withTiming(active ? 1 : 0, { duration: motion.fast });
   }, [active, on]);
 
-  const fill = theme.color.fill;
-  const brass = theme.color.brass;
+  const rollIdle = theme.color.textFaint;
+  const rollActive = theme.color.accent;
   const faint = theme.color.onOverlayFaint;
   const accent = theme.color.onOverlayAccent;
 
   const animated = useAnimatedStyle(() => {
     if (deck) {
       return {
-        backgroundColor: interpolateColor(on.value, [0, 1], [fill, brass]),
-        opacity: 0.5 + on.value * 0.5,
-        transform: [{ scaleY: 0.9 + on.value * 0.1 }],
+        backgroundColor: interpolateColor(on.value, [0, 1], [rollIdle, rollActive]),
+        transform: [{ scaleY: 0.92 + on.value * 0.08 }],
       };
     }
     return {
       backgroundColor: interpolateColor(on.value, [0, 1], [faint, accent]),
       opacity: 0.65 + on.value * 0.35,
     };
-  }, [deck, fill, brass, faint, accent]);
+  }, [deck, rollIdle, rollActive, faint, accent]);
 
   return (
     <Animated.View
