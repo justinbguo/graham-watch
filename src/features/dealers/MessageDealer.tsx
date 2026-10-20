@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, Text } from 'react-native';
 
 import { useMessageDealer } from '@/data/messages';
 import { type Theme } from '@/lib/theme';
-import { useOpenStack } from '@/lib/openStack';
+import { useOpenConversation } from '@/features/messages/useOpenConversation';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -26,7 +26,7 @@ export function MessageDealer({
   const { userId } = useSession();
   const theme = useTheme();
   const styles = useThemedStyles(messageStyles);
-  const open = useOpenStack();
+  const openConversation = useOpenConversation();
   const start = useMessageDealer();
 
   if (!userId) return null;
@@ -41,13 +41,7 @@ export function MessageDealer({
       onPress={() =>
         start.mutate(dealer.id, {
           onSuccess: (conversationId) =>
-            open(
-              'conversation/[conversationId]',
-              listingId ? { conversationId, listingId } : { conversationId },
-              listingId
-                ? `/conversation/${conversationId}?listingId=${listingId}`
-                : `/conversation/${conversationId}`,
-            ),
+            openConversation({ conversationId, listingId }),
           onError: (error) => Alert.alert('Could not open that message', error.message),
         })
       }

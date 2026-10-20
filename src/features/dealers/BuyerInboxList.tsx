@@ -4,7 +4,7 @@ import { FlatList, View } from 'react-native';
 import { SearchField, searchFieldInset } from '@/components/SearchBar';
 import { Centered, Heading, Message, Spinner } from '@/components/ui';
 import { BODY_SEARCH_MIN, useMessagesMatching } from '@/data/messages';
-import { useOpenStack } from '@/lib/openStack';
+import { useOpenConversation } from '@/features/messages/useOpenConversation';
 import { inset, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -19,7 +19,7 @@ const BODY_SEARCH_PAUSE = 300;
 /** Buyer threads for a claimed shop — no outer Screen wrapper. */
 export function BuyerInboxList({ dealerId }: { dealerId: string }) {
   const styles = useThemedStyles(inboxStyles);
-  const open = useOpenStack();
+  const openConversation = useOpenConversation();
   const openParty = useOpenParty();
   const { threads, isPending, error } = useShopInbox(dealerId);
   const [query, setQuery] = useState('');
@@ -76,13 +76,7 @@ export function BuyerInboxList({ dealerId }: { dealerId: string }) {
             <ConversationRow
               conversation={item}
               onOpenParty={() => openParty(item.with)}
-              onPress={() =>
-                open(
-                  'conversation/[conversationId]',
-                  { conversationId: item.id },
-                  `/conversation/${item.id}`,
-                )
-              }
+              onPress={() => openConversation({ conversationId: item.id })}
             />
           )}
         />

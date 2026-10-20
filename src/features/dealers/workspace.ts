@@ -15,9 +15,8 @@ export type DealerTotals = { live: number; saves: number; inquiries: number };
 const NO_INVENTORY: DealerInventoryItem[] = [];
 
 /**
- * The shop half of the Profile tab: which dealer this login owns, what that shop
- * has in the catalogue, and how to retire a watch. A buyer gets a workspace with
- * no shop and no claim, and Profile renders nothing extra.
+ * Which dealer this login owns and their catalogue rows. Profile edits the shop;
+ * the Deal tab lists inventory. A buyer gets no shop and no claim.
  *
  * `isLoading` rather than `isPending`: a disabled query stays pending forever, so
  * a buyer with no shop would sit under a spinner.

@@ -1,13 +1,11 @@
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { Button, Field, Message } from '@/components/ui';
+import { Button, Message } from '@/components/ui';
 import { useClaimDealer } from '@/data/dealers';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-import { DealerPanel } from './DealerPanel';
-import type { DealerAccount, DealerTotals } from './workspace';
+import type { DealerAccount } from './workspace';
 
 /**
  * The fast lane: this login is signed in as the very address the shop publishes,
@@ -45,67 +43,6 @@ export function ClaimByCodeCard({ onStart }: { onStart: () => void }) {
         <Message text="Tell us your website and we will send a code to a mailbox on it. You can keep signing in with whichever address you already use." />
       </View>
       <Button label="Claim your shop" onPress={onStart} />
-    </View>
-  );
-}
-
-export function DealerShopCard({
-  shop,
-  totals,
-  onFindWatches,
-}: {
-  shop: DealerAccount;
-  totals: DealerTotals;
-  onFindWatches: (sourceUrl: string) => void;
-}) {
-  const styles = useThemedStyles(cardStyles);
-  const [sourceUrl, setSourceUrl] = useState(shop.website ?? '');
-
-  return (
-    <View style={styles.group}>
-      <View style={styles.card}>
-        <DealerPanel dealer={shop} />
-
-        <View style={styles.rule} />
-        <View style={styles.stats}>
-          <Stat value={totals.live} label="Live listings" />
-          <Stat value={totals.saves} label="Wishlists" />
-          <Stat value={totals.inquiries} label="Inquiries" />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.copy}>
-          <Text style={styles.heading}>Add or refresh inventory</Text>
-          <Message text="We read your own catalogue page and compare it to what is here. New watches are yours to tick; prices and sold watches follow your site on their own." />
-        </View>
-        <Field
-          accessibilityLabel="Catalogue URL"
-          keyboardType="url"
-          placeholder="https://your-shop.com/watches"
-          value={sourceUrl}
-          onChangeText={setSourceUrl}
-        />
-        <Button
-          label="Refresh from my site"
-          disabled={!sourceUrl.trim()}
-          onPress={() => onFindWatches(sourceUrl.trim())}
-        />
-        <Text style={styles.hint}>
-          Anything you correct by hand here is kept. A refresh never writes over your own edits.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  const styles = useThemedStyles(cardStyles);
-
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value.toLocaleString()}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
