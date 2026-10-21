@@ -16,8 +16,8 @@ import type {
  * all. It exists so the UI can be built and reviewed while the backend is
  * unavailable. Every read in `src/data` short-circuits here when it is on.
  *
- * Turn on with EXPO_PUBLIC_DEMO=1. The EAS `preview` profile sets this so a
- * phone install works with no backend. Never set it on a store/`production` build.
+ * Turn on with EXPO_PUBLIC_DEMO=1. EAS `preview` and `production` force it off
+ * and talk to the hosted project. Never set it on a store build.
  */
 export const isDemo = process.env.EXPO_PUBLIC_DEMO === '1';
 

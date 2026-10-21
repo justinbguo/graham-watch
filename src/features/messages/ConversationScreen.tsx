@@ -21,6 +21,7 @@ import {
 } from '@/data/messages';
 import { DealCard } from '@/features/messages/DealCard';
 import { OfferDealSheet } from '@/features/messages/OfferDealSheet';
+import { track } from '@/lib/analytics';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { useOpenStack } from '@/lib/openStack';
@@ -183,8 +184,12 @@ export function ConversationScreen({
     // The field clears as the bubble rises. If the write fails the words come
     // back to the field, unless something new has been typed over them.
     setDraft('');
+    const replyFromShop = shopThread && who.kind === 'person';
     send.mutate(body, {
       onError: () => setDraft((current) => current || body),
+      onSuccess: () => {
+        if (replyFromShop) track('dealer_reply', { conversation_id: conversationId });
+      },
     });
   }
 

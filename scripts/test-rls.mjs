@@ -3062,6 +3062,110 @@ console.log('\nmessages');
   }
 }
 
+console.log('\npush tokens');
+{
+  const bad = await api('/rest/v1/rpc/register_push_token', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_token: 'not-a-token', p_platform: 'ios' },
+  });
+  check('a nonsense push token is refused', bad.status >= 400, JSON.stringify(bad.body));
+
+  const web = await api('/rest/v1/rpc/register_push_token', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_token: `ExponentPushToken[web${stamp}]`, p_platform: 'web' },
+  });
+  check(
+    'a push token for an unknown platform is refused',
+    web.status >= 400,
+    JSON.stringify(web.body),
+  );
+
+  const expo = `ExponentPushToken[buyer${stamp}]`;
+  const registered = await api('/rest/v1/rpc/register_push_token', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_token: expo, p_platform: 'ios' },
+  });
+  check(
+    'a user can register their own push token',
+    registered.status < 300,
+    JSON.stringify(registered.body),
+  );
+
+  const own = await api('/rest/v1/device_push_tokens?select=token,user_id', { token: buyer.token });
+  check(
+    'a user can read their own push token',
+    Array.isArray(own.body) && own.body.some((row) => row.token === expo && row.user_id === buyer.id),
+    JSON.stringify(own.body),
+  );
+
+  const other = await api('/rest/v1/device_push_tokens?select=token', { token: importer.token });
+  check(
+    "a user cannot read someone else's push token",
+    Array.isArray(other.body) && other.body.length === 0,
+    JSON.stringify(other.body),
+  );
+
+  const direct = await api('/rest/v1/device_push_tokens', {
+    token: buyer.token,
+    method: 'POST',
+    body: { user_id: buyer.id, token: `ExponentPushToken[direct${stamp}]`, platform: 'ios' },
+    prefer: 'return=representation',
+  });
+  check(
+    'a client cannot insert a push token directly',
+    direct.status >= 400,
+    JSON.stringify(direct.body),
+  );
+
+  const anon = await api('/rest/v1/rpc/register_push_token', {
+    method: 'POST',
+    body: { p_token: expo, p_platform: 'ios' },
+  });
+  check(
+    'a signed-out caller cannot register a push token',
+    anon.status >= 400,
+    JSON.stringify(anon.body),
+  );
+
+  const stolen = await api('/rest/v1/rpc/unregister_push_token', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_token: expo },
+  });
+  const still = await api('/rest/v1/device_push_tokens?select=token', { token: buyer.token });
+  check(
+    "someone else cannot remove your push token",
+    stolen.status < 300 && Array.isArray(still.body) && still.body.some((row) => row.token === expo),
+    JSON.stringify({ stolen: stolen.body, still: still.body }),
+  );
+
+  const moved = await api('/rest/v1/rpc/register_push_token', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_token: expo, p_platform: 'ios' },
+  });
+  const buyerAfter = await api('/rest/v1/device_push_tokens?select=token', { token: buyer.token });
+  const importerAfter = await api('/rest/v1/device_push_tokens?select=token,user_id', {
+    token: importer.token,
+  });
+  check(
+    'registering a token moves it to the account now using the phone',
+    moved.status < 300 &&
+      Array.isArray(buyerAfter.body) &&
+      !buyerAfter.body.some((row) => row.token === expo) &&
+      Array.isArray(importerAfter.body) &&
+      importerAfter.body.some((row) => row.token === expo && row.user_id === importer.id),
+    JSON.stringify({
+      moved: moved.body,
+      buyerAfter: buyerAfter.body,
+      importerAfter: importerAfter.body,
+    }),
+  );
+}
+
 await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);

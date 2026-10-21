@@ -1,8 +1,12 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
+import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
+
+import { resetIdentity } from './analytics';
+import { releasePushToken } from './push';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -70,11 +74,22 @@ export async function verifyEmailCode(email: string, token: string) {
 export const isAppleSignInAvailable = () => AppleAuthentication.isAvailableAsync();
 
 export async function signInWithApple() {
+  // Apple stores the SHA-256 of this nonce in the identity token. Supabase
+  // hashes the raw value the same way and rejects the token if they differ,
+  // which is what stops a captured token from being replayed.
+  const rawNonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    rawNonce,
+    { encoding: Crypto.CryptoEncoding.HEX },
+  );
+
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [
       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
       AppleAuthentication.AppleAuthenticationScope.EMAIL,
     ],
+    nonce: hashedNonce,
   });
 
   if (!credential.identityToken) throw new Error('Apple did not return an identity token.');
@@ -82,6 +97,7 @@ export async function signInWithApple() {
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
+    nonce: rawNonce,
   });
   if (error) throw error;
 
@@ -167,6 +183,10 @@ async function assertProviderReady(url: string, provider: keyof typeof PROVIDER_
 }
 
 export async function signOut(options?: { scope?: 'global' | 'local' | 'others' }) {
+  // The token has to leave while the session can still authorise the delete.
+  // A failed unregister must not trap the person in the account.
+  await releasePushToken().catch(() => undefined);
+  resetIdentity();
   const { error } = await supabase.auth.signOut(options);
   if (error) throw error;
 }

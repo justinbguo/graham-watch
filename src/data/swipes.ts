@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
+import { track } from '@/lib/analytics';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
@@ -113,7 +114,11 @@ export function useRecordSwipe(actorId: string | null) {
         queryClient.setQueryData(key, counts);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      track('swipe', { direction: variables.direction, listing_id: variables.listingId });
+      if (variables.direction === 'right') {
+        track('save', { listing_id: variables.listingId });
+      }
       if (!actorId) return;
       // Both lists, whichever way the thumb went. The write is an upsert, so
       // saving a watch from the listing screen after passing on it in the deck

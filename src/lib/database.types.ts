@@ -509,6 +509,41 @@ export type Database = {
           },
         ]
       }
+      device_push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_comments: {
         Row: {
           author_handle: string | null
@@ -1768,6 +1803,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      register_push_token: {
+        Args: { p_platform: string; p_token: string }
+        Returns: undefined
+      }
       rename_group: {
         Args: { p_conversation_id: string; p_title: string }
         Returns: undefined
@@ -1912,6 +1951,7 @@ export type Database = {
         Args: { p_me: string; p_them: string }
         Returns: string
       }
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
       url_path: { Args: { p_url: string }; Returns: string }
       verify_application_email: {
         Args: { p_application_id: string; p_code: string }
