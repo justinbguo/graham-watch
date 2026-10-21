@@ -13,8 +13,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useOnboardingGate } from '@/data/profile';
 import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
+import { PushBridge } from '@/features/notifications/PushBridge';
+import { Telemetry } from '@/features/telemetry/Telemetry';
 import { haasFonts } from '@/lib/fonts';
+import { installErrorReporter } from '@/lib/report';
 import { applySystemChrome } from '@/lib/systemChrome';
+
+installErrorReporter();
 import { QueryProvider } from '@/providers/query';
 import { RevenueCatProvider } from '@/providers/revenuecat';
 import { SessionProvider, useSession } from '@/providers/session';
@@ -38,6 +43,8 @@ export default function RootLayout() {
               <GuestProvider>
                 <FilterProvider>
                   <SplashScreenController />
+                  <Telemetry />
+                  <PushBridge />
                   <Chrome />
                 </FilterProvider>
               </GuestProvider>

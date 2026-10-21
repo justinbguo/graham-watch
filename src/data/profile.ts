@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { track } from '@/lib/analytics';
 import { signOut } from '@/lib/auth';
 import type { Database } from '@/lib/database';
 import { demo, isDemo } from '@/lib/demo';
@@ -221,6 +222,7 @@ export function useCompleteOnboarding(userId: string | null) {
       return saveOnboarding(userId, answers);
     },
     onSuccess: () => {
+      track('signup_complete');
       if (!userId) return;
       queryClient.invalidateQueries({ queryKey: keys.profile(userId) });
       // Favourite brands rank the deck, so the pile built before the answers

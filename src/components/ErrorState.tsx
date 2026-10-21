@@ -1,7 +1,9 @@
 import { router, type ErrorBoundaryProps } from 'expo-router';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Button, Centered, Message, Screen } from '@/components/ui';
+import { captureException } from '@/lib/report';
 
 /**
  * What a screen shows instead of vanishing.
@@ -33,6 +35,10 @@ function leave() {
 }
 
 function Fallback({ error, retry, inTabs }: ErrorBoundaryProps & { inTabs: boolean }) {
+  useEffect(() => {
+    captureException(error);
+  }, [error]);
+
   return (
     <Screen title="Something broke" inTabs={inTabs}>
       <Centered>
@@ -69,6 +75,10 @@ export function TabErrorBoundary(props: ErrorBoundaryProps) {
  * dark mode still lands.
  */
 export function RootErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    captureException(error, { fatal: true });
+  }, [error]);
+
   const dark = useColorScheme() === 'dark';
   const ink = dark ? '#f5f5f5' : '#111111';
 

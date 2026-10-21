@@ -18,8 +18,11 @@
     },
     "preview": {
       "distribution": "internal",
-      "environment": "preview",
+      "environment": "production",
       "node": "22.16.0",
+      "env": {
+        "EXPO_PUBLIC_DEMO": "0"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -27,7 +30,10 @@
     "production": {
       "environment": "production",
       "autoIncrement": true,
-      "node": "22.16.0"
+      "node": "22.16.0",
+      "env": {
+        "EXPO_PUBLIC_DEMO": "0"
+      }
     }
   },
   "submit": {

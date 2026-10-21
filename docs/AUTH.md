@@ -152,13 +152,70 @@ On an iPhone, `signInWithApple` uses `expo-apple-authentication`, which hands
 Supabase an identity token directly with no browser round trip. That view does
 not exist in a browser or in Expo Go, so `isAppleSignInAvailable()` is false
 there and the screen draws our own door instead. That door opens Apple in the
-browser, the same round trip as Google, and it does nothing until
-`[auth.external.apple]` is enabled with a Services ID. The native button
-starts working on the first development build, no further code change.
+browser, the same round trip as Google.
+
+The native button is on in every iOS build (`ios.usesAppleSignIn` and the
+`expo-apple-authentication` plugin). It still fails until the dashboard steps
+below are done — the failure shows on the sign-in screen, it does not crash.
+App Store review requires this button whenever Google is offered. Google stays
+hidden until `EXPO_PUBLIC_GOOGLE_SIGN_IN=1`, but the Apple button is already
+the one a TestFlight build presents, so configure it before inviting testers.
 
 Apple sends the user's name on the very first sign-in and never again, so
 `signInWithApple` writes it to `profiles` immediately. Losing that moment means
-the name is gone for good.
+the name is gone for good. The call also sends a nonce: Apple puts the SHA-256
+of it in the identity token, and Supabase checks that hash. A token captured
+from another device cannot be replayed.
+
+An Apple account that shares no email is rejected (`email_optional` is off).
+The inquiry mail uses that address as the reply-to. Hide My Email is fine —
+that relay address is a real inbox.
+
+### What you do in Apple Developer (once)
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/)
+   ($99/year). TestFlight will not accept a build without it.
+2. Identifiers → App IDs → register `com.grahamwatch.app` (or confirm the one
+   EAS creates on the first `eas build`). Enable **Sign in with Apple**. Leave
+   the server-to-server notification URL blank — Supabase does not use it.
+3. Identifiers → Services IDs → register one for the web door, for example
+   `com.grahamwatch.app.signin`. Enable Sign in with Apple, and set the
+   website:
+   - Domain: `<project-ref>.supabase.co` (hosted is
+     `hbxgxtbtefpyutyqafoi.supabase.co`)
+   - Return URL: `https://<project-ref>.supabase.co/auth/v1/callback`
+4. Keys → create a key, enable Sign in with Apple, and download the `.p8`
+   file once. You need the Key ID and your Team ID as well. Apple will not
+   let you download the file again.
+
+### What you do in the Supabase dashboard (hosted)
+
+The local `config.toml` does not apply to the hosted project. Open
+Authentication → Providers → Apple on the hosted project and turn it on.
+
+| Field | Value |
+| --- | --- |
+| Client IDs | Services ID **first**, then the bundle id. Example: `com.grahamwatch.app.signin,com.grahamwatch.app` |
+| Secret | The JWT from the `.p8` key. The dashboard can generate it from the Team ID, Key ID, Services ID, and file. |
+| Callback | `https://<project-ref>.supabase.co/auth/v1/callback` |
+
+The first Client ID is the one the web door uses. Native sign-in accepts any
+id in the list as the token's audience, so the bundle id has to be in that
+list or the iPhone button fails with an audience error. If the bundle id is
+listed first, the iPhone still works and the website door does not.
+
+The secret expires every six months. After it expires, the iPhone button keeps
+working (it never uses the secret) and the website's Apple door starts failing.
+Regenerate the secret from the same key when that happens.
+
+Under Authentication → URL configuration, allow `graham://` and
+`graham://**`, plus the Vercel origins already listed in `config.toml`. A
+redirect that is not allowed comes back as the browser sheet closing with no
+session.
+
+Local `supabase start` reads `SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID` and
+`SUPABASE_AUTH_EXTERNAL_APPLE_SECRET` from the repo-root `.env`. Leave them
+empty and the provider stays inert, the same way Google does.
 
 ## Phone
 

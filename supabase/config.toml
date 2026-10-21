@@ -367,18 +367,24 @@ max_frequency = "5s"
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
 [auth.external.apple]
-enabled = false
-client_id = ""
+# On here, same as Google: an empty client id leaves the provider inert rather
+# than stopping `supabase start`. The hosted project does not read this file.
+# Turn Apple on there — Authentication → Providers → Apple — and put the
+# Services ID first in Client IDs, then the bundle id `com.grahamwatch.app`.
+# See docs/AUTH.md. The secret is a JWT Apple expires every six months; native
+# sign-in keeps working after it expires, the web door does not.
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
-# Overrides the default auth callback URL derived from auth.external_url.
-redirect_uri = ""
+# Apple's console accepts localhost and often refuses a raw 127.0.0.1 URI.
+redirect_uri = "http://localhost:54321/auth/v1/callback"
 # Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
 # or any other third-party OIDC providers.
 url = ""
-# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
+# Leave this off. Native sign-in sends a nonce; skipping the check would accept a replayed token.
 skip_nonce_check = false
-# If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
+# An Apple account with no email cannot send an inquiry — the reply-to would be empty.
 email_optional = false
 
 [auth.external.google]
