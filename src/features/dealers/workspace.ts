@@ -4,6 +4,7 @@ import { useMyApplication } from '@/data/applications';
 import {
   useDealerAccounts,
   useDealerInventory,
+  useDeleteDealerListing,
   useUpdateDealerListing,
   type DealerAccount,
   type DealerInventoryItem,
@@ -14,9 +15,8 @@ export type DealerTotals = { live: number; saves: number; inquiries: number };
 const NO_INVENTORY: DealerInventoryItem[] = [];
 
 /**
- * The shop half of the Profile tab: which dealer this login owns, what that shop
- * has in the catalogue, and how to retire a watch. A buyer gets a workspace with
- * no shop and no claim, and Profile renders nothing extra.
+ * Which dealer this login owns and their catalogue rows. Profile edits the shop;
+ * the Deal tab lists inventory. A buyer gets no shop and no claim.
  *
  * `isLoading` rather than `isPending`: a disabled query stays pending forever, so
  * a buyer with no shop would sit under a spinner.
@@ -33,6 +33,7 @@ export function useDealerWorkspace() {
 
   const inventory = useDealerInventory(shop?.id ?? null);
   const update = useUpdateDealerListing(shop?.id ?? null);
+  const remove = useDeleteDealerListing(shop?.id ?? null);
   const items = inventory.data ?? NO_INVENTORY;
 
   const totals = useMemo<DealerTotals>(
@@ -45,6 +46,7 @@ export function useDealerWorkspace() {
   );
 
   const { mutate } = update;
+  const { mutate: removeListing } = remove;
 
   const togglePublished = useCallback(
     (item: DealerInventoryItem) =>
@@ -64,6 +66,11 @@ export function useDealerWorkspace() {
     [mutate]
   );
 
+  const deleteListing = useCallback(
+    (item: DealerInventoryItem) => removeListing(item.id),
+    [removeListing],
+  );
+
   return {
     shop,
     claimable,
@@ -71,11 +78,13 @@ export function useDealerWorkspace() {
     inventory: items,
     totals,
     isLoading: accounts.isLoading || inventory.isLoading,
-    error: accounts.error ?? inventory.error ?? update.error ?? null,
-    isSaving: update.isPending,
+    isReloading: inventory.isFetching && !inventory.isLoading,
+    error: accounts.error ?? inventory.error ?? update.error ?? remove.error ?? null,
+    isSaving: update.isPending || remove.isPending,
     reload: inventory.refetch,
     togglePublished,
     toggleSold,
+    deleteListing,
   };
 }
 

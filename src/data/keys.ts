@@ -16,6 +16,8 @@ export const keys = {
   searchCount: (filters: unknown) => ['listing-counts', 'search', filters] as const,
   facets: ['facets'] as const,
   profile: (userId: string) => ['profile', userId] as const,
+  /** Saved ship-to and payment stand-in for deal checkout. */
+  checkoutDefaults: (userId: string) => ['checkout-defaults', userId] as const,
   saved: (userId: string) => ['saved', userId] as const,
   passes: (userId: string) => ['passes', userId] as const,
   listing: (listingId: string) => ['listing', listingId] as const,
@@ -24,6 +26,7 @@ export const keys = {
   myApplication: (userId: string) => ['my-application', userId] as const,
   claimableDealer: (website: string) => ['claimable-dealer', website] as const,
   dealerInventory: (dealerId: string) => ['dealer-inventory', dealerId] as const,
+  dealerTopCustomers: (dealerId: string) => ['dealer-top-customers', dealerId] as const,
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,

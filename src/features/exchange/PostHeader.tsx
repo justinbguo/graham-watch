@@ -7,6 +7,8 @@ import { formatRelativeTime } from '@/lib/format';
 import { size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
+import { personMonogram } from '@/lib/avatarMonogram';
+
 import { atHandle } from './copy';
 
 /**
@@ -56,7 +58,15 @@ export function PostHeader({
         onPress={onPress}
         hitSlop={space.sm}
         style={styles.person}>
-        <Avatar url={author.avatar_url} px={size.avatarByline} />
+        <Avatar
+          url={author.avatar_url}
+          px={size.avatarByline}
+          monogram={personMonogram({
+            userId: author.id,
+            name: author.name,
+            handle: author.handle,
+          })}
+        />
         <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>

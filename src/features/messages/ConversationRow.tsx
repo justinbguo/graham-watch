@@ -21,6 +21,8 @@ export function ConversationRow({
   detail,
   label,
   busy = false,
+  selected = false,
+  desktop = false,
   onOpenParty,
 }: {
   conversation: ConversationSummary;
@@ -29,6 +31,9 @@ export function ConversationRow({
   detail?: string;
   label?: string;
   busy?: boolean;
+  selected?: boolean;
+  /** Desktop split: full-bleed rows with hairlines between them. */
+  desktop?: boolean;
   onOpenParty?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
@@ -37,33 +42,62 @@ export function ConversationRow({
   const unread = !detail && conversation.unread > 0;
   const preview = detail ?? lastLine(conversation);
 
-  return (
-    <View style={[styles.row, busy && styles.busy]}>
-      <PartyAvatar who={who} onPress={onOpenParty} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
-        accessibilityState={{ disabled: busy, busy }}
-        disabled={busy}
-        onPress={onPress}
-        style={({ pressed }) => [styles.rowPress, pressed && !busy && styles.pressed]}>
-        <View style={styles.copy}>
-          <View style={styles.line}>
-            <Text style={styles.name} numberOfLines={1}>
-              {name}
+  const rowStyle = [
+    styles.row,
+    !desktop && selected && styles.selected,
+    busy && styles.busy,
+  ];
+
+  const desktopShotStyle = [
+    styles.desktopShot,
+    selected && styles.selectedDesktop,
+    busy && styles.busy,
+  ];
+
+  const copy = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label ?? (unread ? `${name}, unread` : name)}
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
+      onPress={onPress}
+      style={({ pressed }) => [styles.rowPress, pressed && !busy && styles.pressed]}>
+      <View style={styles.copy}>
+        <View style={styles.line}>
+          <Text style={styles.name} numberOfLines={1}>
+            {name}
+          </Text>
+          {!detail && conversation.last ? (
+            <Text style={[styles.when, unread && desktop && styles.whenUnread]}>
+              {formatRelativeTime(conversation.last.at)}
             </Text>
-            {!detail && conversation.last ? (
-              <Text style={styles.when}>{formatRelativeTime(conversation.last.at)}</Text>
-            ) : null}
-          </View>
-          <View style={styles.line}>
-            <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
-              {preview}
-            </Text>
-            {unread ? <View style={styles.dot} /> : null}
-          </View>
+          ) : null}
         </View>
-      </Pressable>
+        <View style={styles.line}>
+          <Text style={[styles.preview, unread && styles.unreadPreview]} numberOfLines={1}>
+            {preview}
+          </Text>
+          {unread ? <View style={[styles.dot, desktop && styles.dotDesktop]} /> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+
+  if (desktop) {
+    return (
+      <View style={desktopShotStyle}>
+        <View style={styles.rowDesktop}>
+          <PartyAvatar who={who} px={size.avatarSmall} onPress={onOpenParty} />
+          <View style={styles.copyDesktop}>{copy}</View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={rowStyle}>
+      <PartyAvatar who={who} onPress={onOpenParty} />
+      {copy}
     </View>
   );
 }
@@ -84,6 +118,33 @@ const rowStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.md,
     paddingVertical: space.md,
+    paddingHorizontal: space.sm,
+    marginHorizontal: -space.sm,
+    borderRadius: radius.md,
+  },
+  desktopShot: {
+    width: '100%' as const,
+    marginBottom: space.sm,
+    borderRadius: radius.md,
+    overflow: 'hidden' as const,
+  },
+  rowDesktop: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+  },
+  copyDesktop: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center' as const,
+  },
+  selected: {
+    backgroundColor: theme.color.surfaceSunken,
+  },
+  selectedDesktop: {
+    backgroundColor: theme.color.messageIncoming,
   },
   rowPress: {
     flex: 1,
@@ -114,6 +175,10 @@ const rowStyles = (theme: Theme) => ({
     ...type.caption,
     color: theme.color.textFaint,
     marginLeft: 'auto' as const,
+    flexShrink: 0,
+  },
+  whenUnread: {
+    color: theme.color.save,
   },
   preview: {
     ...type.caption,
@@ -122,6 +187,7 @@ const rowStyles = (theme: Theme) => ({
   },
   unreadPreview: {
     color: theme.color.text,
+    fontFamily: type.labelStrong.fontFamily,
   },
   dot: {
     width: size.unread,
@@ -129,5 +195,8 @@ const rowStyles = (theme: Theme) => ({
     borderRadius: radius.full,
     marginLeft: 'auto' as const,
     backgroundColor: theme.color.brass,
+  },
+  dotDesktop: {
+    backgroundColor: theme.color.save,
   },
 });

@@ -3,13 +3,21 @@
  * them so existing `@/lib/theme` imports keep working.
  */
 export {
+  cardDismissDuration,
+  cardSettleDuration,
   GUEST_SWIPE_BUDGET,
   HIT_TARGET,
+  saveFlightDuration,
   WIDE_BREAKPOINT,
   barChrome,
+  controlText,
+  controlTextNudge,
   color as palette,
+  actionPillChrome,
   dealerSocial,
   face,
+  fieldChrome,
+  fieldOutline,
   glass,
   inset,
   layout,

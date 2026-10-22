@@ -4,8 +4,8 @@ import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
-
 import { resetIdentity } from './analytics';
+import { backendInfo } from './backend';
 import { releasePushToken } from './push';
 import { supabase } from './supabase';
 
@@ -42,6 +42,17 @@ export async function createSessionFromUrl(url: string) {
  * logging in does not, so an address nobody registered gets a 422 "Signups
  * not allowed for otp" instead of a silent new account under a typo.
  */
+/** GoTrue rate-limits OTP resends. Say what to do instead of quoting the timer. */
+export function humanizeAuthError(message: string): string {
+  if (/security purposes|too many requests|rate limit|after \d+ seconds/i.test(message)) {
+    return 'We already sent a code. Check your email, or wait a minute before asking for another.';
+  }
+  return message;
+}
+
+/** Minimum gap between OTP requests so the client does not hit GoTrue's resend wall. */
+export const emailOtpResendCooldownMs = 60_000;
+
 export async function sendEmailCode(email: string, { createAccount }: { createAccount: boolean }) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
@@ -49,9 +60,38 @@ export async function sendEmailCode(email: string, { createAccount }: { createAc
   });
   if (!error) return;
   if (!createAccount && /signups not allowed/i.test(error.message)) {
-    throw new Error('No account uses that address yet. Create one instead.');
+    const { shortLabel } = backendInfo();
+    throw new Error(
+      `No account uses that address on ${shortLabel}. Create an account instead, or check Settings → Backend.`,
+    );
   }
-  throw error;
+  throw new Error(humanizeAuthError(error.message));
+}
+
+/**
+ * One email door: try sign-in first, then account creation when the address is
+ * new. Matches "Continue with email" on web without a create/log in toggle.
+ */
+export async function sendEmailCodeAdaptive(email: string) {
+  const trimmed = email.trim();
+  const options = { emailRedirectTo: redirectTo };
+
+  const login = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    options: { ...options, shouldCreateUser: false },
+  });
+  if (!login.error) return;
+
+  if (/signups not allowed|user not found|not registered/i.test(login.error.message)) {
+    const signup = await supabase.auth.signInWithOtp({
+      email: trimmed,
+      options: { ...options, shouldCreateUser: true },
+    });
+    if (!signup.error) return;
+    throw new Error(humanizeAuthError(signup.error.message));
+  }
+
+  throw new Error(humanizeAuthError(login.error.message));
 }
 
 /**
@@ -65,7 +105,7 @@ export async function verifyEmailCode(email: string, token: string) {
   const signup = await supabase.auth.verifyOtp({ email: trimmed, token: otp, type: 'signup' });
   if (!signup.error) return;
   const magic = await supabase.auth.verifyOtp({ email: trimmed, token: otp, type: 'email' });
-  if (magic.error) throw magic.error;
+  if (magic.error) throw new Error(humanizeAuthError(magic.error.message));
 }
 
 // Ask the module, not the platform. Apple Sign In is missing in Expo Go and on

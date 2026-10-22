@@ -148,6 +148,22 @@ export function formatMessageDay(iso: string, now = new Date()): string {
   return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** Time left on a clock: "2d 4h", "5h", "12m". Null once it has passed. */
+export function formatTimeLeft(iso: string, now = Date.now()): string | null {
+  const left = new Date(iso).getTime() - now;
+  if (left <= 0) return null;
+  const days = Math.floor(left / DAY);
+  const hours = Math.floor((left % DAY) / HOUR);
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return `${hours}h`;
+  return `${Math.max(1, Math.floor(left / MINUTE))}m`;
+}
+
+/** A deadline as a short date: "Oct 23". */
+export function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(iso));
+}
+
 /** Forum timestamps: "2h ago", then a date once a week has passed. */
 export function formatRelativeTime(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime();

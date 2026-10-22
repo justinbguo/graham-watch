@@ -14,6 +14,7 @@ import { useThemedStyles } from '@/providers/theme';
 import { PersonPickRow } from './PersonPickRow';
 import { useOpenParty } from './openParty';
 import { useDebounced } from './useDebounced';
+import { useOpenConversation } from './useOpenConversation';
 
 /** Each letter is not a search. Suggestions are asked once typing pauses. */
 const SUGGEST_PAUSE = 300;
@@ -32,6 +33,7 @@ const GROUP_NAME = 40;
 export function CreateGroup() {
   const styles = useThemedStyles(groupStyles);
   const openParty = useOpenParty();
+  const openConversation = useOpenConversation();
   const queryClient = useQueryClient();
   const lift = useKeyboardLift();
   const search = useRef<TextInput>(null);
@@ -79,7 +81,7 @@ export function CreateGroup() {
           // This sheet sits on New message. Close on the thread should land
           // on Messages, so both sheets go before the thread opens.
           router.dismissAll();
-          router.push(`/conversation/${conversationId}`);
+          openConversation({ conversationId }, { replace: true });
         },
         onError: (error) => setFailure(said(error)),
       },

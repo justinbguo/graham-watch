@@ -1,4 +1,11 @@
-import { HIT_TARGET, dealerSocial, size, space, type, type Theme } from '@/lib/theme';
+import {
+  controlText,
+  HIT_TARGET,
+  dealerSocial,
+  size,
+  space,
+  type Theme,
+} from '@/lib/theme';
 
 /** Shared chrome for Follow and Message on a shop. */
 export function dealerSocialButtonStyles(theme: Theme) {
@@ -29,7 +36,7 @@ export function dealerSocialButtonStyles(theme: Theme) {
       opacity: 0.72,
     },
     label: {
-      ...type.labelStrong,
+      ...controlText.label,
       color: theme.color.text,
     },
     solidLabel: {

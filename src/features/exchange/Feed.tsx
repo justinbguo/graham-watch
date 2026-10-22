@@ -23,12 +23,16 @@ export function Feed({
   filter,
   onOpen,
   onOpenAuthor,
+  flush = false,
 }: {
   filter: FeedFilter;
   onOpen: (id: string) => void;
   onOpenAuthor: (author: ExchangeAuthor) => void;
+  /** Desktop community column: gutter comes from the shell, not the list. */
+  flush?: boolean;
 }) {
   const styles = useThemedStyles(feedStyles);
+  const gutter = flush ? space.lg : inset.screen;
   const { data: posts = [], isPending, error } = useExchangeFeed();
   const vote = useCastExchangeVote();
   // Buying is a request, so on All it stays at the top instead of ageing out
@@ -44,18 +48,25 @@ export function Feed({
   if (isPending) return <Spinner />;
   if (error) {
     return (
-      <View style={styles.state}>
+      <View style={[styles.state, { paddingHorizontal: gutter }]}>
         <Message text="The community did not load." />
       </View>
     );
   }
 
+  const listPad = { paddingHorizontal: gutter, paddingBottom: space.xxxl };
+  const pinPull = { marginHorizontal: flush ? -space.lg : -inset.screen };
+
   return (
     <FlatList
       data={rest}
       keyExtractor={(post) => post.id}
-      contentContainerStyle={rest.length === 0 && buying.length === 0 ? styles.empty : styles.list}
-      ListHeaderComponent={buying.length ? <PinnedBuys posts={buying} onOpen={onOpen} /> : null}
+      contentContainerStyle={
+        rest.length === 0 && buying.length === 0 ? { ...listPad, gap: space.md } : { ...listPad, gap: space.md }
+      }
+      ListHeaderComponent={
+        buying.length ? <PinnedBuys posts={buying} onOpen={onOpen} pinPull={pinPull} /> : null
+      }
       ListEmptyComponent={
         <Message
           text={
@@ -85,9 +96,11 @@ export function Feed({
 function PinnedBuys({
   posts,
   onOpen,
+  pinPull,
 }: {
   posts: ExchangePost[];
   onOpen: (id: string) => void;
+  pinPull: { marginHorizontal: number };
 }) {
   const styles = useThemedStyles(feedStyles);
 
@@ -95,7 +108,7 @@ function PinnedBuys({
     <ScrollView
       horizontal
       contentContainerStyle={styles.pinRow}
-      style={styles.pins}>
+      style={[styles.pins, pinPull]}>
       {posts.map((post) => (
         <Pressable
           key={post.id}

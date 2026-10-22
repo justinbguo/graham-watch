@@ -34,59 +34,121 @@ export type Database = {
   }
   public: {
     Tables: {
+      checkout_defaults: {
+        Row: {
+          payment_label: string | null
+          ship_to: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          payment_label?: string | null
+          ship_to?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          payment_label?: string | null
+          ship_to?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_defaults_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_deals: {
         Row: {
+          accepted_at: string | null
           amount_cents: number
           buyer_id: string
+          cancelled_reason: string | null
+          completed_at: string | null
           conversation_id: string
           created_at: string
           currency: string
+          expires_at: string | null
           fee_bps: number
           fee_cents: number | null
+          funded_at: string | null
           id: string
           listing_id: string | null
           message_id: string | null
           payment_intent_id: string | null
           payment_provider: string | null
           proposed_by: string
+          reviewed_at: string | null
           seller_id: string
+          ship_by: string | null
+          ship_to: Json | null
+          shipped_at: string | null
           status: Database["public"]["Enums"]["deal_status"]
+          tracking_carrier: string | null
+          tracking_number: string | null
           updated_at: string
         }
         Insert: {
+          accepted_at?: string | null
           amount_cents: number
           buyer_id: string
+          cancelled_reason?: string | null
+          completed_at?: string | null
           conversation_id: string
           created_at?: string
           currency?: string
+          expires_at?: string | null
           fee_bps?: number
           fee_cents?: number | null
+          funded_at?: string | null
           id?: string
           listing_id?: string | null
           message_id?: string | null
           payment_intent_id?: string | null
           payment_provider?: string | null
           proposed_by: string
+          reviewed_at?: string | null
           seller_id: string
+          ship_by?: string | null
+          ship_to?: Json | null
+          shipped_at?: string | null
           status?: Database["public"]["Enums"]["deal_status"]
+          tracking_carrier?: string | null
+          tracking_number?: string | null
           updated_at?: string
         }
         Update: {
+          accepted_at?: string | null
           amount_cents?: number
           buyer_id?: string
+          cancelled_reason?: string | null
+          completed_at?: string | null
           conversation_id?: string
           created_at?: string
           currency?: string
+          expires_at?: string | null
           fee_bps?: number
           fee_cents?: number | null
+          funded_at?: string | null
           id?: string
           listing_id?: string | null
           message_id?: string | null
           payment_intent_id?: string | null
           payment_provider?: string | null
           proposed_by?: string
+          reviewed_at?: string | null
           seller_id?: string
+          ship_by?: string | null
+          ship_to?: Json | null
+          shipped_at?: string | null
           status?: Database["public"]["Enums"]["deal_status"]
+          tracking_carrier?: string | null
+          tracking_number?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -252,6 +314,68 @@ export type Database = {
           {
             foreignKeyName: "conversations_partner_id_fkey"
             columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_reviews: {
+        Row: {
+          body: string | null
+          created_at: string
+          deal_id: string
+          dealer_id: string | null
+          id: string
+          rating: number
+          reviewer_id: string
+          subject_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          deal_id: string
+          dealer_id?: string | null
+          id?: string
+          rating: number
+          reviewer_id: string
+          subject_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          deal_id?: string
+          dealer_id?: string | null
+          id?: string
+          rating?: number
+          reviewer_id?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_reviews_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: true
+            referencedRelation: "conversation_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_reviews_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_reviews_subject_id_fkey"
+            columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -875,6 +999,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
@@ -906,6 +1031,7 @@ export type Database = {
           case_size_mm?: number | null
           complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
+          cost_cents?: number | null
           created_at?: string
           currency?: string
           dealer_id: string
@@ -937,6 +1063,7 @@ export type Database = {
           case_size_mm?: number | null
           complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
+          cost_cents?: number | null
           created_at?: string
           currency?: string
           dealer_id?: string
@@ -991,6 +1118,7 @@ export type Database = {
           deal_id: string | null
           id: string
           listing_id: string | null
+          photo_path: string | null
           sender_id: string
           via: string
         }
@@ -1001,6 +1129,7 @@ export type Database = {
           deal_id?: string | null
           id?: string
           listing_id?: string | null
+          photo_path?: string | null
           sender_id: string
           via?: string
         }
@@ -1011,6 +1140,7 @@ export type Database = {
           deal_id?: string | null
           id?: string
           listing_id?: string | null
+          photo_path?: string | null
           sender_id?: string
           via?: string
         }
@@ -1391,6 +1521,10 @@ export type Database = {
           name: string
         }[]
       }
+      complete_conversation_deal: {
+        Args: { p_deal_id: string }
+        Returns: undefined
+      }
       controls_dealer: { Args: { p_dealer_id: string }; Returns: boolean }
       conversation_about_listing: {
         Args: { p_listing_id: string }
@@ -1441,6 +1575,7 @@ export type Database = {
           person_id: string
           person_name: string
           person_number: number
+          thread_dealer_id: string
           unread: number
         }[]
       }
@@ -1459,6 +1594,7 @@ export type Database = {
           p_amount_cents: number
           p_conversation_id: string
           p_currency?: string
+          p_expires_in_hours?: number
           p_listing_id?: string
           p_proposer_is_seller?: boolean
         }
@@ -1508,6 +1644,18 @@ export type Database = {
           saves: number
         }[]
       }
+      dealer_top_customers: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          buyer_id: string
+          display_name: string
+          handle: string
+          inquiries: number
+          last_active: string
+          passes: number
+          saves: number
+        }[]
+      }
       decline_dealer_application: {
         Args: {
           p_application_id: string
@@ -1517,6 +1665,14 @@ export type Database = {
         Returns: undefined
       }
       delete_own_account: { Args: never; Returns: undefined }
+      discovery_visible_to_caller: {
+        Args: {
+          p_dealer_claimed_by: string
+          p_exclude_own: boolean
+          p_imported_by: string
+        }
+        Returns: boolean
+      }
       exchange_feed: {
         Args: never
         Returns: {
@@ -1570,9 +1726,17 @@ export type Database = {
         Args: { p_comment_id: string; p_post_id: string; p_value: number }
         Returns: undefined
       }
+      expire_conversation_deals: {
+        Args: { p_conversation_id: string }
+        Returns: undefined
+      }
       format_deal_amount: {
         Args: { p_amount_cents: number; p_currency: string }
         Returns: string
+      }
+      fund_conversation_deal: {
+        Args: { p_deal_id: string; p_payment_label?: string; p_ship_to: Json }
+        Returns: undefined
       }
       get_deck: {
         Args: { p_limit?: number }
@@ -1585,6 +1749,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
@@ -1820,6 +1985,14 @@ export type Database = {
         Args: { p_action: string; p_deal_id: string }
         Returns: undefined
       }
+      review_conversation_deal: {
+        Args: { p_body?: string; p_deal_id: string; p_rating: number }
+        Returns: string
+      }
+      revise_conversation_deal: {
+        Args: { p_amount_cents: number; p_deal_id: string }
+        Returns: undefined
+      }
       save_exchange_post: {
         Args: {
           p_body?: string
@@ -1862,6 +2035,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
@@ -1898,6 +2072,15 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["dealer_permission"]
       }
+      ship_conversation_deal: {
+        Args: {
+          p_carrier: string
+          p_deal_id: string
+          p_tracking_number: string
+        }
+        Returns: undefined
+      }
+      ship_to_is_complete: { Args: { p_ship_to: Json }; Returns: boolean }
       store_application_claim_code: {
         Args: {
           p_application_id: string
@@ -2009,6 +2192,7 @@ export type Database = {
         | "proposed"
         | "accepted"
         | "funded"
+        | "shipped"
         | "completed"
         | "declined"
         | "cancelled"
@@ -2239,6 +2423,7 @@ export const Constants = {
         "proposed",
         "accepted",
         "funded",
+        "shipped",
         "completed",
         "declined",
         "cancelled",

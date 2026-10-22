@@ -17,7 +17,7 @@ import type {
   WatchStyle,
   Winding,
 } from '@/lib/models';
-import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
+import { fieldChrome, HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const { case_material, complication, dial_color, watch_style, winding } = Constants.public.Enums;
@@ -165,7 +165,7 @@ export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () =
         {photo ? <Image source={{ uri: photo }} style={styles.thumb} contentFit="cover" /> : null}
         <View style={styles.identityCopy}>
           <Text style={styles.title}>{[card.brand, card.model].filter(Boolean).join(' ')}</Text>
-          <Message text="Photos come from your own site. Refresh inventory to pick up new ones." />
+          <Message text="Photos come from your own site. Refresh from the Deal tab Listings section to pick up new ones." />
           {/* The rule is invisible otherwise, and a dealer who does not know it
               cannot tell a refresh that respected their work from one that got
               lucky. */}
@@ -495,15 +495,16 @@ const editorStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   option: {
+    ...fieldChrome(theme),
     borderRadius: radius.full,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
     minHeight: HIT_TARGET,
     justifyContent: 'center' as const,
-    backgroundColor: theme.color.fill,
   },
   optionSelected: {
     backgroundColor: theme.color.brass,
+    borderColor: theme.color.brass,
   },
   optionLabel: {
     ...type.control,

@@ -1,48 +1,105 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 
 import type { DealerInventoryItem } from '@/data/dealers';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatTitle } from '@/lib/format';
 import { useIsWide } from '@/lib/layout';
+import { ShopListingMenu } from './ShopListingMenu';
 import { HIT_TARGET, inset, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
+
+const SHOP_PHOTO_WIDTH = 120;
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 /**
  * One watch as its own shop sees it: the photograph a buyer sees, what it is
  * doing in the catalogue, and how many people wanted it.
- *
- * Removing is `status = 'hidden'`, never a delete. A deleted row takes its
- * photos, every save pointing at it, and the record that a buyer asked about it,
- * so the watch would vanish off someone's wishlist with no explanation.
- * Removal is reversible from the same button.
  */
 export function DealerInventoryRow({
   item,
   busy,
+  layout = 'profile',
   onEdit,
   onTogglePublished,
   onToggleSold,
+  onDelete,
 }: {
   item: DealerInventoryItem;
   busy: boolean;
+  /** Your Shop listings: tighter row on a flat background. */
+  layout?: 'profile' | 'shop';
   onEdit: () => void;
   onTogglePublished: () => void;
   onToggleSold: () => void;
+  onDelete?: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
   const isWide = useIsWide();
+  const hubRow = Platform.OS === 'web' && isWide;
+  const shop = layout === 'shop';
   const photo = item.photos[0]?.url;
-  const removed = item.status === 'hidden';
-  const state = item.sold_at ? 'Sold' : removed ? 'Removed' : 'Live';
+  const hidden = item.status === 'hidden';
+  const state = item.sold_at ? 'Sold' : hidden ? 'Hidden' : 'Live';
+  const subtitle = [item.reference, item.sold_at ? null : formatPrice(item), state]
+    .filter(Boolean)
+    .join(' · ');
+
+  if (shop) {
+    return (
+      <View style={[styles.rowShop, hidden && styles.rowHidden]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${formatTitle(item)}`}
+          onPress={onEdit}
+          style={styles.shopPhotoHit}>
+          {photo ? (
+            <Image source={{ uri: photo }} style={styles.thumbShop} contentFit="cover" />
+          ) : (
+            <View style={[styles.thumbShop, styles.thumbEmpty]} />
+          )}
+        </Pressable>
+
+        <View style={styles.shopBody}>
+          <View style={styles.shopTitleRow}>
+            <View style={styles.shopTitleWrap}>
+              <Text style={styles.shopTitle}>{formatTitle(item)}</Text>
+            </View>
+            <ShopListingMenu
+              sold={Boolean(item.sold_at)}
+              hidden={hidden}
+              disabled={busy}
+              onMarkSold={onToggleSold}
+              onEdit={onEdit}
+              onToggleVisibility={onTogglePublished}
+              onDelete={onDelete}
+            />
+          </View>
+          {subtitle ? (
+            <Text style={styles.detail} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+          <View style={styles.shopMetrics}>
+            <MetricStat label="Saves" value={item.saves} />
+            <MetricStat label="Inquiries" value={item.inquiries} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.row, !isWide && styles.rowNarrow]}>
+    <View
+      style={[
+        styles.row,
+        !hubRow && !isWide && styles.rowNarrow,
+        hidden && styles.rowHidden,
+      ]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit ${item.brand} ${item.model ?? ''}`.trim()}
+        accessibilityLabel={`Edit ${formatTitle(item)}`}
         onPress={onEdit}
         style={styles.watch}>
         {photo ? (
@@ -52,16 +109,11 @@ export function DealerInventoryRow({
         )}
 
         <View style={styles.names}>
-          <Text style={styles.brand} numberOfLines={1}>
-            {item.brand}
-          </Text>
-          <Text style={styles.model} numberOfLines={1}>
-            {item.model ?? 'Unknown model'}
+          <Text style={styles.model} numberOfLines={hubRow ? 2 : 1}>
+            {formatTitle(item)}
           </Text>
           <Text style={styles.detail} numberOfLines={1}>
-            {[item.reference, item.sold_at ? 'Sold' : formatPrice(item), state]
-              .filter(Boolean)
-              .join(' · ')}
+            {subtitle}
           </Text>
         </View>
       </Pressable>
@@ -77,40 +129,57 @@ export function DealerInventoryRow({
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           onPress={onToggleSold}
-          style={({ pressed }) => [
-            styles.action,
-            pressed && styles.pressed,
-            busy && styles.disabled,
-          ]}>
+          style={({ pressed }) => [styles.action, pressed && styles.pressed, busy && styles.disabled]}>
           <Text style={styles.actionLabel}>{item.sold_at ? 'Mark available' : 'Mark sold'}</Text>
         </Pressable>
 
         <IconAction icon="pencil-outline" label="Edit" disabled={busy} onPress={onEdit} />
         <IconAction
-          icon={removed ? 'eye-outline' : 'eye-off-outline'}
-          label={removed ? 'Restore' : 'Remove'}
+          icon={hidden ? 'eye-outline' : 'eye-off-outline'}
+          label={hidden ? 'Show listing' : 'Hide listing'}
           disabled={busy}
           onPress={onTogglePublished}
         />
+        {onDelete ? (
+          <IconAction
+            icon="trash-can-outline"
+            label="Delete listing"
+            disabled={busy}
+            danger
+            onPress={onDelete}
+          />
+        ) : null}
       </View>
     </View>
   );
 }
 
-/** A glyph with the word in its accessibility label, where the row is short of width. */
+function MetricStat({ label, value }: { label: string; value: number }) {
+  const styles = useThemedStyles(rowStyles);
+  return (
+    <View style={styles.metricBlock}>
+      <Text style={styles.metricValue}>{value.toLocaleString()}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function IconAction({
   icon,
   label,
   disabled,
+  danger = false,
   onPress,
 }: {
   icon: IconName;
   label: string;
   disabled: boolean;
+  danger?: boolean;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(rowStyles);
   const theme = useTheme();
+  const color = danger ? theme.color.danger : theme.color.text;
 
   return (
     <Pressable
@@ -124,7 +193,7 @@ function IconAction({
         pressed && styles.pressed,
         disabled && styles.disabled,
       ]}>
-      <MaterialCommunityIcons name={icon} size={size.icon} color={theme.color.text} />
+      <MaterialCommunityIcons name={icon} size={size.icon} color={color} />
     </Pressable>
   );
 }
@@ -135,16 +204,78 @@ const rowStyles = (theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.md,
     paddingVertical: space.md,
+    minWidth: 0,
+  },
+  rowShop: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
+    minWidth: 0,
+    gap: space.md,
+    paddingVertical: space.sm,
+  },
+  rowHidden: {
+    opacity: 0.52,
   },
   rowNarrow: {
     flexDirection: 'column' as const,
     alignItems: 'stretch' as const,
   },
+  shopPhotoHit: {
+    flexShrink: 0,
+  },
+  shopBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.xs,
+    paddingTop: space.xs,
+  },
+  shopTitleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: 0,
+    width: '100%' as const,
+    minWidth: 0,
+  },
+  shopTitleWrap: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  shopTitle: {
+    ...type.bodyStrong,
+    color: theme.color.text,
+    flexShrink: 1,
+  },
+  shopMetrics: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: space.lg,
+    paddingTop: space.xs,
+  },
+  metricBlock: {
+    minWidth: 72,
+    alignItems: 'flex-start' as const,
+    gap: 2,
+  },
+  metricValue: {
+    ...type.title,
+    fontSize: 20,
+    lineHeight: 24,
+    color: theme.color.text,
+  },
+  metricLabel: {
+    ...type.caption,
+    color: theme.color.textMuted,
+  },
   watch: {
-    flex: 2,
+    flex: 1,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.md,
+    minWidth: 0,
   },
   thumb: {
     width: size.thumb,
@@ -152,15 +283,17 @@ const rowStyles = (theme: Theme) => ({
     borderRadius: radius.sm,
     backgroundColor: theme.color.surfaceSunken,
   },
-  thumbEmpty: {
+  thumbShop: {
+    width: SHOP_PHOTO_WIDTH,
+    aspectRatio: 5 / 7,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surfaceSunken,
   },
+  thumbEmpty: {},
   names: {
     flex: 1,
     gap: stack.tight,
-  },
-  brand: {
-    ...type.eyebrow,
-    color: theme.color.textMuted,
+    minWidth: 0,
   },
   model: {
     ...type.bodyStrong,
@@ -173,6 +306,7 @@ const rowStyles = (theme: Theme) => ({
   metrics: {
     flexDirection: 'row' as const,
     gap: space.md,
+    flexShrink: 0,
   },
   metric: {
     ...type.caption,
@@ -182,6 +316,7 @@ const rowStyles = (theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.sm,
+    flexShrink: 0,
   },
   action: {
     minHeight: HIT_TARGET,

@@ -9,8 +9,9 @@ import {
   useRef,
   useState,
   type PropsWithChildren,
+  type ReactNode,
 } from 'react';
-import { StyleSheet, View, type ColorValue } from 'react-native';
+import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -23,7 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { motion, radius, size, type Theme } from '@/lib/theme';
+import { motion, radius, saveFlightDuration, size, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -136,9 +137,10 @@ function FlyingCard({
   const endScale = Math.max(flight.to.width / flight.from.width, MIN_SCALE);
 
   useEffect(() => {
+    const web = Platform.OS === 'web';
     progress.value = withTiming(
       1,
-      { duration: motion.flight, easing: Easing.out(Easing.cubic) },
+      { duration: saveFlightDuration(flight.from.width, web), easing: Easing.out(Easing.cubic) },
       (finished) => {
         if (!finished) return;
         arrivals.value += 1;
@@ -178,12 +180,11 @@ function FlyingCard({
 }
 
 /**
- * The Wishlist tab's bookmark, which also reports where it is and takes the
- * landing. Measured rather than worked out from the tab count: the bar is the
- * navigator's to lay out, it moves to the left rail on a wide window, and its
- * height differs per device.
+ * Reports where the Wishlist tab sits so a save can fly there. The desktop
+ * header uses text pills instead of `SaveTargetIcon`, but the flight still
+ * needs a measured target.
  */
-export function SaveTargetIcon({ color }: { color: ColorValue }) {
+export function SaveFlightTarget({ children }: { children: ReactNode }) {
   const { registerTarget, arrivals } = useSaveFlight();
   const frame = useRef<View>(null);
   const pulse = useSharedValue(0);
@@ -196,8 +197,6 @@ export function SaveTargetIcon({ color }: { color: ColorValue }) {
   }, [registerTarget]);
 
   useEffect(() => {
-    // The first layout pass can report an empty frame, and on a phone nothing
-    // else will make the tab bar lay out again.
     const handle = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(handle);
   }, [measure]);
@@ -219,8 +218,17 @@ export function SaveTargetIcon({ color }: { color: ColorValue }) {
 
   return (
     <Animated.View ref={frame} collapsable={false} onLayout={measure} style={pulseStyle}>
-      <MaterialCommunityIcons name="bookmark-outline" size={size.tabIcon} color={color} />
+      {children}
     </Animated.View>
+  );
+}
+
+/** Bottom or side tab bar: bookmark glyph that registers the flight target. */
+export function SaveTargetIcon({ color }: { color: ColorValue }) {
+  return (
+    <SaveFlightTarget>
+      <MaterialCommunityIcons name="bookmark-outline" size={size.tabIcon} color={color} />
+    </SaveFlightTarget>
   );
 }
 

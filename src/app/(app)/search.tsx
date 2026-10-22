@@ -2,12 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { FilterButton } from '@/components/FilterButton';
+import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchField } from '@/components/SearchBar';
 import { CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { usePrimeListing } from '@/data/listings';
 import { useSearch } from '@/data/search';
-import { useOpenFilters } from '@/features/filters/open';
 import { ExploreGrid } from '@/features/search/ExploreGrid';
 import { SearchMorph } from '@/features/search/SearchMorph';
 import { useFilters } from '@/features/filters/provider';
@@ -25,7 +24,6 @@ export default function Search() {
   const open = useOpenStack();
   const primeListing = usePrimeListing();
   const { filters, setOne } = useFilters('search');
-  const openFilters = useOpenFilters();
   const { data: results = [], isPending, error, refetch } = useSearch(filters);
   const { compose } = useLocalSearchParams<{ compose?: string }>();
   const root = useRef<View>(null);
@@ -58,7 +56,15 @@ export default function Search() {
       const frame = requestAnimationFrame(() => {
         root.current?.measureInWindow((ox, oy, ow, oh) => {
           const origin = { x: ox, y: oy, width: ow, height: oh };
-          barAnchor.current?.measureInWindow((x, y, width, height) => {
+          if (!barAnchor.current) {
+            setFieldReady(true);
+            return;
+          }
+          barAnchor.current.measureInWindow((x, y, width, height) => {
+            if (width <= 0 || height <= 0) {
+              setFieldReady(true);
+              return;
+            }
             setMorph({
               from: localize(from, origin),
               to: localize({ x, y, width, height }, origin),
@@ -114,7 +120,7 @@ export default function Search() {
           />
         </View>
       }
-      action={<FilterButton count={chipCount} onPress={() => openFilters('search')} />}>
+      action={<FilterMenu surface="search" count={chipCount} />}>
       <View style={styles.body}>
         {error ? (
           <View style={styles.state}>

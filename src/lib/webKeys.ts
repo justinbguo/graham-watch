@@ -8,19 +8,28 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Desktop arrow keys for a swipe-shaped action. Left and right only — up and
- * down stay free for lists. Skips when a field has focus, and only runs on web,
- * where a keyboard is a real pointer.
+ * Desktop arrow keys on the buy deck. Left and right pass or save; optional up
+ * and down step the photograph roll. S toggles card/grid when `onToggleView` is
+ * set. Skips when a field has focus; web only.
  */
 export function useWebArrowSwipe(
   onLeft: (() => void) | undefined,
   onRight: (() => void) | undefined,
-  enabled = true
+  enabled = true,
+  onUp?: () => void,
+  onDown?: () => void,
+  onToggleView?: () => void,
 ) {
   const left = useRef(onLeft);
   const right = useRef(onRight);
+  const up = useRef(onUp);
+  const down = useRef(onDown);
+  const toggleView = useRef(onToggleView);
   left.current = onLeft;
   right.current = onRight;
+  up.current = onUp;
+  down.current = onDown;
+  toggleView.current = onToggleView;
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !enabled) return;
@@ -29,6 +38,11 @@ export function useWebArrowSwipe(
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
 
+      if ((event.key === 's' || event.key === 'S') && toggleView.current) {
+        event.preventDefault();
+        toggleView.current();
+        return;
+      }
       if (event.key === 'ArrowLeft' && left.current) {
         event.preventDefault();
         left.current();
@@ -37,6 +51,16 @@ export function useWebArrowSwipe(
       if (event.key === 'ArrowRight' && right.current) {
         event.preventDefault();
         right.current();
+        return;
+      }
+      if (event.key === 'ArrowUp' && up.current) {
+        event.preventDefault();
+        up.current();
+        return;
+      }
+      if (event.key === 'ArrowDown' && down.current) {
+        event.preventDefault();
+        down.current();
       }
     };
 

@@ -3,13 +3,12 @@ import { useMemo } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { FilterButton } from '@/components/FilterButton';
+import { FilterMenu } from '@/features/filters/FilterMenu';
 import { ListingRow } from '@/components/ListingRow';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { dealerPicture } from '@/features/dealers/picture';
 import { useDealerShop } from '@/data/dealers';
 import { usePrimeListing } from '@/data/listings';
-import { useOpenFilters } from '@/features/filters/open';
 import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
 import { activeCount } from '@/features/filters/types';
@@ -22,7 +21,6 @@ import { DealerPanel } from './DealerPanel';
 export function DealerShop({ dealerId }: { dealerId: string }) {
   const styles = useThemedStyles(shopStyles);
   const open = useOpenStack();
-  const openFilters = useOpenFilters();
   const primeListing = usePrimeListing();
   const { filters } = useFilters('shop', dealerId);
   const { data, isPending, error } = useDealerShop(dealerId);
@@ -81,7 +79,7 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
             <View style={styles.inventoryHead}>
               <Text style={styles.inventoryTitle}>Inventory</Text>
               {listings.length > 0 ? (
-                <FilterButton count={chosen} onPress={() => openFilters('shop', dealer.id)} />
+                <FilterMenu surface="shop" dealerId={dealer.id} count={chosen} />
               ) : null}
             </View>
             {chosen > 0 ? (

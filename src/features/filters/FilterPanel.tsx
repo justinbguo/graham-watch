@@ -27,8 +27,17 @@ import {
  * Price, era, size, brand, and dealer when the catalogue has more than one.
  * Options come from `listing_facets` so nothing offered can only return zero rows.
  */
-export function FilterPanel({ surface, dealerId }: { surface: Surface; dealerId?: string }) {
+export function FilterPanel({
+  surface,
+  dealerId,
+  variant = 'sheet',
+}: {
+  surface: Surface;
+  dealerId?: string;
+  variant?: 'sheet' | 'dropdown';
+}) {
   const styles = useThemedStyles(panelStyles);
+  const dropdown = variant === 'dropdown';
   const api = useFilters(surface, dealerId);
   const { filters, toggle, setPrice, togglePrice, replace, clear } = api;
   const { data: catalogue = [] } = useFacets(surface === 'deck', surface !== 'shop');
@@ -69,12 +78,13 @@ export function FilterPanel({ surface, dealerId }: { surface: Surface; dealerId?
     ));
 
   return (
-    <View style={styles.panel}>
-      <FilterSummary matched={matched} chips={chips} onClear={clear} />
+    <View style={[styles.panel, dropdown && styles.panelDropdown]}>
+      <FilterSummary matched={matched} chips={chips} onClear={clear} compact={dropdown} />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+        contentContainerStyle={[styles.content, dropdown && styles.contentDropdown]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={dropdown}>
         <FilterGroup title="Price" selectedCount={filters.prices.length || undefined}>
           <View style={styles.range}>
             <Field
@@ -163,14 +173,25 @@ const panelStyles = (theme: Theme) => ({
   panel: {
     flex: 1,
   },
+  panelDropdown: {
+    flex: 1,
+    minHeight: 0,
+  },
   scroll: {
     flex: 1,
+    minHeight: 0,
   },
   content: {
     paddingHorizontal: inset.screen,
     paddingTop: space.md,
     paddingBottom: space.md,
     gap: stack.group,
+  },
+  contentDropdown: {
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    gap: stack.section,
   },
   range: {
     flexDirection: 'row' as const,

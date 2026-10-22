@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View, type TextInput } from 'react-native'
 
 import { Button, Field, Heading, Message, Spinner } from '@/components/ui';
 import { VOLUMES, VOLUME_LABELS } from '@/data/applications';
-import { HIT_TARGET, inset, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { fieldChrome, HIT_TARGET, inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { useShopApplication } from './application';
@@ -247,15 +247,16 @@ const formStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   option: {
+    ...fieldChrome(theme),
     borderRadius: radius.full,
     paddingHorizontal: inset.compactX,
     paddingVertical: inset.compactY,
     minHeight: HIT_TARGET,
     justifyContent: 'center' as const,
-    backgroundColor: theme.color.fill,
   },
   optionSelected: {
     backgroundColor: theme.color.brass,
+    borderColor: theme.color.brass,
   },
   optionLabel: {
     ...type.control,

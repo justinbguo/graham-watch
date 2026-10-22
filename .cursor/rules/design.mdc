@@ -47,7 +47,7 @@ nobody follows.
 - `save` or `danger` colour used for anything but saving and passing. A price is
   `money`, because a price in `save` looks like a watch you kept.
 - A check after a name, except a dealer in a list of dealers. That mark is
-  `check-decagram-outline` at `size.iconSmall` in `brass`, spoken with the name as
+  `VerifiedMark`: gold-filled decagram, bold white check, spoken with the name as
   verified. The deck's title wears none, and so does a person. A check on a
   watch row is still a promise the row did not make.
 - A header count assembled from rows already in hand. `listing_counts` counts
@@ -64,13 +64,13 @@ nobody follows.
   A list row is 5/7 and uses `contain`, so the case stays recognisable. The
   full-screen viewer also keeps the whole photograph, and a dealer's mark,
   which is a logo and not a photograph.
-- `borderWidth` on four sides of anything at all. Nothing in this app is drawn
-  with an outline: a card, tile, panel, or notice is a `surface` fill, a control
-  with a label is a `fill`, and a container inside a container takes
-  `surfaceSunken`. A hairline on *one* edge is a separator and is fine — `border`
-  for those, `size.rule` for a chosen row's brass mark. The follow capsule is
-  the exception: a `text` stroke on the page colour, because a filled capsule
-  there read as the page's main button.
+- `borderWidth` on four sides of a card, tile, panel, or notice. Depth there
+  stays in `surface` / `surfaceSunken` steps. Text fields, selects, and
+  community action pills (vote and comment) use `field` plus `fieldChrome()` —
+  white (or lifted in dark) with a `border` hairline, not `fill`. A hairline on
+  *one* edge is still a separator. `size.rule` is for selection marks, not field
+  outlines (`fieldOutline`). The follow capsule keeps a `text` stroke on the page
+  colour.
 - Any background behind an icon-only control. The glyph is the control; it gets
   a `HIT_TARGET` box of empty space and colour for state, never a block.
 - A shadow or elevation in place of the outline you just removed. Depth is the
@@ -269,6 +269,14 @@ nobody follows.
 - Keep tappable areas at `HIT_TARGET` or give them `hitSlop`, on every platform.
 - Check a narrow phone and a wide browser window. Resize the window: layout
   that reads a stale size looks right until it moves.
+- On desktop web, a left rail and the column beside it share one top edge. Put
+  `paddingTop` on both or on neither — never an inset on only the rail or only
+  the main column to "line up" with something inside the neighbor. If the feed
+  or grid is flush, the rail is flush too.
+- Desktop Buy caps at `layout.deckFrameWeb`, not `cardWeb`, so the rail does not
+  steal width from the card. The block stays centred in the tab column (`column`
+  `alignSelf: 'center'`). Tab bodies with no title use `columnDesktopFlush`
+  (`space.lg` under the marketplace header).
 - Pass `inTabs` to `Screen` from a screen inside `(tabs)`, and only from there.
   A bottom tab bar owns the bottom inset; a wide left rail does not.
 - Pass `inSheet` to `Screen` from a route presented as `modal`, and only from

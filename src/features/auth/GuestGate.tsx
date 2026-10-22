@@ -1,4 +1,5 @@
 import { Button, Centered, Heading, Message, Screen } from '@/components/ui';
+import type { LayoutWidth } from '@/lib/theme';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useSession } from '@/providers/session';
 
@@ -9,9 +10,11 @@ import { useSession } from '@/providers/session';
 export function GuestGate({
   title,
   message,
+  width = 'reading',
 }: {
   title: string;
   message: string;
+  width?: LayoutWidth;
 }) {
   const { isSignedIn } = useSession();
   const guest = useGuest();
@@ -19,7 +22,7 @@ export function GuestGate({
   if (isSignedIn) return null;
 
   return (
-    <Screen title={title} inTabs>
+    <Screen title={title} inTabs width={width}>
       <Centered>
         <Heading>Sign in to continue</Heading>
         <Message text={message} />

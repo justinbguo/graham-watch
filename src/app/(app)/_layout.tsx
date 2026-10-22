@@ -54,6 +54,7 @@ export default function AppLayout() {
           <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-listing/[listingId]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="import-inventory" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="seller-messages" options={{ presentation: 'modal' }} />
           <Stack.Screen name="apply" options={{ presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
           <Stack.Screen name="graham-pro" options={{ presentation: 'modal' }} />
@@ -63,7 +64,15 @@ export default function AppLayout() {
             name="search"
             options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
           />
-          <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="sign-in"
+            options={{
+              presentation: 'modal',
+              ...(Platform.OS === 'web'
+                ? { animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }
+                : {}),
+            }}
+          />
         </Stack>
       </SaveFlightProvider>
     </FilterProvider>

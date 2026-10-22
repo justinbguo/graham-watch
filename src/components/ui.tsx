@@ -11,6 +11,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  controlText,
+  controlTextNudge,
+  fieldOutline,
   HIT_TARGET,
   inset,
   layout,
@@ -23,7 +26,7 @@ import {
   type LayoutWidth,
   type Theme,
 } from '@/lib/theme';
-import { useIsWide } from '@/lib/layout';
+import { useDesktopColumnWidth, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -64,6 +67,8 @@ export function Screen({
   width = 'reading',
   inTabs = false,
   inSheet = false,
+  sideRail,
+  desktopBleed = false,
   children,
 }: PropsWithChildren<{
   title?: string;
@@ -92,50 +97,73 @@ export function Screen({
   width?: LayoutWidth;
   inTabs?: boolean;
   inSheet?: boolean;
+  /** A vertical strip beside the column. Desktop Buy undo, filters, and view toggle. */
+  sideRail?: ReactNode;
+  /**
+   * On desktop web inside tabs, keep the shared centred column but let the
+   * inner block use `width` (swipe deck) instead of filling the column.
+   */
+  desktopBleed?: boolean;
 }>) {
   const styles = useThemedStyles(screenStyles);
   const theme = useTheme();
   const isWide = useIsWide();
+  const isDesktopWeb = useIsDesktopWeb();
+  const desktopColumnWidth = useDesktopColumnWidth();
   const insets = useSafeAreaInsets();
   const titleLine = titleSize === 'title' && !subtitle;
-  return (
+  const padTop = inSheet ? 0 : inTabs && isDesktopWeb ? 0 : insets.top;
+  const padBottom = inTabs && !isWide && !isDesktopWeb ? 0 : insets.bottom;
+  const inDesktopColumn = isDesktopWeb && inTabs;
+  // Most tab screens use the full desktop column. Named narrow caps (wishlist,
+  // card, grid) still apply so the block stays centred inside the shell.
+  const columnCap =
+    inDesktopColumn && !desktopBleed && width === 'reading' ? undefined : layout[width];
+  // Top nav names the tab; nested stacks still show a title when `back` is set.
+  const hideTabTitle = inDesktopColumn && !back;
+  const showTitle = Boolean(title && !hideTabTitle);
+  const showHeader = Boolean(
+    back || showTitle || titleControl || action || leading || subhead || titleExtra || subtitle,
+  );
+
+  const column = (
     <View
       style={[
-        styles.screen,
-        {
-          paddingTop: inSheet ? 0 : insets.top,
-          paddingBottom: inTabs && !isWide ? 0 : insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-        },
+        styles.column,
+        inDesktopColumn && !desktopBleed ? styles.columnDesktop : null,
+        inDesktopColumn && !showHeader && !desktopBleed ? styles.columnDesktopBare : null,
+        inDesktopColumn && !showHeader && desktopBleed ? styles.columnDesktopFlush : null,
+        columnCap != null ? { maxWidth: columnCap } : null,
       ]}>
-      <View style={[styles.column, { maxWidth: layout[width] }]}>
-        {back ? (
-          <View style={styles.backRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={back.label}
-              hitSlop={space.sm}
-              onPress={back.onPress}
-              style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-              <MaterialCommunityIcons name="arrow-left" size={size.icon} color={theme.color.text} />
-            </Pressable>
-          </View>
-        ) : null}
-        {title || titleControl || action || leading || subhead ? (
-          <View style={subhead ? styles.headed : undefined}>
+      {back ? (
+        <View style={styles.backRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={back.label}
+            hitSlop={space.sm}
+            onPress={back.onPress}
+            style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name="arrow-left" size={size.icon} color={theme.color.text} />
+          </Pressable>
+        </View>
+      ) : null}
+      {showHeader ? (
+        <View style={subhead ? styles.headed : undefined}>
+          <View
+            style={[
+              styles.header,
+              subhead ? styles.headerFlush : null,
+              titleLine ? styles.headerTitleLine : null,
+              hideTabTitle && !showTitle ? styles.headerToolsOnly : null,
+            ]}>
+            {leading ? <View style={styles.leading}>{leading}</View> : null}
             <View
               style={[
-                styles.header,
-                subhead ? styles.headerFlush : null,
-                titleLine ? styles.headerTitleLine : null,
+                styles.heading,
+                titleExtra || leading || titleControl ? styles.headingShare : null,
+                hideTabTitle && !showTitle && !subtitle ? styles.headingCollapsed : null,
               ]}>
-              {leading ? <View style={styles.leading}>{leading}</View> : null}
-              <View
-                style={[
-                  styles.heading,
-                  titleExtra || leading || titleControl ? styles.headingShare : null,
-                ]}>
+              {showTitle || subtitle || titleControl ? (
                 <View
                   style={[
                     styles.titleRow,
@@ -143,24 +171,62 @@ export function Screen({
                     titleControl ? styles.titleRowFill : null,
                   ]}>
                   {titleControl ??
-                    (title ? (
+                    (showTitle ? (
                       <Text style={titleSize === 'title' ? styles.titleQuiet : styles.title}>{title}</Text>
                     ) : null)}
                   {titleExtra}
                 </View>
-                {typeof subtitle === 'string' ? (
-                  <Text style={styles.subtitle}>{subtitle}</Text>
-                ) : (
-                  subtitle
-                )}
-              </View>
-              {action ? <View style={styles.actionSlot}>{action}</View> : null}
+              ) : null}
+              {typeof subtitle === 'string' ? (
+                <Text style={styles.subtitle}>{subtitle}</Text>
+              ) : (
+                subtitle
+              )}
             </View>
-            {subhead}
+            {action ? <View style={styles.actionSlot}>{action}</View> : null}
           </View>
-        ) : null}
-        {children}
-      </View>
+          {subhead}
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+
+  const padHorizontal = {
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
+  const padVertical = {
+    paddingTop: padTop,
+    paddingBottom: padBottom,
+  };
+
+  const main = sideRail ? (
+    <View style={styles.screenRow}>
+      <View style={styles.sideRail}>{sideRail}</View>
+      <View style={styles.screenMain}>{column}</View>
+    </View>
+  ) : (
+    column
+  );
+
+  const body = inDesktopColumn ? (
+    <View style={styles.desktopShell}>
+      <View style={[styles.desktopColumn, { width: desktopColumnWidth }]}>{main}</View>
+    </View>
+  ) : (
+    main
+  );
+
+  return (
+    <View
+      style={[
+        styles.screen,
+        padVertical,
+        padHorizontal,
+        inDesktopColumn || sideRail || desktopBleed ? styles.screenFlex : null,
+      ]}>
+      {body}
     </View>
   );
 }
@@ -318,6 +384,48 @@ const screenStyles = (theme: Theme) => ({
     flex: 1,
     backgroundColor: theme.color.background,
   },
+  screenFlex: {
+    flex: 1,
+  },
+  desktopShell: {
+    flex: 1,
+    width: '100%' as const,
+    alignItems: 'center' as const,
+  },
+  desktopColumn: {
+    flex: 1,
+    width: '100%' as const,
+    maxWidth: '100%' as const,
+  },
+  columnDesktop: {
+    width: '100%' as const,
+    maxWidth: '100%' as const,
+  },
+  columnDesktopBare: {
+    paddingTop: space.sm,
+  },
+  columnDesktopFlush: {
+    paddingTop: space.lg,
+  },
+  headerToolsOnly: {
+    paddingBottom: 0,
+  },
+  headingCollapsed: {
+    flex: 0,
+    minWidth: 0,
+  },
+  screenRow: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'stretch' as const,
+  },
+  sideRail: {
+    flexShrink: 0,
+  },
+  screenMain: {
+    flex: 1,
+    minWidth: 0,
+  },
   // The top gap lives here, not on the header, so a screen without a title
   // still clears the notch instead of starting flush against it.
   column: {
@@ -380,6 +488,7 @@ const screenStyles = (theme: Theme) => ({
   // control — the settings cog, the filters — off the trailing edge.
   actionSlot: {
     flexShrink: 0,
+    alignSelf: 'center' as const,
     marginLeft: 'auto' as const,
     zIndex: 1,
   },
@@ -450,7 +559,7 @@ const buttonStyles = (theme: Theme) => ({
     gap: space.sm,
   },
   label: {
-    ...type.labelStrong,
+    ...controlText.label,
     flexShrink: 1,
     maxWidth: '100%' as const,
     textAlign: 'center' as const,
@@ -466,48 +575,41 @@ const buttonStyles = (theme: Theme) => ({
 
 const fieldStyles = (theme: Theme) => ({
   field: {
-    // Face and size only. `type.body`'s line height is a paragraph measure;
-    // on a single line iOS applies it as a baseline offset to the value and
-    // not the placeholder, so the two do not share a line.
-    fontFamily: type.body.fontFamily,
-    fontSize: type.body.fontSize,
-    // A field stays `fill`. A button is `accent`, and a black field would
-    // read as a second button.
-    backgroundColor: theme.color.fill,
-    // An <input> on web carries an intrinsic width of about 20 characters, and
-    // `min-width: auto` makes a flex row refuse to shrink past it. Two fields
-    // side by side then run off the screen edge.
+    ...controlText.body,
+    backgroundColor: theme.color.field,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.border,
     minWidth: 0,
     height: size.controlMin,
     borderRadius: radius.md,
     paddingHorizontal: inset.controlX,
-    // This face's x-height sits about 2px low in its box. Padding on the
-    // bottom only moves the centred line up by half of `space.xs`.
     paddingTop: 0,
-    paddingBottom: space.xs,
+    ...controlTextNudge,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
-    // Android adds the font's extra ascent above the letters.
-    includeFontPadding: false,
   },
   compact: {
-    fontFamily: type.body.fontFamily,
+    fontFamily: type.caption.fontFamily,
     fontSize: type.caption.fontSize,
-    lineHeight: type.caption.lineHeight,
-    backgroundColor: theme.color.fill,
+    lineHeight: type.caption.fontSize,
+    includeFontPadding: false,
+    backgroundColor: theme.color.field,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.border,
     minWidth: 0,
     height: 36,
     borderRadius: radius.md,
     paddingHorizontal: space.sm,
     paddingTop: 0,
-    paddingBottom: 0,
+    ...controlTextNudge,
     color: theme.color.ink,
     textAlignVertical: 'center' as const,
-    includeFontPadding: false,
   },
   multiline: {
     ...type.body,
-    backgroundColor: theme.color.fill,
+    backgroundColor: theme.color.field,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.border,
     minWidth: 0,
     borderRadius: radius.md,
     paddingHorizontal: inset.controlX,

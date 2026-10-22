@@ -1,8 +1,9 @@
+import { Image } from 'expo-image';
 import { Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import type { MessageListing } from '@/data/messages';
-import { motion, radius, space, stack, type, type Theme } from '@/lib/theme';
+import { motion, radius, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { ListingQuote } from './ListingQuote';
@@ -24,20 +25,25 @@ const rise = FadeInDown.duration(motion.base).withInitialValues({
 export function Bubble({
   body,
   mine,
+  /** Desktop split: bubbles sit on `surfaceSunken`, not the page. */
+  inPane = false,
   /** The watch this message answers. Sits above the words. */
   listing,
   onOpenListing,
   /** How it left, when that is not obvious: "Sent by email". */
   caption,
+  photoUrl,
   when,
   sent = false,
   speaker,
 }: {
   body: string;
   mine: boolean;
+  inPane?: boolean;
   listing?: MessageListing | null;
   onOpenListing?: () => void;
   caption?: string | null;
+  photoUrl?: string | null;
   when?: string | null;
   /** Just sent from this screen, so it arrives rather than being there. */
   sent?: boolean;
@@ -52,11 +58,23 @@ export function Bubble({
         <ListingQuote listing={listing} onPress={onOpenListing} mine={mine} />
       ) : null}
       {speaker ? <Text style={styles.speaker}>{speaker}</Text> : null}
-      <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+      <View
+        style={[
+          styles.bubble,
+          mine ? [styles.mine, inPane && styles.minePane] : inPane ? styles.theirsPane : styles.theirs,
+        ]}>
         {caption ? (
           <Text style={[styles.caption, mine && styles.captionMine]}>{caption}</Text>
         ) : null}
-        <Text style={[styles.body, mine && styles.bodyMine]}>{body}</Text>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={styles.photo}
+            contentFit="cover"
+            accessibilityLabel="Photo"
+          />
+        ) : null}
+        {body.trim() ? <Text style={[styles.body, mine && styles.bodyMine]}>{body}</Text> : null}
       </View>
       {when ? <Text style={styles.when}>{when}</Text> : null}
     </Animated.View>
@@ -86,12 +104,25 @@ const bubbleStyles = (theme: Theme) => ({
   theirs: {
     backgroundColor: theme.color.fill,
   },
+  theirsPane: {
+    backgroundColor: theme.color.messageIncoming,
+    maxWidth: '75%' as const,
+  },
+  minePane: {
+    maxWidth: '75%' as const,
+  },
   body: {
     ...type.body,
     color: theme.color.text,
   },
   bodyMine: {
     color: theme.color.onAccent,
+  },
+  photo: {
+    width: size.messagePhoto,
+    height: size.messagePhoto,
+    borderRadius: radius.md,
+    backgroundColor: theme.color.surfaceSunken,
   },
   caption: {
     ...type.caption,

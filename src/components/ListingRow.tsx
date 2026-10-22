@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable as FramePressable, ScrollView, Text, View } from 'react-native';
 import { Pressable } from 'react-native-gesture-handler';
 
@@ -7,6 +7,7 @@ import { InquireMark } from '@/components/InquireMark';
 import { ListingSummary } from '@/components/ListingSummary';
 import { useSwipeGuard } from '@/components/SwipeToRemove';
 import { formatTitle } from '@/lib/format';
+import { photoScrollPage } from '@/lib/photoPager';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
 import { radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -212,7 +213,7 @@ const rowStyles = (theme: Theme) => ({
   // name that wrapped made the frame taller, and the same photograph was
   // magnified and cut differently in one row than in the next.
   frame: {
-    backgroundColor: theme.color.surfaceSunken,
+    backgroundColor: theme.color.photoMat,
     overflow: 'hidden' as const,
   },
   fill: {
@@ -224,7 +225,7 @@ const rowStyles = (theme: Theme) => ({
     // Centred rather than stretched: at a large accessibility text size the
     // type outgrows the frame, and the frame must not change shape with it.
     alignSelf: 'center' as const,
-    backgroundColor: theme.color.surfaceSunken,
+    backgroundColor: theme.color.photoMat,
   },
   photoSlot: {
     position: 'relative' as const,
@@ -316,6 +317,16 @@ function ScanPhotos({
     if (next) void Image.prefetch(next.url);
   }, [photos, page]);
 
+  const syncPage = useCallback(
+    (offsetX: number) => {
+      setPage((current) => {
+        const next = photoScrollPage(offsetX, width, photos.length);
+        return current === next ? current : next;
+      });
+    },
+    [photos.length, width],
+  );
+
   return (
     <View style={[styles.frame, { width, height }]}>
       <ScrollView
@@ -325,10 +336,17 @@ function ScanPhotos({
         directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         style={styles.fill}
+        scrollEventThrottle={16}
         onScrollBeginDrag={() => setDragged(true)}
+        onScroll={(event) => syncPage(event.nativeEvent.contentOffset.x)}
         onMomentumScrollEnd={(event) => {
-          const next = Math.round(event.nativeEvent.contentOffset.x / width);
-          setPage(Math.min(Math.max(next, 0), photos.length - 1));
+          syncPage(event.nativeEvent.contentOffset.x);
+          setDragged(false);
+        }}
+        onScrollEndDrag={(event) => {
+          syncPage(event.nativeEvent.contentOffset.x);
+          const vx = event.nativeEvent.velocity?.x ?? 0;
+          if (vx === 0) setDragged(false);
         }}>
         {photos.map((photo) => (
           // React Native's pressable, not Gesture Handler's. The handler's

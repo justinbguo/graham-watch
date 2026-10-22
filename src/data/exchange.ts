@@ -380,7 +380,9 @@ export function useDeleteExchangePost() {
 function cast<T extends { vote_count: number; my_vote: VoteValue }>(row: T, value: VoteValue): T {
   // Swinging from down to up is a swing of two. No clamp: a post can stand
   // below zero, which is the whole point of a downvote.
-  return { ...row, vote_count: row.vote_count + (value - row.my_vote), my_vote: value };
+  const mine = (Number(row.my_vote) || 0) as VoteValue;
+  const count = Number(row.vote_count) || 0;
+  return { ...row, vote_count: count + (value - mine), my_vote: value };
 }
 
 /**

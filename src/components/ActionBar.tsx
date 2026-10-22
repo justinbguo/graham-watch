@@ -3,7 +3,7 @@ import { Image, type ImageSource } from 'expo-image';
 import type { PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
+import { actionPillChrome, HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -88,10 +88,7 @@ export const barStyles = (theme: Theme) => ({
     minHeight: HIT_TARGET,
     paddingVertical: space.sm,
     paddingHorizontal: space.md,
-    borderRadius: radius.full,
-    // Filled, not outlined: a row of outlines reads as a row of empty boxes,
-    // and the app keeps depth in the step between surfaces.
-    backgroundColor: theme.color.fill,
+    ...actionPillChrome(theme),
   },
   text: {
     ...type.labelStrong,

@@ -1,7 +1,7 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
+import { VerifiedMark } from '@/components/VerifiedMark';
 import { Message } from '@/components/ui';
 import { useFollows } from '@/data/follows';
 import { FollowDealer } from '@/features/dealers/FollowDealer';
@@ -9,13 +9,12 @@ import { dealerPicture } from '@/features/dealers/picture';
 import { useOpenStack } from '@/lib/openStack';
 import { size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
-import { useTheme, useThemedStyles } from '@/providers/theme';
+import { useThemedStyles } from '@/providers/theme';
 
 export function FollowingList() {
   const { userId } = useSession();
   const { data: follows = [], isPending } = useFollows(userId);
   const open = useOpenStack();
-  const theme = useTheme();
   const styles = useThemedStyles(listStyles);
 
   return (
@@ -46,12 +45,7 @@ export function FollowingList() {
                 <Text style={styles.name} numberOfLines={1}>
                   {shop.name}
                 </Text>
-                <MaterialCommunityIcons
-                  name="check-decagram-outline"
-                  size={size.iconSmall}
-                  color={theme.color.brass}
-                  accessible={false}
-                />
+                <VerifiedMark />
               </Pressable>
               {/* The capsule aligns itself to the start of its own box. The row
                   centres this box, so the button sits on the name's line. */}

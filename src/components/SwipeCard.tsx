@@ -28,7 +28,19 @@ import { ListingDetails } from '@/features/listings/ListingDetails';
 import { impact, tick } from '@/lib/haptics';
 import { setPhotoLaunchRect } from '@/lib/photoLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
-import { inset, motion, radius, shadow, size, space, type, type Theme } from '@/lib/theme';
+import {
+  cardDismissDuration,
+  cardSettleDuration,
+  inset,
+  layout,
+  motion,
+  radius,
+  shadow,
+  size,
+  space,
+  type,
+  type Theme,
+} from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const FLING_VELOCITY = 800;
@@ -56,7 +68,24 @@ export function deckPhotoHeight(frame: { width: number; height: number }) {
 }
 // Timing, not a spring: an overshoot past centre reads as the card rejecting
 // the drop rather than settling from it.
-const SETTLE = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
+const SETTLE_EASING = Easing.out(Easing.cubic);
+const WEB_DISMISS_MIN = 340;
+const WEB_DISMISS_MAX = 560;
+
+function dismissTiming(width: number, web: boolean) {
+  'worklet';
+  if (!web) return motion.fast;
+  const w = width > 0 ? width : layout.cardWeb;
+  return Math.min(
+    WEB_DISMISS_MAX,
+    Math.max(WEB_DISMISS_MIN, Math.round((w / layout.card) * motion.smooth))
+  );
+}
+
+function settleTiming(web: boolean) {
+  'worklet';
+  return web ? motion.smooth : motion.settle;
+}
 /** Finger travel in, card travel out: one to one, then elastic past the commit point. */
 function resist(travel: number, commit: number) {
   'worklet';
@@ -153,7 +182,7 @@ export const SwipeCard = forwardRef<
   // back with it.
   const cardX = useSharedValue(returning ? -offScreen : 0);
   useEffect(() => {
-    if (returning) cardX.value = withTiming(0, SETTLE);
+    if (returning) cardX.value = withTiming(0, settleConfig);
   }, [cardX, returning]);
   const lift = useSharedValue(0);
   const thresholdFired = useSharedValue(false);
@@ -171,6 +200,9 @@ export const SwipeCard = forwardRef<
   const contentHeight = useSharedValue(0);
   const portHeight = useSharedValue(0);
   const web = Platform.OS === 'web';
+  /** Web card view: photo left, copy scrolls on the right. */
+  const webSplit = web;
+  const settleConfig = { duration: cardSettleDuration(web), easing: SETTLE_EASING };
   // The wheel listener needs the scroll view to have mounted.
   const [portReady, setPortReady] = useState(false);
   // Measured rather than taken from `Dimensions`: the card is capped on a wide
@@ -211,9 +243,11 @@ export const SwipeCard = forwardRef<
         return;
       }
 
-      const leave = { duration: motion.fast, easing: Easing.out(Easing.cubic) };
       const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
-      cardX.value = withTiming(-distance, leave, (finished) => {
+      cardX.value = withTiming(
+        -distance,
+        { duration: cardDismissDuration(distance, web), easing: SETTLE_EASING },
+        (finished) => {
         if (!finished) {
           leaving.current = false;
           return;
@@ -323,8 +357,8 @@ export const SwipeCard = forwardRef<
         mode.value = 'pinch';
         dragX.value = 0;
         dragY.value = 0;
-        cardX.value = withTiming(0, SETTLE);
-        lift.value = withTiming(0, SETTLE);
+        cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
+        lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
         if (wasActive) state.end();
         else state.fail();
         return;
@@ -363,6 +397,12 @@ export const SwipeCard = forwardRef<
         dragY.value = dy;
         lift.value = resistDown(dy, cardHeight.value);
         state.activate();
+        return;
+      }
+
+      // On web the photograph is a fixed column; only the right pane scrolls.
+      if (webSplit && touchX.value < cardWidth.value * 0.5) {
+        state.fail();
         return;
       }
 
@@ -413,21 +453,22 @@ export const SwipeCard = forwardRef<
         // One card-width, not off the window. Travelling on to 1.5 screens
         // put the last of the fade past the edge. The opacity follows cardX,
         // so this finish is the drag's fade carried to its end.
-        const leave = { duration: motion.fast, easing: Easing.out(Easing.cubic) };
         const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
-        cardX.value = withTiming(-distance, leave, () =>
-          scheduleOnRN(onSwipe, 'left', cardX.value)
+        cardX.value = withTiming(
+          -distance,
+          { duration: dismissTiming(distance, web), easing: SETTLE_EASING },
+          () => scheduleOnRN(onSwipe, 'left', cardX.value)
         );
         return;
       }
 
       dragX.value = 0;
-      cardX.value = withTiming(0, SETTLE);
+      cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
     })
     .onFinalize(() => {
       if (mode.value !== 'peek') return;
       dragY.value = 0;
-      lift.value = withTiming(0, SETTLE);
+      lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
     });
 
   useAnimatedReaction(
@@ -511,50 +552,92 @@ export const SwipeCard = forwardRef<
         {/* The card behind is the same size and already painted under this one.
             This one moves out of the way whole, as far as it is tall. */}
         <View style={styles.card}>
-        {/* Scrolling is off on the view itself. Its pan was taking every
-            downward drag, and left and right only worked because a scroll
-            view has nothing to do sideways. The card's pan scrolls the words
-            now, and reveals the next watch when there is nowhere left to
-            scroll. No indicator: a bar down the right edge draws a second
-            line beside the photograph. */}
-        <Animated.ScrollView
-          ref={scroller}
-          scrollEnabled={false}
-          showsVerticalScrollIndicator={false}
-          style={styles.scroller}
-          onContentSizeChange={(_width, height) => {
-            contentHeight.value = height;
-          }}
-          onLayout={(event) => {
-            portHeight.value = event.nativeEvent.layout.height;
-            setPortReady(true);
-          }}
-          contentContainerStyle={styles.content}>
-          <View
-            ref={photoPlateRef}
-            style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
-            <PhotoCarousel
-              photos={card.photos}
-              active={isTop}
-              index={photoIndex}
-              onIndexChange={setPhotoIndex}
-              showBars={false}
-              onExpand={openFullScreen}
-              measureRef={photoPlateRef}
-              alongside={panRef}
-            />
-            <PhotoCaption
-              card={card}
-              onExpand={isTop ? () => openFullScreen(photoIndex) : undefined}
-            />
+        {webSplit ? (
+          <View style={styles.webRow}>
+            <View style={styles.webPhotoColumn}>
+              <View ref={photoPlateRef} style={styles.webPhoto}>
+                <PhotoCarousel
+                  photos={card.photos}
+                  active={isTop}
+                  index={photoIndex}
+                  onIndexChange={setPhotoIndex}
+                  showBars={false}
+                  onExpand={openFullScreen}
+                  measureRef={photoPlateRef}
+                  alongside={panRef}
+                />
+                <PhotoCaption
+                  card={card}
+                  onExpand={isTop ? () => openFullScreen(photoIndex) : undefined}
+                />
+              </View>
+            </View>
+            <Animated.ScrollView
+              ref={scroller}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+              style={styles.webDetailScroll}
+              onContentSizeChange={(_width, height) => {
+                contentHeight.value = height;
+              }}
+              onLayout={(event) => {
+                portHeight.value = event.nativeEvent.layout.height;
+                setPortReady(true);
+              }}
+              contentContainerStyle={styles.webDetailContent}>
+              <View style={styles.body}>
+                <ListingDetails card={card} />
+              </View>
+            </Animated.ScrollView>
           </View>
+        ) : (
+          <>
+            {/* Scrolling is off on the view itself. Its pan was taking every
+                downward drag, and left and right only worked because a scroll
+                view has nothing to do sideways. The card's pan scrolls the words
+                now, and reveals the next watch when there is nowhere left to
+                scroll. No indicator: a bar down the right edge draws a second
+                line beside the photograph. */}
+            <Animated.ScrollView
+              ref={scroller}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+              style={styles.scroller}
+              onContentSizeChange={(_width, height) => {
+                contentHeight.value = height;
+              }}
+              onLayout={(event) => {
+                portHeight.value = event.nativeEvent.layout.height;
+                setPortReady(true);
+              }}
+              contentContainerStyle={styles.content}>
+              <View
+                ref={photoPlateRef}
+                style={[styles.photo, photoHeight ? { height: photoHeight } : styles.photoPending]}>
+                <PhotoCarousel
+                  photos={card.photos}
+                  active={isTop}
+                  index={photoIndex}
+                  onIndexChange={setPhotoIndex}
+                  showBars={false}
+                  onExpand={openFullScreen}
+                  measureRef={photoPlateRef}
+                  alongside={panRef}
+                />
+                <PhotoCaption
+                  card={card}
+                  onExpand={isTop ? () => openFullScreen(photoIndex) : undefined}
+                />
+              </View>
 
-          <View style={styles.body}>
-            {/* No buttons on the card. The swipe is the verdict, and the
-                inquiry waits on the listing route a saved watch opens. */}
-            <ListingDetails card={card} />
-          </View>
-        </Animated.ScrollView>
+              <View style={styles.body}>
+                {/* No buttons on the card. The swipe is the verdict, and the
+                    inquiry waits on the listing route a saved watch opens. */}
+                <ListingDetails card={card} />
+              </View>
+            </Animated.ScrollView>
+          </>
+        )}
 
         <Animated.View pointerEvents="none" style={[styles.ring, ringStyle]} />
         </View>
@@ -604,6 +687,27 @@ const cardStyles = (theme: Theme) => ({
     // The photograph now carries the name, price, and year, so the
     // description opens the block under it.
     paddingTop: space.md,
+  },
+  webRow: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    minHeight: 0,
+  },
+  webPhotoColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  webPhoto: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%' as const,
+  },
+  webDetailScroll: {
+    flex: 1,
+    minWidth: 0,
+  },
+  webDetailContent: {
+    paddingBottom: space.sm,
   },
   // Over everything, on the card's own frame, so it never moves with the
   // scroll underneath it.

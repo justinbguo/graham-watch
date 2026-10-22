@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-const STYLE_ID = 'graham-scrollbars';
+const STYLE_ID = 'graham-web-chrome';
 
 const CSS = `
   * {
@@ -9,6 +9,9 @@ const CSS = `
   }
   ::-webkit-scrollbar {
     display: none;
+  }
+  *:focus {
+    outline: none;
   }
 `;
 
@@ -27,6 +30,10 @@ const CSS = `
  * enough to need dragging.
  *
  * No theme: hidden has no colour, so this runs once and never repaints.
+ *
+ * Browsers also paint a default blue focus ring on inputs and buttons. The app
+ * uses fill and border for state instead (docs/DESIGN.md), so focus outlines
+ * are suppressed on web the same way scrollbars are.
  */
 export function hideScrollbars() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;

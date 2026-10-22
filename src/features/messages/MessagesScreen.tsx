@@ -1,25 +1,46 @@
-import { HeaderIcon } from '@/components/HeaderIcon';
 import { Screen } from '@/components/ui';
+import { useIsDesktopWeb } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 
 import { ConversationList } from './ConversationList';
+import { DesktopMessagesLayout } from './DesktopMessagesLayout';
+import { NewMessageButton } from './NewMessageButton';
 
-/** The Messages tab. The plus opens New message as a sheet over it. */
-export function MessagesScreen({ userId }: { userId: string }) {
+type MessagesScreenProps = {
+  userId: string;
+  back?: { label: string; onPress: () => void };
+  conversationId?: string | null;
+  listingId?: string | null;
+};
+
+/** The Messages tab, or the same list pushed from Seller Hub. */
+export function MessagesScreen({
+  userId,
+  back,
+  conversationId = null,
+  listingId = null,
+}: MessagesScreenProps) {
+  const isDesktopWeb = useIsDesktopWeb();
   const open = useOpenStack();
+
+  if (isDesktopWeb) {
+    return (
+      <DesktopMessagesLayout
+        userId={userId}
+        conversationId={conversationId}
+        listingId={listingId}
+        back={back}
+      />
+    );
+  }
 
   return (
     <Screen
       title="Messages"
-      inTabs
-      action={
-        <HeaderIcon
-          label="New message"
-          name="plus"
-          onPress={() => open('new-message', undefined, '/new-message')}
-        />
-      }>
-      <ConversationList userId={userId} />
+      inTabs={!back}
+      back={back}
+      action={<NewMessageButton onPress={() => open('new-message', undefined, '/new-message')} />}>
+      <ConversationList userId={userId} selectedConversationId={conversationId} />
     </Screen>
   );
 }

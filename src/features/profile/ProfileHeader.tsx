@@ -6,6 +6,7 @@ import { Avatar } from '@/components/Avatar';
 import { Message } from '@/components/ui';
 import { useSaved } from '@/data/listings';
 import { fullName, useProfile, useSetAvatar } from '@/data/profile';
+import { personMonogram } from '@/lib/avatarMonogram';
 import { size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
@@ -57,7 +58,15 @@ export function ProfileHeader() {
           disabled={setAvatar.isPending}
           onPress={pickPhoto}
           style={({ pressed }) => [styles.photoPress, pressed && styles.pressed]}>
-          <Avatar url={profile?.avatar_url ?? null} px={size.profile} />
+          <Avatar
+            url={profile?.avatar_url ?? null}
+            px={size.profile}
+            monogram={personMonogram({
+              userId,
+              name: fullName(profile),
+              handle: profile?.handle,
+            })}
+          />
         </Pressable>
 
         <View style={styles.copy}>

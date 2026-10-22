@@ -61,6 +61,41 @@ asks Metro (`/__dev-inbox`), and Metro reads Mailpit. The phone skips that hop.
 used to deliver the bundle (`src/lib/localHost.ts`). Phone and Mac have to be
 on the same Wi-Fi. The code still does not go to a real inbox.
 
+## Which server am I on?
+
+Graham has **two** Supabase projects: **local** (Docker on your Mac) and
+**hosted** (production). Users and passwords do **not** sync between them.
+
+| Check | Command or UI |
+| --- | --- |
+| Terminal | `npm run env` or `npm run backend` — lists app, scripts, operator UI |
+| Before Metro starts | `npm run check:env` prints `app → local` or `app → hosted · …` |
+| In the app | Sign-in shows a one-line backend label; **Settings → Backend** has the full hint |
+| Switch | `npm run env -- local` or `npm run env -- hosted`, then **restart Metro** |
+
+**"No account uses that address"** while logging in usually means one of:
+
+1. **Wrong mode** — you chose **Log in** but never created that email on *this*
+   server. Use **Create account** once, or use a fixture (`npm run mock:users` on local).
+2. **Wrong server** — the account exists on hosted but the app points at local
+   (or the opposite). Match Settings → Backend to where you signed up.
+3. **Local reset** — `npm run db:reset` deletes every local auth user. Run
+   `npm run mock:users` again or create the account again.
+
+### Fixture `gold@graham.test` on hosted
+
+`@graham.test` addresses do not receive real mail on hosted. After seeding:
+
+```
+npm run env -- hosted
+npm run mock:users -- --yes --gold-only
+npm run mock:signin -- gold@graham.test
+```
+
+Paste the printed six-digit code in the app (**Log in with email**). Requires
+`SUPABASE_SERVICE_ROLE_KEY` in `scripts/.env.operator.local`. Goldfinger's shop
+must already exist in that project (import + approve if not seeded).
+
 ## Google
 
 The code is written and inert. It turns on when the credentials exist.

@@ -10,17 +10,19 @@ export function FilterSummary({
   matched,
   chips,
   onClear,
+  compact = false,
 }: {
   matched?: number;
   chips: FilterChip[];
   onClear: () => void;
+  compact?: boolean;
 }) {
   const styles = useThemedStyles(summaryStyles);
   const count =
     matched == null ? null : `${matched} watch${matched === 1 ? '' : 'es'}`;
 
   return (
-    <View style={styles.summary}>
+    <View style={[styles.summary, compact && styles.summaryCompact]}>
       <View style={styles.head}>
         <Text style={styles.count}>{count ?? ' '}</Text>
         {chips.length ? (
@@ -66,6 +68,11 @@ const summaryStyles = (theme: Theme) => ({
     gap: space.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.color.border,
+  },
+  summaryCompact: {
+    paddingHorizontal: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
   },
   head: {
     flexDirection: 'row' as const,

@@ -9,7 +9,7 @@ import Animated, {
 
 import { SearchBarShell } from '@/components/SearchBar';
 import type { SearchBarRect } from '@/lib/searchLaunch';
-import { motion, type, type Theme } from '@/lib/theme';
+import { controlText, motion, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 const PLACEHOLDER = 'Search';
@@ -65,9 +65,8 @@ const morphStyles = (theme: Theme) => ({
     position: 'absolute' as const,
   },
   label: {
-    ...type.body,
+    ...controlText.body,
     flex: 1,
     color: theme.color.inkMuted,
-    includeFontPadding: false,
   },
 });

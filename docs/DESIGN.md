@@ -24,8 +24,10 @@ literal hex in a component.
 | `background` | The page itself |
 | `surface` | The fill of anything sitting on the page: cards, tiles, the tab bar |
 | `surfaceSunken` | A well inside a fill: image placeholders, a chosen row |
-| `fill` | A field, a segment, a chip. Not a button |
-| `border` | Hairlines *between* content, and nothing else |
+| `photoMat` | Matte behind a `contain` watch photograph on the page (grid tile, list row) |
+| `fill` | A segment, a chip, and other matte controls that are not typed into. Not a button |
+| `field` | Text fields, selects, and outlined action pills: white (light) or lifted (dark) with a `border` hairline via `fieldChrome()` |
+| `border` | Hairlines between content, and the outline on `field` |
 | `text` | Primary reading colour, on the page |
 | `textMuted` | Supporting copy, descriptions, eyebrows |
 | `textFaint` | Hints and placeholders you should be able to ignore |
@@ -55,8 +57,8 @@ Rules:
 - `money` is a price, and only a price. A price in `save` looks like a watch you kept.
 - Dark mode is not inverted light mode. It is a warm charcoal (`#121110`), not
   black, and text is `#F3EFE8`, not white. Pure black plus pure white on OLED
-  vibrates and makes photographs look blown out. The app opens in this scheme.
-  Settings can switch to light or follow the system; a choice already saved
+  vibrates and makes photographs look blown out. The app opens in light.
+  Settings can switch to dark or follow the system; a choice already saved
   there is kept.
 - `ink` equals `text` in both warm schemes, so reach for whichever names where
   the type sits. They only differ in a palette that lights a container
@@ -196,10 +198,12 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 
 ## Identity
 
-Buy has no title. The header is one row: the search door at
+Buy has no title. On phone and narrow web the header is one row: the search door at
 `layout.deckHeaderSearchShare` (60%) of the width, undo, filters, and the view
 toggle grouped at the trailing edge with `space.xs` between them and
-`space.md` before the cluster. The count is the subtitle under that row. Sign-in is the one place the letters
+`space.md` before the cluster. On desktop web search lives in the top nav and undo,
+filters, and the view toggle stack in `layout.deckToolRail` at the left of the deck.
+The count is the subtitle under that row. Sign-in is the one place the letters
 are `GRAHAM`, drawn by `Wordmark`, at the left of that column. Do not invent a
 crest, heritage date, or seal to imply history the product does not have.
 
@@ -222,6 +226,20 @@ watch beside the word, and no card around the doors.
 them together is what makes six letters read as a mark instead of a heading.
 It uses a cut the interface already loads, so the wordmark costs no second
 download.
+
+The desktop nav lockup is the same Display bold at 22pt with
+`tracking.wordmarkHeader` (−0.8), looser than the 44pt sign-in mark. Its line
+height matches `size.headerLogo` so the letters share a row with the gold G and
+the nav pills. Tracking does not scale down unchanged: a size needs its own
+token when it leaves the sign-in lockup.
+
+### Optical alignment in a row
+
+When type sits beside a mark or a control, align the **row** not the bounding
+boxes alone. Give the type the same height as the mark (`lineHeight` equals the
+logo edge), centre with `alignItems: 'center'`, then nudge caps one step if they
+still sit low in the em box. Nav chrome, search, and lockups share `HIT_TARGET`
+or the logo height so nothing drifts above the baseline of its neighbours.
 
 ### Onboarding is one slide grammar
 
@@ -591,15 +609,37 @@ Every screen is a centred column with a ceiling, from `layout`:
 | Token | Width | Job |
 | --- | --- | --- |
 | `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
+| `layout.dealSheet` | 640 | Offer-deal sheet over a thread; Profile tab column. |
 | `layout.card` | 480 | The swipe stage. |
+| `layout.cardWeb` | 960 | Web swipe stage with photo and copy side by side. |
+| `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
 | `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
+| `layout.desktopColumnShare` | 0.75 | Desktop web tabs: one centred column for each tab's body. |
+| `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |
+
+On desktop web inside `(tabs)`, `Screen` uses the centred `desktopColumnShare`
+column. `DesktopTabHeader` uses `desktopContentWidth` — the same width as a
+padded tab body such as Seller Hub's section nav (`inset.screen` gutters). The
+swipe deck is the exception: pass `desktopBleed`
+and `width="deckFrameWeb"` so the capped block is wide enough for the tool rail
+plus a full `cardWeb` stage, centred in the tab column with `space.lg` under the
+header.
+
+A left rail and the column beside it share one top edge. Padding belongs on both
+columns or on neither — not a one-off `paddingTop` on the rail to chase a roll,
+photo, or first row inside the neighbor. Buy uses `DeckDesktopFrame`; Community
+uses `desktopSplit` the same way.
+
+The rail and the main column are separated by `size.rule` in `border`, with
+`space.lg` on the main side. Use `desktopSplitMain` and `desktopSplitRailEdge`
+from `src/lib/desktopSplit.ts` — do not hand-roll another width or colour.
 
 `Screen` applies the cap and centres the column in the window, so a new screen
 is capped without doing anything. The type inside that column aligns left.
 Pass `width` only to leave the default: the deck asks for `card` in swipe
-view and `grid` in grid view.
+view on native, `cardWeb` on web, and `grid` in grid view.
 
 A phone is narrower than all three, so these values change nothing on a phone.
 They exist for the case the app already supports and nobody looks at.
@@ -703,9 +743,11 @@ between the three columns reads as a seam and the center row is the position.
   above it, on the grid. Either view is reachable at any width — the breakpoint
   picks the opening move, it does not lock a door.
 - Navigation is a column of glyphs. Below the breakpoint it runs along the
-  bottom; above it the same routes stand in `layout.rail` at the left. A desktop
+  bottom; above it on native the same routes stand in `layout.rail` at the left;
+  on web the same routes become text pills in `layout.desktopHeader` at the top. A desktop
   bottom strip under a narrow content column reads like a phone screenshot.
-- The current tab is the white one, on the bar and on the rail alike.
+- The current tab is the white one on the phone bar and the native rail; on web it is the
+  brass pill in the header.
 - Anything doable by swipe is doable without one. On web, in the card view,
   left passes and right saves — the top card flings the same way a committed
   drag would. In the grid, the arrows move the selection (across a row, and
@@ -1353,7 +1395,7 @@ A list of dealers, such as Following on Profile, puts the same capsule at the
 end of the row. The row itself opens the shop, and the capsule is its own
 button: one control inside the other would open the shop and change the follow
 on the same tap. To the right of the name, before that spare space, sits a
-`check-decagram-outline` at `size.iconSmall` in `brass`. It is the gold mark, and the
+`VerifiedMark` (gold-filled decagram, bold white check). It is the gold mark, and the
 row is spoken as verified. Every shop in the list wears it. There is no
 separate verified flag on a dealer, so the mark is the list's, not a second
 status. A person does not wear it, and neither does a watch row.
@@ -1464,9 +1506,14 @@ not be a pile of overrides.
 
 On a phone it is a `LiquidGlass` pill — `expo-blur` over the page, `glassFill` and
 `glassBorder`, `radius.full`, floated in the screen gutter above the home indicator. On a
-wide window the same material stacks in a rounded rail at the left. Glyphs still use
+wide native window the same material stacks in a rounded rail at the left. Glyphs still use
 `onBar` at 55% white and `onBarActive` at full white; the current tab gets a `glassWell`
 behind its icon. The page shows through the dock instead of meeting a solid `bar` floor.
+
+On a wide web window the bar is `DesktopTabHeader`: logo, text nav pills on `background`,
+search centred in the row, and a `border` rule under `layout.desktopHeader`. The current
+pill is `brass` with `onCaution` type. Buy drops its duplicate search and keeps deck
+controls in its screen header.
 
 The tab you are on used to be brass, and the glyph used to fill in. On a black floor
 that is a third signal. The step from 55% to 100% white is the contrast the eye

@@ -1,10 +1,22 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text, View } from 'react-native';
 
+import { DeckRailButton } from '@/components/DeckRailButton';
 import { intentLabel, type ExchangeIntent } from '@/data/exchange';
 import { HIT_TARGET, inset, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { INTENTS } from './copy';
+
+type RailIcon = keyof typeof MaterialCommunityIcons.glyphMap;
+
+const RAIL_ICONS: Record<FeedFilter, RailIcon> = {
+  all: 'view-list',
+  sell: 'tag-outline',
+  buy: 'cart-outline',
+  trade: 'swap-horizontal',
+  random: 'shuffle-variant',
+};
 
 export type FeedFilter = ExchangeIntent | 'all';
 
@@ -14,21 +26,43 @@ const CHOICES: { value: FeedFilter; label: string }[] = [
 ];
 
 /**
- * One row of capsules under the title: All, then each kind of post. One is
- * always on. The chosen one is `brass` with `background` type; the rest sit
- * on `fill`, the same shape, so choosing swaps the ink and nothing moves.
- *
- * They share the row in equal widths instead of scrolling. Five fit across a
- * phone, and a row with a half-hidden last word reads as cut off.
+ * Feed intent filter. On a phone it is a row of capsules under the title. On
+ * desktop web it is a left rail beside the feed.
  */
 export function IntentFilter({
   value,
   onChange,
+  variant = 'bar',
 }: {
   value: FeedFilter;
   onChange: (next: FeedFilter) => void;
+  variant?: 'bar' | 'rail';
 }) {
-  const styles = useThemedStyles(filterStyles);
+  const bar = useThemedStyles(barStyles);
+  const rail = useThemedStyles(railStyles);
+
+  if (variant === 'rail') {
+    const styles = rail;
+    return (
+      <View style={styles.rail}>
+        {CHOICES.map((choice) => {
+          const on = choice.value === value;
+          return (
+            <DeckRailButton
+              key={choice.value}
+              label={choice.label}
+              icon={RAIL_ICONS[choice.value]}
+              active={on}
+              accessibilityLabel={choice.value === 'all' ? 'All posts' : choice.label}
+              onPress={() => onChange(choice.value)}
+            />
+          );
+        })}
+      </View>
+    );
+  }
+
+  const styles = bar;
 
   return (
     <View style={styles.row}>
@@ -53,9 +87,7 @@ export function IntentFilter({
   );
 }
 
-const filterStyles = (theme: Theme) => ({
-  // Sits in the screen's subhead, which already spaces it from the title and
-  // from the feed. This row only insets to the same gutter as the title.
+const barStyles = (theme: Theme) => ({
   row: {
     flexDirection: 'row' as const,
     gap: space.sm,
@@ -82,5 +114,12 @@ const filterStyles = (theme: Theme) => ({
   },
   pressed: {
     opacity: 0.72,
+  },
+});
+
+const railStyles = (_theme: Theme) => ({
+  rail: {
+    alignSelf: 'stretch' as const,
+    gap: space.sm,
   },
 });

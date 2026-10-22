@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Keyboard, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { size } from '@/lib/theme';
 
 /**
@@ -52,6 +52,8 @@ export function useKeyboardOverlap(below = 0) {
 export function useKeyboardLift(inTabs = false) {
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
-  const standing = inTabs && !isWide ? size.tabBar + insets.bottom : insets.bottom;
+  const isDesktopWeb = useIsDesktopWeb();
+  const standing =
+    inTabs && !isWide && !isDesktopWeb ? size.tabBar + insets.bottom : insets.bottom;
   return useKeyboardOverlap(standing);
 }

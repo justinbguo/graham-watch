@@ -4,10 +4,11 @@ import { Tabs } from 'expo-router';
 import { BuyTabIcon } from '@/components/BuyTabIcon';
 import { TabBar } from '@/components/TabBar';
 import { useUnreadCount } from '@/features/messages/count';
+import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
 import { ProfileTabIcon } from '@/features/profile/ProfileTabIcon';
 import { SaveTargetIcon } from '@/features/saved/flight';
 import { useSavedCount } from '@/features/saved/count';
-import { useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { size } from '@/lib/theme';
 import { useTheme } from '@/providers/theme';
 
@@ -27,9 +28,12 @@ const ICONS: Record<string, IconName> = {
 };
 
 export default function TabsLayout() {
+  const isDesktopWeb = useIsDesktopWeb();
   const isWide = useIsWide();
   const saved = useSavedCount();
   const unread = useUnreadCount();
+  const { shop, ready } = useClaimedDealerShop();
+  const sellerHub = ready && shop;
   const theme = useTheme();
 
   return (
@@ -40,7 +44,7 @@ export default function TabsLayout() {
       screenOptions={({ route }) => ({
         headerShown: false,
         sceneStyle: { backgroundColor: theme.color.background },
-        tabBarPosition: isWide ? 'left' : 'bottom',
+        tabBarPosition: isDesktopWeb ? 'top' : isWide ? 'left' : 'bottom',
         tabBarIcon: ({ color }) => {
           const icon = ICONS[route.name];
           if (!icon) return null;
@@ -58,8 +62,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
+          title: sellerHub ? 'Deal' : 'Messages',
+          tabBarAccessibilityLabel: sellerHub ? 'Deal' : 'Messages',
           tabBarBadge: unread || undefined,
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name={sellerHub ? 'storefront-outline' : 'chat-outline'}
+              size={size.tabIcon}
+              color={color}
+            />
+          ),
         }}
       />
       <Tabs.Screen

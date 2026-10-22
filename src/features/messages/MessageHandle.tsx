@@ -8,13 +8,16 @@ export function MessageHandle({
   handle,
   busy,
   onPress,
+  desktop = false,
 }: {
   handle: string;
   busy: boolean;
   onPress: () => void;
+  desktop?: boolean;
 }) {
   return (
     <ConversationRow
+      desktop={desktop}
       conversation={{
         id: `compose:${handle}`,
         with: {
@@ -27,6 +30,7 @@ export function MessageHandle({
         },
         last: null,
         unread: 0,
+        threadDealerId: null,
       }}
       detail="New message"
       label={`New message to @${handle}`}

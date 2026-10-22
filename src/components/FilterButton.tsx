@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -13,10 +13,40 @@ const MARK = require('../../assets/filter.svg');
  * page. The count is the whole point: without it a user who filtered on
  * another screen has no way to tell why the deck looks short.
  */
-export function FilterButton({ count, onPress }: { count: number; onPress: () => void }) {
+export function FilterButton({
+  count,
+  onPress,
+  variant = 'icon',
+}: {
+  count: number;
+  onPress: () => void;
+  variant?: 'icon' | 'text';
+}) {
   const styles = useThemedStyles(buttonStyles);
   const theme = useTheme();
   const isActive = count > 0;
+
+  if (variant === 'text') {
+    const label = isActive ? `Filter · ${count}` : 'Filter';
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={count ? `Filters, ${count} active` : 'Filters'}
+        onPress={onPress}
+        style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
+        <View style={styles.textRow}>
+          <Image
+            source={MARK}
+            style={styles.mark}
+            contentFit="contain"
+            tintColor={isActive ? theme.color.brass : theme.color.text}
+            accessible={false}
+          />
+          <Text style={[styles.textLabel, isActive && styles.textLabelActive]}>{label}</Text>
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -54,6 +84,24 @@ const buttonStyles = (theme: Theme) => ({
   },
   count: {
     ...type.control,
+    color: theme.color.brass,
+  },
+  textButton: {
+    alignSelf: 'flex-start' as const,
+    minHeight: size.desktopNavPill,
+    paddingHorizontal: space.md,
+    justifyContent: 'center' as const,
+  },
+  textRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.sm,
+  },
+  textLabel: {
+    ...type.labelStrong,
+    color: theme.color.text,
+  },
+  textLabelActive: {
     color: theme.color.brass,
   },
 });
