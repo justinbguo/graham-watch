@@ -999,6 +999,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
@@ -1030,6 +1031,7 @@ export type Database = {
           case_size_mm?: number | null
           complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
+          cost_cents?: number | null
           created_at?: string
           currency?: string
           dealer_id: string
@@ -1061,6 +1063,7 @@ export type Database = {
           case_size_mm?: number | null
           complications?: Database["public"]["Enums"]["complication"][]
           condition?: string | null
+          cost_cents?: number | null
           created_at?: string
           currency?: string
           dealer_id?: string
@@ -1746,6 +1749,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
@@ -2031,6 +2035,7 @@ export type Database = {
           case_size_mm: number | null
           complications: Database["public"]["Enums"]["complication"][]
           condition: string | null
+          cost_cents: number | null
           created_at: string
           currency: string
           dealer_id: string
