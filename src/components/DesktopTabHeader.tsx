@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SearchDoor } from '@/components/SearchBar';
@@ -138,10 +138,13 @@ const headerStyles = (theme: Theme) => ({
     backgroundColor: theme.color.background,
     borderBottomWidth: size.rule,
     borderBottomColor: theme.color.border,
-    ...Platform.select({
+    // `sticky` is not in React Native's position union. Without the
+    // assertion, Platform.select types this style as a union and
+    // StyleSheet.NamedStyles rejects it.
+    ...(Platform.select({
       web: { position: 'sticky' as const, top: 0, zIndex: 10 },
       default: {},
-    }),
+    }) as ViewStyle),
   },
   shellAlign: {
     width: '100%' as const,
@@ -175,10 +178,10 @@ const headerStyles = (theme: Theme) => ({
     justifyContent: 'center' as const,
     gap: space.md,
     flexShrink: 0,
-    ...Platform.select({
+    ...(Platform.select({
       web: { flexWrap: 'nowrap' as const },
       default: {},
-    }),
+    }) as ViewStyle),
   },
   search: {
     flexGrow: 0,
@@ -221,10 +224,10 @@ const headerStyles = (theme: Theme) => ({
     ...type.labelStrong,
     flexShrink: 0,
     color: theme.color.text,
-    ...Platform.select({
+    ...(Platform.select({
       web: { whiteSpace: 'nowrap' as const },
       default: {},
-    }),
+    }) as TextStyle),
   },
   pillLabelActive: {
     color: theme.color.onAccent,
