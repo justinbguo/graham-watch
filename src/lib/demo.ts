@@ -187,6 +187,7 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
   has_box: index % 2 === 0,
   has_papers: index % 3 === 0,
   price_cents: fixture.price_cents,
+  cost_cents: null,
   currency: 'USD',
   description: fixture.description,
   status: 'active',
