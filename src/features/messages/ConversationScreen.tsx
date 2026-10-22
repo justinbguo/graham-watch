@@ -25,6 +25,7 @@ import { DealSheetPortals } from '@/features/messages/DealSheetPortals';
 import { useDealSheets } from '@/features/messages/DealSheets';
 import { OfferDealButton } from '@/features/messages/OfferDealButton';
 import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
+import { track } from '@/lib/analytics';
 import { formatRelativeTime, formatTitle } from '@/lib/format';
 import { useKeyboardLift } from '@/lib/keyboard';
 import { useOpenStack } from '@/lib/openStack';
@@ -248,6 +249,9 @@ export function ConversationScreen({
         onError: () => {
           setDraft((current) => current || body);
           setPhoto((current) => current ?? sending);
+        },
+        onSuccess: () => {
+          if (isShopSeller) track('dealer_reply', { conversation_id: conversationId });
         },
       },
     );

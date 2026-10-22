@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-const CHANNEL_ID = 'watch-updates';
+import { ensureAndroidChannel, syncPushRegistration } from '@/lib/push';
 
 function isAllowed(settings: Notifications.NotificationPermissionsStatus): boolean {
   return (
@@ -20,23 +20,24 @@ function isAllowed(settings: Notifications.NotificationPermissionsStatus): boole
 export async function requestNotificationPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Watch updates',
-      description: 'New vintage watches and changes to watches you save.',
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
-  }
+  await ensureAndroidChannel();
 
   const existing = await Notifications.getPermissionsAsync();
-  if (isAllowed(existing)) return true;
+  const allowed = isAllowed(existing)
+    ? true
+    : isAllowed(
+        await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+          },
+        }),
+      );
 
-  const requested = await Notifications.requestPermissionsAsync({
-    ios: {
-      allowAlert: true,
-      allowBadge: true,
-      allowSound: true,
-    },
-  });
-  return isAllowed(requested);
+  // The permission is what onboarding records. Registering the token can fail
+  // in Expo Go (that binary is Expo's, not Graham's) and still succeed on the
+  // next launch of a real build.
+  if (allowed) await syncPushRegistration().catch(() => undefined);
+  return allowed;
 }

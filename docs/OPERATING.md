@@ -933,8 +933,8 @@ The Expo project is [@guodini/graham](https://expo.dev/accounts/guodini/projects
 | --- | --- |
 | `development` | Debug app with `expo-dev-client` on a physical phone. Needed for Sign in with Apple, which Expo Go cannot load. |
 | `development-simulator` | Same, for the iOS Simulator. `simulator: true` cannot be installed on a device. |
-| `preview` | Production-like, sideloaded. Android `.apk`. iOS still needs an Apple Developer account (ad hoc devices). |
-| `production` | Store / TestFlight. `autoIncrement` bumps the build number on Expo's servers. |
+| `preview` | Production-like, sideloaded. Android `.apk`. iOS still needs an Apple Developer account (ad hoc devices). Uses the `production` environment, so it talks to hosted Supabase. |
+| `production` | Store / TestFlight. `autoIncrement` bumps the build number on Expo's servers. `EXPO_PUBLIC_DEMO` is forced off. |
 
 Pin `EXPO_PUBLIC_DEMO` off for every profile. A store binary with it on is the
 fixture app, not Graham.
@@ -950,8 +950,9 @@ eas env:create --name EXPO_PUBLIC_SUPABASE_URL --environment production --visibi
 eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --environment production --visibility plaintext
 ```
 
-Repeat for `preview` and `development` if those builds should hit hosted
-Supabase rather than `127.0.0.1`. Never put the service-role key here.
+`preview` reads that same `production` environment, so one pair covers both
+install paths. Repeat for `development` only if a dev-client build should hit
+hosted Supabase rather than `127.0.0.1`. Never put the service-role key here.
 
 A build is the one configuration you cannot check by looking at a file on your
 machine, so confirm it with `eas env:list --environment production` rather than
@@ -987,10 +988,16 @@ applications.
 
 ## Known limits
 
-Only email codes work today. Google's door stays off until
-`EXPO_PUBLIC_GOOGLE_SIGN_IN=1`. Apple's door is always on screen; the native
-button needs a development build, and the tap needs a Services ID. See
-[AUTH](AUTH.md) for what turning either on takes.
+Only email codes work until Apple is configured in the hosted dashboard. The
+button is on; the steps are in [AUTH](AUTH.md#apple). Google's door stays off
+until `EXPO_PUBLIC_GOOGLE_SIGN_IN=1`.
+
+A reply in a thread pushes to the other person's phone once they have allowed
+notifications and the hosted database has the `device_push_tokens` migration.
+The send happens in Postgres (`notify_message_push`), not in the app, so an
+inquiry that opens a thread notifies a shop that has claimed its account and
+installed the app. Expo Go cannot receive that push — the token would belong
+to Expo's app, not Graham's.
 
 The automated tests above the database are the Squarespace, Shopify, and
 sitemap parsers, plus the operator UI's pasted-list parser. `test:rls` covers

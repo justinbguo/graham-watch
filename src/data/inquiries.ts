@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { track } from '@/lib/analytics';
 import type { DeckCard } from '@/lib/models';
 import { demoMailDraft, isDemo } from '@/lib/demo';
 import { openMailDraft, type MailDraft } from '@/lib/mail';
@@ -114,7 +115,8 @@ export function useSendInquiry(buyerId: string | null) {
       }
       return inquiry;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      track('inquiry_sent', { listing_id: variables.card.id });
       if (buyerId) queryClient.invalidateQueries({ queryKey: keys.inquiries(buyerId) });
     },
   });

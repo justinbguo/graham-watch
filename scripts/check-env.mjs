@@ -53,6 +53,8 @@ function announce(where) {
   } else if (env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY || env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY) {
     console.log('  subscriptions → RevenueCat (store keys)');
   }
+  if (env.EXPO_PUBLIC_POSTHOG_KEY) console.log('  analytics → PostHog');
+  if (env.EXPO_PUBLIC_SENTRY_DSN) console.log('  errors → Sentry');
 }
 
 if (!LOCAL_HOSTS.has(host)) {
