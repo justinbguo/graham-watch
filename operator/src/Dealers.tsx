@@ -20,12 +20,6 @@ type Row = OperatorDealer;
  */
 type Profile = { description: string | null; instagram: string | null; logo_url: string | null };
 
-const NEXT: Record<Permission, Permission> = {
-  pending: 'approved',
-  approved: 'revoked',
-  revoked: 'approved',
-};
-
 /** The shop whose catalogue is open, and what the read that opened it found. */
 type Picking = { dealer: Row; note: string | null };
 
@@ -88,10 +82,7 @@ export function Dealers() {
   }
 
   function setPermission(dealer: Row, permission: Permission) {
-    const asked =
-      permission === 'approved'
-        ? `Put ${dealer.name}'s ${dealer.listings_held} imported watch(es) in front of buyers?`
-        : `Pull ${dealer.name} out of the deck? Buyers stop seeing their watches.`;
+    const asked = permissionQuestion(dealer, permission);
     if (!confirmWrite(asked)) return;
 
     void run(dealer, async () => {
@@ -201,7 +192,7 @@ export function Dealers() {
                 <th className="num">In the deck</th>
                 <th className="num">Imported</th>
                 <th className="num">Catalogue</th>
-                <th>Last sync</th>
+                <th>Last refresh</th>
                 <th>Description</th>
                 <th>Instagram</th>
                 <th>Status</th>
@@ -210,7 +201,6 @@ export function Dealers() {
             </thead>
             <tbody>
               {shown.map((dealer) => {
-                const next = NEXT[dealer.permission];
                 const expanded = open === dealer.id;
                 const held = Number(dealer.listings_held);
                 const inDeck = Number(dealer.listings_in_deck);
@@ -294,7 +284,7 @@ export function Dealers() {
                     </td>
 
                     <td className="small">
-                      <Freshness dealer={dealer} />
+                      <RefreshStatus dealer={dealer} />
                     </td>
 
                     {/* Both read off the shop's own site by the scrape, and
@@ -354,12 +344,7 @@ export function Dealers() {
                         onClick={() => setPicking({ dealer, note: null })}>
                         Add watches
                       </button>
-                      <button
-                        className={next === 'approved' ? '' : 'ghost'}
-                        disabled={busyId !== null}
-                        onClick={() => setPermission(dealer, next)}>
-                        {next === 'approved' ? 'Publish' : 'Pull back'}
-                      </button>
+                      <ShopPermission dealer={dealer} busy={busyId !== null} onSet={setPermission} />
                     </td>
                   </tr>,
 
@@ -380,20 +365,22 @@ export function Dealers() {
             <strong>In the deck</strong> is what a buyer can see right now: the watch is
             active, unsold, and the shop is approved. <strong>Imported</strong> is every
             watch we hold for them. <strong>Catalogue</strong> is what their site is
-            offering. <strong>Last sync</strong> is when the nightly job or a manual
-            refresh last finished reading their site. A gap between the first two means
-            some are sold or hidden — or that the shop is not approved, in which case
-            none of them show.
+            offering. <strong>Last refresh</strong> is the nightly job: when it last
+            finished, how many listings it published and skipped, and the last error.
+            Photos are the live gallery on active, unsold watches. A gap between the
+            first two counts means some are sold or hidden — or that the shop is not
+            approved, in which case none of them show.
           </p>
 
           <p className="muted small legend">
-            The three actions do different jobs. <strong>Refresh from site</strong> reads
-            their site again for stock we have not seen and then shows it — free, and it
-            imports nothing on its own. <strong>Add watches</strong> opens the same list
-            without re-reading, so you can pick from the catalogue we already hold;
-            importing is the only step that spends a model call per watch.{' '}
-            <strong>Publish</strong> and <strong>Pull back</strong> decide whether buyers
-            see the watches we have already imported.
+            <strong>Refresh from site</strong> reads their site again and then shows
+            what they have — free, and it imports nothing on its own.{' '}
+            <strong>Add watches</strong> opens that list without re-reading; importing
+            is the only step that spends a model call per watch. <strong>Publish</strong>{' '}
+            puts the watches in the deck. <strong>Pause</strong> takes a published shop
+            out of the deck and out of the nightly refresh until <strong>Resume</strong>.{' '}
+            <strong>Pull back</strong> revokes the shop. That is a separate decision
+            from pause, and publishing again is how a revoked shop comes back.
           </p>
         </>
       )}
@@ -411,31 +398,133 @@ export function Dealers() {
   );
 }
 
-function Freshness({ dealer }: { dealer: Row }) {
-  if (dealer.last_sync_error) {
+function permissionQuestion(dealer: Row, permission: Permission): string {
+  if (permission === 'paused') {
+    return `Pause ${dealer.name}? Buyers stop seeing their watches, and the nightly refresh skips them, until you resume.`;
+  }
+  if (permission === 'revoked') {
+    return `Revoke ${dealer.name}? Buyers stop seeing their watches. Publishing them again is a separate decision from resume.`;
+  }
+  if (dealer.permission === 'paused') {
+    return `Resume ${dealer.name}? Their ${dealer.listings_held} imported watch(es) go back in front of buyers, and the nightly refresh includes them again.`;
+  }
+  return `Put ${dealer.name}'s ${dealer.listings_held} imported watch(es) in front of buyers?`;
+}
+
+function ShopPermission({
+  dealer,
+  busy,
+  onSet,
+}: {
+  dealer: Row;
+  busy: boolean;
+  onSet: (dealer: Row, permission: Permission) => void;
+}) {
+  if (dealer.permission === 'approved') {
     return (
-      <span className="badge wait" title={dealer.last_sync_error}>
-        sync failed
-      </span>
+      <>
+        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'paused')}>
+          Pause
+        </button>
+        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'revoked')}>
+          Pull back
+        </button>
+      </>
     );
   }
 
-  if (!dealer.last_synced_at) {
+  if (dealer.permission === 'paused') {
+    return (
+      <>
+        <button disabled={busy} onClick={() => onSet(dealer, 'approved')}>
+          Resume
+        </button>
+        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'revoked')}>
+          Pull back
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <button disabled={busy} onClick={() => onSet(dealer, 'approved')}>
+      Publish
+    </button>
+  );
+}
+
+function newer(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
+function RefreshStatus({ dealer }: { dealer: Row }) {
+  const nightly = dealer.last_refresh_at;
+  const sync = dealer.last_synced_at;
+  const when = newer(nightly, sync);
+  const syncIsNewer = Boolean(sync && nightly && new Date(sync).getTime() > new Date(nightly).getTime());
+  const errors = [...new Set([dealer.last_refresh_error, dealer.last_sync_error].filter(Boolean))];
+
+  if (!when && errors.length === 0) {
     return <span className="muted">never</span>;
   }
 
-  const when = formatAge(dealer.last_synced_at);
-  if (dealer.last_sync_complete === false) {
-    return (
-      <span title="The catalogue read stopped at the size limit; absence was not treated as sold.">
-        {when}
-        <br />
-        <span className="badge wait">incomplete</span>
-      </span>
-    );
-  }
-
-  return <span title={new Date(dealer.last_synced_at).toLocaleString()}>{when}</span>;
+  return (
+    <span>
+      {when ? (
+        <span title={new Date(when).toLocaleString()}>{formatAge(when)}</span>
+      ) : (
+        <span className="muted">never</span>
+      )}
+      {nightly ? (
+        <>
+          <br />
+          <span className="muted" title={new Date(nightly).toLocaleString()}>
+            {dealer.last_refresh_published ?? 0} published, {dealer.last_refresh_skipped ?? 0} skipped
+          </span>
+        </>
+      ) : null}
+      {sync && (!nightly || syncIsNewer) ? (
+        <>
+          <br />
+          <span className="muted" title={new Date(sync).toLocaleString()}>
+            read {dealer.last_sync_found ?? 0}, {dealer.last_sync_added ?? 0} new
+          </span>
+        </>
+      ) : null}
+      <br />
+      {dealer.photo_count > 0 || dealer.listings_missing_photos > 0 ? (
+        <span className="muted">{dealer.photo_count} photos</span>
+      ) : (
+        <span className="muted">no live listings</span>
+      )}
+      {dealer.listings_missing_photos > 0 ? (
+        <>
+          {' '}
+          <span className="badge wait">{dealer.listings_missing_photos} missing photos</span>
+        </>
+      ) : null}
+      {dealer.last_sync_complete === false ? (
+        <>
+          <br />
+          <span
+            className="badge wait"
+            title="The catalogue read stopped at the size limit; absence was not treated as sold.">
+            incomplete
+          </span>
+        </>
+      ) : null}
+      {errors.length > 0 ? (
+        <>
+          <br />
+          <span className="badge wait" title={errors.join('\n')}>
+            last error
+          </span>
+        </>
+      ) : null}
+    </span>
+  );
 }
 
 function formatAge(iso: string): string {

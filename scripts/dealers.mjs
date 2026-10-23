@@ -7,6 +7,8 @@
  *   npm run dealers -- stats <id|host>    saves and inquiries per watch
  *   npm run dealers -- remove <id|host>   delete them, their listings and photos
  *   npm run dealers -- approve <id|host>  publish their listings
+ *   npm run dealers -- pause   <id|host>  hide a published shop and skip refresh
+ *   npm run dealers -- resume  <id|host>  publish a paused shop again
  *   npm run dealers -- revoke  <id|host>  pull them back
  *
  *   npm run dealers -- applications       shops asking to be listed
@@ -62,12 +64,13 @@ async function list() {
   console.log('');
   for (const dealer of body) {
     const count = dealer.listings?.[0]?.count ?? 0;
-    const mark = dealer.permission === 'approved' ? '●' : '○';
+    const mark =
+      dealer.permission === 'approved' ? '●' : dealer.permission === 'paused' ? '◐' : '○';
     console.log(`  ${mark} ${dealer.permission.padEnd(9)} ${String(count).padStart(3)} listings  ${dealer.name}`);
     console.log(`    ${dealer.website ?? 'no website'}  ${dealer.id}`);
     console.log(`    ${dealer.contact_email ?? '⚠ no contact address — inquiries cannot send'}`);
   }
-  console.log('\n  ● live in the deck   ○ hidden from everyone but the importer\n');
+  console.log('\n  ● live in the deck   ◐ paused   ○ hidden from buyers\n');
 }
 
 const SAMPLE_SIZE = 3;
@@ -392,17 +395,19 @@ async function stats() {
  */
 async function setPermission(permission, explicitTarget) {
   const subject = explicitTarget ?? target;
+  const commandName = { approved: 'approve', revoked: 'revoke', paused: 'pause' }[permission];
   if (!subject) {
-    console.error(`Usage: npm run dealers -- ${permission === 'approved' ? 'approve' : 'revoke'} <id|host>`);
+    console.error(`Usage: npm run dealers -- ${commandName} <id|host>`);
     process.exit(1);
   }
 
   const dealer = await findDealer(subject);
 
-  // Both directions are buyer-visible: approve puts stock in front of real
-  // people, revoke takes a working shop out of the deck. Neither asked before.
+  // All three are buyer-visible. Approve puts stock in front of people.
+  // Pause hides a published shop and skips the nightly refresh until resume.
+  // Revoke pulls the shop back; publishing again is a separate decision.
   if (!config().isLocal) {
-    const verb = permission === 'approved' ? 'Publish' : 'Hide';
+    const verb = { approved: 'Publish', revoked: 'Revoke', paused: 'Pause' }[permission];
     if (!(await confirm(`${verb} ${dealer.name} on PRODUCTION?`))) {
       console.log('Nothing changed.');
       return;
@@ -420,6 +425,21 @@ async function setPermission(permission, explicitTarget) {
     process.exit(1);
   }
   console.log(`${dealer.name} → ${body}`);
+}
+
+async function resume() {
+  if (!target) {
+    console.error('Usage: npm run dealers -- resume <id|host>');
+    process.exit(1);
+  }
+
+  const dealer = await findDealer(target);
+  if (dealer.permission !== 'paused') {
+    console.error(`${dealer.name} is ${dealer.permission}, not paused. Use approve to publish a shop.`);
+    process.exit(1);
+  }
+
+  await setPermission('approved', dealer.id);
 }
 
 /**
@@ -619,6 +639,12 @@ switch (command) {
   case 'approve':
     await setPermission('approved');
     break;
+  case 'pause':
+    await setPermission('paused');
+    break;
+  case 'resume':
+    await resume();
+    break;
   case 'revoke':
     await setPermission('revoked');
     break;
@@ -636,7 +662,7 @@ switch (command) {
     break;
   default:
     console.error(
-      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, revoke, applications, accept, decline, operator.`
+      `Unknown command "${command}". Try: list, add, set, stats, remove, approve, pause, resume, revoke, applications, accept, decline, operator.`
     );
     process.exit(1);
 }

@@ -1,0 +1,55 @@
+name: Deploy edge functions
+
+# Merging function code to main used to leave the hosted function on the
+# previous deploy. import-listings is the one the nightly refresh calls, and
+# a stale copy is what returned HTTP 546 for a whole night. This job ships
+# the functions whose code changed. It does not apply migrations — that
+# writes production schema and is still a deliberate `npm run db:push`
+# after a dump. See docs/OPERATING.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - 'scripts/deploy-functions.mjs'
+      - '.github/workflows/deploy-functions.yml'
+  # A manual run deploys every function. github.event.before is empty, and
+  # the script treats an unknown diff as "ship the lot".
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push waits. Cancelling a deploy halfway leaves production on
+# whichever function had already finished.
+concurrency:
+  group: deploy-edge-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy changed functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Same pin as ci.yml and package.json. A newer CLI can change the
+      # deploy defaults, including JWT verification.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: node scripts/deploy-functions.mjs --plan
+
+      - name: deploy
+        env:
+          BEFORE: ${{ github.event.before }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/deploy-functions.mjs

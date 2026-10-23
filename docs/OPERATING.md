@@ -71,16 +71,42 @@ deploy that has not happened, not a bug to hunt:
 supabase secrets set RESEND_API_KEY=... SCRAPE_PROVIDER=jina JINA_API_KEY=...
 ```
 
-Migrations and functions go up the same way, and they are writes to production —
-run them deliberately, and take a dump first if the data matters:
+Functions go up from GitHub when a change to `supabase/functions/` or
+`supabase/config.toml` is pushed to `main`
+(`.github/workflows/deploy-functions.yml`). That is the deploy that was
+missing when `import-listings` on hosted stayed on an old copy. The workflow
+deploys only the functions whose code changed. Shared code or a config
+change deploys all of them. `import-listings` keeps `verify_jwt = true` in
+`supabase/config.toml`; the workflow refuses to run if that is turned off,
+and it never passes `--no-verify-jwt`.
+
+One new repository secret, and nothing else:
+
+| Secret | What it is |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | A personal access token from [Account → Access Tokens](https://supabase.com/dashboard/account/tokens). The CLI reads it from the environment. The project ref `hbxgxtbtefpyutyqafoi` is in the workflow, not a secret. |
+
+The nightly refresh secrets are unchanged and still required on the repo:
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`GRAHAM_CRON_SECRET`.
+
+Migrations do not ride along. `supabase db push` writes the production
+schema, including every migration hosted has not seen yet, and it needs the
+database password. Apply them on purpose, and take a dump first if the data
+matters:
 
 ```
 npx supabase db dump --linked --data-only -f ~/graham-backups/data-$(date +%F).sql
 npm run db:push:dry
 npm run db:push
-npx supabase functions deploy send-inquiry
-npx supabase functions deploy inquiry-draft
 ```
+
+`refresh_runs`, pause, and the photo counts in the operator console all wait
+on that push. The refresh script keeps working before it: a missing table is
+a note in the job log, not a failed night. Function deploys do not wait on
+the migration. After the token above is set, the next push to `main` that
+touches a function ships it. Re-run the failed Deploy workflow from the
+Actions tab if the token was added after that push.
 
 Run those as separate lines. A `#` comment on the same line as `npm run db:push`
 is not a comment to npm — everything after `--` is forwarded to the Supabase CLI,
@@ -251,6 +277,8 @@ npm run dealers -- set <id|host>         # re-read their name and address from t
 npm run dealers -- stats <id|host>       # saves and inquiries per watch
 npm run dealers -- remove <id|host>      # delete them, their listings and their photos
 npm run dealers -- approve <id|host>     # publish their listings
+npm run dealers -- pause <id|host>       # hide a published shop, skip its refresh
+npm run dealers -- resume <id|host>      # publish a paused shop again
 npm run dealers -- revoke <id|host>      # pull them back
 
 npm run dealers -- applications          # shops asking to be listed
@@ -345,9 +373,26 @@ on the hosted `import-listings` function) plus the ordinary service-role trio.
 GitHub Actions runs the same command nightly at 06:00 UTC
 (`.github/workflows/refresh.yml`); set the four secrets on the repo.
 
-The Dealers table shows **Last sync**. `incomplete` means the catalogue read
-hit the size cap, so absence was not treated as sold. `sync failed` carries the
-error on hover.
+A paused shop is not in that list. Pause is a permission (`paused`), same as
+revoked not being `approved`, so the nightly query never calls the function
+for it. Resume publishes it again. Revoke is the other door: the console
+shows a different word, and only a shop that is published right now can be
+paused.
+
+The job prints a shop health summary after the per-shop lines and writes one
+row per shop to `refresh_runs` when that table exists. A single shop's error,
+an empty catalogue, live watches with no photographs, or seven nights with
+nothing new, changed, or published is a warning on the Actions run. The job
+stays green unless every shop failed or the request itself was rejected.
+Until the migration is on hosted, the summary says the history table is
+missing and still prints today's lines.
+
+The Dealers table shows **Last refresh**: when the nightly job last finished,
+how many listings it published and skipped, the photo count, how many live
+watches have no photograph, and the last error (hover the badge). Before the
+first recorded run, the cell falls back to the catalogue read (how many it
+found, how many were new). `incomplete` means that read hit the size cap, so
+absence was not treated as sold.
 
 ### Which Graham the UI is talking to
 
@@ -514,10 +559,14 @@ seconds. CI runs all of them on every push and pull request:
 
 | Job | Checks |
 | --- | --- |
-| `app` | `npm run typecheck`, then a web bundle |
+| `app` | `npm run typecheck`, a web bundle, and the refresh and deploy planner tests |
 | `operator ui` | `npm run build`, `oxlint --deny-warnings`, and `npm test`, in `operator/` |
 | `edge functions` | `deno check` on all five, then `deno test` over the directory |
 | `database` | every migration from empty, `npm run test:rls`, generated types |
+
+Deploying the functions is a different workflow, `Deploy edge functions`, and
+it runs only on a push to `main` that touches function code or
+`supabase/config.toml`. A pull request does not deploy anything.
 
 The operator job installs from `operator/package-lock.json` and never runs the
 root `npm ci`. Vite and Expo both want to own React and the bundler, so the two

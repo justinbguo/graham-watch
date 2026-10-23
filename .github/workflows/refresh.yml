@@ -32,9 +32,10 @@ jobs:
       # shop read its catalogue. The job goes red when every shop failed,
       # or the request itself was rejected (missing secret, bad key).
       #
-      # Merging this file does not update the hosted function. Deploy
-      # import-listings before the next run, or each shop is still drained
-      # inside the one catalogue call.
+      # One shop's error, an empty catalogue, missing photos, or a week of
+      # nothing new is a warning annotation. It does not fail this job.
+      # Hosted import-listings is updated by .github/workflows/deploy-functions.yml
+      # when that function changes on main.
       - name: refresh
         env:
           GRAHAM_TARGET: hosted

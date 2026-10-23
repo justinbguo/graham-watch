@@ -1995,6 +1995,15 @@ console.log('\noperators');
   const byBuyer = await publish(buyer.token, 'approved');
   check('a buyer cannot publish a shop', byBuyer.status >= 400, `got ${byBuyer.status}`);
 
+  const pauseByBuyer = await publish(buyer.token, 'paused');
+  check('a buyer cannot pause a shop', pauseByBuyer.status >= 400, `got ${pauseByBuyer.status}`);
+
+  const gapsByBuyer = await api('/rest/v1/rpc/catalogue_photo_gaps', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check('a buyer cannot read photo gaps', gapsByBuyer.status >= 400, `got ${gapsByBuyer.status}`);
+
   // The dealer who claimed this shop is the sharpest case: they have every
   // other power over it, and still cannot put their own stock in the deck.
   const byDealer = await publish(dealerUser.token, 'approved');
@@ -2094,6 +2103,85 @@ console.log('\noperators');
     published?.listings_in_deck === sellable.body?.length,
     `${published?.listings_in_deck} in deck vs ${sellable.body?.length} active and unsold`
   );
+
+  const paused = await publish(buyer.token, 'paused');
+  check(
+    'an operator can pause a published shop',
+    paused.body === 'paused',
+    `${paused.status} ${JSON.stringify(paused.body)}`
+  );
+  const whilePaused = await api('/rest/v1/rpc/operator_dealers', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  const pausedRow = whilePaused.body?.find((row) => row.id === dealerId);
+  check(
+    'a paused shop is out of the deck and the console can see photo counts',
+    pausedRow?.permission === 'paused' &&
+      pausedRow?.listings_in_deck === 0 &&
+      typeof pausedRow?.photo_count === 'number' &&
+      typeof pausedRow?.listings_missing_photos === 'number',
+    JSON.stringify(pausedRow)?.slice(0, 400)
+  );
+
+  const pauseAgain = await publish(buyer.token, 'paused');
+  check(
+    'pausing a shop that is not published is refused',
+    pauseAgain.status >= 400,
+    `${pauseAgain.status} ${JSON.stringify(pauseAgain.body)}`
+  );
+
+  const ledgerDenied = await api('/rest/v1/refresh_runs', {
+    token: buyer.token,
+    method: 'POST',
+    body: { dealer_id: dealerId, ok: true, published: 2, skipped_listings: 1 },
+  });
+  check(
+    'an operator cannot write the refresh ledger',
+    ledgerDenied.status >= 400,
+    `got ${ledgerDenied.status}`
+  );
+
+  const recorded = await fetch(`${URL}/rest/v1/refresh_runs`, {
+    method: 'POST',
+    headers: { ...admin, Prefer: 'return=representation' },
+    body: JSON.stringify({
+      dealer_id: dealerId,
+      ok: true,
+      published: 2,
+      skipped_listings: 1,
+      error: 'boom',
+    }),
+  });
+  const recordedBody = await recorded.json();
+  check(
+    'the service role records a refresh run',
+    recorded.ok,
+    `${recorded.status} ${JSON.stringify(recordedBody)?.slice(0, 200)}`
+  );
+
+  const withRun = await api('/rest/v1/rpc/operator_dealers', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  const ran = withRun.body?.find((row) => row.id === dealerId);
+  check(
+    'the console shows that run’s published and skipped counts and its error',
+    ran?.last_refresh_published === 2 &&
+      ran?.last_refresh_skipped === 1 &&
+      ran?.last_refresh_error === 'boom' &&
+      typeof ran?.last_refresh_at === 'string',
+    JSON.stringify(ran)?.slice(0, 400)
+  );
+
+  const hiddenLedger = await api('/rest/v1/refresh_runs?select=id', { token: buyer.token });
+  check(
+    'refresh history is not readable over REST',
+    hiddenLedger.status >= 400,
+    `got ${hiddenLedger.status}`
+  );
+
+  await publish(buyer.token, 'approved');
 
   // ---------------------------------------------------------------------
   // The console's own reads
@@ -2257,6 +2345,8 @@ console.log('\nwhat anon can reach');
   for (const [fn, body] of [
     ['operator_dealers', {}],
     ['set_dealer_permission', { p_dealer_id: dealerId, p_permission: 'approved' }],
+    ['catalogue_photo_gaps', {}],
+    ['listing_photo_counts', {}],
     ['approve_dealer_application', { p_application_id: applicationId }],
     ['decline_dealer_application', { p_application_id: applicationId, p_reason: 'no' }],
     ['is_operator', {}],

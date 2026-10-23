@@ -11,18 +11,27 @@
  * ("CPU Time exceeded") on 23 Oct 2026. Watches still queued when this
  * process stops are in `source_items` and the next run continues them.
  *
- * A revoked shop is not in the list (`permission` is not `approved`).
+ * A revoked shop is not in the list (`permission` is not `approved`). A
+ * paused shop is not either: pause is a permission, not a second flag, so
+ * the same filter skips it.
  *
  * Exits 0 when at least one shop finished its catalogue read. A shop that
  * failed is logged and left for the next night. Exits 1 when the request
  * itself failed (missing secret, rejected cron secret, OpenAI key) or every
- * shop failed.
+ * shop failed. Health warnings — one shop's error, an empty catalogue,
+ * missing photos, a week with nothing new — do not change that exit code.
  */
 
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 
 import { OPERATOR_HOSTED, parseEnvFile } from './_env.mjs';
 import { config, describeTarget, request, serviceKey } from './_supabase.mjs';
+import {
+  healthReport,
+  isSchemaMiss,
+  refreshRunRow,
+  shopFlags,
+} from './refresh-health.mjs';
 import { formatShop, refreshFailureReason, runRefresh } from './refresh-run.mjs';
 
 function cronSecret() {
@@ -153,9 +162,129 @@ console.log(
   `\n${results.length} shop(s): ${published} published, ${retired} retired, ${failed} failed, ${waiting} with watches left for the next run.`
 );
 
+await reportHealth(results);
+
 if (exitCode !== 0) {
   const reason = refreshFailureReason(results);
   console.error(reason);
   annotation('error', 'RefreshFailed', reason);
   process.exit(exitCode);
+}
+
+function stepSummary(markdown) {
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
+}
+
+async function insertRuns(rows) {
+  if (rows.length === 0) return { recorded: true, missing: false, detail: null };
+  const response = await request('/rest/v1/refresh_runs', {
+    token: key,
+    method: 'POST',
+    body: rows,
+    prefer: 'return=minimal',
+  });
+  if (response.ok) return { recorded: true, missing: false, detail: null };
+  const detail = response.body?.message ?? response.body?.error ?? JSON.stringify(response.body);
+  return {
+    recorded: false,
+    missing: isSchemaMiss(response.body, response.status),
+    detail,
+  };
+}
+
+async function fetchRuns(dealerIds) {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = [];
+  const page = 1000;
+  const filter = `dealer_id=in.(${dealerIds.join(',')})`;
+  for (let offset = 0; ; offset += page) {
+    const response = await request(
+      `/rest/v1/refresh_runs?select=dealer_id,finished_at,ok,skipped,added,changed,published,error&${filter}&finished_at=gte.${encodeURIComponent(since)}&order=finished_at.desc&limit=${page}&offset=${offset}`,
+      { token: key }
+    );
+    if (!response.ok) return { ok: false, missing: isSchemaMiss(response.body, response.status), rows, detail: response.body?.message };
+    const batch = Array.isArray(response.body) ? response.body : [];
+    rows.push(...batch);
+    if (batch.length < page) return { ok: true, missing: false, rows, detail: null };
+  }
+}
+
+function runsByDealer(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    const list = map.get(row.dealer_id) ?? [];
+    list.push(row);
+    map.set(row.dealer_id, list);
+  }
+  return map;
+}
+
+async function fetchPhotoGaps() {
+  const response = await request('/rest/v1/rpc/catalogue_photo_gaps', {
+    token: key,
+    method: 'POST',
+    body: {},
+  });
+  if (!response.ok) {
+    return {
+      ok: false,
+      missing: isSchemaMiss(response.body, response.status),
+      rows: [],
+      detail: response.body?.message ?? response.body?.error ?? null,
+    };
+  }
+  return {
+    ok: true,
+    missing: false,
+    rows: Array.isArray(response.body) ? response.body : [],
+    detail: null,
+  };
+}
+
+async function reportHealth(results) {
+  const notes = [];
+  const rows = results.map(refreshRunRow);
+  const saved = await insertRuns(rows);
+  let history = new Map();
+
+  if (!saved.recorded && saved.missing) {
+    notes.push(
+      'Refresh history is not on this database yet. Apply the new migrations with npm run db:push (after a dump) so the next nights can see a quiet streak. Today’s lines above are still the run.'
+    );
+  } else if (!saved.recorded) {
+    notes.push(`Could not record refresh history (${saved.detail}).`);
+    annotation('warning', 'RefreshHistory', saved.detail ?? 'Could not record refresh history.');
+  } else if (results.length > 0) {
+    const loaded = await fetchRuns(results.map((shop) => shop.dealerId));
+    if (loaded.ok) history = runsByDealer(loaded.rows);
+    else {
+      notes.push(`Could not read refresh history (${loaded.detail ?? 'request failed'}).`);
+      annotation('warning', 'RefreshHistory', loaded.detail ?? 'Could not read refresh history.');
+    }
+  }
+
+  const photos = new Map();
+  const gaps = await fetchPhotoGaps();
+  if (gaps.ok) {
+    for (const row of gaps.rows) photos.set(row.dealer_id, row);
+  } else if (gaps.missing) {
+    notes.push('Photo gap check is not on this database yet. It arrives with the same migration.');
+  } else {
+    notes.push(`Could not read photo gaps (${gaps.detail ?? 'request failed'}).`);
+    annotation('warning', 'PhotoGaps', gaps.detail ?? 'Could not read photo gaps.');
+  }
+
+  const entries = results.map((shop) => {
+    const recorded = saved.recorded ? (history.get(shop.dealerId) ?? []) : [refreshRunRow(shop)];
+    return {
+      label: shop.website ?? shop.dealerId,
+      flags: shopFlags(shop, recorded, gaps.ok ? (photos.get(shop.dealerId) ?? null) : null),
+    };
+  });
+
+  const report = healthReport(entries, notes);
+  console.log(`\n${report.text}`);
+  stepSummary(`### Shop health\n\n\`\`\`\n${report.text}\n\`\`\`\n`);
+  for (const warning of report.warnings) annotation('warning', warning.title, warning.message);
 }
