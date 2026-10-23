@@ -1277,6 +1277,74 @@ export type Database = {
         }
         Relationships: []
       }
+      refresh_runs: {
+        Row: {
+          added: number
+          changed: number
+          complete: boolean | null
+          dealer_id: string
+          error: string | null
+          fatal: boolean
+          finished_at: string
+          found: number
+          http_status: number | null
+          id: string
+          ok: boolean
+          pending: number
+          published: number
+          relisted: number
+          retired: number
+          skipped: boolean
+          skipped_listings: number
+        }
+        Insert: {
+          added?: number
+          changed?: number
+          complete?: boolean | null
+          dealer_id: string
+          error?: string | null
+          fatal?: boolean
+          finished_at?: string
+          found?: number
+          http_status?: number | null
+          id?: string
+          ok: boolean
+          pending?: number
+          published?: number
+          relisted?: number
+          retired?: number
+          skipped?: boolean
+          skipped_listings?: number
+        }
+        Update: {
+          added?: number
+          changed?: number
+          complete?: boolean | null
+          dealer_id?: string
+          error?: string | null
+          fatal?: boolean
+          finished_at?: string
+          found?: number
+          http_status?: number | null
+          id?: string
+          ok?: boolean
+          pending?: number
+          published?: number
+          relisted?: number
+          retired?: number
+          skipped?: boolean
+          skipped_listings?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refresh_runs_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       source_items: {
         Row: {
           applied_hash: string | null
@@ -1492,6 +1560,17 @@ export type Database = {
       can_verify_application: {
         Args: { p_application_id: string; p_email: string }
         Returns: boolean
+      }
+      catalogue_photo_gaps: {
+        Args: never
+        Returns: {
+          dealer_id: string
+          missing_photos: number
+          name: string
+          photo_count: number
+          published_listings: number
+          website: string
+        }[]
       }
       claim_code_digest: {
         Args: { p_code: string; p_salt: string }
@@ -1822,6 +1901,15 @@ export type Database = {
           value: string
         }[]
       }
+      listing_photo_counts: {
+        Args: never
+        Returns: {
+          dealer_id: string
+          missing_photos: number
+          photo_count: number
+          published_listings: number
+        }[]
+      }
       lookup_claimable_dealer: {
         Args: { p_website: string }
         Returns: {
@@ -1877,6 +1965,10 @@ export type Database = {
           contact_email: string
           created_at: string
           id: string
+          last_refresh_at: string
+          last_refresh_error: string
+          last_refresh_published: number
+          last_refresh_skipped: number
           last_sync_added: number
           last_sync_changed: number
           last_sync_complete: boolean
@@ -1887,8 +1979,10 @@ export type Database = {
           last_synced_at: string
           listings_held: number
           listings_in_deck: number
+          listings_missing_photos: number
           name: string
           permission: Database["public"]["Enums"]["dealer_permission"]
+          photo_count: number
           website: string
         }[]
       }
@@ -2197,7 +2291,7 @@ export type Database = {
         | "declined"
         | "cancelled"
         | "expired"
-      dealer_permission: "pending" | "approved" | "revoked"
+      dealer_permission: "pending" | "approved" | "paused" | "revoked"
       dial_color:
         | "black"
         | "white"
@@ -2429,7 +2523,7 @@ export const Constants = {
         "cancelled",
         "expired",
       ],
-      dealer_permission: ["pending", "approved", "revoked"],
+      dealer_permission: ["pending", "approved", "paused", "revoked"],
       dial_color: [
         "black",
         "white",

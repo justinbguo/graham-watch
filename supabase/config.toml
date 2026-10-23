@@ -454,6 +454,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# The nightly job sends the service-role JWT plus the cron secret. Verification
+# stays on so the anon key alone cannot reach the importer. The deploy
+# workflow reads this and refuses to ship the function if it is false. It
+# does not pass --no-verify-jwt. A change to this file deploys every function.
+[functions.import-listings]
+verify_jwt = true
+
 [analytics]
 # Vector bind-mounts the host container socket, which Colima's VM cannot pass
 # through. This only disables the Logs tab in Studio.

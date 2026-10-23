@@ -100,6 +100,9 @@ are still only on your laptop. Go back to step 3, then push again.
 ## 5. Read the checks, then merge
 
 CI runs four jobs: `app`, `operator ui`, `edge functions`, and `database`.
+A fifth workflow, `Deploy edge functions`, runs only after a push to `main`
+that changes a function or `supabase/config.toml`. It does not run on a pull
+request, and it does not apply migrations.
 Vercel builds a preview of the web app. Open the preview and click the thing
 you changed.
 

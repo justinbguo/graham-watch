@@ -49,7 +49,7 @@ export function formatShop(shop) {
     label,
     `  read ${shop.found}, ${shop.changed} changed, ${shop.added} new, ${shop.retired} retired, ${shop.relisted} relisted, ${shop.published} published${
       shop.complete ? '' : ', incomplete read'
-    }`,
+    }${Number(shop.listingsSkipped) > 0 ? `, ${shop.listingsSkipped} skipped` : ''}`,
   ];
   if (shop.publishError) lines.push(`  publish stopped: ${shop.publishError}`);
   if (shop.pending > 0) {
@@ -82,6 +82,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
       retired: 0,
       relisted: 0,
       published: 0,
+      listingsSkipped: 0,
       pending: 0,
       complete: false,
       publishError: null,
@@ -104,6 +105,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
       retired: 0,
       relisted: 0,
       published: 0,
+      listingsSkipped: 0,
       pending: 0,
       complete: true,
       publishError: null,
@@ -127,6 +129,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
       retired: 0,
       relisted: 0,
       published: 0,
+      listingsSkipped: 0,
       pending: 0,
       complete: false,
       publishError: null,
@@ -148,6 +151,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
     retired: Number(row.retired ?? 0),
     relisted: Number(row.relisted ?? 0),
     published: Number(row.published ?? 0),
+    listingsSkipped: Number(row.skipped ?? 0),
     pending: Number(row.pending ?? 0),
     complete: row.complete !== false,
     publishError: null,
@@ -172,6 +176,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
     }
 
     shop.published += Number(step.published ?? 0);
+    shop.listingsSkipped += Number(step.skipped ?? 0);
     const next = Number(step.pending ?? 0);
     const processed = Number(step.processed ?? 0);
     shop.pending = next;

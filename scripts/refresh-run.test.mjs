@@ -182,6 +182,20 @@ test('a publish slice that moves nothing is not retried in a loop', async () => 
   assert.match(formatShop(shop).at(-1), /6 still waiting/);
 });
 
+test('catalogue skips and publish skips add up on the shop', async () => {
+  const shop = await refreshDealer(OLD, async (body) => {
+    if (body.phase === 'sync') return syncResponse({ found: 8, pending: 2, skipped: 3 });
+    return {
+      ok: true,
+      status: 200,
+      body: { bounded: true, results: [{ ok: true, published: 1, skipped: 1, processed: 2, pending: 0 }] },
+    };
+  });
+  assert.equal(shop.listingsSkipped, 4);
+  assert.equal(shop.published, 1);
+  assert.match(formatShop(shop)[1], /1 published, 4 skipped/);
+});
+
 test('the per-night cap leaves the rest of the queue for the next run', async () => {
   let publishes = 0;
   const shop = await refreshDealer(
