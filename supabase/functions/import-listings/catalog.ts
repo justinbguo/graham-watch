@@ -169,39 +169,49 @@ export async function syncCatalog(
   // PostgREST needs every row in a bulk upsert to carry the same keys.
   const preTyped = extracted.size > 0;
 
-  const rows = await Promise.all(
-    items.map(async (item) => {
-      const textHash = await textFingerprint(item);
+  // Built and written a chunk at a time. `raw` is the shop's full prose, so
+  // a second array of every watch would sit next to `items` until the request
+  // ended. The isolate has 256MB, and the catalogue read shares it with
+  // nothing else only because publish is a later request.
+  let added = 0;
+  let changed = 0;
+  for (let start = 0; start < items.length; start += UPSERT_CHUNK) {
+    const rows = await Promise.all(
+      items.slice(start, start + UPSERT_CHUNK).map(async (item) => {
+        const textHash = await textFingerprint(item);
 
-      return {
-        dealer_id: dealerId,
-        provider,
-        external_id: item.externalId,
-        source_url: item.sourceUrl,
-        raw: item,
-        text_hash: textHash,
-        content_hash: await contentFingerprint(item),
-        available: item.available,
-        last_seen_at: readAt,
-        error: null,
-        // publish, applied_hash, photos_hash, listing_id and first_seen_at are
-        // omitted on purpose: PostgREST only overwrites the keys it is sent, so
-        // leaving them out is what preserves a dealer's choices across a
-        // refresh. Sending `extracted: null` here would throw away every
-        // extraction we have paid for.
-        ...(preTyped
-          ? { extracted: extracted.get(item.externalId) ?? null, extracted_hash: textHash }
-          : {}),
-      };
-    })
-  );
+        return {
+          dealer_id: dealerId,
+          provider,
+          external_id: item.externalId,
+          source_url: item.sourceUrl,
+          raw: item,
+          text_hash: textHash,
+          content_hash: await contentFingerprint(item),
+          available: item.available,
+          last_seen_at: readAt,
+          error: null,
+          // publish, applied_hash, photos_hash, listing_id and first_seen_at are
+          // omitted on purpose: PostgREST only overwrites the keys it is sent, so
+          // leaving them out is what preserves a dealer's choices across a
+          // refresh. Sending `extracted: null` here would throw away every
+          // extraction we have paid for.
+          ...(preTyped
+            ? { extracted: extracted.get(item.externalId) ?? null, extracted_hash: textHash }
+            : {}),
+        };
+      })
+    );
 
-  // Chunked because `raw` carries the shop's full prose for every watch, and a
-  // 500-watch catalogue in one body is megabytes.
-  for (let start = 0; start < rows.length; start += UPSERT_CHUNK) {
+    for (const row of rows) {
+      const previous = known.get(row.external_id);
+      if (previous === undefined) added += 1;
+      else if (previous !== row.content_hash) changed += 1;
+    }
+
     const { error } = await supabase
       .from('source_items')
-      .upsert(rows.slice(start, start + UPSERT_CHUNK), { onConflict: 'dealer_id,external_id' });
+      .upsert(rows, { onConflict: 'dealer_id,external_id' });
     if (error) throw new Error(error.message);
   }
 
@@ -228,17 +238,9 @@ export async function syncCatalog(
   const retired = Number(counts.retired ?? 0);
   const relisted = Number(counts.relisted ?? 0);
 
-  let added = 0;
-  let changed = 0;
-  for (const row of rows) {
-    const previous = known.get(row.external_id);
-    if (previous === undefined) added += 1;
-    else if (previous !== row.content_hash) changed += 1;
-  }
-
   return {
     provider,
-    found: rows.length,
+    found: items.length,
     added,
     changed,
     adopted: (adopted.data as number) ?? 0,

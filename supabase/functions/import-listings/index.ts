@@ -6,7 +6,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 import { MAX_CATALOG_ITEMS, adapterItems, readCatalog, syncCatalog } from './catalog.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
-import { DEFAULT_BATCH, MAX_BATCH, publishBatch } from './publish.ts';
+import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
 import type { SkippedItem, SourceItem } from './source.ts';
 
@@ -404,24 +404,30 @@ async function autoQueuePublish(supabase: SupabaseClient, dealerId: string) {
   if (error) throw new Error(error.message);
 }
 
-async function drainPublish(supabase: SupabaseClient, dealerId: string) {
-  const totals = { processed: 0, published: 0, skipped: 0, failed: 0, pending: 0 };
-  for (let pass = 0; pass < 200; pass += 1) {
-    const batch = await publishBatch(supabase, admin(), dealerId, DEFAULT_BATCH);
-    totals.processed += batch.processed;
-    totals.published += batch.published;
-    totals.skipped += batch.skipped;
-    totals.failed += batch.failed;
-    totals.pending = batch.pending;
-    if (batch.pending === 0 || batch.processed === 0) break;
-  }
-  return totals;
+type ApprovedShop = { id: string; name: string; website: string };
+
+function approvedShops(supabase: SupabaseClient) {
+  return supabase
+    .from('dealers')
+    .select('id, name, website')
+    .eq('permission', 'approved')
+    .not('website', 'is', null)
+    .order('name');
 }
 
 /**
- * Nightly freshness. Auth is a shared secret, not a user session, because an
- * operator identity cannot write a claimed shop's catalogue and the service
- * role is what the RPCs already treat as the scheduler.
+ * Nightly freshness for exactly one shop.
+ *
+ * Auth is a shared secret, not a user session, because an operator identity
+ * cannot write a claimed shop's catalogue and the service role is what the
+ * RPCs already treat as the scheduler.
+ *
+ * One request does one thing. An isolate has two seconds of CPU and 256MB;
+ * refreshing every shop inside one of them is what returned HTTP 546
+ * ("CPU Time exceeded") before a single shop had been printed. `phase` is
+ * `sync` (read the catalogue) or `publish` (two watches). The script calls
+ * publish again while `pending` is non-zero. `bounded` is how it tells this
+ * function from an older deploy that drained the whole queue itself.
  */
 async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
   const secret = Deno.env.get('GRAHAM_CRON_SECRET');
@@ -434,58 +440,100 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
   if (offered !== secret) return bad('Not authorized.', 401);
 
   const supabase = admin();
-  const onlyId = typeof body.dealerId === 'string' ? body.dealerId : null;
+  const dealerId = typeof body.dealerId === 'string' ? body.dealerId : '';
 
-  let query = supabase
-    .from('dealers')
-    .select('id, name, website')
-    .eq('permission', 'approved')
-    .not('website', 'is', null)
-    .order('name');
-  if (onlyId) query = query.eq('id', onlyId);
-
-  const { data: shops, error } = await query;
-  if (error) return bad(error.message, 502);
-  if (!shops?.length) return Response.json({ shops: 0, results: [] });
-
-  const results: Array<Record<string, unknown>> = [];
-
-  for (const shop of shops) {
-    const website = shop.website as string;
-    try {
-      const sync = await syncCatalog(supabase, shop.id, website, MAX_CATALOG_ITEMS);
-      await recordSync(supabase, shop.id, sync);
-      await autoQueuePublish(supabase, shop.id);
-      const published = await drainPublish(supabase, shop.id);
-      results.push({
-        dealerId: shop.id,
-        name: shop.name,
-        website,
-        ok: true,
-        ...sync,
-        ...published,
-      });
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'Refresh failed.';
-      console.error(`${website}: ${message}`);
-      await recordSyncFailure(supabase, shop.id, message);
-      results.push({ dealerId: shop.id, name: shop.name, website, ok: false, error: message });
-
-      // A missing or rejected key fails every remaining shop the same way.
-      // Stopping here is what turns the nightly job red; a single shop's
-      // scrape or rate-limit failure stays in `results` and the loop goes on.
-      if (caught instanceof ExtractorUnavailable && caught.config) {
-        const failed = results.filter((row) => row.ok === false).length;
-        return Response.json(
-          { error: message, shops: results.length, failed, results },
-          { status: 503 }
-        );
-      }
-    }
+  // No id used to mean every approved shop, in this same request. That is the
+  // call that died with HTTP 546. The script looks the shops up itself and
+  // passes one id. Refusing here is also what stops an older script — which
+  // would treat a list and an empty `results` as a finished night — from
+  // reporting success after writing nothing.
+  if (!dealerId) {
+    return bad(
+      'scheduled-refresh needs one dealerId. One request cannot refresh every shop.',
+      400
+    );
   }
 
-  const failed = results.filter((row) => row.ok === false).length;
-  return Response.json({ shops: results.length, failed, results });
+  const { data: shop, error } = await approvedShops(supabase).eq('id', dealerId).maybeSingle();
+  if (error) return bad(error.message, 502);
+  if (!shop?.website) return Response.json({ bounded: true, shops: 0, results: [] });
+
+  const approved = shop as ApprovedShop;
+  const phase = body.phase === 'publish' ? 'publish' : 'sync';
+
+  try {
+    if (phase === 'publish') {
+      const published = await publishBatch(
+        supabase,
+        admin(),
+        approved.id,
+        SCHEDULED_PUBLISH_BATCH
+      );
+      return Response.json({
+        bounded: true,
+        phase,
+        shops: 1,
+        failed: 0,
+        results: [
+          {
+            dealerId: approved.id,
+            name: approved.name,
+            website: approved.website,
+            ok: true,
+            ...published,
+          },
+        ],
+      });
+    }
+
+    const sync = await syncCatalog(supabase, approved.id, approved.website, MAX_CATALOG_ITEMS);
+    await recordSync(supabase, approved.id, sync);
+    await autoQueuePublish(supabase, approved.id);
+    const counts = await supabase.rpc('pending_source_item_count', {
+      p_dealer_id: approved.id,
+    });
+    if (counts.error) throw new Error(counts.error.message);
+    const pending = counts.data?.[0]?.pending ?? 0;
+
+    return Response.json({
+      bounded: true,
+      phase,
+      shops: 1,
+      failed: 0,
+      results: [
+        {
+          dealerId: approved.id,
+          name: approved.name,
+          website: approved.website,
+          ok: true,
+          ...sync,
+          pending,
+          published: 0,
+        },
+      ],
+    });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : 'Refresh failed.';
+    console.error(`${approved.website}: ${message}`);
+    if (phase === 'sync') await recordSyncFailure(supabase, approved.id, message);
+    const result = {
+      dealerId: approved.id,
+      name: approved.name,
+      website: approved.website,
+      ok: false,
+      error: message,
+    };
+
+    // A missing or rejected key fails every remaining shop the same way.
+    if (caught instanceof ExtractorUnavailable && caught.config) {
+      return Response.json(
+        { error: message, bounded: true, shops: 1, failed: 1, results: [result] },
+        { status: 503 }
+      );
+    }
+
+    return Response.json({ bounded: true, phase, shops: 1, failed: 1, results: [result] });
+  }
 }
 
 const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) => {
@@ -727,8 +775,11 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
 /**
  * Six actions, one function.
  *
- * `scheduled-refresh` is the nightly job: cron secret, service role, sync then
- * auto-publish every approved shop. Everything else needs a signed-in user.
+ * `scheduled-refresh` is the nightly job: cron secret, service role, and one
+ * dealer id. `phase` `sync` reads that shop's catalogue and `phase` `publish`
+ * publishes two watches. The script loops. A call with no id is refused,
+ * because that used to refresh every shop in the one request. Everything
+ * else needs a signed-in user.
  *
  * `discover` turns a domain into the URL its watches live at, writing nothing.
  * `delete-listing` removes one imported watch and its photographs.

@@ -17,6 +17,17 @@ import { canonicalBrand } from './taxonomy.ts';
 export const DEFAULT_BATCH = 8;
 export const MAX_BATCH = 25;
 
+/**
+ * Watches in one nightly publish request.
+ *
+ * The operator's publish button can take eight: a person is waiting and can
+ * call again. The nightly job is unattended, and the isolate only gets two
+ * seconds of CPU and 256MB. Two watches — one model call each, a handful of
+ * photographs — stays inside that. The script calls again while the queue
+ * in `source_items` is non-empty.
+ */
+export const SCHEDULED_PUBLISH_BATCH = 2;
+
 // How many watches hydrate and copy photographs at once. OpenAI is gated
 // separately, one call at a time (extract.ts): raising this does not raise
 // how many chat completions are in flight, which is what a low RPM key rejects.
