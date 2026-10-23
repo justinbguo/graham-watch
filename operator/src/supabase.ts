@@ -68,3 +68,16 @@ export function confirmWrite(question: string): boolean {
   if (target.isLocal) return true;
   return window.confirm(`${question}\n\nThis is production: ${target.host}`);
 }
+
+/**
+ * Delete is the one write that asks even on the local stack. Hide is the
+ * reversible choice; this prompt says so, and the operator has to type the
+ * word before the row is gone.
+ */
+export function confirmDelete(question: string): boolean {
+  const where = target.isLocal ? '' : `\n\nThis is production: ${target.host}`;
+  const typed = window.prompt(
+    `${question}\n\nHiding keeps the watch and is the reversible choice. Deleting removes it, its photographs, the wishlists that saved it, and its inquiries.${where}\n\nType DELETE to confirm.`,
+  );
+  return typed === 'DELETE';
+}

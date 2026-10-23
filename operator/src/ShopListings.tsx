@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { deleteListing, formatPrice, photoUrl } from './importer';
-import { confirmWrite, supabase, type Database } from './supabase';
+import { ListingEditor } from './ListingEditor';
+import { confirmDelete, confirmWrite, supabase, type Database } from './supabase';
 
 type Listing = Database['public']['Functions']['operator_listings']['Returns'][number];
 type Problem = Database['public']['Functions']['operator_catalog_problems']['Returns'][number];
@@ -33,7 +34,8 @@ export function ShopListings({
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Listing | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -53,12 +55,59 @@ export function ShopListings({
     };
   }, [dealerId, reload]);
 
+  const nameOf = (listing: Listing) =>
+    [listing.brand, listing.model].filter(Boolean).join(' ') || 'this watch';
+
+  async function run(listing: Listing, work: () => Promise<void>) {
+    setBusyId(listing.id);
+    setError(null);
+    try {
+      await work();
+      onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'That did not work.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function setStatus(listing: Listing, hidden: boolean) {
+    const name = nameOf(listing);
+    const asked = hidden
+      ? `Hide ${name}? Buyers stop seeing it. A refresh will not show it again. You can show it later.`
+      : `Show ${name} again?`;
+    if (!confirmWrite(asked)) return;
+    void run(listing, async () => {
+      const { error: failed } = await supabase.rpc('operator_set_listing_status', {
+        p_listing_id: listing.id,
+        p_status: hidden ? 'hidden' : 'active',
+      });
+      if (failed) throw failed;
+    });
+  }
+
+  function setSold(listing: Listing, sold: boolean) {
+    const name = nameOf(listing);
+    const asked = sold
+      ? `Mark ${name} sold? The nightly refresh will not put it back on sale.`
+      : `Mark ${name} available again? The next refresh can mark it sold if the shop's site says so.`;
+    if (!confirmWrite(asked)) return;
+    void run(listing, async () => {
+      const { error: failed } = await supabase.rpc('operator_set_listing_sold', {
+        p_listing_id: listing.id,
+        p_sold: sold,
+      });
+      if (failed) throw failed;
+    });
+  }
+
   /**
-   * Deleting is permanent and takes a buyer's saved watch with it, so the
-   * question names what goes rather than asking "are you sure".
+   * Deleting is permanent and takes a buyer's saved watch with it. Hide is
+   * the button next to this one. The prompt makes the operator type DELETE,
+   * including on the local stack, where other writes do not ask.
    */
-  async function remove(listing: Listing) {
-    const name = [listing.brand, listing.model].filter(Boolean).join(' ') || 'this watch';
+  function remove(listing: Listing) {
+    const name = nameOf(listing);
     const losses = [
       listing.saved_count > 0 ? `${listing.saved_count} on wishlists` : '',
       listing.inquiry_count > 0 ? `${listing.inquiry_count} inquiry(s)` : '',
@@ -72,18 +121,11 @@ export function ShopListings({
       .filter(Boolean)
       .join('\n\n');
 
-    if (!confirmWrite(asked)) return;
+    if (!confirmDelete(asked)) return;
 
-    setRemoving(listing.id);
-    setError(null);
-    try {
+    void run(listing, async () => {
       await deleteListing(listing.id);
-      onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not delete that watch.');
-    } finally {
-      setRemoving(null);
-    }
+    });
   }
 
   if (error) return <p className="error">{error}</p>;
@@ -135,6 +177,12 @@ export function ShopListings({
                       {listing.reference ? `ref. ${listing.reference}` : 'no reference'}
                       {listing.photo_count > 1 ? ` · ${listing.photo_count} photos` : ''}
                     </span>
+                    {listing.edited_fields.length > 0 ? (
+                      <>
+                        <br />
+                        <span className="muted small">hand-edited: {listing.edited_fields.join(', ')}</span>
+                      </>
+                    ) : null}
                   </td>
                   <td className="num">{listing.year ?? <span className="muted">—</span>}</td>
                   <td className="num">
@@ -170,10 +218,25 @@ export function ShopListings({
                   <td className="actions">
                     <button
                       className="ghost"
-                      disabled={removing !== null}
-                      title="Delete this watch and its photographs for good"
-                      onClick={() => void remove(listing)}>
-                      {removing === listing.id ? 'Deleting…' : 'Delete'}
+                      disabled={busyId !== null}
+                      onClick={() => setStatus(listing, listing.status !== 'hidden')}>
+                      {listing.status === 'hidden' ? 'Show' : 'Hide'}
+                    </button>
+                    <button className="ghost" disabled={busyId !== null} onClick={() => setEditing(listing)}>
+                      Edit
+                    </button>
+                    <button
+                      className="ghost"
+                      disabled={busyId !== null}
+                      onClick={() => setSold(listing, !listing.sold_at)}>
+                      {listing.sold_at ? 'Available' : 'Sold'}
+                    </button>
+                    <button
+                      className="ghost"
+                      disabled={busyId !== null}
+                      title="Prefer Hide. Delete removes the watch, its photographs, wishlists, and inquiries."
+                      onClick={() => remove(listing)}>
+                      {busyId === listing.id ? 'Working…' : 'Delete'}
                     </button>
                   </td>
                 </tr>
@@ -182,6 +245,17 @@ export function ShopListings({
           </tbody>
         </table>
       )}
+
+      {editing ? (
+        <ListingEditor
+          listing={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            onChanged();
+          }}
+        />
+      ) : null}
 
       {problems.length > 0 ? (
         <details className="problems">

@@ -339,7 +339,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   font-family: var(--face-text);
   font-size: 16px;
   line-height: 24px;
@@ -912,4 +913,131 @@ button.sort:hover {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* ------------------------------------------------------- users and handoff */
+
+.errtext {
+  color: var(--danger);
+  display: block;
+  max-width: 18rem;
+  white-space: pre-wrap;
+}
+
+.claim {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--xs);
+  margin-top: var(--xs);
+}
+
+.claim .code {
+  display: flex;
+  gap: var(--sm);
+  align-items: center;
+}
+
+.claim .code input {
+  width: 7.5rem;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--md);
+}
+
+.fields .span {
+  grid-column: 1 / -1;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sm);
+}
+
+.stat {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+}
+
+.stat strong {
+  font-family: var(--face-display);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.block {
+  margin-top: var(--xl);
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--lg);
+  margin-top: var(--md);
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 88px;
+}
+
+.bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.bar-fill {
+  width: 100%;
+  background: var(--brass);
+  border-radius: 2px 2px 0 0;
+}
+
+.roll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+}
+
+.roll-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 2rem;
+  gap: var(--sm);
+  align-items: center;
+}
+
+.roll-track {
+  display: block;
+  height: 8px;
+  background: var(--fill);
+  border-radius: var(--radius-sm);
+}
+
+.roll-fill {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+  border-radius: var(--radius-sm);
+}
+
+h3.small {
+  margin: 0 0 var(--xs);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
 }

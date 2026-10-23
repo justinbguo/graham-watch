@@ -465,6 +465,7 @@ export type Database = {
           dealer_id: string | null
           email: string
           expires_at: string
+          handoff: boolean
           id: string
           requested_by: string
           salt: string
@@ -478,6 +479,7 @@ export type Database = {
           dealer_id?: string | null
           email: string
           expires_at: string
+          handoff?: boolean
           id?: string
           requested_by: string
           salt?: string
@@ -491,6 +493,7 @@ export type Database = {
           dealer_id?: string | null
           email?: string
           expires_at?: string
+          handoff?: boolean
           id?: string
           requested_by?: string
           salt?: string
@@ -1169,6 +1172,47 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operator_actions: {
+        Row: {
+          action: string
+          after: Json | null
+          before: Json | null
+          created_at: string
+          id: string
+          operator_id: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          operator_id?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          operator_id?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_actions_operator_id_fkey"
+            columns: ["operator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1943,6 +1987,20 @@ export type Database = {
           website: string
         }[]
       }
+      operator_activity: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          after: Json
+          before: Json
+          created_at: string
+          id: string
+          operator_id: string
+          operator_label: string
+          target_id: string
+          target_type: string
+        }[]
+      }
       operator_catalog_problems: {
         Args: { p_dealer_id: string }
         Returns: {
@@ -1954,6 +2012,7 @@ export type Database = {
           title: string
         }[]
       }
+      operator_dashboard: { Args: never; Returns: Json }
       operator_dealers: {
         Args: never
         Returns: {
@@ -1961,7 +2020,11 @@ export type Database = {
           catalog_failed: number
           catalog_queued: number
           catalog_total: number
+          claim_code_expires_at: string
           claimed_by: string
+          claimer_handle: string
+          claimer_last_sign_in_at: string
+          claimer_name: string
           contact_email: string
           created_at: string
           id: string
@@ -1981,14 +2044,37 @@ export type Database = {
           listings_in_deck: number
           listings_missing_photos: number
           name: string
+          neglect_flags: string[]
           permission: Database["public"]["Enums"]["dealer_permission"]
           photo_count: number
+          unanswered_count: number
           website: string
         }[]
       }
       operator_delete_listing: {
         Args: { p_listing_id: string }
         Returns: string[]
+      }
+      operator_edit_listing: {
+        Args: {
+          p_brand: string
+          p_case_size_mm?: number
+          p_condition?: string
+          p_description?: string
+          p_listing_id: string
+          p_model?: string
+          p_price_cents?: number
+          p_reference?: string
+          p_year?: number
+        }
+        Returns: undefined
+      }
+      operator_issue_claim_code: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          code: string
+          expires_at: string
+        }[]
       }
       operator_listings: {
         Args: { p_dealer_id: string }
@@ -1999,6 +2085,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string
+          edited_fields: string[]
           id: string
           inquiry_count: number
           model: string
@@ -2013,6 +2100,39 @@ export type Database = {
           year: number
         }[]
       }
+      operator_recent_users: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at: string
+          first_name: string
+          handle: string
+          id: string
+          last_active: string
+          onboarded: boolean
+          swipe_count: number
+        }[]
+      }
+      operator_revoke_claim_code: {
+        Args: { p_dealer_id: string }
+        Returns: number
+      }
+      operator_set_listing_sold: {
+        Args: { p_listing_id: string; p_sold: boolean }
+        Returns: string
+      }
+      operator_set_listing_status: {
+        Args: {
+          p_listing_id: string
+          p_status: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: Database["public"]["Enums"]["listing_status"]
+      }
+      operator_unclaim_shop: {
+        Args: { p_dealer_id: string }
+        Returns: undefined
+      }
+      operator_user_detail: { Args: { p_user_id: string }; Returns: Json }
       pending_source_item_count: {
         Args: { p_dealer_id: string }
         Returns: {
@@ -2059,6 +2179,16 @@ export type Database = {
           p_found?: number
           p_relisted?: number
           p_retired?: number
+        }
+        Returns: undefined
+      }
+      record_operator_action: {
+        Args: {
+          p_action: string
+          p_after: Json
+          p_before: Json
+          p_target_id: string
+          p_target_type: string
         }
         Returns: undefined
       }
