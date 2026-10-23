@@ -621,6 +621,49 @@ let syncedListingId;
   );
   check('a published listing starts with no hand edits', published.body?.[0]?.edited_fields.length === 0);
 
+  // Hashes agree and nothing has been copied yet. The queue still has to
+  // offer the watch, or a gallery that failed to record stays blank forever.
+  const bareQueue = await fetch(`${URL}/rest/v1/rpc/pending_source_items`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_dealer_id: dealerId, p_limit: 25 }),
+  });
+  const bareRows = await bareQueue.json();
+  check(
+    'a published watch with no photographs stays queued',
+    bareQueue.status < 300 && Array.isArray(bareRows) && bareRows.some((row) => row.id === itemId),
+    `got ${bareQueue.status} ${JSON.stringify(bareRows)?.slice(0, 180)}`
+  );
+
+  const scheduledWrite = await fetch(`${URL}/rest/v1/rpc/replace_listing_photos`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_listing_id: syncedListingId,
+      p_photos: [
+        { source_url: 'https://shop.test/a.jpg', storage_path: `${syncedListingId}/0.jpg`, position: 0 },
+      ],
+    }),
+  });
+  const scheduledWritten = await scheduledWrite.json();
+  check(
+    'the nightly refresh, which has no signed-in user, writes the gallery',
+    scheduledWrite.status < 300 && scheduledWritten === 1,
+    `got ${scheduledWrite.status} ${JSON.stringify(scheduledWritten)}`
+  );
+
+  const filledQueue = await fetch(`${URL}/rest/v1/rpc/pending_source_items`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_dealer_id: dealerId, p_limit: 25 }),
+  });
+  const filledRows = await filledQueue.json();
+  check(
+    'a watch leaves the queue once it has a photograph',
+    filledQueue.status < 300 && Array.isArray(filledRows) && !filledRows.some((row) => row.id === itemId),
+    `got ${filledQueue.status} ${JSON.stringify(filledRows)?.slice(0, 180)}`
+  );
+
   // The whole point of edited_fields: a correction has to outlive the refresh
   // that would otherwise put the shop's own value back.
   const corrected = await api(
@@ -1513,6 +1556,20 @@ console.log('\nreplacing a gallery');
     token: buyer.token,
   });
   check('replacing a shorter gallery leaves no tail behind', left.body?.length === 1);
+
+  // The refresh runs with the service key. auth.uid() is null. This used to
+  // raise "Sign in first." after the files were already in the bucket.
+  const scheduled = await fetch(`${URL}/rest/v1/rpc/replace_listing_photos`, {
+    method: 'POST',
+    headers: { ...admin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_listing_id: listingId, p_photos: gallery }),
+  });
+  const scheduledBody = await scheduled.json();
+  check(
+    'the nightly refresh replaces a claimed shop’s gallery',
+    scheduled.status < 300 && scheduledBody === 2,
+    `got ${scheduled.status} ${JSON.stringify(scheduledBody)}`
+  );
 }
 
 console.log('\ndealer applications');
