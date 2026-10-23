@@ -1,17 +1,21 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 
+import { Activity } from './Activity';
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
 import { Dealers } from './Dealers';
 import { SignIn } from './SignIn';
+import { Users } from './Users';
 import { supabase, target } from './supabase';
 
 // Dealers first, because that is the screen an operator opens the console to
-// use: importing watches and publishing a shop both happen there. Applications
-// is a queue that is empty most days.
+// use: importing watches and publishing a shop both happen there. Users is the
+// activity dashboard. Applications is a queue that is empty most days.
 const SCREENS = {
   dealers: 'Dealers',
+  users: 'Users',
+  activity: 'Activity',
   applications: 'Applications',
   add: 'Add shops',
 } as const;
@@ -108,6 +112,10 @@ export function App() {
       <main className="body">
         {screen === 'applications' ? (
           <Applications />
+        ) : screen === 'users' ? (
+          <Users />
+        ) : screen === 'activity' ? (
+          <Activity />
         ) : screen === 'dealers' ? (
           <Dealers />
         ) : (

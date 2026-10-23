@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 
+import {
+  shopErrors,
+  visibleDealers,
+  type FlagFilter,
+  type ShopStatus,
+  type SortKey,
+} from './dealerTable';
 import { ImportPreview } from './ImportPreview';
 import {
   importListings,
@@ -32,6 +39,11 @@ export function Dealers() {
   const [open, setOpen] = useState<string | null>(null);
   const [picking, setPicking] = useState<Picking | null>(null);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | ShopStatus>('all');
+  const [flagFilter, setFlagFilter] = useState<FlagFilter>('all');
+  const [sort, setSort] = useState<SortKey>('newest');
+  const [codes, setCodes] = useState<Record<string, { code: string; expiresAt: string }>>({});
+  const [copied, setCopied] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
 
@@ -146,13 +158,76 @@ export function Dealers() {
     });
   }
 
-  const needle = query.trim().toLowerCase();
-  const shown = (rows ?? []).filter(
-    (dealer) =>
-      !needle ||
-      dealer.name.toLowerCase().includes(needle) ||
-      (dealer.website ?? '').toLowerCase().includes(needle)
-  );
+  function issueCode(dealer: Row) {
+    if (dealer.claimed_by) {
+      setError(`Unassign ${dealer.name} before issuing a claim code.`);
+      return;
+    }
+    if (!confirmWrite(`Issue a claim code for ${dealer.name}? Anyone with the code can claim the shop for 7 days.`)) {
+      return;
+    }
+    void run(dealer, async () => {
+      const { data, error: failed } = await supabase.rpc('operator_issue_claim_code', {
+        p_dealer_id: dealer.id,
+      });
+      if (failed) throw failed;
+      const issued = data?.[0];
+      if (!issued) throw new Error('No code came back.');
+      setCodes((current) => ({
+        ...current,
+        [dealer.id]: { code: issued.code, expiresAt: issued.expires_at },
+      }));
+      return `${dealer.name}: claim code ${issued.code}`;
+    });
+  }
+
+  function revokeCode(dealer: Row) {
+    if (!confirmWrite(`Revoke the live claim code for ${dealer.name}?`)) return;
+    void run(dealer, async () => {
+      const { error: failed } = await supabase.rpc('operator_revoke_claim_code', {
+        p_dealer_id: dealer.id,
+      });
+      if (failed) throw failed;
+      setCodes((current) => {
+        const next = { ...current };
+        delete next[dealer.id];
+        return next;
+      });
+      return `${dealer.name}: claim code revoked`;
+    });
+  }
+
+  function unassign(dealer: Row) {
+    const who = dealer.claimer_name || (dealer.claimer_handle ? `@${dealer.claimer_handle}` : 'the dealer');
+    if (
+      !confirmWrite(
+        `Unassign ${who} from ${dealer.name}? They lose the shop, and any live claim code is burned.`,
+      )
+    ) {
+      return;
+    }
+    void run(dealer, async () => {
+      const { error: failed } = await supabase.rpc('operator_unclaim_shop', { p_dealer_id: dealer.id });
+      if (failed) throw failed;
+      setCodes((current) => {
+        const next = { ...current };
+        delete next[dealer.id];
+        return next;
+      });
+      return `${dealer.name} is unclaimed`;
+    });
+  }
+
+  async function copyCode(dealerId: string, code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(dealerId);
+    } catch {
+      setError('Could not copy. Select the code and copy it yourself.');
+    }
+  }
+
+  const shown = visibleDealers(rows ?? [], query, statusFilter, flagFilter, sort);
 
   return (
     <section>
@@ -163,6 +238,28 @@ export function Dealers() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Filter by name or website"
         />
+        <select
+          aria-label="Status"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as 'all' | ShopStatus)}>
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Published</option>
+          <option value="paused">Paused</option>
+          <option value="revoked">Revoked</option>
+        </select>
+        <select
+          aria-label="Flags"
+          value={flagFilter}
+          onChange={(event) => setFlagFilter(event.target.value as FlagFilter)}>
+          <option value="all">All flags</option>
+          <option value="neglected">Neglected</option>
+          <option value="unclaimed">Unclaimed</option>
+          <option value="quiet">Quiet 14 days</option>
+          <option value="unanswered">Unanswered 48 hours</option>
+          <option value="missing_photos">Missing photos</option>
+          <option value="last_error">Last error</option>
+        </select>
         <button className="ghost push" onClick={reload}>
           Reload
         </button>
@@ -188,14 +285,28 @@ export function Dealers() {
             <thead>
               <tr>
                 <th className="tick" />
-                <th>Shop</th>
+                <SortHeader label="Shop" sortKey="name" sort={sort} onSort={setSort} />
                 <th className="num">In the deck</th>
-                <th className="num">Imported</th>
+                <SortHeader label="Imported" sortKey="listings" sort={sort} onSort={setSort} numeric />
                 <th className="num">Catalogue</th>
-                <th>Last refresh</th>
+                <th>
+                  <button
+                    className="sort"
+                    aria-pressed={sort === 'last_error'}
+                    onClick={() => setSort(sort === 'last_error' ? 'newest' : 'last_error')}>
+                    Last refresh{sort === 'last_error' ? ' ·' : ''}
+                  </button>
+                  <button
+                    className="sort"
+                    aria-pressed={sort === 'missing_photos'}
+                    onClick={() => setSort(sort === 'missing_photos' ? 'newest' : 'missing_photos')}>
+                    Photos{sort === 'missing_photos' ? ' ·' : ''}
+                  </button>
+                </th>
                 <th>Description</th>
                 <th>Instagram</th>
-                <th>Status</th>
+                <SortHeader label="Status" sortKey="status" sort={sort} onSort={setSort} />
+                <SortHeader label="Flags" sortKey="flags" sort={sort} onSort={setSort} />
                 <th />
               </tr>
             </thead>
@@ -251,6 +362,16 @@ export function Dealers() {
                           ) : (
                             <span className="badge wait">no address — inquiries fail</span>
                           )}
+                          <ClaimLine
+                            dealer={dealer}
+                            code={codes[dealer.id] ?? null}
+                            copied={copied === dealer.id}
+                            busy={busyId !== null}
+                            onIssue={() => issueCode(dealer)}
+                            onRevoke={() => revokeCode(dealer)}
+                            onUnassign={() => unassign(dealer)}
+                            onCopy={(code) => void copyCode(dealer.id, code)}
+                          />
                         </div>
                       </div>
                     </td>
@@ -315,10 +436,27 @@ export function Dealers() {
 
                     <td>
                       <span
-                        className={`badge ${dealer.permission === 'approved' ? 'ok' : 'wait'}`}>
+                        className={`badge ${dealer.permission === 'approved' ? 'ok' : dealer.permission === 'paused' ? 'wait' : 'wait'}`}>
                         {dealer.permission}
                       </span>
-                      {dealer.claimed_by ? <span className="badge">claimed</span> : null}
+                    </td>
+
+                    <td>
+                      {(dealer.neglect_flags ?? []).length === 0 ? (
+                        <span className="muted">—</span>
+                      ) : (
+                        (dealer.neglect_flags ?? []).map((flag) => (
+                          <span key={flag} className="badge wait">
+                            {flag === 'quiet' ? 'quiet 14d' : flag === 'unanswered' ? 'unanswered 48h' : flag}
+                          </span>
+                        ))
+                      )}
+                      {dealer.unanswered_count > 0 ? (
+                        <>
+                          <br />
+                          <span className="muted small">{dealer.unanswered_count} waiting</span>
+                        </>
+                      ) : null}
                     </td>
 
                     <td className="actions">
@@ -350,7 +488,7 @@ export function Dealers() {
 
                   expanded ? (
                     <tr key={`${dealer.id}-detail`} className="detail-row">
-                      <td colSpan={10}>
+                      <td colSpan={11}>
                         <ShopListings dealerId={dealer.id} reload={tick} onChanged={reload} />
                       </td>
                     </tr>
@@ -366,7 +504,8 @@ export function Dealers() {
             active, unsold, and the shop is approved. <strong>Imported</strong> is every
             watch we hold for them. <strong>Catalogue</strong> is what their site is
             offering. <strong>Last refresh</strong> is the nightly job: when it last
-            finished, how many listings it published and skipped, and the last error.
+            finished, how many listings it published and skipped, and the last error
+            in the cell.
             Photos are the live gallery on active, unsold watches. A gap between the
             first two counts means some are sold or hidden — or that the shop is not
             approved, in which case none of them show.
@@ -464,7 +603,7 @@ function RefreshStatus({ dealer }: { dealer: Row }) {
   const sync = dealer.last_synced_at;
   const when = newer(nightly, sync);
   const syncIsNewer = Boolean(sync && nightly && new Date(sync).getTime() > new Date(nightly).getTime());
-  const errors = [...new Set([dealer.last_refresh_error, dealer.last_sync_error].filter(Boolean))];
+  const errors = shopErrors(dealer);
 
   if (!when && errors.length === 0) {
     return <span className="muted">never</span>;
@@ -518,8 +657,8 @@ function RefreshStatus({ dealer }: { dealer: Row }) {
       {errors.length > 0 ? (
         <>
           <br />
-          <span className="badge wait" title={errors.join('\n')}>
-            last error
+          <span className="errtext" title={errors.join('\n')}>
+            {errors.join(' · ')}
           </span>
         </>
       ) : null}
@@ -550,6 +689,93 @@ function Chevron() {
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M8.59 16.58 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.42Z" />
     </svg>
+  );
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  numeric,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortKey;
+  onSort: (key: SortKey) => void;
+  numeric?: boolean;
+}) {
+  return (
+    <th className={numeric ? 'num' : undefined}>
+      <button
+        className="sort"
+        aria-pressed={sort === sortKey}
+        onClick={() => onSort(sort === sortKey && sortKey !== 'newest' ? 'newest' : sortKey)}>
+        {label}
+        {sort === sortKey ? ' ·' : ''}
+      </button>
+    </th>
+  );
+}
+
+function ClaimLine({
+  dealer,
+  code,
+  copied,
+  busy,
+  onIssue,
+  onRevoke,
+  onUnassign,
+  onCopy,
+}: {
+  dealer: Row;
+  code: { code: string; expiresAt: string } | null;
+  copied: boolean;
+  busy: boolean;
+  onIssue: () => void;
+  onRevoke: () => void;
+  onUnassign: () => void;
+  onCopy: (code: string) => void;
+}) {
+  const liveUntil = code?.expiresAt ?? dealer.claim_code_expires_at;
+  return (
+    <span className="claim">
+      {dealer.claimed_by ? (
+        <>
+          <span className="small">
+            Claimed by {dealer.claimer_name || 'an account'}
+            {dealer.claimer_handle ? ` (@${dealer.claimer_handle})` : ''}
+            {dealer.claimer_last_sign_in_at ? ` · signed in ${formatAge(dealer.claimer_last_sign_in_at)}` : ''}
+          </span>
+          <button className="ghost" disabled={busy} onClick={onUnassign}>
+            Unassign
+          </button>
+        </>
+      ) : (
+        <span className="muted small">Nobody has claimed this shop.</span>
+      )}
+      {code ? (
+        <span className="code">
+          <input readOnly value={code.code} aria-label="Claim code" />
+          <button className="ghost" type="button" onClick={() => onCopy(code.code)}>
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </span>
+      ) : null}
+      {liveUntil ? (
+        <span className="muted small">Code live until {new Date(liveUntil).toLocaleString()}</span>
+      ) : null}
+      {dealer.claimed_by ? null : (
+        <button className="ghost" disabled={busy} onClick={onIssue}>
+          {liveUntil ? 'New code' : 'Claim code'}
+        </button>
+      )}
+      {liveUntil ? (
+        <button className="ghost" disabled={busy} onClick={onRevoke}>
+          Revoke code
+        </button>
+      ) : null}
+    </span>
   );
 }
 

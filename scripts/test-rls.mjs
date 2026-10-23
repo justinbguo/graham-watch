@@ -545,6 +545,7 @@ console.log('\nafter approval');
 
 console.log('\ncatalogue');
 let syncedListingId;
+let itemId;
 {
   const typed = {
     brand: 'Heuer',
@@ -573,7 +574,7 @@ let syncedListingId;
     prefer: 'return=representation',
   });
   check('a shop can record its own catalogue', created.status === 201, `got ${created.status}`);
-  const itemId = created.body?.[0]?.id;
+  itemId = created.body?.[0]?.id;
 
   // A catalogue holds watches the shop has not published, at prices it has not
   // committed to. It is the shop's book, not the deck.
@@ -2023,6 +2024,39 @@ console.log('\noperators');
     `got ${overviewBefore.status}`
   );
 
+  const logBefore = await api('/rest/v1/rpc/operator_activity', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check('a buyer cannot read the operator log', logBefore.status >= 400, `got ${logBefore.status}`);
+
+  const dashBefore = await api('/rest/v1/rpc/operator_dashboard', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check('a buyer cannot read the user dashboard', dashBefore.status >= 400, `got ${dashBefore.status}`);
+
+  const dealerOverride = await api('/rest/v1/rpc/operator_edit_listing', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {
+      p_listing_id: listingId,
+      p_brand: 'Hijack',
+      p_model: null,
+      p_reference: null,
+      p_year: null,
+      p_case_size_mm: null,
+      p_price_cents: null,
+      p_condition: null,
+      p_description: null,
+    },
+  });
+  check(
+    'the dealer who claimed the shop cannot use the operator override',
+    dealerOverride.status >= 400,
+    `got ${dealerOverride.status}`
+  );
+
   await fetch(`${URL}/rest/v1/operators`, {
     method: 'POST',
     headers: admin,
@@ -2124,6 +2158,21 @@ console.log('\noperators');
     JSON.stringify(pausedRow)?.slice(0, 400)
   );
 
+  const pauseLog = await api('/rest/v1/rpc/operator_activity', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 20 },
+  });
+  check(
+    'pausing a shop is written to the operator log',
+    Array.isArray(pauseLog.body) &&
+      pauseLog.body.some((row) => row.action === 'pause_shop' && row.target_id === dealerId),
+    JSON.stringify(pauseLog.body)?.slice(0, 400)
+  );
+
+  const logTable = await api('/rest/v1/operator_actions?select=id', { token: buyer.token });
+  check('the operator log is unreachable over REST', logTable.status >= 400, `got ${logTable.status}`);
+
   const pauseAgain = await publish(buyer.token, 'paused');
   check(
     'pausing a shop that is not published is refused',
@@ -2209,6 +2258,163 @@ console.log('\noperators');
     `${problems.status} ${JSON.stringify(problems.body)?.slice(0, 120)}`
   );
 
+  const beforeEdit = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=brand,model,reference,year,case_size_mm,price_cents,condition,description,edited_fields`,
+    { token: SERVICE }
+  );
+  const held = beforeEdit.body?.[0];
+  const operatorEdit = await api('/rest/v1/rpc/operator_edit_listing', {
+    token: buyer.token,
+    method: 'POST',
+    body: {
+      p_listing_id: syncedListingId,
+      p_brand: held?.brand,
+      p_model: held?.model,
+      p_reference: held?.reference,
+      p_year: held?.year,
+      p_case_size_mm: held?.case_size_mm,
+      p_price_cents: 111100,
+      p_condition: held?.condition,
+      p_description: held?.description,
+    },
+  });
+  check('an operator can correct a watch on a claimed shop', operatorEdit.status < 300, `got ${operatorEdit.status} ${JSON.stringify(operatorEdit.body)}`);
+
+  const editedFields = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=price_cents,edited_fields`,
+    { token: SERVICE }
+  );
+  check(
+    'an operator edit is recorded so a refresh will keep it',
+    editedFields.body?.[0]?.price_cents === 111100 &&
+      editedFields.body?.[0]?.edited_fields?.includes('price_cents'),
+    JSON.stringify(editedFields.body?.[0])
+  );
+
+  await api(`/rest/v1/source_items?id=eq.${itemId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: {
+      extracted: {
+        brand: held?.brand,
+        model: 'After operator',
+        reference: held?.reference ?? 'FEED-2',
+        price_cents: 222200,
+        currency: 'USD',
+      },
+      text_hash: 't-op',
+      extracted_hash: 't-op',
+      content_hash: 'c-op',
+    },
+  });
+  const reapplied = await api('/rest/v1/rpc/apply_source_item', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_source_item_id: itemId },
+  });
+  const kept = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=price_cents,model`,
+    { token: SERVICE }
+  );
+  check(
+    'a refresh keeps the operator price and updates a field they did not touch',
+    reapplied.status < 300 && kept.body?.[0]?.price_cents === 111100 && kept.body?.[0]?.model === 'After operator',
+    `${reapplied.status} ${JSON.stringify(kept.body?.[0])}`
+  );
+
+  await api('/rest/v1/rpc/operator_edit_listing', {
+    token: buyer.token,
+    method: 'POST',
+    body: {
+      p_listing_id: syncedListingId,
+      p_brand: held?.brand,
+      p_model: held?.model,
+      p_reference: held?.reference,
+      p_year: held?.year,
+      p_case_size_mm: held?.case_size_mm,
+      p_price_cents: held?.price_cents,
+      p_condition: held?.condition,
+      p_description: held?.description,
+    },
+  });
+
+  const hidden = await api('/rest/v1/rpc/operator_set_listing_status', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_listing_id: listingId, p_status: 'hidden' },
+  });
+  check('an operator can hide a watch', hidden.body === 'hidden', JSON.stringify(hidden.body));
+  const shownAgain = await api('/rest/v1/rpc/operator_set_listing_status', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_listing_id: listingId, p_status: 'active' },
+  });
+  check('an operator can show it again', shownAgain.body === 'active', JSON.stringify(shownAgain.body));
+
+  const markedSold = await api('/rest/v1/rpc/operator_set_listing_sold', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_listing_id: listingId, p_sold: true },
+  });
+  const soldSource = await api(`/rest/v1/listings?id=eq.${listingId}&select=sold_at,sold_source`, {
+    token: SERVICE,
+  });
+  check(
+    'marking sold is a dealer decision the feed will not clear',
+    markedSold.status < 300 &&
+      soldSource.body?.[0]?.sold_at &&
+      soldSource.body?.[0]?.sold_source === 'dealer',
+    JSON.stringify(soldSource.body?.[0])
+  );
+  await api('/rest/v1/rpc/operator_set_listing_sold', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_listing_id: listingId, p_sold: false },
+  });
+  const availableAgain = await api(`/rest/v1/listings?id=eq.${listingId}&select=sold_at,sold_source`, {
+    token: SERVICE,
+  });
+  check(
+    'marking available clears the sold date',
+    availableAgain.body?.[0]?.sold_at === null && availableAgain.body?.[0]?.sold_source === null,
+    JSON.stringify(availableAgain.body?.[0])
+  );
+
+  const dash = await api('/rest/v1/rpc/operator_dashboard', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'an operator can read signup and activity counts',
+    dash.status < 300 && dash.body?.totals?.users >= 1 && dash.body?.activity?.dau >= 1,
+    `${dash.status} ${JSON.stringify(dash.body)?.slice(0, 240)}`
+  );
+  check(
+    'the dashboard does not include email addresses',
+    !JSON.stringify(dash.body).includes('example.com'),
+    JSON.stringify(dash.body)?.slice(0, 200)
+  );
+  const recent = await api('/rest/v1/rpc/operator_recent_users', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 20 },
+  });
+  check(
+    'recent users are a table without an email column',
+    Array.isArray(recent.body) && recent.body.every((row) => !('email' in row) && row.id),
+    JSON.stringify(recent.body?.[0])
+  );
+  const detail = await api('/rest/v1/rpc/operator_user_detail', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_user_id: buyer.id },
+  });
+  check(
+    'a user drill-in returns onboarding answers and no email',
+    detail.status < 300 && detail.body?.id === buyer.id && !JSON.stringify(detail.body).includes('example.com'),
+    `${detail.status} ${JSON.stringify(detail.body)?.slice(0, 240)}`
+  );
+
   // ---------------------------------------------------------------------
   // Who may run the importer
   // ---------------------------------------------------------------------
@@ -2237,9 +2443,15 @@ console.log('\noperators');
   // An unclaimed shop is the operator's to import even though somebody else
   // added it. The terminal tools sign in as their own account, so without this
   // every shop added from a laptop is unimportable in the browser.
+  const unclaimedShop = await setClaim(null);
   check(
     'an operator controls an unclaimed shop it did not add',
-    (await setClaim(null))?.can_import === true
+    unclaimedShop?.can_import === true
+  );
+  check(
+    'an unclaimed shop is flagged neglected',
+    unclaimedShop?.neglect_flags?.includes('unclaimed') === true,
+    JSON.stringify(unclaimedShop?.neglect_flags)
   );
 
   // can_import is a claim about writes, and a catalogue read cashes it in two
@@ -2271,6 +2483,102 @@ console.log('\noperators');
   // A claim is a dealer taking over their own inventory. 20260917000002 exists
   // to stop an earlier importer writing over them, and operator status must not
   // be a way back in.
+  const issuedWhileOpen = await api('/rest/v1/rpc/operator_issue_claim_code', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  const handoffCode = issuedWhileOpen.body?.[0]?.code;
+  check(
+    'an operator can issue a claim code for an unclaimed shop',
+    issuedWhileOpen.status < 300 && /^\d{6}$/.test(handoffCode),
+    `${issuedWhileOpen.status} ${JSON.stringify(issuedWhileOpen.body)}`
+  );
+  const wrongCode = handoffCode === '000000' ? '111111' : '000000';
+  const wrongClaimCode = await api('/rest/v1/rpc/claim_dealer_with_code', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_code: wrongCode },
+  });
+  check(
+    'a wrong handoff code does not claim the shop',
+    wrongClaimCode.status < 300 && wrongClaimCode.body === null,
+    JSON.stringify(wrongClaimCode.body)
+  );
+  const spent = await api('/rest/v1/rpc/claim_dealer_with_code', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_code: handoffCode },
+  });
+  check(
+    'whoever has the handoff code can claim the shop',
+    spent.body === dealerId,
+    `${spent.status} ${JSON.stringify(spent.body)}`
+  );
+  const unassigned = await api('/rest/v1/rpc/operator_unclaim_shop', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check('an operator can unassign the claimer', unassigned.status < 300, `got ${unassigned.status}`);
+  const reused = await api('/rest/v1/rpc/claim_dealer_with_code', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_code: handoffCode },
+  });
+  check('a spent handoff code cannot be used again', reused.status >= 400, `got ${reused.status}`);
+
+  const reissued = await api('/rest/v1/rpc/operator_issue_claim_code', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  const codesRevoked = await api('/rest/v1/rpc/operator_revoke_claim_code', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  const afterRevoke = await api('/rest/v1/rpc/claim_dealer_with_code', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_code: reissued.body?.[0]?.code },
+  });
+  check(
+    'revoking a claim code stops it being spent',
+    codesRevoked.status < 300 && afterRevoke.status >= 400,
+    `revoke ${codesRevoked.status}, spend ${afterRevoke.status}`
+  );
+
+  const staleInquiry = await api(
+    `/rest/v1/inquiries?dealer_id=eq.${dealerId}&select=id,created_at&limit=1`,
+    { token: SERVICE }
+  );
+  const stale = staleInquiry.body?.[0];
+  if (stale?.id) {
+    await fetch(`${URL}/rest/v1/inquiries?id=eq.${stale.id}`, {
+      method: 'PATCH',
+      headers: admin,
+      body: JSON.stringify({ created_at: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString() }),
+    });
+    const flagged = await api('/rest/v1/rpc/operator_dealers', {
+      token: buyer.token,
+      method: 'POST',
+    });
+    const waiting = flagged.body?.find((row) => row.id === dealerId);
+    check(
+      'an inquiry older than 48 hours flags the shop unanswered',
+      waiting?.neglect_flags?.includes('unanswered') === true && waiting?.unanswered_count > 0,
+      JSON.stringify(waiting?.neglect_flags)
+    );
+    await fetch(`${URL}/rest/v1/inquiries?id=eq.${stale.id}`, {
+      method: 'PATCH',
+      headers: admin,
+      body: JSON.stringify({ created_at: stale.created_at }),
+    });
+  } else {
+    check('an inquiry older than 48 hours flags the shop unanswered', false, 'no inquiry to age');
+  }
+
   check(
     'an operator does not control a shop a dealer has claimed',
     (await setClaim(dealerUser.id))?.can_import === false
@@ -2351,6 +2659,30 @@ console.log('\nwhat anon can reach');
     ['decline_dealer_application', { p_application_id: applicationId, p_reason: 'no' }],
     ['is_operator', {}],
     ['require_operator', {}],
+    ['operator_activity', {}],
+    ['operator_dashboard', {}],
+    ['operator_recent_users', {}],
+    ['operator_user_detail', { p_user_id: buyer.id }],
+    ['record_operator_action', { p_action: 'x', p_target_type: 'shop', p_target_id: dealerId, p_before: {}, p_after: {} }],
+    [
+      'operator_edit_listing',
+      {
+        p_listing_id: listingId,
+        p_brand: 'Omega',
+        p_model: null,
+        p_reference: null,
+        p_year: null,
+        p_case_size_mm: null,
+        p_price_cents: null,
+        p_condition: null,
+        p_description: null,
+      },
+    ],
+    ['operator_set_listing_status', { p_listing_id: listingId, p_status: 'hidden' }],
+    ['operator_set_listing_sold', { p_listing_id: listingId, p_sold: true }],
+    ['operator_issue_claim_code', { p_dealer_id: dealerId }],
+    ['operator_revoke_claim_code', { p_dealer_id: dealerId }],
+    ['operator_unclaim_shop', { p_dealer_id: dealerId }],
     ['can_claim_with_email', { p_dealer_id: dealerId, p_email: 'sales@example.com' }],
     ['store_dealer_claim_code', { p_dealer_id: dealerId, p_email: 'sales@example.com' }],
     ['replace_listing_photos', { p_listing_id: listingId, p_photos: [] }],

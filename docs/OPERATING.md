@@ -389,10 +389,35 @@ missing and still prints today's lines.
 
 The Dealers table shows **Last refresh**: when the nightly job last finished,
 how many listings it published and skipped, the photo count, how many live
-watches have no photograph, and the last error (hover the badge). Before the
+watches have no photograph, and the last error as text in the cell. Before the
 first recorded run, the cell falls back to the catalogue read (how many it
 found, how many were new). `incomplete` means that read hit the size cap, so
 absence was not treated as sold.
+
+Filter the table by status or by a flag. A shop is **neglected** when it is
+unclaimed, when the person who claimed it has not signed in for 14 days, or
+when a buyer’s inquiry or message has waited 48 hours with no reply from that
+person. Sort by name, status, how many watches are imported, missing photos,
+last error, or how many of those flags are set.
+
+The arrow on a shop opens its watches. **Hide** takes one out of the deck and
+leaves it there across a refresh. **Edit** changes brand, model, reference,
+year, size, price, condition, and description; those fields are recorded the
+same way a dealer’s own corrections are, so the nightly refresh does not put
+the shop’s old values back. **Sold** marks it sold with dealer provenance,
+which the feed will not clear. **Available** puts it back on sale, and the
+next refresh may sell it again if the site says so. **Delete** is still there
+and asks you to type DELETE. Prefer Hide.
+
+**Claim code** on an unclaimed shop issues a six-digit code, shows it once so
+you can copy it, and lets you revoke it. It lasts seven days and any signed-in
+account can enter it on Profile → Claim your shop. **Unassign** clears whoever
+claimed the shop and burns a live code. Mailbox codes, the ones the app emails,
+are unchanged: fifteen minutes, and only the account that asked can spend them.
+
+**Users** is the dashboard: signups, who is active, onboarding answers, saves,
+the path from inquiries to deals, and how fast each shop replies. **Activity**
+is the log of operator writes. Neither screen is readable by a buyer.
 
 ### Which Graham the UI is talking to
 
@@ -904,8 +929,9 @@ share one code implementation: `claim_code_digest`, plus the same limits table.
 Codes live 15 minutes, five wrong guesses burn one, three outstanding per shop per
 account, and a code is spendable only by the account that asked for it — so
 forwarding the email hands over nothing. `dealer_claim_codes` has RLS on and no
-policies: only the edge functions write it, and only the definer functions spend
-it. Codes are stored as a salted SHA-256, never in the clear.
+policies: the claim-dealer edge function writes a mailbox code, and
+`operator_issue_claim_code` writes a handoff code. Only the definer functions
+spend either. Codes are stored as a salted SHA-256, never in the clear.
 
 The domain rule is the exact host with `www.` stripped, never a parent. Taking the
 registrable domain would read `goldfinger.squarespace.com` as `squarespace.com`
@@ -918,8 +944,9 @@ as the address a shop prints on its own contact page and the shop was yours.
 `dealer_accounts` and `claim_dealer` also check `email_confirmed_at` directly, so
 flipping the dashboard toggle cannot quietly reopen it.
 
-There is no way in the app to move a claim off an account. A dealer who loses the
-mailbox needs an operator to clear `claimed_by` by hand.
+The phone app cannot move a claim off an account. The operator console can:
+**Unassign** on the Dealers row clears `claimed_by` and burns any live handoff
+code. A dealer who loses the mailbox is handed the shop again with **Claim code**.
 
 ## What a dealer may know
 
