@@ -26,9 +26,15 @@ jobs:
 
       - run: npm ci
 
-      # Exits 0 when the function returns and at least one shop finished.
-      # A failed shop is a warning in the log. The job goes red when every
-      # shop failed, or the request itself was rejected (missing secret, bad key).
+      # One request per shop, then short publish requests. A single request
+      # that refreshed every shop exceeded the isolate's 2s CPU budget and
+      # died HTTP 546 before printing anything. Exits 0 when at least one
+      # shop read its catalogue. The job goes red when every shop failed,
+      # or the request itself was rejected (missing secret, bad key).
+      #
+      # Merging this file does not update the hosted function. Deploy
+      # import-listings before the next run, or each shop is still drained
+      # inside the one catalogue call.
       - name: refresh
         env:
           GRAHAM_TARGET: hosted
