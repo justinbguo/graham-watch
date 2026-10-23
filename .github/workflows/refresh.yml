@@ -26,6 +26,9 @@ jobs:
 
       - run: npm ci
 
+      # Exits 0 when the function returns and at least one shop finished.
+      # A failed shop is a warning in the log. The job goes red when every
+      # shop failed, or the request itself was rejected (missing secret, bad key).
       - name: refresh
         env:
           GRAHAM_TARGET: hosted

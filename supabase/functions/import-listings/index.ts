@@ -4,6 +4,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, adapterItems, readCatalog, syncCatalog } from './catalog.ts';
+import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, publishBatch } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
@@ -466,8 +467,20 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Refresh failed.';
+      console.error(`${website}: ${message}`);
       await recordSyncFailure(supabase, shop.id, message);
       results.push({ dealerId: shop.id, name: shop.name, website, ok: false, error: message });
+
+      // A missing or rejected key fails every remaining shop the same way.
+      // Stopping here is what turns the nightly job red; a single shop's
+      // scrape or rate-limit failure stays in `results` and the loop goes on.
+      if (caught instanceof ExtractorUnavailable && caught.config) {
+        const failed = results.filter((row) => row.ok === false).length;
+        return Response.json(
+          { error: message, shops: results.length, failed, results },
+          { status: 503 }
+        );
+      }
     }
   }
 

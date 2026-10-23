@@ -17,6 +17,9 @@ import { canonicalBrand } from './taxonomy.ts';
 export const DEFAULT_BATCH = 8;
 export const MAX_BATCH = 25;
 
+// How many watches hydrate and copy photographs at once. OpenAI is gated
+// separately, one call at a time (extract.ts): raising this does not raise
+// how many chat completions are in flight, which is what a low RPM key rejects.
 const EXTRACT_CONCURRENCY = 4;
 const MAX_PHOTOS_PER_LISTING = 6;
 
@@ -195,10 +198,13 @@ export async function publishBatch(
     try {
       return await publishOne(supabase, storage, row);
     } catch (error) {
-      // The extractor being down is not this watch's fault, so the row keeps a
-      // clean slate and the whole batch is reported as failed instead.
+      // The extractor being down is not this watch's fault — retries have
+      // already been spent inside the call — so the row keeps a clean slate
+      // and the whole batch is reported as failed instead. A rejected key has
+      // to win over a sibling watch's rate limit, or the nightly job would
+      // keep going and fail the same way on every shop.
       if (error instanceof ExtractorUnavailable) {
-        unavailable ??= error;
+        if (!unavailable || error.config) unavailable = error;
         return 'failed' as const;
       }
 

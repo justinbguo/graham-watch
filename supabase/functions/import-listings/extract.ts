@@ -113,13 +113,277 @@ is in them. ${SHARED_RULES} Write description as one or two plain sentences draw
 the dealer's prose, without marketing superlatives.`;
 
 /**
+ * One chat completion at a time.
+ *
+ * The publish pool runs several watches at once, and that burst is what a
+ * 10-request-per-minute key answers with 429. The gate lives on the model
+ * call, so photograph copies still overlap. The gap is not a fixed six
+ * seconds: a higher quota just proceeds, and a 429 waits for the hint
+ * OpenAI sent.
+ */
+export const OPENAI_CONCURRENCY = 1;
+
+/** First try plus three waits. A 429 that survives this fails the shop. */
+export const OPENAI_MAX_ATTEMPTS = 4;
+
+/**
+ * Ceiling for one sleep. The hint this tier sends is a few seconds ("try
+ * again in 6s"); a longer one must not own the invocation.
+ */
+export const OPENAI_MAX_DELAY_MS = 15_000;
+
+/**
+ * Ceiling for every sleep inside one completion.
+ *
+ * The nightly refresh is one HTTP request, and the platform closes it after
+ * 150s (edge function request idle timeout). Three six-second hints fit;
+ * a watch that is still limited after that fails so the other shops get
+ * their turn.
+ */
+export const OPENAI_MAX_CALL_WAIT_MS = 20_000;
+
+const HINT =
+  /try again in\s+(\d+(?:\.\d+)?)\s*(milliseconds|millisecond|seconds|second|minutes|minute|ms|secs|sec|min|m|s)\b/i;
+
+/**
  * The extractor failed, rather than the watch being unreadable.
  *
- * A missing key or a rate limit fails every watch identically. Recording that
- * against the row would bury the whole catalogue behind an error that has
- * nothing to do with any of it, so the caller retries these instead.
+ * A missing key, a rejected key, or a rate limit that outlasted the waits
+ * above fails every watch the same way. Recording that against the row would
+ * bury the catalogue behind an error that has nothing to do with any of it,
+ * so the caller fails the batch and leaves the row clean for the next night.
+ * `config` means the key itself is missing or rejected: another shop will
+ * fail identically, and the nightly job stops instead of walking the list.
  */
-export class ExtractorUnavailable extends Error {}
+export class ExtractorUnavailable extends Error {
+  readonly config: boolean;
+
+  constructor(message: string, options?: { config?: boolean }) {
+    super(message);
+    this.name = 'ExtractorUnavailable';
+    this.config = options?.config ?? false;
+  }
+}
+
+/** How this status should be treated. `retry` is 429 and 5xx, apart from a dead quota. */
+export function openAIFailureKind(status: number, body: string): 'retry' | 'config' | 'stop' {
+  if (status === 401 || status === 403) return 'config';
+  // Billing, not the per-minute window. Waiting cannot refill it.
+  if (status === 429 && /insufficient_quota/.test(body)) return 'config';
+  if (status === 429 || (status >= 500 && status <= 599)) return 'retry';
+  return 'stop';
+}
+
+function unitMs(unit: string): number {
+  const name = unit.toLowerCase();
+  if (name === 'ms' || name.startsWith('milli')) return 1;
+  if (name === 'm' || name.startsWith('min')) return 60_000;
+  return 1_000;
+}
+
+/** Retry-After is either delta-seconds or an HTTP date. */
+function retryAfterHeaderMs(value: string, now: number): number | null {
+  const trimmed = value.trim();
+  const seconds = /^(\d+(?:\.\d+)?)\s*s?$/i.exec(trimmed);
+  if (seconds) return Math.round(Number(seconds[1]) * 1_000);
+
+  const date = Date.parse(trimmed);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, date - now);
+}
+
+function bodyHintMs(body: string): number | null {
+  const match = HINT.exec(body);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  return Math.round(amount * unitMs(match[2]));
+}
+
+/**
+ * How long OpenAI asked us to wait, in milliseconds.
+ *
+ * The header and the "try again in 6s" line in the body should agree. When
+ * they don't, the longer one is what keeps the next attempt out of the window
+ * that just rejected us. `null` means the response carried no hint.
+ */
+export function retryHintMs(
+  retryAfter: string | null,
+  body: string,
+  now = Date.now()
+): number | null {
+  const hints = [
+    retryAfter ? retryAfterHeaderMs(retryAfter, now) : null,
+    bodyHintMs(body),
+  ].filter((value): value is number => value !== null);
+  if (!hints.length) return null;
+  return Math.max(...hints);
+}
+
+/**
+ * Delay before another attempt, or `null` when this failure is final.
+ *
+ * A missing hint falls back to 1s, 2s, 4s. The delay is capped so one
+ * answer cannot sleep for the rest of the refresh.
+ */
+export function openAIRetryDelayMs(
+  status: number,
+  retryAfter: string | null,
+  body: string,
+  attempt: number,
+  now = Date.now()
+): number | null {
+  if (openAIFailureKind(status, body) !== 'retry') return null;
+  if (attempt >= OPENAI_MAX_ATTEMPTS - 1) return null;
+  const hinted = retryHintMs(retryAfter, body, now);
+  const backoff = 1_000 * 2 ** attempt;
+  return Math.min(hinted ?? backoff, OPENAI_MAX_DELAY_MS);
+}
+
+type OpenAIClient = {
+  fetch: typeof fetch;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+  apiKey: () => string | undefined;
+  model: () => string;
+  /**
+   * Tests pass a signal with no timer. AbortSignal.timeout keeps a 60s timer
+   * that would outlive the test and hold the process open.
+   */
+  abortSignal: () => AbortSignal;
+};
+
+function productionClient(): OpenAIClient {
+  return {
+    fetch: (input, init) => globalThis.fetch(input, init),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now: () => Date.now(),
+    apiKey: () => Deno.env.get('OPENAI_API_KEY'),
+    model: () => Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini',
+    abortSignal: () => AbortSignal.timeout(TIMEOUT.model),
+  };
+}
+
+let client = productionClient();
+let active = 0;
+const waiting: Array<() => void> = [];
+
+/** Tests install a fake network and clock. Passing null restores production. */
+export function setOpenAIClientForTests(next: Partial<OpenAIClient> | null) {
+  if (!next) {
+    client = productionClient();
+  } else {
+    if (!next.fetch) throw new Error('A test OpenAI client needs fetch.');
+    client = {
+      fetch: next.fetch,
+      sleep: next.sleep ?? (() => Promise.resolve()),
+      now: next.now ?? (() => 0),
+      apiKey: next.apiKey ?? (() => 'test-key'),
+      model: next.model ?? (() => 'gpt-4o-mini'),
+      abortSignal: next.abortSignal ?? (() => new AbortController().signal),
+    };
+  }
+  active = 0;
+  waiting.length = 0;
+}
+
+function acquire(): Promise<void> {
+  if (active < OPENAI_CONCURRENCY) {
+    active += 1;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    waiting.push(() => {
+      active += 1;
+      resolve();
+    });
+  });
+}
+
+function release() {
+  active -= 1;
+  const resume = waiting.shift();
+  if (resume) resume();
+}
+
+function clip(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= 500) return flat;
+  return `${flat.slice(0, 500)}…`;
+}
+
+async function chat(
+  apiKey: string,
+  system: string,
+  user: string,
+  schema: unknown,
+  schemaName: string
+): Promise<unknown> {
+  let lastMessage = 'OpenAI returned no content.';
+
+  let waited = 0;
+  for (let attempt = 0; attempt < OPENAI_MAX_ATTEMPTS; attempt += 1) {
+    const response = await client.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: client.model(),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: schemaName, strict: true, schema },
+        },
+      }),
+      signal: client.abortSignal(),
+    });
+
+    if (response.ok) {
+      const body = await response.json();
+      const content = body?.choices?.[0]?.message?.content;
+      if (!content) throw new ExtractorUnavailable('OpenAI returned no content.');
+      return JSON.parse(content);
+    }
+
+    const text = await response.text();
+    const detail = clip(text);
+    lastMessage = detail
+      ? `OpenAI returned ${response.status}: ${detail}`
+      : `OpenAI returned ${response.status}`;
+
+    const kind = openAIFailureKind(response.status, text);
+    if (kind === 'config') throw new ExtractorUnavailable(lastMessage, { config: true });
+
+    const delay = openAIRetryDelayMs(
+      response.status,
+      response.headers.get('retry-after'),
+      text,
+      attempt,
+      client.now()
+    );
+    if (kind !== 'retry' || delay === null) throw new ExtractorUnavailable(lastMessage);
+
+    if (waited + delay > OPENAI_MAX_CALL_WAIT_MS) {
+      console.warn(
+        `OpenAI returned ${response.status}; not waiting ${delay}ms because this call has already waited ${waited}ms.`
+      );
+      throw new ExtractorUnavailable(lastMessage);
+    }
+
+    waited += delay;
+    console.warn(
+      `OpenAI returned ${response.status}; waiting ${delay}ms (attempt ${attempt + 1} of ${OPENAI_MAX_ATTEMPTS}).`
+    );
+    if (delay > 0) await client.sleep(delay);
+  }
+
+  throw new ExtractorUnavailable(lastMessage);
+}
 
 async function complete(
   system: string,
@@ -127,39 +391,17 @@ async function complete(
   schema: unknown,
   schemaName: string
 ): Promise<unknown> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) throw new ExtractorUnavailable('OPENAI_API_KEY is not set.');
+  const apiKey = client.apiKey();
+  if (!apiKey) throw new ExtractorUnavailable('OPENAI_API_KEY is not set.', { config: true });
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: schemaName, strict: true, schema },
-      },
-    }),
-    signal: AbortSignal.timeout(TIMEOUT.model),
-  });
-
-  if (!response.ok) {
-    throw new ExtractorUnavailable(
-      `OpenAI returned ${response.status}: ${await response.text()}`
-    );
+  // Held across the backoff as well as the request, so a burst of watches
+  // queues here instead of collecting a 429 each.
+  await acquire();
+  try {
+    return await chat(apiKey, system, user, schema, schemaName);
+  } finally {
+    release();
   }
-
-  const body = await response.json();
-  const content = body?.choices?.[0]?.message?.content;
-  if (!content) throw new ExtractorUnavailable('OpenAI returned no content.');
-  return JSON.parse(content);
 }
 
 /** For pages where we do not know what the listings are. The model finds them. */
