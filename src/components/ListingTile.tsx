@@ -1,12 +1,15 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Platform,
   Pressable as FramePressable,
   ScrollView,
   Text,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
+
+import { GridPhotoStrip } from '@/components/GridPhotoStrip';
 import { Pressable } from 'react-native-gesture-handler';
 
 import { Avatar } from '@/components/Avatar';
@@ -151,6 +154,24 @@ function TilePhotos({
           accessible={false}
         />
       </FramePressable>
+    );
+  }
+
+  const contentFit = photoShape === 'swipe' ? 'cover' : 'contain';
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={frameStyle} onLayout={onLayout}>
+        <GridPhotoStrip
+          photos={photos}
+          width={width}
+          height={frameHeight}
+          contentFit={contentFit}
+          page={page}
+          onPageChange={setPage}
+          onPress={onPress}
+        />
+      </View>
     );
   }
 
