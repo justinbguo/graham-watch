@@ -32,6 +32,11 @@ export function dealerSocialButtonStyles(theme: Theme) {
     solid: {
       backgroundColor: theme.color.text,
     },
+    /** White fill, dark ink — the quiet partner beside solid Follow. */
+    message: {
+      backgroundColor: theme.color.field,
+      borderColor: theme.color.border,
+    },
     pressed: {
       opacity: 0.72,
     },
@@ -43,8 +48,8 @@ export function dealerSocialButtonStyles(theme: Theme) {
       color: theme.color.background,
     },
     mark: {
-      width: size.icon,
-      height: size.icon,
+      width: size.dealerSocialMark,
+      height: size.dealerSocialMark,
     },
   };
 }

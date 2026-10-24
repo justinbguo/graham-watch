@@ -64,7 +64,7 @@ export function FollowDealer({
         on={following}
         from="account-plus-outline"
         to="account-check-outline"
-        size={size.icon}
+        size={size.dealerSocialMark}
         color={following ? theme.color.text : theme.color.background}
       />
       <Text style={[styles.label, !following && styles.solidLabel]} numberOfLines={1}>

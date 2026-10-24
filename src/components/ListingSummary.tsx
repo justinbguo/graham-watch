@@ -87,7 +87,7 @@ const summaryStyles = (theme: Theme) => ({
   // The left is `md`: at `sm` the name sat on the photograph.
   summaryDense: {
     paddingVertical: space.sm,
-    paddingRight: space.sm,
+    paddingRight: space.xs,
     paddingLeft: space.md,
     gap: space.xs,
   },

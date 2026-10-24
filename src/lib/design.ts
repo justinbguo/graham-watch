@@ -574,8 +574,15 @@ export const layout = {
    * window fills with watches rather than one tall row each.
    */
   gridColumns: 4,
+  /** Phone home grid: two tiles across the column. */
+  gridColumnsPhone: 2,
   /** Desktop web home grid: two swipe-photo columns across `cardWeb`. */
   gridColumnsWeb: 2,
+  /**
+   * Scan and wishlist rows: photograph width as a share of the row, capped at
+   * `gridPhoto` so a list row does not become a poster.
+   */
+  gridScanWidthShare: 0.38,
   /**
    * Grid photograph frame matches the web swipe card's left column (half of
    * `cardWeb`, a little taller than wide).
@@ -683,9 +690,9 @@ export const size = {
   /** A photograph sent in a message thread. */
   messagePhoto: 200,
   /**
-   * The same frame on the home grid and the wishlist. Shorter, so a scan of
-   * the deck or a saved list is a list. A shop keeps `gridPhoto`. Search is a
-   * wall of photographs, not a row.
+   * Fallback width for a scan or wishlist photograph before the row lays out.
+   * After layout, width is `gridScanWidthShare` of the row, capped at
+   * `gridPhoto`. A shop keeps `gridPhoto`. Search is a wall of photographs.
    */
   gridScan: 72,
   /**
@@ -696,6 +703,8 @@ export const size = {
   /** Glyphs. `icon` for a tab or a header control, `iconSmall` inline with text. */
   icon: 24,
   iconSmall: 16,
+  /** Follow and Message on a shop, and the same chrome on a listing. */
+  dealerSocialMark: 18,
   /** Multi-select row checkbox. */
   check: 22,
   checkMark: 14,
