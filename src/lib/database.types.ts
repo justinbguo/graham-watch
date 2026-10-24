@@ -2113,6 +2113,30 @@ export type Database = {
           swipe_count: number
         }[]
       }
+      operator_refresh_runs: {
+        Args: { p_limit?: number }
+        Returns: {
+          added: number
+          changed: number
+          complete: boolean
+          dealer_id: string
+          dealer_name: string
+          error: string
+          fatal: boolean
+          finished_at: string
+          found: number
+          http_status: number
+          id: string
+          ok: boolean
+          pending: number
+          published: number
+          relisted: number
+          retired: number
+          skipped: boolean
+          skipped_listings: number
+          website: string
+        }[]
+      }
       operator_revoke_claim_code: {
         Args: { p_dealer_id: string }
         Returns: number
@@ -2127,6 +2151,15 @@ export type Database = {
           p_status: Database["public"]["Enums"]["listing_status"]
         }
         Returns: Database["public"]["Enums"]["listing_status"]
+      }
+      operator_stale_listings: {
+        Args: never
+        Returns: {
+          dealer_id: string
+          name: string
+          oldest_checked_at: string
+          stale_count: number
+        }[]
       }
       operator_unclaim_shop: {
         Args: { p_dealer_id: string }

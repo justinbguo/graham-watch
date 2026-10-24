@@ -1,0 +1,34 @@
+name: Refresh watch
+
+# Catalogue refresh already goes red, and GitHub mails that, when the job
+# itself fails. A schedule that never started writes no row and sends no
+# mail. This runs two hours later and fails when refresh_runs has nothing
+# in the last 24 hours. That failure is the mail. The secrets are the ones
+# the catalogue job already uses. There is no new one.
+
+on:
+  schedule:
+    # 08:00 UTC, after the 06:00 refresh has had time to finish and write.
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  watch:
+    name: ledger has a row from the last 24 hours
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No npm ci. The script and its helpers are plain Node, and installing
+      # the app here would only make a missed night take longer to say so.
+      - name: check the ledger
+        env:
+          GRAHAM_TARGET: hosted
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/refresh-watch.mjs

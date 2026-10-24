@@ -18,6 +18,52 @@ export function isSchemaMiss(body, status) {
   return status === 404 && (body?.code === 'PGRST202' || body?.code === 'PGRST205');
 }
 
+/**
+ * A missing table is a migration that has not been applied. The night still
+ * happened, and the log says so. Any other refusal means the console will
+ * keep saying the refresh never ran, so the job itself goes red.
+ *
+ * @param {{ recorded?: boolean, missing?: boolean, detail?: string | null }} saved
+ * @returns {string | null}
+ */
+export function historyWriteProblem(saved) {
+  if (!saved || saved.recorded || saved.missing) return null;
+  return saved.detail || 'Could not record refresh history.';
+}
+
+/** How long the ledger may sit still before the watch calls the night missing. */
+export const LEDGER_GAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * No usable timestamp, or the newest one is older than 24 hours.
+ * An empty list is a gap: the job never recorded a run.
+ */
+export function ledgerIsStale(finishedAts, now = Date.now()) {
+  let latest = null;
+  for (const value of finishedAts) {
+    const time = Date.parse(value);
+    if (!Number.isFinite(time)) continue;
+    if (latest === null || time > latest) latest = time;
+  }
+  if (latest === null) return true;
+  return now - latest > LEDGER_GAP_MS;
+}
+
+/**
+ * The watch fails when an approved shop should have been refreshed and the
+ * ledger has nothing from the last 24 hours. Zero approved shops is not a
+ * missed night: the job has nothing to write.
+ *
+ * @param {{ approvedWithWebsite: number, finishedAts: string[], now?: number }} input
+ * @returns {string | null}
+ */
+export function watchFailure(input) {
+  const now = input.now ?? Date.now();
+  if (input.approvedWithWebsite === 0) return null;
+  if (!ledgerIsStale(input.finishedAts, now)) return null;
+  return 'No catalogue refresh recorded in the last 24 hours.';
+}
+
 /** The row the refresh script inserts. `skipped` here is the boolean, not the listing count. */
 export function refreshRunRow(shop) {
   return {

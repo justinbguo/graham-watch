@@ -17,9 +17,11 @@
  *
  * Exits 0 when at least one shop finished its catalogue read. A shop that
  * failed is logged and left for the next night. Exits 1 when the request
- * itself failed (missing secret, rejected cron secret, OpenAI key) or every
- * shop failed. Health warnings — one shop's error, an empty catalogue,
- * missing photos, a week with nothing new — do not change that exit code.
+ * itself failed (missing secret, rejected cron secret, OpenAI key), every
+ * shop failed, or the ledger refused the rows for a reason other than the
+ * table not existing yet. Health warnings — one shop's error, an empty
+ * catalogue, missing photos, a week with nothing new — do not change that
+ * exit code. A missing table is a note, not a failed night.
  */
 
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -28,6 +30,7 @@ import { OPERATOR_HOSTED, parseEnvFile } from './_env.mjs';
 import { config, describeTarget, request, serviceKey } from './_supabase.mjs';
 import {
   healthReport,
+  historyWriteProblem,
   isSchemaMiss,
   refreshRunRow,
   shopFlags,
@@ -162,13 +165,22 @@ console.log(
   `\n${results.length} shop(s): ${published} published, ${retired} retired, ${failed} failed, ${waiting} with watches left for the next run.`
 );
 
-await reportHealth(results);
+const health = await reportHealth(results);
 
 if (exitCode !== 0) {
   const reason = refreshFailureReason(results);
   console.error(reason);
   annotation('error', 'RefreshFailed', reason);
   process.exit(exitCode);
+}
+
+// A shop error stays a warning. A ledger the console cannot read does not:
+// Dealers would keep saying the night never happened. A missing table is
+// the exception, and reportHealth already printed that as a note.
+if (health.recordFailure) {
+  console.error(health.recordFailure);
+  annotation('error', 'RefreshHistory', health.recordFailure);
+  process.exit(1);
 }
 
 function stepSummary(markdown) {
@@ -247,14 +259,14 @@ async function reportHealth(results) {
   const rows = results.map(refreshRunRow);
   const saved = await insertRuns(rows);
   let history = new Map();
+  const recordFailure = historyWriteProblem(saved);
 
   if (!saved.recorded && saved.missing) {
     notes.push(
       'Refresh history is not on this database yet. Apply the new migrations with npm run db:push (after a dump) so the next nights can see a quiet streak. Today’s lines above are still the run.'
     );
-  } else if (!saved.recorded) {
-    notes.push(`Could not record refresh history (${saved.detail}).`);
-    annotation('warning', 'RefreshHistory', saved.detail ?? 'Could not record refresh history.');
+  } else if (recordFailure) {
+    notes.push(`Could not record refresh history (${recordFailure}).`);
   } else if (results.length > 0) {
     const loaded = await fetchRuns(results.map((shop) => shop.dealerId));
     if (loaded.ok) history = runsByDealer(loaded.rows);
@@ -287,4 +299,5 @@ async function reportHealth(results) {
   console.log(`\n${report.text}`);
   stepSummary(`### Shop health\n\n\`\`\`\n${report.text}\n\`\`\`\n`);
   for (const warning of report.warnings) annotation('warning', warning.title, warning.message);
+  return { recordFailure };
 }

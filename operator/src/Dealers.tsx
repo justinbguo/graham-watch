@@ -16,6 +16,7 @@ import {
   type PublishTotals,
 } from './importer';
 import { ShopListings } from './ShopListings';
+import type { DealerFocus } from './navigation';
 import { confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
 type Row = OperatorDealer;
@@ -30,7 +31,7 @@ type Profile = { description: string | null; instagram: string | null; logo_url:
 /** The shop whose catalogue is open, and what the read that opened it found. */
 type Picking = { dealer: Row; note: string | null };
 
-export function Dealers() {
+export function Dealers({ focus = null }: { focus?: DealerFocus | null }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,22 @@ export function Dealers() {
   const [copied, setCopied] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
+  // A Needs attention row names the shop and the filter that shows it.
+  // Adjusting state while rendering is how a new jump replaces the filter
+  // the operator had typed, without an effect that renders twice.
+  const focusKey = focus
+    ? `${focus.dealerId ?? ''}|${focus.flag ?? ''}|${focus.openListings ? '1' : '0'}`
+    : '';
+  // Starts unset, not equal to focusKey. Dealers unmounts when another screen
+  // is open, so a jump back has to apply the filter on the fresh mount too.
+  const [appliedFocus, setAppliedFocus] = useState<string | null>(null);
+  if (focus && focusKey !== appliedFocus) {
+    setAppliedFocus(focusKey);
+    setFlagFilter(focus.flag ?? 'all');
+    setStatusFilter('all');
+    setQuery('');
+    setOpen(focus.openListings && focus.dealerId ? focus.dealerId : null);
+  }
 
   useEffect(() => {
     let live = true;
@@ -78,6 +95,13 @@ export function Dealers() {
       live = false;
     };
   }, [tick]);
+
+  useEffect(() => {
+    if (!focus?.dealerId || !rows) return;
+    document.querySelector(`[data-dealer="${CSS.escape(focus.dealerId)}"]`)?.scrollIntoView({
+      block: 'nearest',
+    });
+  }, [focus, rows, flagFilter]);
 
   async function run(dealer: Row, work: () => Promise<string>) {
     setBusyId(dealer.id);
@@ -318,7 +342,10 @@ export function Dealers() {
                 const profile = profiles[dealer.id];
 
                 return [
-                  <tr key={dealer.id} className={expanded ? 'open' : undefined}>
+                  <tr
+                    key={dealer.id}
+                    data-dealer={dealer.id}
+                    className={expanded ? 'open' : undefined}>
                     <td className="tick">
                       <button
                         className="arrow"
@@ -630,6 +657,12 @@ function RefreshStatus({ dealer }: { dealer: Row }) {
           <span className="muted" title={new Date(sync).toLocaleString()}>
             read {dealer.last_sync_found ?? 0}, {dealer.last_sync_added ?? 0} new
           </span>
+        </>
+      ) : null}
+      {!nightly && sync ? (
+        <>
+          <br />
+          <span className="muted">no nightly run recorded</span>
         </>
       ) : null}
       <br />

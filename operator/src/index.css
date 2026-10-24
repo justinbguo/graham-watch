@@ -893,6 +893,141 @@ button.sort:hover {
   justify-content: flex-end;
 }
 
+/* The refresh banner is a status, not a primary action. It stays a button
+   so a missed night is one press away from the history that explains it. */
+button.health {
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  white-space: normal;
+  text-align: left;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  font-weight: 400;
+  padding: var(--sm) var(--md);
+  border-left: 3px solid var(--text-faint);
+  margin-bottom: var(--lg);
+  gap: var(--sm);
+}
+
+button.health strong {
+  font-weight: 500;
+}
+
+button.health.ok {
+  border-left-color: var(--save);
+}
+
+button.health.warn {
+  border-left-color: var(--brass);
+}
+
+button.health.bad {
+  border-left-color: var(--danger);
+}
+
+.attention .row {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.attention h2 {
+  margin-top: var(--xs);
+}
+
+.problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm);
+}
+
+.problems li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm);
+  align-items: center;
+}
+
+.problems button {
+  padding: var(--xs) var(--md);
+  min-height: var(--hit);
+}
+
+tr.mark {
+  background: var(--fill);
+}
+
+@media (max-width: 700px) {
+  .top {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sm);
+    padding: var(--sm) var(--md);
+  }
+
+  .tabs {
+    order: 3;
+    flex: 1 0 100%;
+    overflow-x: auto;
+  }
+
+  .who {
+    margin-left: auto;
+  }
+
+  .body {
+    padding: var(--md);
+  }
+
+  header.bar {
+    flex-wrap: wrap;
+  }
+
+  table.runs thead {
+    display: none;
+  }
+
+  table.runs,
+  table.runs tbody,
+  table.runs tr,
+  table.runs td {
+    display: block;
+    width: 100%;
+  }
+
+  table.runs tr {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--sm);
+    padding: var(--sm) var(--md);
+  }
+
+  table.runs td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--md);
+    border: 0;
+    padding: var(--xs) 0;
+    text-align: right;
+  }
+
+  table.runs td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  table.runs td:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+}
+
 @media (max-width: 700px) {
   .candidate {
     grid-template-columns: auto 4rem minmax(0, 1fr);

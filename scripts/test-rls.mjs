@@ -2036,6 +2036,20 @@ console.log('\noperators');
   });
   check('a buyer cannot read the user dashboard', dashBefore.status >= 400, `got ${dashBefore.status}`);
 
+  const historyBefore = await api('/rest/v1/rpc/operator_refresh_runs', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check('a buyer cannot read refresh history', historyBefore.status >= 400, `got ${historyBefore.status}`);
+
+  const staleBefore = await api('/rest/v1/rpc/operator_stale_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check('a buyer cannot list stale listings', staleBefore.status >= 400, `got ${staleBefore.status}`);
+
   const dealerOverride = await api('/rest/v1/rpc/operator_edit_listing', {
     token: dealerUser.token,
     method: 'POST',
@@ -2230,7 +2244,44 @@ console.log('\noperators');
     `got ${hiddenLedger.status}`
   );
 
+  const history = await api('/rest/v1/rpc/operator_refresh_runs', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_limit: 20 },
+  });
+  check(
+    'an operator reads that run through the history function',
+    Array.isArray(history.body) &&
+      history.body.some((row) => row.dealer_id === dealerId && row.error === 'boom' && row.ok === true),
+    `${history.status} ${JSON.stringify(history.body)?.slice(0, 300)}`
+  );
+
   await publish(buyer.token, 'approved');
+
+  // Null means the watch has never been confirmed. That is stale on purpose:
+  // a live listing with no check is the row the console has to surface.
+  const backdated = await fetch(`${URL}/rest/v1/listings?id=eq.${listingId}`, {
+    method: 'PATCH',
+    headers: { ...admin, Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      status: 'active',
+      sold_at: null,
+      availability_checked_at: null,
+    }),
+  });
+  const staleListings = await api('/rest/v1/rpc/operator_stale_listings', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  const staleRow = Array.isArray(staleListings.body)
+    ? staleListings.body.find((row) => row.dealer_id === dealerId)
+    : null;
+  check(
+    'an operator sees an active listing that has never been availability-checked',
+    backdated.ok && staleListings.status === 200 && Number(staleRow?.stale_count) >= 1,
+    `patch ${backdated.status}; ${staleListings.status} ${JSON.stringify(staleListings.body)?.slice(0, 300)}`
+  );
 
   // ---------------------------------------------------------------------
   // The console's own reads
@@ -2652,6 +2703,8 @@ console.log('\nwhat anon can reach');
 
   for (const [fn, body] of [
     ['operator_dealers', {}],
+    ['operator_refresh_runs', {}],
+    ['operator_stale_listings', {}],
     ['set_dealer_permission', { p_dealer_id: dealerId, p_permission: 'approved' }],
     ['catalogue_photo_gaps', {}],
     ['listing_photo_counts', {}],

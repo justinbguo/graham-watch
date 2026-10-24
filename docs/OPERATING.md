@@ -101,10 +101,21 @@ npm run db:push:dry
 npm run db:push
 ```
 
-`refresh_runs`, pause, and the photo counts in the operator console all wait
-on that push. The refresh script keeps working before it: a missing table is
-a note in the job log, not a failed night. Function deploys do not wait on
-the migration. After the token above is set, the next push to `main` that
+Pause, photo counts, and the `refresh_runs` ledger are already on hosted.
+The ledger is empty until a nightly run of the script that inserts rows
+finishes; a catalogue read from the console does not write one. Two later
+functions, `operator_refresh_runs` and `operator_stale_listings`, are what
+the Refresh and Needs attention screens call. They are not on hosted until
+you apply the migration that adds them (`npm run db:push`, after a dump).
+Until that push, the console says the history function is missing rather
+than pretending the night never happened.
+
+The refresh script already writes `refresh_runs` on hosted. It does not
+call the two new functions, so it does not wait on this migration. A
+missing table is a note in the job log, not a failed night. A ledger that
+exists and then refuses the insert does fail the night, because otherwise
+the console would keep saying the refresh never ran. Function deploys do
+not wait on the migration. After the token above is set, the next push to `main` that
 touches a function ships it. Re-run the failed Deploy workflow from the
 Actions tab if the token was added after that push.
 
@@ -383,9 +394,28 @@ The job prints a shop health summary after the per-shop lines and writes one
 row per shop to `refresh_runs` when that table exists. A single shop's error,
 an empty catalogue, live watches with no photographs, or seven nights with
 nothing new, changed, or published is a warning on the Actions run. The job
-stays green unless every shop failed or the request itself was rejected.
-Until the migration is on hosted, the summary says the history table is
-missing and still prints today's lines.
+stays green unless every shop failed, the request itself was rejected, or
+the ledger refused the rows for a reason other than the table not existing
+yet. Until the migration is on a database, the summary says the history
+table is missing and still prints today's lines.
+
+The console banner is that ledger, not the catalogue stamp on the shop.
+**Last successful refresh** means a row where a shop finished without a
+fatal error. Nothing recorded in 24 hours is a missed night, including a
+schedule that never started. The Refresh screen lists each run: how many
+shops were ok, fatal, or in error, when it finished, and the per-shop error
+text. Needs attention turns a missed or failed run, a shop left out of a
+run, and the other queues (pending applications, a reply waiting 48 hours,
+a claimer quiet for 14 days, an active listing with no photo, an active
+listing not availability-checked for 48 hours) into one list. The nav badge
+is the length of that list.
+
+GitHub already mails a failed Catalogue refresh. It cannot mail a run that
+never started. `.github/workflows/refresh-watch.yml` runs at 08:00 UTC and
+fails when `refresh_runs` has no row in the last 24 hours. That failure is
+the mail: the same GitHub Actions notification, using the secrets the
+catalogue job already has. No new secret. It arrives only if your GitHub
+notification settings include failed workflows.
 
 The Dealers table shows **Last refresh**: when the nightly job last finished,
 how many listings it published and skipped, the photo count, how many live

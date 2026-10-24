@@ -4,23 +4,27 @@ import { useEffect, useState } from 'react';
 import { Activity } from './Activity';
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
+import { Attention } from './Attention';
 import { Dealers } from './Dealers';
+import { Refresh } from './Refresh';
 import { SignIn } from './SignIn';
 import { Users } from './Users';
+import type { DealerFocus, Jump, Screen } from './navigation';
+import { usePulse } from './pulse';
 import { supabase, target } from './supabase';
 
-// Dealers first, because that is the screen an operator opens the console to
-// use: importing watches and publishing a shop both happen there. Users is the
-// activity dashboard. Applications is a queue that is empty most days.
+// Needs attention is first in the nav because the badge is the thing to see
+// on the way in. Dealers stays the screen that opens: importing watches and
+// publishing a shop both happen there.
 const SCREENS = {
+  attention: 'Needs attention',
   dealers: 'Dealers',
+  refresh: 'Refresh',
   users: 'Users',
   activity: 'Activity',
   applications: 'Applications',
   add: 'Add shops',
-} as const;
-
-type Screen = keyof typeof SCREENS;
+} as const satisfies Record<Screen, string>;
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,6 +34,12 @@ export function App() {
   // that render is the whole operator UI.
   const [access, setAccess] = useState<{ userId: string; ok: boolean } | null>(null);
   const [screen, setScreen] = useState<Screen>('dealers');
+  const [dealerFocus, setDealerFocus] = useState<DealerFocus | null>(null);
+  const [refreshDealerId, setRefreshDealerId] = useState<string | undefined>();
+  // The previous account's answer stays in state until the new check returns.
+  // Fetching in that gap would ask as the new session and trust the old grant.
+  const operatorReady = Boolean(session && access?.userId === session.user.id && access.ok);
+  const pulseState = usePulse(operatorReady, screen);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -80,6 +90,14 @@ export function App() {
     );
   }
 
+  const waiting = pulseState.pulse?.items.length ?? 0;
+
+  function go(jump: Jump) {
+    if (jump.screen === 'dealers') setDealerFocus(jump.focus);
+    if (jump.screen === 'refresh') setRefreshDealerId(jump.dealerId);
+    setScreen(jump.screen);
+  }
+
   return (
     <div className="shell">
       <header className="top">
@@ -98,6 +116,9 @@ export function App() {
               className={screen === key ? 'tab on' : 'tab'}
               onClick={() => setScreen(key as Screen)}>
               {label}
+              {key === 'attention' && waiting > 0 ? (
+                <span className="badge wait">{waiting}</span>
+              ) : null}
             </button>
           ))}
         </nav>
@@ -110,14 +131,36 @@ export function App() {
       </header>
 
       <main className="body">
-        {screen === 'applications' ? (
+        <button
+          className={pulseState.pulse ? `health ${pulseState.pulse.banner.tone}` : 'health'}
+          onClick={() => setScreen('refresh')}>
+          <strong>{pulseState.pulse?.banner.title ?? 'Checking the last refresh…'}</strong>
+          {pulseState.pulse ? <span className="muted">{pulseState.pulse.banner.detail}</span> : null}
+        </button>
+        {screen === 'attention' ? (
+          <Attention
+            items={pulseState.pulse?.items ?? null}
+            error={pulseState.pulse?.error ?? null}
+            onJump={go}
+            onReload={pulseState.reload}
+          />
+        ) : screen === 'refresh' ? (
+          <Refresh
+            runs={pulseState.pulse?.runs ?? null}
+            runsUnavailable={pulseState.pulse?.runsUnavailable ?? false}
+            error={pulseState.pulse?.error ?? null}
+            highlightDealerId={refreshDealerId}
+            onOpenDealer={(dealerId) => go({ screen: 'dealers', focus: { dealerId, openListings: true } })}
+            onReload={pulseState.reload}
+          />
+        ) : screen === 'applications' ? (
           <Applications />
         ) : screen === 'users' ? (
           <Users />
         ) : screen === 'activity' ? (
           <Activity />
         ) : screen === 'dealers' ? (
-          <Dealers />
+          <Dealers focus={dealerFocus} />
         ) : (
           // Lands on Dealers after a run, because the next two steps — importing
           // watches and publishing the shop — both live there.

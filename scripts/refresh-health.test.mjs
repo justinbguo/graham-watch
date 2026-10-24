@@ -5,7 +5,10 @@ import { refreshExitCode } from './refresh-run.mjs';
 import {
   QUIET_NIGHTS,
   healthReport,
+  historyWriteProblem,
   isSchemaMiss,
+  ledgerIsStale,
+  watchFailure,
   quietStreak,
   refreshRunRow,
   shopFlags,
@@ -124,4 +127,38 @@ test('a missing ledger is a schema-cache miss, not a shop failure', () => {
   assert.match(report.text, /nothing to flag/);
   assert.match(report.text, /not on this database yet/);
   assert.equal(report.warnings.length, 0);
+});
+
+test('a missing table does not fail the night, and any other ledger refusal does', () => {
+  assert.equal(historyWriteProblem({ recorded: true, missing: false, detail: null }), null);
+  assert.equal(
+    historyWriteProblem({ recorded: false, missing: true, detail: 'refresh_runs' }),
+    null
+  );
+  assert.equal(
+    historyWriteProblem({ recorded: false, missing: false, detail: 'permission denied' }),
+    'permission denied'
+  );
+  assert.equal(historyWriteProblem({ recorded: false, missing: false, detail: '' }), 'Could not record refresh history.');
+});
+
+test('the watch calls a ledger stale when nothing landed in 24 hours', () => {
+  const now = Date.parse('2026-10-24T08:00:00Z');
+  assert.equal(ledgerIsStale([], now), true);
+  assert.equal(ledgerIsStale(['not-a-date'], now), true);
+  assert.equal(ledgerIsStale(['2026-10-23T06:00:00Z'], now), true);
+  assert.equal(ledgerIsStale(['2026-10-23T06:00:00Z', '2026-10-24T06:05:00Z'], now), false);
+});
+
+test('the watch stays quiet when there is no approved shop to refresh', () => {
+  const now = Date.parse('2026-10-24T08:00:00Z');
+  assert.equal(watchFailure({ approvedWithWebsite: 0, finishedAts: [], now }), null);
+  assert.equal(
+    watchFailure({ approvedWithWebsite: 2, finishedAts: [], now }),
+    'No catalogue refresh recorded in the last 24 hours.'
+  );
+  assert.equal(
+    watchFailure({ approvedWithWebsite: 2, finishedAts: ['2026-10-24T06:05:00Z'], now }),
+    null
+  );
 });
