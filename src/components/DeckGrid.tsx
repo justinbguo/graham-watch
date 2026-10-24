@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Platform, View } from 'react-native';
 
-import { ListingRow } from '@/components/ListingRow';
 import { ListingTile } from '@/components/ListingTile';
 import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
@@ -9,12 +8,12 @@ import { layout, space } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useThemedStyles } from '@/providers/theme';
 
-const GAP = space.md;
+const GAP = space.sm;
 
 /**
- * The scanning half of the deck. On a wide window it is a tile grid —
- * photograph above the copy, `layout.gridColumns` across — so the page fills
- * with watches. On a phone it stays one row each. A tap opens the listing.
+ * The scanning half of the deck. Tiles — photograph above the copy — fill the
+ * column: two across on a phone, more on a wide window. A tap opens the
+ * listing.
  *
  * On web the arrows move the selection (left/right within a row, up/down by a
  * row). Enter opens. Pass and save live on the listing, and on the card view's
@@ -35,7 +34,11 @@ export function DeckGrid({
   const styles = useThemedStyles(gridStyles);
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
-  const columns = wide ? (isDesktopWeb ? layout.gridColumnsWeb : layout.gridColumns) : 1;
+  const columns = wide
+    ? isDesktopWeb
+      ? layout.gridColumnsWeb
+      : layout.gridColumns
+    : layout.gridColumnsPhone;
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !active) return;
@@ -72,37 +75,16 @@ export function DeckGrid({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, cards, columns, selectedIndex, onOpen]);
 
-  if (!wide) {
-    return (
-      <FlatList
-        data={cards}
-        keyExtractor={(card) => card.id}
-        contentContainerStyle={styles.content}
-        renderItem={({ item, index }) => (
-          <ListingRow
-            card={item}
-            scan
-            selected={Platform.OS === 'web' && index === selectedIndex}
-            onPress={() => {
-              setSelected(index);
-              onOpen(item);
-            }}
-          />
-        )}
-      />
-    );
-  }
-
   return (
     <FlatList
       key={`deck-grid-${columns}`}
       data={cards}
       keyExtractor={(card) => card.id}
       numColumns={columns}
-      columnWrapperStyle={styles.row}
+      columnWrapperStyle={columns > 1 ? styles.row : undefined}
       contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}
       renderItem={({ item, index }) => (
-        <View style={[styles.cell, { maxWidth: `${100 / columns}%` as const }]}>
+        <View style={[styles.cell, columns > 1 && { maxWidth: `${100 / columns}%` as const }]}>
           <ListingTile
             card={item}
             photoShape={isDesktopWeb ? 'swipe' : 'square'}
@@ -120,8 +102,8 @@ export function DeckGrid({
 
 const gridStyles = () => ({
   content: {
-    paddingHorizontal: space.md,
-    paddingBottom: space.md,
+    paddingHorizontal: space.sm,
+    paddingBottom: space.sm,
     gap: GAP,
   },
   contentDesktop: {

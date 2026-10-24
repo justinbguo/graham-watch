@@ -169,16 +169,16 @@ nobody follows.
 - A sent message that waits for the server to appear. The row goes into the
   thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
   it.
-- More than one watch on a grid row, except Search and the wide home grid.
-  Above the breakpoint the home grid is `layout.gridColumns` tiles
-  (`ListingTile`): square photograph alone on the page (`contain`,
-  `radius.md`), name / specs / price+dealer under it — no `surface` wrapping
-  the block, no badge or heart on the photo. Below the breakpoint, and on the
-  wishlist and a shop, `ListingRow` puts the photograph on the left
-  (`gridScan` on the phone home grid and wishlist, `gridPhoto` in a shop) and
-  the details on the right. The row or tile does not pass or save — that
-  happens on the listing it opens. Search is a wall of square photographs,
-  three across, described in `docs/DESIGN.md`.
+- More than one watch on a grid row for Search, the home grid (`ListingTile`:
+  `layout.gridColumnsPhone` on a phone, `layout.gridColumns` / `gridColumnsWeb`
+  above the breakpoint), and nowhere else. Tiles are a square photograph alone
+  on the page (`contain`, `radius.md`), name / specs / price+dealer under it —
+  no `surface` wrapping the block. The wishlist and a shop use `ListingRow`:
+  photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;
+  wishlist and any scan row), `gridPhoto` in a shop, details on the right. The
+  row or tile does not pass or save — that happens on the listing it opens.
+  Search is a wall of square photographs, three across, described in
+  `docs/DESIGN.md`.
 - `surfaceSunken` on something sitting directly on the page. It is darker than
   the page in the dark scheme and disappears there; it only works inside a
   container.

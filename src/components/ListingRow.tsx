@@ -9,7 +9,7 @@ import { useSwipeGuard } from '@/components/SwipeToRemove';
 import { formatTitle } from '@/lib/format';
 import { photoScrollPage } from '@/lib/photoPager';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { layout, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
@@ -67,7 +67,14 @@ export function ListingRow({
   const styles = useThemedStyles(rowStyles);
   const theme = useTheme();
   const photo = card.photos[0]?.url;
-  const frame = photoWidth ?? (scan || compact ? size.gridScan : size.gridPhoto);
+  const [rowWidth, setRowWidth] = useState(0);
+  const scanFrame =
+    scan || compact
+      ? rowWidth > 0
+        ? Math.min(Math.round(rowWidth * layout.gridScanWidthShare), size.gridPhoto)
+        : size.gridScan
+      : undefined;
+  const frame = photoWidth ?? scanFrame ?? size.gridPhoto;
   const photoStyle = [styles.photo, compact && styles.photoCompact, { width: frame }];
   const messageLabel = inConversation ? 'In conversation' : 'Message';
   // In a list where a row can be swiped, the end of that swipe is not a tap.
@@ -75,6 +82,10 @@ export function ListingRow({
 
   return (
     <View
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout.width;
+        setRowWidth((current) => (Math.abs(current - next) < 1 ? current : next));
+      }}
       style={[
         styles.row,
         compact && styles.rowCompact,

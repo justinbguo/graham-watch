@@ -936,17 +936,18 @@ price on the left and the dealer in `brass` on the right. Tiles sit
 badges, hearts, or shipping lines on the photograph — those are another
 product's furniture.
 
-Below the breakpoint the home grid stays one watch per row: photograph on
-the left at `size.gridScan`, details on the right, denser summary padding.
-That row still pages its photographs sideways. A shop keeps the taller
-`gridPhoto` row. Search is a wall of photographs, described under Search.
-The wishlist has its own compact row, described below. The row or tile does
-not decide — a tap opens the listing, and Pass or Save there is the verdict.
+Below the breakpoint the home grid is the same tiles as a wide window, but
+`layout.gridColumnsPhone` across — photograph above the copy, `space.sm`
+between tiles. A shop keeps the taller `gridPhoto` row. Search is a wall of
+photographs, described under Search. The wishlist has its own compact row,
+described below. The row or tile does not decide — a tap opens the listing,
+and Pass or Save there is the verdict.
 
-`size.gridPhoto` is a quarter of a phone's width, not a third. At 128 the
-photograph was big enough to inspect and three rows filled the screen, so a
-list of fifty watches read as a stack of posters and scanning it meant
-scrolling. Inspecting happens on the listing; a row only has to be recognised.
+Wishlist and shop rows that still use `ListingRow` size the photograph at
+`layout.gridScanWidthShare` of the row, capped at `size.gridPhoto`, so the
+thumb grows on a wide row without becoming a poster. `size.gridScan` is only
+the width before layout. Inspecting happens on the listing; a list row only
+has to be recognised.
 
 The price and the dealer share one line, divided by a middot with air around
 it, exactly as they do on the card. The dealer is `control` in `brass`: medium,
