@@ -703,6 +703,8 @@ export const size = {
   /** Glyphs. `icon` for a tab or a header control, `iconSmall` inline with text. */
   icon: 24,
   iconSmall: 16,
+  /** Follow and Message on a shop, and the same chrome on a listing. */
+  dealerSocialMark: 18,
   /** Multi-select row checkbox. */
   check: 22,
   checkMark: 14,

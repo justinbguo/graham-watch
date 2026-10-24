@@ -45,7 +45,12 @@ export function MessageDealer({
           onError: (error) => Alert.alert('Could not open that message', error.message),
         })
       }
-      style={({ pressed }) => [styles.button, block && styles.block, pressed && styles.pressed]}>
+      style={({ pressed }) => [
+        styles.button,
+        styles.message,
+        block && styles.block,
+        pressed && styles.pressed,
+      ]}>
       {start.isPending ? (
         <ActivityIndicator size="small" color={theme.color.text} />
       ) : (

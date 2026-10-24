@@ -5,7 +5,7 @@ import { dealerSocialButtonStyles, dealerSocialHitSlop } from '@/features/dealer
 import { size, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-/** Same chrome as Follow and Message: rounded rect, `labelStrong`, 24pt mark. */
+/** Same chrome as Follow and Message: rounded rect, `labelStrong`, social mark. */
 export function AddToWishlist({
   loading,
   block = false,
@@ -33,7 +33,7 @@ export function AddToWishlist({
       ) : (
         <MaterialCommunityIcons
           name="bookmark-outline"
-          size={size.icon}
+          size={size.dealerSocialMark}
           color={theme.color.text}
           accessible={false}
         />

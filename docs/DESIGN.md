@@ -548,7 +548,8 @@ with its strap, at `size.tabIcon`. `expo-image` tints them — the file's stroke
 black and black disappears on the dark page. The three line drawings are a 1.5
 stroke on a 24 box; the watch is a 1 stroke. Filters is `text` until a filter
 is on, then `brass`. Message and comment take the ink of the control they sit
-on: `ink` on a community pill, `onAccent` on the wishlist's Message button.
+on: `ink` on a community pill, `text` on the wishlist's Message button (`field`
+fill).
 Each has one drawing, not an outline and a solid.
 
 The tab bar uses that same family at `size.tabIcon`. Its glyphs have no word
@@ -1353,7 +1354,7 @@ On the shop's own page the screen title is that name, so the panel does not
 say it again. The title steps down to `type.title` so Follow can share the
 line. The name takes its own width; when the line is full the capsules wrap
 under it rather than crushing the name. **Message** sits beside Follow, the
-same height and the outline ink Following uses, with the commissioned bubble.
+same height, `field` fill with `text` ink and the commissioned bubble.
 It opens that shop's thread. A watch is not named unless the button is the
 one under a listing. **Filters** sits in the header beside Close, the same
 control the deck uses. It is there once the shop has a watch to isolate.
@@ -1377,8 +1378,8 @@ links. The shop's own page shows neither: the list is already there.
 
 **Follow** sits on the name's line, a rounded rectangle at `dealerSocial`
 (`minHeight` 36, `paddingX` `space.md`, `radius.lg`) with the word in
-`labelStrong` and the glyph at `size.icon`. **Message** is the same shape beside
-it, outline in every state, because Follow is the loud one. When a long name
+`labelStrong` and the glyph at `size.dealerSocialMark`. **Message** is the same
+shape beside it, `field` with `text` ink, because Follow is the loud one. When a long name
 pushes them to a row of their own, they stay side by side on that row. The panel
 measures the wrap rather than guessing from the name. Each button is shorter than
 `HIT_TARGET`, so `hitSlop` makes up the rest.

@@ -161,13 +161,13 @@ export function ListingRow({
             onPress={guard(onMessage)}
             style={({ pressed }) => [styles.message, pressed && styles.pressed]}>
             {messagePending ? (
-              <ActivityIndicator color={theme.color.onAccent} />
+              <ActivityIndicator color={theme.color.text} />
             ) : (
               <Image
                 source={require('../../assets/message.svg')}
                 style={styles.messageMark}
                 contentFit="contain"
-                tintColor={theme.color.onAccent}
+                tintColor={theme.color.text}
                 accessible={false}
               />
             )}
@@ -273,15 +273,17 @@ const rowStyles = (theme: Theme) => ({
     marginLeft: space.md,
     marginBottom: space.sm,
     borderRadius: radius.full,
-    backgroundColor: theme.color.accent,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.field,
   },
   messageLabel: {
     ...type.control,
-    color: theme.color.onAccent,
+    color: theme.color.text,
   },
   messageMark: {
-    width: size.iconSmall,
-    height: size.iconSmall,
+    width: size.dealerSocialMark,
+    height: size.dealerSocialMark,
   },
   pressed: {
     opacity: 0.72,
