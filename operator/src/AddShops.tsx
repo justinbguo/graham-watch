@@ -564,6 +564,9 @@ function ShopDetail({ row, onInspect }: { row: Row; onInspect: () => void }) {
             {row.preview.counts.read} products read via {row.preview.provider} ·{' '}
             {row.preview.counts.for_sale} for sale · {row.preview.counts.sold} sold ·{' '}
             {row.preview.counts.skipped} refused. Only the ones for sale can be imported.
+            {row.preview.complete === false
+              ? ' This read stopped early, so the counts are not the whole shop and nothing is retired just for being absent.'
+              : ''}
           </p>
           <ShopProducts preview={row.preview} />
         </>

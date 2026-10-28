@@ -391,8 +391,8 @@ The Dealers table shows **Last refresh**: when the nightly job last finished,
 how many listings it published and skipped, the photo count, how many live
 watches have no photograph, and the last error as text in the cell. Before the
 first recorded run, the cell falls back to the catalogue read (how many it
-found, how many were new). `incomplete` means that read hit the size cap, so
-absence was not treated as sold.
+found, how many were new). `incomplete` means that read stopped before the
+end of the catalogue, so absence was not treated as sold.
 
 Filter the table by status or by a flag. A shop is **neglected** when it is
 unclaimed, when the person who claimed it has not signed in for 14 days, or

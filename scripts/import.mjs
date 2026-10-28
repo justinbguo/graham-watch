@@ -37,7 +37,7 @@ try {
     `  ${synced.found} watches via ${synced.provider}: ${synced.added} new, ${synced.changed} changed, ${synced.adopted} matched to listings we had, ${synced.retired} retired.`
   );
   if (!synced.complete) {
-    console.log('  Stopped at the read limit. Run it again to read further.');
+    console.log('  Stopped before the end of the catalogue. Watches that were not read were left alone.');
   }
 
   const picked = await choose({ dealerId: synced.dealerId, limit, token: operator.token });
