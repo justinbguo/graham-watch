@@ -5,6 +5,7 @@ import { Activity } from './Activity';
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
 import { Dealers } from './Dealers';
+import { Inbox, type InboxFocus } from './Inbox';
 import { SignIn } from './SignIn';
 import { Users } from './Users';
 import { supabase, target } from './supabase';
@@ -14,6 +15,7 @@ import { supabase, target } from './supabase';
 // activity dashboard. Applications is a queue that is empty most days.
 const SCREENS = {
   dealers: 'Dealers',
+  inbox: 'Inbox',
   users: 'Users',
   activity: 'Activity',
   applications: 'Applications',
@@ -30,6 +32,7 @@ export function App() {
   // that render is the whole operator UI.
   const [access, setAccess] = useState<{ userId: string; ok: boolean } | null>(null);
   const [screen, setScreen] = useState<Screen>('dealers');
+  const [inboxFocus, setInboxFocus] = useState<InboxFocus | null>(null);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -72,7 +75,7 @@ export function App() {
             {session.user.email} is signed in but cannot approve shops. Grant it with:
           </p>
           <pre>npm run dealers -- operator {session.user.email}</pre>
-          <button className="ghost" onClick={() => void supabase.auth.signOut()}>
+          <button className="ghost compact" onClick={() => void supabase.auth.signOut()}>
             Sign out
           </button>
         </div>
@@ -103,7 +106,7 @@ export function App() {
         </nav>
         <div className="who">
           <span className="muted small">{session.user.email}</span>
-          <button className="ghost" onClick={() => void supabase.auth.signOut()}>
+          <button className="ghost compact" onClick={() => void supabase.auth.signOut()}>
             Sign out
           </button>
         </div>
@@ -117,7 +120,14 @@ export function App() {
         ) : screen === 'activity' ? (
           <Activity />
         ) : screen === 'dealers' ? (
-          <Dealers />
+          <Dealers
+            onOpenInbox={(dealer) => {
+              setInboxFocus({ dealerId: dealer.id, dealerName: dealer.name });
+              setScreen('inbox');
+            }}
+          />
+        ) : screen === 'inbox' ? (
+          <Inbox focus={inboxFocus} onClearFocus={() => setInboxFocus(null)} />
         ) : (
           // Lands on Dealers after a run, because the next two steps — importing
           // watches and publishing the shop — both live there.

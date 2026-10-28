@@ -103,6 +103,12 @@ export const CANDIDATE_LIMIT = 500;
 const MAX_PASSES = 200;
 
 /**
+ * Watches per publish request. Higher = fewer round trips from the browser;
+ * the edge function has ~150s, so this stays below the nightly cap of 25.
+ */
+export const PUBLISH_BATCH = 15;
+
+/**
  * `functions.invoke` swallows the body of a failed response and reports
  * "non-2xx status", which throws away the only useful part: the function says
  * why in `error`, and a 429 has to be told apart from a bad domain.
@@ -156,6 +162,11 @@ export function deleteListing(listingId: string): Promise<{ photos: number }> {
   return call<{ photos: number }>({ action: 'delete-listing', listingId });
 }
 
+/** Removes the shop, every imported watch, and catalogue rows. Irreversible. */
+export function deleteDealer(dealerId: string): Promise<{ photos: number }> {
+  return call<{ photos: number }>({ action: 'delete-dealer', dealerId });
+}
+
 /**
  * Reads a shop's whole catalogue and writes nothing.
  *
@@ -193,6 +204,14 @@ export function syncCatalog(input: {
   dealerId?: string;
 }): Promise<SyncResult> {
   return call<SyncResult>({ action: 'sync', ...input });
+}
+
+/**
+ * Marks every for-sale catalogue row for publish, like the nightly job after
+ * sync. Publish still skips watches without enough photos or already imported.
+ */
+export function queueCatalogForPublish(dealerId: string): Promise<{ pending: number }> {
+  return call<{ pending: number }>({ action: 'queue-publish', dealerId });
 }
 
 type SourceItemDraft = {
@@ -392,7 +411,8 @@ export async function stageImport(
  */
 export async function importListings(
   dealerId: string,
-  onProgress?: (totals: PublishTotals) => void
+  onProgress?: (totals: PublishTotals) => void,
+  onLog?: (message: string) => void
 ): Promise<PublishTotals> {
   const totals: PublishTotals = {
     processed: 0,
@@ -402,8 +422,17 @@ export async function importListings(
     pending: 0,
   };
 
+  onLog?.(
+    `Draining the queue in batches of ${PUBLISH_BATCH}. Each watch needs one AI read plus photos — often several minutes for a large shop.`
+  );
+
+  const jobStarted = Date.now();
+
   for (let pass = 0; pass < MAX_PASSES; pass += 1) {
-    const batch = await call<PublishTotals>({ action: 'publish', dealerId });
+    onLog?.(`Batch ${pass + 1}: calling import-listings (${PUBLISH_BATCH} watches max)…`);
+    const started = Date.now();
+    const batch = await call<PublishTotals>({ action: 'publish', dealerId, batch: PUBLISH_BATCH });
+    const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
     totals.processed += batch.processed;
     totals.published += batch.published;
@@ -411,11 +440,41 @@ export async function importListings(
     totals.failed += batch.failed;
     totals.pending = batch.pending;
 
+    onLog?.(
+      `Batch ${pass + 1} (${seconds}s): processed ${batch.processed}, published ${batch.published}, skipped ${batch.skipped}, failed ${batch.failed}, ${batch.pending} still queued`
+    );
+
+    if (totals.published > 0 && totals.pending > 0) {
+      const elapsedSec = (Date.now() - jobStarted) / 1000;
+      const perWatch = elapsedSec / totals.published;
+      const etaSec = Math.round(perWatch * totals.pending);
+      onLog?.(`Roughly ${formatEta(etaSec)} left at this pace.`);
+    }
+
     onProgress?.({ ...totals });
     if (batch.pending === 0 || batch.processed === 0) break;
   }
 
+  if (totals.pending > 0) {
+    onLog?.(`Stopped after ${MAX_PASSES} batches with ${totals.pending} still queued. Run import again to continue.`);
+  } else if (totals.processed === 0) {
+    onLog?.('Queue was empty — nothing to publish in this pass.');
+  } else {
+    onLog?.(
+      `Done. ${totals.published} published, ${totals.skipped} skipped (usually photos), ${totals.failed} failed.`
+    );
+  }
+
   return totals;
+}
+
+function formatEta(seconds: number): string {
+  if (seconds < 90) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 120) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
 export function formatPrice(cents: number | null, currency: string | null): string {

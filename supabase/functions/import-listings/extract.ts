@@ -121,7 +121,13 @@ the dealer's prose, without marketing superlatives.`;
  * seconds: a higher quota just proceeds, and a 429 waits for the hint
  * OpenAI sent.
  */
-export const OPENAI_CONCURRENCY = 1;
+/** Override with OPENAI_CONCURRENCY (1–4) when your key allows more than one in flight. */
+export function openAIConcurrencyLimit(): number {
+  const raw = Deno.env.get('OPENAI_CONCURRENCY');
+  const parsed = raw ? Number(raw) : 1;
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(Math.floor(parsed), 4);
+}
 
 /** First try plus three waits. A 429 that survives this fails the shop. */
 export const OPENAI_MAX_ATTEMPTS = 4;
@@ -288,7 +294,7 @@ export function setOpenAIClientForTests(next: Partial<OpenAIClient> | null) {
 }
 
 function acquire(): Promise<void> {
-  if (active < OPENAI_CONCURRENCY) {
+  if (active < openAIConcurrencyLimit()) {
     active += 1;
     return Promise.resolve();
   }

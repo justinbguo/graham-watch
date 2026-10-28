@@ -24,7 +24,7 @@ export function Activity() {
 
   return (
     <section>
-      <header className="bar">
+      <header className="toolbar">
         <h1>Activity</h1>
       </header>
       <p className="muted small legend">

@@ -61,7 +61,7 @@ export function Users() {
 
   return (
     <section>
-      <header className="bar">
+      <header className="toolbar">
         <h1>Users</h1>
       </header>
       <div className="stats">

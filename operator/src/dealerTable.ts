@@ -1,3 +1,5 @@
+import { dealerLastSyncAt } from './refreshSchedule.ts';
+
 /**
  * What the Dealers table shows after the search box, the two filters, and a
  * column sort. The database returns every shop; this is the only place that
@@ -8,9 +10,9 @@ export type ShopStatus = 'pending' | 'approved' | 'paused' | 'revoked';
 
 export type NeglectFlag = 'unclaimed' | 'quiet' | 'unanswered';
 
-export type FlagFilter = 'all' | 'neglected' | NeglectFlag | 'missing_photos' | 'last_error';
+export type FlagFilter = 'all' | 'neglected' | NeglectFlag | 'last_error';
 
-export type SortKey = 'newest' | 'name' | 'status' | 'listings' | 'missing_photos' | 'last_error' | 'flags';
+export type SortKey = 'newest' | 'name' | 'status' | 'listings' | 'last_sync' | 'last_error' | 'flags';
 
 export type DealerRow = {
   id: string;
@@ -19,7 +21,8 @@ export type DealerRow = {
   permission: ShopStatus;
   created_at: string;
   listings_held: number;
-  listings_missing_photos: number;
+  last_refresh_ok_at?: string | null;
+  last_synced_at?: string | null;
   last_refresh_error: string | null;
   last_sync_error: string | null;
   neglect_flags: string[] | null;
@@ -60,7 +63,6 @@ function matchesFlag(dealer: DealerRow, flag: FlagFilter): boolean {
   const flags = dealer.neglect_flags ?? [];
   if (flag === 'all') return true;
   if (flag === 'neglected') return flags.length > 0;
-  if (flag === 'missing_photos') return dealer.listings_missing_photos > 0;
   if (flag === 'last_error') return shopErrors(dealer).length > 0;
   return flags.includes(flag);
 }
@@ -71,8 +73,10 @@ function compareDealers(a: DealerRow, b: DealerRow, sort: SortKey): number {
     return STATUS_ORDER.indexOf(a.permission) - STATUS_ORDER.indexOf(b.permission) || byNewest(a, b);
   }
   if (sort === 'listings') return b.listings_held - a.listings_held || byNewest(a, b);
-  if (sort === 'missing_photos') {
-    return b.listings_missing_photos - a.listings_missing_photos || byNewest(a, b);
+  if (sort === 'last_sync') {
+    const aAt = syncSortKey(a);
+    const bAt = syncSortKey(b);
+    return aAt - bAt || byNewest(a, b);
   }
   if (sort === 'last_error') {
     const aErr = shopErrors(a).length > 0 ? 0 : 1;
@@ -89,4 +93,10 @@ function compareDealers(a: DealerRow, b: DealerRow, sort: SortKey): number {
 
 function byNewest(a: DealerRow, b: DealerRow): number {
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
+/** Missing sync sorts oldest-first (0) so neglected shops rise to the top. */
+function syncSortKey(dealer: DealerRow): number {
+  const at = dealerLastSyncAt(dealer);
+  return at ? new Date(at).getTime() : 0;
 }

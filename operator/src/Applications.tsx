@@ -80,7 +80,7 @@ export function Applications() {
 
   return (
     <section>
-      <header className="bar">
+      <header className="toolbar">
         <h1>
           Waiting on you
           {rows && rows.length > 0 ? <span className="badge">{rows.length}</span> : null}

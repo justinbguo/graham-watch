@@ -59,22 +59,28 @@
 }
 
 :root {
-  /* color.dark */
-  --background: #121110;
-  --surface: #1e1b18;
-  --surface-sunken: #0d0c0b;
-  --fill: #302c27;
-  --border: #2e2a26;
-  --text: #f3efe8;
-  --text-muted: #9a9186;
-  --text-faint: #6f675c;
-  --ink: #f3efe8;
-  --ink-muted: #9a9186;
-  --accent: #f3efe8;
-  --on-accent: #17140f;
-  --brass: #c9a468;
-  --save: #5fb68c;
-  --danger: #e0776b;
+  /* color.dark — operator uses the app palette with dashboard elevation */
+  --background: #0f0e0d;
+  --surface: #181614;
+  --surface-raised: #1f1c19;
+  --surface-sunken: #0a0908;
+  --fill: #262220;
+  --fill-hover: #302c28;
+  --border: #2a2622;
+  --border-strong: #3d3832;
+  --text: #ece7df;
+  --text-muted: #9c948a;
+  --text-faint: #6b645c;
+  --ink: #ece7df;
+  --ink-muted: #9c948a;
+  --accent: #e8e2d8;
+  --on-accent: #14110e;
+  --brass: #c4a066;
+  --link: #d4b87a;
+  --save: #5aab84;
+  --danger: #d97066;
+  --danger-muted: rgb(217 112 102 / 14%);
+  --message-incoming: #221f1c;
 
   /* space */
   --xs: 4px;
@@ -90,9 +96,11 @@
   --radius-lg: 10px;
   --radius-full: 9999px;
 
-  /* HIT_TARGET, and the capsule's horizontal padding: controlMin / 2. */
-  --hit: 44px;
-  --capsule-x: 26px;
+  /* Touch target for icon-only controls; dense rows use --control-h. */
+  --hit: 36px;
+  --control-h: 32px;
+  --control-h-sm: 28px;
+  --control-pad-x: 12px;
 
   /* Text below 20px, Display at 20 and above. */
   --face-text: 'NHaasGroteskTXPro', ui-sans-serif, system-ui, sans-serif;
@@ -100,9 +108,9 @@
 
   color-scheme: dark;
   font-family: var(--face-text);
-  /* type.body */
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -113,6 +121,10 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--text);
+}
+
+::selection {
+  background: rgb(196 160 102 / 28%);
 }
 
 /* type.title, in Display: 22 is over the 20px line where the family switches. */
@@ -148,7 +160,13 @@ p + p {
 }
 
 a {
-  color: var(--brass);
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* No outline on four sides: a well inside the page is `surfaceSunken`. */
@@ -185,6 +203,30 @@ code {
   padding-left: var(--sm);
 }
 
+.refresh-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--md);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--surface);
+}
+
+.refresh-banner.ok {
+  border-left-color: var(--save);
+}
+
+.refresh-banner.warn {
+  border-left-color: var(--brass);
+}
+
+.refresh-banner.error {
+  border-left-color: var(--danger);
+}
+
 .quote {
   border-left: 2px solid var(--border);
   padding-left: var(--sm);
@@ -202,12 +244,14 @@ code {
 }
 
 .panel {
-  background: var(--surface);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--lg);
   display: flex;
   flex-direction: column;
   gap: var(--md);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 35%);
 }
 
 .narrow {
@@ -223,17 +267,21 @@ code {
 .top {
   display: flex;
   align-items: center;
-  gap: var(--lg);
+  gap: var(--md);
   padding: var(--sm) var(--lg);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 40%);
 }
 
 .brand {
+  font-family: var(--face-display);
   font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.2px;
   white-space: nowrap;
 }
 
@@ -245,29 +293,48 @@ code {
 }
 
 .body {
-  padding: var(--xl) var(--lg);
-  /* Wide enough for the dealers table's nine columns. Narrower and the
-     description column took its room from the counts. */
-  max-width: 96rem;
+  padding: var(--lg);
   width: 100%;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
-.bar {
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm);
+  margin-bottom: var(--md);
+  padding: var(--sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.toolbar h1 {
   display: flex;
   align-items: center;
-  gap: var(--md);
-  margin-bottom: var(--md);
+  gap: var(--sm);
+  margin-right: var(--sm);
 }
 
-.bar h1 {
+.push {
+  margin-left: auto;
+}
+
+.toolbar-end {
   display: flex;
   align-items: center;
   gap: var(--sm);
 }
 
-.push {
-  margin-left: auto;
+label.reload-publish {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 .legend {
@@ -275,58 +342,150 @@ code {
   max-width: 44rem;
 }
 
+.legend summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend summary::-webkit-details-marker {
+  display: none;
+}
+
+.legend summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-muted);
+  transition: transform 160ms ease-out;
+}
+
+.legend[open] summary::before {
+  transform: rotate(180deg);
+}
+
+.oneline {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------------------------------------------------------------- controls */
 
-/* A filled button is `accent` with `onAccent` type, centred, in a capsule.
-   It used to be brass, which is this app's selection colour and not a fill for
-   anything you press. */
 button {
   font-family: var(--face-text);
   font-weight: 500;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0.01em;
   background: var(--accent);
   color: var(--on-accent);
-  border: 0;
-  border-radius: var(--radius-full);
-  min-height: var(--hit);
-  padding: var(--sm) var(--capsule-x);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  min-height: var(--control-h);
+  padding: 0 var(--control-pad-x);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sm);
+  gap: 6px;
   white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* The button with no fill carries a `fill` instead, and type in `ink`. */
+/* Secondary: outline, for most dashboard actions. */
 button.ghost {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--border-strong);
+  font-weight: 500;
+  filter: none;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--fill-hover);
+  border-color: color-mix(in srgb, var(--text-muted) 35%, var(--border-strong));
+}
+
+button.ghost:active:not(:disabled) {
   background: var(--fill);
-  color: var(--ink);
-  font-weight: 400;
+}
+
+button.ghost.danger-text {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border-strong));
+  background: var(--danger-muted);
+}
+
+button.ghost.danger-text:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface-raised));
+}
+
+button.compact {
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+button.danger-text:not(.ghost) {
+  background: var(--danger);
+  color: #fff;
 }
 
 .tabs {
-  display: flex;
-  gap: var(--sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 button.tab {
   background: transparent;
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 500;
+  min-height: var(--control-h);
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 2px);
+  filter: none;
 }
 
-/* Selection is the accent fill and its label, the same as a chip in the app. */
+button.tab:hover:not(:disabled) {
+  color: var(--text);
+  background: rgb(255 255 255 / 4%);
+}
+
 button.tab.on {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 500;
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
 }
 
 label {
@@ -342,15 +501,45 @@ input,
 textarea,
 select {
   font-family: var(--face-text);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--ink);
-  background: var(--fill);
-  border: 0;
-  /* A field keeps its corners: the capsule is for controls with a label. */
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  min-height: var(--hit);
-  padding: var(--sm) var(--md);
+  min-height: var(--control-h);
+  padding: 6px 12px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+select {
+  appearance: none;
+  padding-right: 2.25rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%239c948a'%3E%3Cpath d='M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+.toolbar select {
+  min-width: 9.5rem;
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: color-mix(in srgb, var(--text-muted) 30%, var(--border-strong));
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--brass) 55%, var(--border-strong));
+  box-shadow: 0 0 0 3px rgb(196 160 102 / 12%);
 }
 
 textarea {
@@ -382,14 +571,14 @@ input[type='file'] {
    box in a room of capsules. */
 input[type='file']::file-selector-button {
   font-family: var(--face-text);
-  font-size: 14px;
-  font-weight: 400;
-  background: var(--fill);
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--surface-raised);
   color: var(--ink);
-  border: 0;
-  border-radius: var(--radius-full);
-  min-height: var(--hit);
-  padding: 0 var(--capsule-x);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  min-height: var(--control-h);
+  padding: 0 var(--control-pad-x);
   margin-right: var(--sm);
   cursor: pointer;
 }
@@ -423,7 +612,8 @@ summary:focus-visible {
   gap: var(--md);
   align-items: flex-start;
   background: var(--surface);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: var(--md);
 }
 
@@ -446,11 +636,99 @@ summary:focus-visible {
   overflow-x: auto;
 }
 
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.table-card table {
+  margin: 0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+table.dealers {
+  table-layout: fixed;
+}
+
+table.dealers thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+table.dealers th,
+table.dealers td {
+  padding: 10px 14px;
+  border-right: 1px solid var(--border-strong);
+}
+
+table.dealers th:last-child,
+table.dealers td:last-child {
+  border-right: none;
+}
+
+table.dealers thead th {
+  border-bottom-color: var(--border-strong);
+}
+
+table.dealers tbody tr:hover:not(.detail-row) td {
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+
+table.dealers tbody tr.open:hover td {
+  background: color-mix(in srgb, var(--text) 7%, var(--surface));
+}
+
+table.dealers col.shop {
+  width: 16%;
+}
+
+table.dealers col.email {
+  width: 12%;
+}
+
+table.dealers col.description {
+  width: 18%;
+}
+
+table.dealers col.stock {
+  width: 6%;
+}
+
+table.dealers col.sync {
+  width: 11%;
+}
+
+table.dealers col.status {
+  width: 10%;
+}
+
+table.dealers col.actions {
+  width: 22%;
+}
+
+table.dealers td.email-cell,
+table.dealers td.description-cell {
+  min-width: 0;
+}
+
+.cell-clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
 }
 
 /* `space.sm` all round, not `md` sideways: nine columns of gutter is 160px of
@@ -458,18 +736,18 @@ table {
 th,
 td {
   text-align: left;
-  padding: var(--sm);
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
-/* A header names a column and never wraps to do it. "In the deck" broke over
-   two lines and took the row's height with it. */
 th {
   color: var(--text-muted);
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 18px;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -480,22 +758,37 @@ th {
 
 /* Data, not a control: `radius.sm`, never a capsule. */
 .badge {
-  display: inline-block;
-  font-size: 13px;
-  line-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   border-radius: var(--radius-sm);
-  padding: 0 var(--xs);
+  padding: 2px 8px;
   color: var(--text-muted);
   background: var(--fill);
+  border: 1px solid var(--border);
   white-space: nowrap;
 }
 
 .badge.ok {
   color: var(--save);
+  border-color: color-mix(in srgb, var(--save) 35%, var(--border));
+  background: color-mix(in srgb, var(--save) 10%, var(--fill));
 }
 
 .badge.wait {
   color: var(--brass);
+  border-color: color-mix(in srgb, var(--brass) 35%, var(--border));
+  background: color-mix(in srgb, var(--brass) 8%, var(--fill));
+}
+
+.badge.bad {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: var(--danger-muted);
 }
 
 /* Pointed at production. The one place this tool spends `danger` on something
@@ -509,49 +802,107 @@ th {
 
 /* ------------------------------------------------- expanding a shop's row */
 
-.bar.spaced {
+.toolbar.spaced {
   margin: var(--md) 0 0;
 }
 
 td.actions {
   display: table-cell;
-  width: 1%;
+  white-space: normal;
+}
+
+table.dealers td.actions {
+  width: auto;
+}
+
+.action-stack {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-stack button {
+  flex: 0 0 auto;
+}
+
+.shop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm);
+}
+
+.stock-nums {
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-td.actions > * + * {
-  margin-left: var(--sm);
+table.dealers td.stock,
+table.dealers th.stock-head {
+  text-align: left;
 }
 
-/* A row's own controls take `inset.compactX`, the padding the app uses for a
-   dense control, rather than the capsule's 26 each side. Three of those per
-   row were 60px of nothing but padding. */
-td.actions button {
-  padding: var(--sm) var(--md);
+.stock-sep {
+  color: var(--text-faint);
+  margin: 0 1px;
 }
 
-td.tick,
-th.tick {
-  width: var(--hit);
-  padding-left: var(--sm);
-  padding-right: 0;
+.sync-stack,
+.status-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xs);
+  align-items: flex-start;
 }
 
-/* The one control on the row that opens it. A glyph gets a HIT_TARGET box of
-   empty space and colour for state, never a block behind it. It was a 0.9rem
-   triangle in a 2.25rem cell, which is a target you aim at twice. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--xs);
+}
+
+.sync-age-ok {
+  color: var(--text);
+}
+
+.sync-age-stale {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+table.dealers td.tick,
+table.dealers th.tick {
+  width: 2.75rem;
+  padding: 10px 4px;
+  vertical-align: middle;
+  text-align: center;
+}
+
+/* Row expand control — centered in the tick column, not top-aligned with tall rows. */
 button.arrow {
   background: none;
   color: var(--text-muted);
-  min-height: var(--hit);
-  width: var(--hit);
+  min-height: 0;
+  height: 28px;
+  width: 28px;
   padding: 0;
+  margin: 0 auto;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
+  filter: none;
+}
+
+button.arrow:hover:not(:disabled) {
+  background: var(--fill);
+  border-color: var(--border);
+  color: var(--text);
 }
 
 button.arrow svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   transition: transform 160ms ease-out;
 }
 
@@ -572,7 +923,7 @@ tr.open > td {
    with holes cut in it. One step down, and the things inside it sit on it
    rather than in boxes of their own. */
 tr.detail-row > td {
-  padding: 0 var(--md) var(--lg) calc(var(--hit) + var(--sm));
+  padding: 0 var(--md) var(--lg) 2.75rem;
   background: var(--surface-sunken);
 }
 
@@ -594,15 +945,506 @@ table.inner {
 
 table.inner th,
 table.inner td {
-  padding: var(--sm) var(--sm);
+  padding: 8px 10px;
+}
+
+table.inner th {
+  text-transform: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+table.inner.listings {
+  table-layout: fixed;
+}
+
+table.inner.listings tbody tr {
+  transition: background 120ms ease;
+}
+
+table.inner.listings tbody tr:hover td {
+  background: color-mix(in srgb, var(--brass) 12%, var(--surface-sunken));
+}
+
+table.inner.listings tbody tr:hover td.actions {
+  background: color-mix(in srgb, var(--brass) 16%, var(--surface-sunken));
+}
+
+table.inner.listings td:not(.actions) {
+  min-width: 0;
+}
+
+.inventory {
+  padding-top: var(--sm);
+}
+
+.inventory-bar {
+  margin-bottom: var(--md);
+}
+
+.tabs.inventory-tabs,
+.tabs.site-filters {
+  border: none;
+  background: transparent;
+  padding: 0;
+  gap: 6px;
+}
+
+.inventory-tabs .tab,
+.site-filters .tab {
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.inventory-empty {
+  padding: var(--sm) 0 var(--md);
+}
+
+.listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm);
+  justify-content: flex-end;
+}
+
+button.row-btn {
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+table.inner.listings .actions-head {
+  text-align: right;
+}
+
+.site-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm);
+}
+
+.site-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm);
+}
+
+.site-search {
+  flex: 1;
+  min-width: 10rem;
+  max-width: 16rem;
+}
+
+.site-rows {
+  gap: var(--xs);
+}
+
+.site-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.site-rows .site-row:hover {
+  background: color-mix(in srgb, var(--brass) 10%, var(--surface-raised));
+  border-color: color-mix(in srgb, var(--brass) 35%, var(--border-strong));
+}
+
+.site-check-placeholder {
+  width: var(--md);
+  flex: none;
+}
+
+.min-0 {
+  min-width: 0;
+}
+
+.inbox-note {
+  margin: 0 0 var(--md);
+}
+
+.inbox-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm);
+}
+
+.inbox-filter {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sm);
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Same split as the app: inbox rail + thread pane in one bordered frame. */
+.inbox-split {
+  display: flex;
+  align-items: stretch;
+  min-height: min(72vh, 44rem);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--background);
+}
+
+.inbox-rail {
+  flex: 0 0 min(22rem, 38%);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-sunken);
+  border-right: 1px solid var(--border-strong);
+}
+
+.inbox-rail-head {
+  padding: var(--sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-mode-tabs {
+  width: 100%;
+}
+
+.inbox-rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.inbox-rail-empty {
+  padding: var(--lg);
+}
+
+.inbox-conv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-conv-list > li {
+  border-bottom: 1px solid var(--border);
+}
+
+button.inbox-conv,
+.inbox-conv.static {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sm);
+  padding: 12px 14px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  min-height: 0;
+  font-weight: 400;
+  filter: none;
+}
+
+button.inbox-conv:hover:not(:disabled) {
+  background: rgb(255 255 255 / 3%);
+}
+
+button.inbox-conv.on {
+  background: var(--surface-raised);
+  box-shadow: inset 3px 0 0 var(--brass);
+}
+
+.inbox-conv-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inbox-conv-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sm);
+  min-width: 0;
+}
+
+.inbox-conv-name {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-conv-when {
+  flex: none;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-faint);
+}
+
+.inbox-conv-preview {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-muted);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
+}
+
+.inbox-conv-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.inbox-open-thread {
+  margin-left: auto;
+}
+
+.inbox-unread-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  margin-left: 6px;
+}
+
+.person-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--fill);
+  border: 1px solid var(--border);
+}
+
+.inbox-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+}
+
+.inbox-pane-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--lg);
+  text-align: center;
+}
+
+.inbox-pane-head {
+  padding: var(--md) var(--lg);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.inbox-pane-title {
+  font-family: var(--face-display);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.inbox-pane-sub {
+  margin: 4px 0 0;
+}
+
+.inbox-chat {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--md) var(--lg) var(--lg);
+  background: var(--surface-sunken);
+}
+
+.chat-thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm);
+  width: 100%;
+}
+
+.chat-run {
+  display: flex;
+  width: 100%;
+}
+
+.chat-run--buyer {
+  justify-content: flex-start;
+}
+
+.chat-run--shop {
+  justify-content: flex-end;
+}
+
+.chat-bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(32rem, 82%);
+}
+
+.chat-bubble-wrap--buyer {
+  align-items: flex-start;
+}
+
+.chat-bubble-wrap--shop {
+  align-items: flex-end;
+}
+
+.chat-speaker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+
+.chat-role {
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.chat-listing-quote {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.chat-listing-quote--buyer {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.chat-listing-quote--shop {
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.chat-listing-label {
+  display: block;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.chat-bubble {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+}
+
+.chat-bubble--buyer {
+  background: var(--message-incoming);
+  border: 1px solid var(--border-strong);
+}
+
+.chat-bubble--shop {
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 80%, var(--border-strong));
+  color: var(--on-accent);
+}
+
+.chat-bubble--shop .chat-caption {
+  color: color-mix(in srgb, var(--on-accent) 65%, transparent);
+}
+
+.chat-bubble--shop .chat-body {
+  color: var(--on-accent);
+}
+
+.chat-caption {
+  display: block;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.chat-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-when {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-faint);
+  padding: 0 2px;
+}
+
+.legend-buyer {
+  color: var(--text-muted);
+}
+
+.legend-shop {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .inbox-split {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .inbox-rail {
+    flex: none;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border-strong);
+  }
 }
 
 table.inner tr:last-child td {
   border-bottom: none;
-}
-
-td.thumb {
-  width: 56px;
 }
 
 /* Imported prose, in a row of short facts. Clamped rather than truncated on
@@ -620,15 +1462,6 @@ td.prose span {
   -webkit-line-clamp: 2;
 }
 
-td.thumb img {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  display: block;
-  background: var(--surface);
-}
-
 /* What a shop's site says about itself, while it is being added. Type on the
    recess, not a panel inside it: nesting goes one deep. On Dealers these are
    columns instead — there you are scanning forty shops, not reading one. */
@@ -639,22 +1472,6 @@ td.thumb img {
   padding: var(--sm) 0;
 }
 
-/* contain, not cover: a logo cropped square is a different logo. The app's
-   rule allows exactly this exception, and only for a mark. */
-.shopmark {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-  border-radius: var(--radius-sm);
-  flex: none;
-}
-
-.shopmark.small {
-  width: 24px;
-  height: 24px;
-}
-
-/* The shop's mark beside its name, so the column reads as one thing. */
 .shopcell {
   display: flex;
   gap: var(--sm);
@@ -678,7 +1495,17 @@ button.sort {
   font: inherit;
   color: inherit;
   font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
+  filter: none;
+}
+
+table.dealers th button.sort {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 button.sort:hover {
@@ -696,7 +1523,7 @@ button.sort:hover {
 .problems summary {
   cursor: pointer;
   color: var(--text-muted);
-  min-height: var(--hit);
+  min-height: var(--control-h);
   display: flex;
   align-items: center;
 }
@@ -736,8 +1563,20 @@ button.sort:hover {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+}
+
+.listings-modal {
+  grid-template-rows: auto 1fr;
+}
+
+.listings-modal .inventory {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 var(--lg) var(--lg);
 }
 
 .modal-header,
@@ -761,16 +1600,113 @@ button.sort:hover {
   margin-left: auto;
 }
 
+.import-header {
+  align-items: flex-start;
+}
+
+.import-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm) var(--md);
+  margin-top: var(--sm);
+}
+
+.import-stat strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.import-footer-note {
+  max-width: 28rem;
+}
+
+.candidate-sep {
+  opacity: 0.5;
+}
+
+.warn-text {
+  color: var(--brass);
+}
+
+.import-modal-busy {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.import-activity {
+  margin: 0 var(--lg);
+  padding: var(--sm) var(--md);
+  max-height: 11rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.import-activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sm);
+  margin-bottom: var(--sm);
+}
+
+.import-activity-title {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.import-activity-pulse {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--brass);
+}
+
+.import-activity-lines {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.import-activity-lines li {
+  margin: 0.15rem 0;
+  color: var(--text);
+}
+
+.import-headline {
+  margin: 0 0 var(--sm);
+  padding: var(--sm) var(--md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
 /* A glyph-only control: no fill, centred in its own hit target. */
 .icon-button {
-  width: var(--hit);
-  height: var(--hit);
+  width: var(--control-h);
+  height: var(--control-h);
   min-height: 0;
   padding: 0;
   background: transparent;
+  border: 1px solid transparent;
   color: var(--text-muted);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 400;
+  border-radius: var(--radius-md);
+  filter: none;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--fill);
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .candidate-list {
@@ -780,10 +1716,9 @@ button.sort:hover {
 
 .candidate {
   display: grid;
-  grid-template-columns: auto 5rem minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--md);
   align-items: center;
-  min-height: 7rem;
   padding: var(--md) 0;
   border-bottom: 1px solid var(--border);
 }
@@ -800,23 +1735,6 @@ button.sort:hover {
 .candidate-pick input:disabled {
   cursor: default;
   opacity: 0.35;
-}
-
-.candidate > img,
-.candidate-placeholder {
-  width: 5rem;
-  height: 5rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  object-fit: cover;
-}
-
-.candidate-placeholder {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 18px;
 }
 
 .candidate-copy {
@@ -894,16 +1812,6 @@ button.sort:hover {
 }
 
 @media (max-width: 700px) {
-  .candidate {
-    grid-template-columns: auto 4rem minmax(0, 1fr);
-  }
-
-  .candidate > img,
-  .candidate-placeholder {
-    width: 4rem;
-    height: 4rem;
-  }
-
   .candidate-actions {
     grid-column: 3;
     flex-direction: row;
@@ -928,8 +1836,16 @@ button.sort:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.claim-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--xs);
-  margin-top: var(--xs);
+  max-width: 100%;
 }
 
 .claim .code {
@@ -962,7 +1878,8 @@ button.sort:hover {
 
 .stat {
   background: var(--surface);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: var(--md);
   display: flex;
   flex-direction: column;
@@ -994,7 +1911,7 @@ button.sort:hover {
   height: 88px;
 }
 
-.bar {
+.bars > .bar {
   flex: 1;
   height: 100%;
   display: flex;

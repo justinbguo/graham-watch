@@ -659,6 +659,45 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
       return Response.json({ photos: paths.length });
     }
 
+    if (action === 'delete-dealer') {
+      const dealerId = typeof body.dealerId === 'string' ? body.dealerId : null;
+      if (!dealerId) return bad('delete-dealer needs a dealerId.');
+
+      const { data, error } = await ctx.supabase.rpc('operator_delete_dealer', {
+        p_dealer_id: dealerId,
+      });
+      if (error) return bad(error.message, error.code === '42501' ? 403 : 400);
+
+      const paths = (data ?? []) as string[];
+      if (paths.length > 0) {
+        const removed = await admin().storage.from('listing-photos').remove(paths);
+        if (removed.error) {
+          console.error('photo cleanup failed', dealerId, removed.error.message);
+        }
+      }
+
+      return Response.json({ photos: paths.length });
+    }
+
+    if (action === 'queue-publish') {
+      if (!(await isOperator())) return bad('Operators only.', 403);
+
+      const dealerId = typeof body.dealerId === 'string' ? body.dealerId : null;
+      if (!dealerId) return bad('queue-publish needs a dealerId.');
+
+      try {
+        await autoQueuePublish(ctx.supabase, dealerId);
+        const counts = await ctx.supabase.rpc('pending_source_item_count', {
+          p_dealer_id: dealerId,
+        });
+        if (counts.error) throw new Error(counts.error.message);
+        const pending = counts.data?.[0]?.pending ?? 0;
+        return Response.json({ pending });
+      } catch (error) {
+        return bad(error instanceof Error ? error.message : 'Could not queue.', 502);
+      }
+    }
+
     if (action === 'publish') {
       const dealerId = typeof body.dealerId === 'string' ? body.dealerId : null;
       if (!dealerId) return bad('publish needs a dealerId.');
@@ -773,7 +812,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
 });
 
 /**
- * Six actions, one function.
+ * Seven actions, one function.
  *
  * `scheduled-refresh` is the nightly job: cron secret, service role, and one
  * dealer id. `phase` `sync` reads that shop's catalogue and `phase` `publish`

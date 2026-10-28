@@ -206,7 +206,7 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
 
   return (
     <section>
-      <header className="bar">
+      <header className="toolbar">
         <h1>Add shops</h1>
       </header>
 
@@ -223,7 +223,7 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
           />
         </label>
 
-        <div className="bar">
+        <div className="toolbar">
           <input
             type="file"
             accept=".csv,.txt,text/csv,text/plain"
@@ -319,7 +319,7 @@ export function AddShops({ onAdded }: { onAdded: () => void }) {
             </tbody>
           </table>
 
-          <div className="bar spaced">
+          <div className="toolbar spaced">
             <button
               disabled={busy !== false || chosen.length === 0}
               onClick={() => void addShops()}>
@@ -430,9 +430,6 @@ function ShopRow({
 
       <td>
         <div className="shopcell">
-          {found?.profile.logoUrl ? (
-            <img className="shopmark small" src={found.profile.logoUrl} alt="" loading="lazy" />
-          ) : null}
           <div>
             <strong>{row.fromFileName ?? found?.name ?? row.domain}</strong>
             <br />
@@ -544,9 +541,6 @@ function ShopDetail({ row, onInspect }: { row: Row; onInspect: () => void }) {
   return (
     <div className="detail">
       <div className="profile">
-        {found.profile.logoUrl ? (
-          <img className="shopmark" src={found.profile.logoUrl} alt="" loading="lazy" />
-        ) : null}
         <div className="grow">
           {found.profile.description ? (
             <p className="small">{found.profile.description}</p>

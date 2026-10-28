@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { ImportActivityLog } from './ImportActivityLog';
 import {
   CANDIDATE_LIMIT,
   formatPrice,
@@ -13,31 +14,37 @@ type Props = {
   dealerName: string;
   /** What the read that opened this found, when a read opened it. */
   note: string | null;
+  importing?: boolean;
+  activityLog?: string[];
+  onClearLog?: () => void;
   onClose: () => void;
   onImport: (candidates: ImportCandidate[]) => void;
 };
 
-type Filter = 'new' | 'queued' | 'imported' | 'failed' | 'all';
+/** What you can act on in this screen. Live watches are counted above, not listed here. */
+type Filter = 'new' | 'queued' | 'failed';
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'new', label: 'Not imported' },
-  { key: 'queued', label: 'Queued' },
-  { key: 'imported', label: 'In the deck' },
-  { key: 'failed', label: 'Failed' },
-  { key: 'all', label: 'Everything' },
+const FILTERS: { key: Filter; label: string; hint: string }[] = [
+  { key: 'new', label: 'New', hint: 'On their site, not staged yet' },
+  { key: 'queued', label: 'Staged', hint: 'Will import when you confirm' },
+  { key: 'failed', label: 'Failed', hint: 'Last import attempt did not finish' },
 ];
 
-const STATE_LABEL: Record<CandidateState, string> = {
-  new: 'not imported',
-  queued: 'queued',
-  imported: 'in the deck',
-  failed: 'failed',
-};
+const MIN_PHOTOS = 3;
 
-export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }: Props) {
+export function ImportPreview({
+  dealerId,
+  dealerName,
+  note,
+  importing = false,
+  activityLog = [],
+  onClearLog,
+  onClose,
+  onImport,
+}: Props) {
   const [rows, setRows] = useState<ImportCandidate[] | null>(null);
   const [editing, setEditing] = useState<ImportCandidate | null>(null);
-  const [filter, setFilter] = useState<Filter>('new');
+  const [filter, setFilter] = useState<Filter | null>(null);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -56,19 +63,20 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
   }, [dealerId]);
 
   const counts = useMemo(() => tally(rows ?? []), [rows]);
+  const activeFilter = filter ?? (rows ? preferredFilter(counts) : 'queued');
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return (rows ?? []).filter(
       (row) =>
-        (filter === 'all' || row.state === filter) &&
+        row.state === activeFilter &&
         (!needle ||
           row.title.toLowerCase().includes(needle) ||
           row.sourceUrl.toLowerCase().includes(needle))
     );
-  }, [filter, query, rows]);
+  }, [activeFilter, query, rows]);
 
-  const selected = rows?.filter((row) => row.selected) ?? [];
+  const selected = rows?.filter((row) => row.selected && row.state !== 'imported') ?? [];
   const selectable = shown.filter((row) => row.state !== 'imported');
   const allShownChosen = selectable.length > 0 && selectable.every((row) => row.selected);
 
@@ -82,34 +90,70 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
     );
   }
 
+  function selectAllNew() {
+    setRows((current) =>
+      (current ?? []).map((row) => (row.state === 'new' ? { ...row, selected: true } : row))
+    );
+  }
+
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={() => {
+        if (!importing) onClose();
+      }}>
       <section
-        className="import-modal"
+        className={importing || activityLog.length > 0 ? 'import-modal import-modal-busy' : 'import-modal'}
         role="dialog"
         aria-modal="true"
         aria-labelledby="import-title"
         onMouseDown={(event) => event.stopPropagation()}>
-        <header className="modal-header">
+        <header className="modal-header import-header">
           <div>
-            <p className="eyebrow">Choose what to import</p>
+            <p className="eyebrow">Import watches</p>
             <h1 id="import-title">{dealerName}</h1>
             <p className="muted small">
               {note ??
-                'Everything this shop has for sale right now. Ticked watches are imported when you confirm.'}
+                'Tick what should go live in the buyer deck, then confirm. Reading the site is free; import runs one AI pass per watch.'}
             </p>
+            {rows ? (
+              <p className="import-stats muted small">
+                <span className="import-stat">
+                  <strong>{counts.imported}</strong> live in deck
+                </span>
+                <span className="import-stat">
+                  <strong>{counts.queued}</strong> staged
+                </span>
+                <span className="import-stat">
+                  <strong>{counts.new}</strong> new on site
+                </span>
+                {counts.failed > 0 ? (
+                  <span className="import-stat">
+                    <strong>{counts.failed}</strong> failed
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
           </div>
-          <button className="icon-button" aria-label="Close this shop's catalogue" onClick={onClose}>
+          <button
+            className="icon-button"
+            aria-label="Close this shop's catalogue"
+            disabled={importing}
+            onClick={onClose}>
             ×
           </button>
         </header>
 
         <div className="review-toolbar">
-          <div className="tabs">
+          <div className="tabs" role="tablist" aria-label="Catalogue filters">
             {FILTERS.map((one) => (
               <button
                 key={one.key}
-                className={filter === one.key ? 'tab on' : 'tab'}
+                role="tab"
+                aria-selected={activeFilter === one.key}
+                className={activeFilter === one.key ? 'tab on' : 'tab'}
+                title={one.hint}
                 onClick={() => setFilter(one.key)}>
                 {one.label} ({counts[one.key]})
               </button>
@@ -127,7 +171,7 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
             className="ghost"
             disabled={selectable.length === 0}
             onClick={() => chooseShown(!allShownChosen)}>
-            {allShownChosen ? 'Clear these' : `Select these ${selectable.length || ''}`}
+            {allShownChosen ? 'Clear tab' : `Select tab (${selectable.length})`}
           </button>
         </div>
 
@@ -136,12 +180,18 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
 
         {rows && shown.length === 0 ? (
           <div className="empty-state">
-            <h2>Nothing here</h2>
-            <p className="muted">
-              {rows.length === 0
-                ? 'We hold no catalogue for this shop yet. Refresh reads their site.'
-                : 'No watch matches this filter.'}
-            </p>
+            <h2>{emptyTitle(activeFilter, counts)}</h2>
+            <p className="muted">{emptyBody(activeFilter, counts)}</p>
+            {activeFilter === 'new' && counts.queued > 0 ? (
+              <button className="ghost" onClick={() => setFilter('queued')}>
+                Open staged ({counts.queued})
+              </button>
+            ) : null}
+            {activeFilter === 'queued' && counts.new > 0 ? (
+              <button className="ghost" onClick={() => setFilter('new')}>
+                Review new on site ({counts.new})
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -149,6 +199,7 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
           <div className="candidate-list">
             {shown.map((row) => {
               const chooseable = row.state !== 'imported';
+              const photos = photoNote(row.photoUrls.length);
 
               return (
                 <article className="candidate" key={row.id}>
@@ -162,19 +213,14 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
                     />
                   </label>
 
-                  {row.photoUrls[0] ? (
-                    <img src={row.photoUrls[0]} alt="" loading="lazy" />
-                  ) : (
-                    <div className="candidate-placeholder">No photo</div>
-                  )}
-
                   <div className="candidate-copy">
                     <a href={row.sourceUrl} target="_blank" rel="noreferrer">
                       <strong>{row.title}</strong>
                     </a>
                     <p className="muted small">
-                      {formatPrice(row.priceCents, row.currency)} · {row.photoUrls.length} photo
-                      {row.photoUrls.length === 1 ? '' : 's'}
+                      {formatPrice(row.priceCents, row.currency)}
+                      <span className="candidate-sep"> · </span>
+                      <span className={photos.ok ? 'muted' : 'warn-text'}>{photos.text}</span>
                     </p>
                     {row.description ? (
                       <p className="candidate-description">{row.description}</p>
@@ -183,9 +229,7 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
                   </div>
 
                   <div className="candidate-actions">
-                    <span className={row.state === 'imported' ? 'badge ok' : 'badge'}>
-                      {STATE_LABEL[row.state]}
-                    </span>
+                    <span className={stateBadgeClass(row.state)}>{stateBadgeLabel(row.state)}</span>
                     {chooseable ? (
                       <button className="ghost" onClick={() => setEditing(row)}>
                         Edit
@@ -198,19 +242,33 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
           </div>
         ) : null}
 
+        <ImportActivityLog
+          lines={activityLog}
+          busy={importing}
+          onClear={onClearLog}
+          title="Import progress"
+        />
+
         <footer className="modal-footer">
-          <p className="muted small">
-            {rows?.length === CANDIDATE_LIMIT
-              ? `Showing the ${CANDIDATE_LIMIT} most recent. `
-              : ''}
-            Unticking a watch leaves it in the catalogue for later.
+          <p className="muted small import-footer-note">
+            {footerNote(activeFilter, selected.length, counts)}
+            {rows?.length === CANDIDATE_LIMIT ? ` Showing the ${CANDIDATE_LIMIT} most recent.` : ''}
           </p>
           <div className="footer-actions">
-            <button className="ghost" onClick={onClose}>
+            {activeFilter === 'new' && counts.new > 0 ? (
+              <button className="ghost" onClick={selectAllNew}>
+                Select all new ({counts.new})
+              </button>
+            ) : null}
+            <button className="ghost" disabled={importing} onClick={onClose}>
               Cancel
             </button>
-            <button disabled={selected.length === 0} onClick={() => rows && onImport(rows)}>
-              Import {selected.length || ''} watch{selected.length === 1 ? '' : 'es'}
+            <button
+              disabled={importing || selected.length === 0}
+              onClick={() => rows && onImport(rows)}>
+              {importing
+                ? 'Importing…'
+                : `Import ${selected.length || ''} watch${selected.length === 1 ? '' : 'es'}`}
             </button>
           </div>
         </footer>
@@ -230,13 +288,74 @@ export function ImportPreview({ dealerId, dealerName, note, onClose, onImport }:
   );
 }
 
-function tally(rows: ImportCandidate[]): Record<Filter, number> {
+function photoNote(count: number): { text: string; ok: boolean } {
+  if (count >= MIN_PHOTOS) {
+    return { text: `${count} photos`, ok: true };
+  }
+  return {
+    text: `${count} photo${count === 1 ? '' : 's'} — need ${MIN_PHOTOS} to publish`,
+    ok: false,
+  };
+}
+
+function stateBadgeLabel(state: CandidateState): string {
+  if (state === 'new') return 'New';
+  if (state === 'queued') return 'Staged';
+  if (state === 'failed') return 'Failed';
+  return 'Live';
+}
+
+function stateBadgeClass(state: CandidateState): string {
+  if (state === 'queued') return 'badge wait';
+  if (state === 'failed') return 'badge bad';
+  if (state === 'imported') return 'badge ok';
+  return 'badge';
+}
+
+function preferredFilter(counts: ReturnType<typeof tally>): Filter {
+  if (counts.new > 0) return 'new';
+  if (counts.queued > 0) return 'queued';
+  if (counts.failed > 0) return 'failed';
+  return 'new';
+}
+
+function emptyTitle(filter: Filter, counts: ReturnType<typeof tally>): string {
+  if (filter === 'new') return counts.new === 0 ? 'Nothing new to stage' : 'No matches';
+  if (filter === 'queued') return counts.queued === 0 ? 'Nothing staged yet' : 'No matches';
+  return counts.failed === 0 ? 'No failed imports' : 'No matches';
+}
+
+function emptyBody(filter: Filter, counts: ReturnType<typeof tally>): string {
+  if (filter === 'new' && counts.new === 0) {
+    return counts.queued > 0
+      ? 'Every for-sale watch is either staged or already live. Open Staged to import.'
+      : 'Every for-sale watch is already live in the deck, or the catalogue is empty.';
+  }
+  if (filter === 'queued' && counts.queued === 0) {
+    return 'Tick watches on New, or use Sync after the shop adds stock.';
+  }
+  if (filter === 'failed' && counts.failed === 0) {
+    return 'Failed watches show here with the error from the last attempt.';
+  }
+  return 'Try another tab or clear the search box.';
+}
+
+function footerNote(filter: Filter, selected: number, counts: ReturnType<typeof tally>): string {
+  if (selected === 0) {
+    if (counts.queued > 0 && filter !== 'queued') {
+      return `${counts.queued} staged — open that tab or import from View listings.`;
+    }
+    return 'Tick watches to import. Uncheck staged rows you want to skip.';
+  }
+  return `${selected} selected. Import re-checks the site for sold watches before spending.`;
+}
+
+function tally(rows: ImportCandidate[]): Record<Filter | 'imported', number> {
   return {
     new: rows.filter((row) => row.state === 'new').length,
     queued: rows.filter((row) => row.state === 'queued').length,
     imported: rows.filter((row) => row.state === 'imported').length,
     failed: rows.filter((row) => row.state === 'failed').length,
-    all: rows.length,
   };
 }
 
@@ -253,8 +372,6 @@ function CandidateEditor({
   const [price, setPrice] = useState(
     candidate.priceCents === null ? '' : String(candidate.priceCents / 100)
   );
-  const [photos, setPhotos] = useState(candidate.photoUrls.join('\n'));
-
   function save() {
     const dollars = price.trim() === '' ? null : Number(price);
     if (dollars !== null && (!Number.isFinite(dollars) || dollars < 0)) return;
@@ -263,10 +380,7 @@ function CandidateEditor({
       ...draft,
       priceCents: dollars === null ? null : Math.round(dollars * 100),
       currency: draft.currency?.trim().toUpperCase() || null,
-      photoUrls: photos
-        .split('\n')
-        .map((url) => url.trim())
-        .filter(Boolean),
+      photoUrls: draft.photoUrls,
       selected: true,
       edited: true,
     });
@@ -311,10 +425,6 @@ function CandidateEditor({
             value={draft.description}
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
-        </label>
-        <label>
-          Photo links, one per line
-          <textarea rows={5} value={photos} onChange={(event) => setPhotos(event.target.value)} />
         </label>
         <div className="footer-actions">
           <button className="ghost" onClick={onCancel}>
