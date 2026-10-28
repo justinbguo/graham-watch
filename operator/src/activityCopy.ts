@@ -20,6 +20,7 @@ const VERBS: Record<string, string> = {
   issue_claim_code: 'Issued a claim code',
   revoke_claim_code: 'Revoked a claim code',
   unclaim_shop: 'Unassigned a shop',
+  delete_dealer: 'Deleted a shop',
 };
 
 export function actionLabel(action: string): string {

@@ -2029,7 +2029,9 @@ export type Database = {
           created_at: string
           id: string
           last_refresh_at: string
+          last_refresh_attempt_ok: boolean
           last_refresh_error: string
+          last_refresh_ok_at: string
           last_refresh_published: number
           last_refresh_skipped: number
           last_sync_added: number
@@ -2049,6 +2051,75 @@ export type Database = {
           photo_count: number
           unanswered_count: number
           website: string
+        }[]
+      }
+      operator_delete_dealer: {
+        Args: { p_dealer_id: string }
+        Returns: string[]
+      }
+      operator_conversation_messages: {
+        Args: { p_conversation_id: string; p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string
+          deal_status: string
+          id: string
+          listing_label: string
+          sender_handle: string
+          sender_label: string
+          via: string
+        }[]
+      }
+      operator_conversations: {
+        Args: {
+          p_dealer_id?: string
+          p_limit?: number
+          p_unanswered_only?: boolean
+        }
+        Returns: {
+          buyer_handle: string
+          buyer_label: string
+          id: string
+          is_group: boolean
+          last_message_at: string
+          message_count: number
+          partner_handle: string
+          partner_label: string
+          preview: string
+          shop_id: string
+          shop_name: string
+          unanswered: boolean
+        }[]
+      }
+      operator_inquiries: {
+        Args: {
+          p_dealer_id?: string
+          p_limit?: number
+          p_unanswered_only?: boolean
+        }
+        Returns: {
+          buyer_handle: string
+          buyer_label: string
+          conversation_id: string
+          created_at: string
+          id: string
+          listing_label: string
+          message: string
+          shop_name: string
+          status: Database["public"]["Enums"]["inquiry_status"]
+          unanswered: boolean
+        }[]
+      }
+      operator_refresh_schedule: {
+        Args: never
+        Returns: {
+          approved_shops: number
+          last_attempt_at: string
+          last_attempt_error: string
+          last_attempt_ok: boolean
+          last_catalog_sync_at: string
+          last_success_at: string
+          recorded_runs: number
         }[]
       }
       operator_delete_listing: {

@@ -7,16 +7,25 @@ import {
   type ShopStatus,
   type SortKey,
 } from './dealerTable';
+import {
+  dealerLastSyncAt,
+  lastSyncTone,
+  refreshAlert,
+  type RefreshSchedule,
+} from './refreshSchedule';
+import { ImportActivityLog } from './ImportActivityLog';
 import { ImportPreview } from './ImportPreview';
 import {
+  deleteDealer,
   importListings,
   stageImport,
   syncCatalog,
   type ImportCandidate,
   type PublishTotals,
 } from './importer';
+import { refreshAllShops, shopsToRefresh, summariseRefreshAll } from './refreshAll';
 import { ShopListings } from './ShopListings';
-import { confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
+import { confirmDelete, confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
 type Row = OperatorDealer;
 
@@ -25,18 +34,28 @@ type Row = OperatorDealer;
  * read rather than `operator_dealers`, because these three columns are granted
  * to every signed-in reader while the RPC exists for the ones that are not.
  */
-type Profile = { description: string | null; instagram: string | null; logo_url: string | null };
+type Profile = { description: string | null; instagram: string | null };
 
 /** The shop whose catalogue is open, and what the read that opened it found. */
-type Picking = { dealer: Row; note: string | null };
+type Picking = { dealer: Row; note: string | null; skipSync?: boolean };
 
-export function Dealers() {
+export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [importLog, setImportLog] = useState<string[]>([]);
+
+  const appendImportLog = (message: string) => {
+    const time = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    setImportLog((lines) => [...lines, `${time}  ${message}`]);
+  };
+  const [listingsFor, setListingsFor] = useState<Row | null>(null);
   const [picking, setPicking] = useState<Picking | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ShopStatus>('all');
@@ -44,8 +63,46 @@ export function Dealers() {
   const [sort, setSort] = useState<SortKey>('newest');
   const [codes, setCodes] = useState<Record<string, { code: string; expiresAt: string }>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<RefreshSchedule | null>(null);
+  const [reloadPublish, setReloadPublish] = useState(false);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
+
+  function reloadAll() {
+    const shops = shopsToRefresh(rows ?? []);
+    if (shops.length === 0) {
+      reload();
+      return;
+    }
+
+    const publishNote = reloadPublish
+      ? ' Then publish every for-sale watch with at least three photos (skips the rest).'
+      : '';
+    if (
+      !confirmWrite(
+        `Sync all ${shops.length} approved shop(s)? Each reads their live catalogue.${publishNote} This can take several minutes.`
+      )
+    ) {
+      return;
+    }
+
+    setBusyId('__reload__');
+    setError(null);
+    setProgress(`Starting sync for ${shops.length} shop(s)…`);
+
+    void (async () => {
+      try {
+        const results = await refreshAllShops(shops, { publish: reloadPublish }, setProgress);
+        setProgress(summariseRefreshAll(results));
+        reload();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Reload did not finish.');
+        setProgress(null);
+      } finally {
+        setBusyId(null);
+      }
+    })();
+  }
 
   useEffect(() => {
     let live = true;
@@ -57,20 +114,19 @@ export function Dealers() {
       // The scraped profile comes alongside in one read for every shop, rather
       // than a read per shop when a row is opened. It is three short columns,
       // and they are columns on this table now.
-      const [{ data, error: failed }, shops] = await Promise.all([
+      const [{ data, error: failed }, shops, health] = await Promise.all([
         supabase.rpc('operator_dealers'),
-        supabase.from('dealers').select('id, description, instagram, logo_url'),
+        supabase.from('dealers').select('id, description, instagram'),
+        supabase.rpc('operator_refresh_schedule'),
       ]);
 
       if (!live) return;
-      setError(failed?.message ?? shops.error?.message ?? null);
+      setError(failed?.message ?? shops.error?.message ?? health.error?.message ?? null);
       setRows(data ?? []);
+      setSchedule((health.data?.[0] as RefreshSchedule | undefined) ?? null);
       setProfiles(
         Object.fromEntries(
-          (shops.data ?? []).map(({ id, description, instagram, logo_url }) => [
-            id,
-            { description, instagram, logo_url },
-          ])
+          (shops.data ?? []).map(({ id, description, instagram }) => [id, { description, instagram }])
         )
       );
     })();
@@ -87,7 +143,9 @@ export function Dealers() {
       setProgress(await work());
       reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'That did not work.');
+      const message = caught instanceof Error ? caught.message : 'That did not work.';
+      setError(message);
+      setImportLog((lines) => [...lines, `Error: ${message}`]);
     } finally {
       setBusyId(null);
     }
@@ -113,37 +171,55 @@ export function Dealers() {
    * title — is free and reversible, which is why the spend is confirmed here
    * and nowhere earlier.
    */
-  function importSome(dealer: Row, candidates: ImportCandidate[]) {
+  function importSome(dealer: Row, candidates: ImportCandidate[], skipSync = false) {
     const count = candidates.filter((candidate) => candidate.selected).length;
     if (!dealer.website) {
       setError(`${dealer.name} has no website, so stock cannot be verified before import.`);
       return;
     }
     if (!confirmWrite(`Import ${count} watch(es) from ${dealer.name}?`)) return;
-    setPicking(null);
+    setImportLog([]);
+    appendImportLog(`Confirmed ${count} watch(es) for ${dealer.name}.`);
     void run(dealer, async () => {
-      setProgress(`${dealer.name}: checking the shop for sold watches…`);
-      await syncCatalog({ sourceUrl: dealer.website!, dealerId: dealer.id });
+      if (skipSync) {
+        setProgress(`${dealer.name}: staging selection…`);
+        appendImportLog('Skipping catalogue re-read — you just synced this shop.');
+      } else {
+        setProgress(`${dealer.name}: re-reading site…`);
+        appendImportLog('Re-reading their site for sold watches…');
+        const sync = await syncCatalog({ sourceUrl: dealer.website!, dealerId: dealer.id });
+        appendImportLog(
+          `Catalogue read: ${sync.forSale} for sale, ${sync.added} new, ${sync.retired} retired.`
+        );
+      }
+
+      appendImportLog('Saving your selection to the import queue…');
       const queued = await stageImport(dealer.id, candidates);
-      const totals = await importListings(dealer.id, (at) =>
-        setProgress(`${dealer.name}: ${at.published} imported, ${at.pending} to go…`)
+      if (queued === 0) {
+        appendImportLog('Nothing left to queue — selected watches may have sold since you picked them.');
+      } else {
+        appendImportLog(`Queued ${queued} watch(es). Starting publish batches…`);
+      }
+
+      const totals = await importListings(
+        dealer.id,
+        (at) => {
+          setProgress(
+            `${dealer.name}: ${at.published} published, ${at.skipped} skipped, ${at.pending} queued…`
+          );
+        },
+        (line) => appendImportLog(line)
       );
       const result = summarise(dealer.name, queued, totals);
       const sold = count - queued;
+      appendImportLog(result);
+      setPicking(null);
       return sold > 0 ? `${sold} selected watch(es) were no longer for sale. ${result}` : result;
     });
   }
 
-  /**
-   * Re-reads the shop's site, then shows what they have. Costs HTTP and
-   * imports nothing.
-   *
-   * The read and the picker are one action because a refresh that only printed
-   * "3 new" left the operator with a number and no way to act on it. What a
-   * refresh is for is the stock that appeared since the last one, so it ends
-   * on the screen where those can be chosen.
-   */
-  function refresh(dealer: Row) {
+  /** Re-reads the site, then opens the import picker on what was found. */
+  function syncAndImport(dealer: Row) {
     if (!dealer.website) {
       setError(`${dealer.name} has no website to read.`);
       return;
@@ -153,6 +229,7 @@ export function Dealers() {
       setPicking({
         dealer,
         note: `Just read their site: ${result.forSale} for sale, ${result.added} we had not seen before, ${result.retired} gone.`,
+        skipSync: true,
       });
       return `${dealer.name}: ${result.found} in the catalogue, ${result.forSale} for sale, ${result.added} new, ${result.retired} gone.`;
     });
@@ -197,6 +274,31 @@ export function Dealers() {
     });
   }
 
+  function removeDealer(dealer: Row) {
+    const held = Number(dealer.listings_held);
+    const claimed = dealer.claimed_by
+      ? `${dealer.claimer_handle ? `@${dealer.claimer_handle}` : 'The dealer'} will lose this shop.`
+      : null;
+    const asked = [
+      `Delete ${dealer.name} permanently?`,
+      held > 0
+        ? `${held} imported watch(es), their photos, wishlists, and inquiries are removed.`
+        : 'Their catalogue and import history are removed.',
+      claimed,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    if (!confirmDelete(asked)) return;
+
+    void run(dealer, async () => {
+      const result = await deleteDealer(dealer.id);
+      setListingsFor((current) => (current?.id === dealer.id ? null : current));
+      setPicking((current) => (current?.dealer.id === dealer.id ? null : current));
+      return `${dealer.name} deleted (${result.photos} photo file(s) removed).`;
+    });
+  }
+
   function unassign(dealer: Row) {
     const who = dealer.claimer_name || (dealer.claimer_handle ? `@${dealer.claimer_handle}` : 'the dealer');
     if (
@@ -231,7 +333,7 @@ export function Dealers() {
 
   return (
     <section>
-      <header className="bar">
+      <header className="toolbar">
         <input
           className="search"
           value={query}
@@ -257,16 +359,34 @@ export function Dealers() {
           <option value="unclaimed">Unclaimed</option>
           <option value="quiet">Quiet 14 days</option>
           <option value="unanswered">Unanswered 48 hours</option>
-          <option value="missing_photos">Missing photos</option>
           <option value="last_error">Last error</option>
         </select>
-        <button className="ghost push" onClick={reload}>
-          Reload
-        </button>
+        <div className="toolbar-end push">
+          <label className="reload-publish">
+            <input
+              type="checkbox"
+              checked={reloadPublish}
+              onChange={(event) => setReloadPublish(event.target.checked)}
+              disabled={busyId !== null}
+            />
+            Publish all
+          </label>
+          <button className="ghost" onClick={reloadAll} disabled={busyId !== null}>
+            Reload
+          </button>
+        </div>
       </header>
 
       {error ? <p className="error">{error}</p> : null}
-      {progress ? <p className="muted small">{progress}</p> : null}
+      {schedule ? <RefreshBanner schedule={schedule} /> : null}
+      {progress ? <p className="muted small import-headline">{progress}</p> : null}
+      {importLog.length > 0 && !picking ? (
+        <ImportActivityLog
+          lines={importLog}
+          busy={busyId !== null}
+          onClear={() => setImportLog([])}
+        />
+      ) : null}
 
       {rows === null ? (
         <p className="muted">Loading…</p>
@@ -276,92 +396,73 @@ export function Dealers() {
         </p>
       ) : (
         <>
-          {/* Nine columns fit a laptop; a narrow window or a zoomed page does
-              not. The table scrolls sideways inside the page rather than
-              pushing the page itself wider, which would take the header's
-              controls off screen with it. */}
-          <div className="scroller">
-          <table>
+          <div className="table-card scroller">
+          <table className="dealers">
+            <colgroup>
+              <col className="shop" />
+              <col className="email" />
+              <col className="description" />
+              <col className="stock" />
+              <col className="sync" />
+              <col className="status" />
+              <col className="actions" />
+            </colgroup>
             <thead>
               <tr>
-                <th className="tick" />
                 <SortHeader label="Shop" sortKey="name" sort={sort} onSort={setSort} />
-                <th className="num">In the deck</th>
-                <SortHeader label="Imported" sortKey="listings" sort={sort} onSort={setSort} numeric />
-                <th className="num">Catalogue</th>
-                <th>
-                  <button
-                    className="sort"
-                    aria-pressed={sort === 'last_error'}
-                    onClick={() => setSort(sort === 'last_error' ? 'newest' : 'last_error')}>
-                    Last refresh{sort === 'last_error' ? ' ·' : ''}
-                  </button>
-                  <button
-                    className="sort"
-                    aria-pressed={sort === 'missing_photos'}
-                    onClick={() => setSort(sort === 'missing_photos' ? 'newest' : 'missing_photos')}>
-                    Photos{sort === 'missing_photos' ? ' ·' : ''}
-                  </button>
-                </th>
+                <th>Email</th>
                 <th>Description</th>
-                <th>Instagram</th>
+                <SortHeader
+                  label="# listings"
+                  sortKey="listings"
+                  sort={sort}
+                  onSort={setSort}
+                  numeric
+                  title="Imported watches we hold for this shop (held count)"
+                />
+                <SortHeader
+                  label="Last sync"
+                  sortKey="last_sync"
+                  sort={sort}
+                  onSort={setSort}
+                  title="Last catalogue read or successful nightly refresh. Turns red after 48 hours."
+                />
                 <SortHeader label="Status" sortKey="status" sort={sort} onSort={setSort} />
-                <SortHeader label="Flags" sortKey="flags" sort={sort} onSort={setSort} />
-                <th />
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((dealer) => {
-                const expanded = open === dealer.id;
-                const held = Number(dealer.listings_held);
-                const inDeck = Number(dealer.listings_in_deck);
+                const listingCount = Number(dealer.listings_held);
                 const profile = profiles[dealer.id];
 
-                return [
-                  <tr key={dealer.id} className={expanded ? 'open' : undefined}>
-                    <td className="tick">
-                      <button
-                        className="arrow"
-                        aria-expanded={expanded}
-                        aria-label={expanded ? 'Hide watches' : 'Show watches'}
-                        onClick={() => setOpen(expanded ? null : dealer.id)}>
-                        <Chevron />
-                      </button>
-                    </td>
-
+                return (
+                  <tr key={dealer.id}>
                     <td>
                       <div className="shopcell">
-                        {/* The mark the scrape found, beside the name it belongs
-                            to. It used to appear only once a row was opened,
-                            which is the one place you already knew the shop. */}
-                        {profile?.logo_url ? (
-                          <img className="shopmark small" src={profile.logo_url} alt="" loading="lazy" />
-                        ) : null}
                         <div className="grow">
                           <strong>{dealer.name}</strong>
                           {dealer.website ? (
                             <a
-                              className="muted small"
+                              className="muted small oneline"
                               href={dealer.website}
                               target="_blank"
-                              rel="noreferrer">
-                              {dealer.website}
+                              rel="noreferrer"
+                              title={dealer.website}>
+                              {siteLabel(dealer.website)}
                             </a>
                           ) : (
                             <span className="muted small">no website</span>
                           )}
-                          {/* Where the shop is reached, under the name it
-                              belongs to rather than in a column of its own: an
-                              address is identity, and 250px of email was the
-                              column that pushed the table off the window.
-                              send-inquiry has nowhere to send without it, so a
-                              buyer's question fails rather than goes
-                              unanswered — hence the badge, not a dash. */}
-                          {dealer.contact_email ? (
-                            <span className="muted small">{dealer.contact_email}</span>
-                          ) : (
-                            <span className="badge wait">no address — inquiries fail</span>
-                          )}
+                          {profile?.instagram ? (
+                            <a
+                              className="small"
+                              href={`https://instagram.com/${profile.instagram}`}
+                              target="_blank"
+                              rel="noreferrer">
+                              @{profile.instagram}
+                            </a>
+                          ) : null}
                           <ClaimLine
                             dealer={dealer}
                             code={codes[dealer.id] ?? null}
@@ -376,151 +477,87 @@ export function Dealers() {
                       </div>
                     </td>
 
-                    <td className="num">
-                      <strong>{inDeck}</strong>
-                      {inDeck < held ? (
-                        <>
-                          <br />
-                          <span className="muted small">{held - inDeck} not showing</span>
-                        </>
-                      ) : null}
-                    </td>
-
-                    <td className="num">{held}</td>
-
-                    <td className="num">
-                      {dealer.catalog_total}
-                      {dealer.catalog_queued > 0 ? (
-                        <>
-                          <br />
-                          <span className="muted small">{dealer.catalog_queued} queued</span>
-                        </>
-                      ) : null}
-                      {dealer.catalog_failed > 0 ? (
-                        <>
-                          <br />
-                          <span className="muted small">{dealer.catalog_failed} failed</span>
-                        </>
-                      ) : null}
-                    </td>
-
-                    <td className="small">
-                      <RefreshStatus dealer={dealer} />
-                    </td>
-
-                    {/* Both read off the shop's own site by the scrape, and
-                        both are what a buyer sees on the dealer's page. They
-                        are columns because the only way to know the read worked
-                        is to look, and a column can be scanned down a list of
-                        forty shops. */}
-                    <td className="small prose">
-                      {profile?.description ? (
-                        <span title={profile.description}>{profile.description}</span>
-                      ) : (
-                        <span className="muted">not read yet</span>
-                      )}
-                    </td>
-
-                    <td className="small">
-                      {profile?.instagram ? (
+                    <td className="email-cell">
+                      {dealer.contact_email ? (
                         <a
-                          href={`https://instagram.com/${profile.instagram}`}
-                          target="_blank"
-                          rel="noreferrer">
-                          @{profile.instagram}
+                          className="small oneline"
+                          href={`mailto:${dealer.contact_email}`}
+                          title={dealer.contact_email}>
+                          {dealer.contact_email}
                         </a>
                       ) : (
-                        <span className="muted">—</span>
+                        <span className="badge wait">no email</span>
                       )}
                     </td>
 
-                    <td>
-                      <span
-                        className={`badge ${dealer.permission === 'approved' ? 'ok' : dealer.permission === 'paused' ? 'wait' : 'wait'}`}>
-                        {dealer.permission}
-                      </span>
-                    </td>
-
-                    <td>
-                      {(dealer.neglect_flags ?? []).length === 0 ? (
-                        <span className="muted">—</span>
+                    <td className="description-cell">
+                      {profile?.description ? (
+                        <span className="muted small cell-clamp" title={profile.description}>
+                          {profile.description}
+                        </span>
                       ) : (
-                        (dealer.neglect_flags ?? []).map((flag) => (
-                          <span key={flag} className="badge wait">
-                            {flag === 'quiet' ? 'quiet 14d' : flag === 'unanswered' ? 'unanswered 48h' : flag}
-                          </span>
-                        ))
+                        <span className="muted small">—</span>
                       )}
-                      {dealer.unanswered_count > 0 ? (
-                        <>
-                          <br />
-                          <span className="muted small">{dealer.unanswered_count} waiting</span>
-                        </>
-                      ) : null}
+                    </td>
+
+                    <td className="num" title="Imported watches we hold for this shop">
+                      <strong>{listingCount}</strong>
+                    </td>
+
+                    <td className="sync">
+                      <SyncStatus dealer={dealer} />
+                    </td>
+
+                    <td className="status">
+                      <ShopStatus dealer={dealer} onOpenInbox={onOpenInbox} />
                     </td>
 
                     <td className="actions">
-                      <button
-                        className="ghost"
-                        disabled={busyId !== null || !dealer.can_import}
-                        title={
-                          dealer.can_import
-                            ? "Read the shop's site again, then show what they have"
-                            : 'The dealer manages this shop themselves'
-                        }
-                        onClick={() => refresh(dealer)}>
-                        Refresh from site
-                      </button>
-                      <button
-                        className="ghost"
-                        disabled={busyId !== null || !dealer.can_import}
-                        title={
-                          dealer.can_import
-                            ? 'Choose watches from the catalogue we already hold'
-                            : 'The dealer manages this shop themselves'
-                        }
-                        onClick={() => setPicking({ dealer, note: null })}>
-                        Add watches
-                      </button>
-                      <ShopPermission dealer={dealer} busy={busyId !== null} onSet={setPermission} />
+                      <div className="action-stack">
+                        <button
+                          className="ghost compact"
+                          disabled={busyId !== null}
+                          title="Active imports and for-sale watches on their site"
+                          onClick={() => setListingsFor(dealer)}>
+                          View listings
+                        </button>
+                        <button
+                          className="ghost compact"
+                          disabled={busyId !== null || !dealer.can_import}
+                          title={
+                            dealer.can_import
+                              ? 'Read their website, then choose watches to import. Reading is free; import runs when you confirm.'
+                              : 'This shop is self-managed — the dealer runs their own catalogue.'
+                          }
+                          onClick={() => syncAndImport(dealer)}>
+                          Sync
+                        </button>
+                        <ShopPermission dealer={dealer} busy={busyId !== null} onSet={setPermission} compact />
+                        <button
+                          className="ghost compact danger-text"
+                          disabled={busyId !== null}
+                          title="Permanently delete this shop, every imported watch, and their photos. Type DELETE to confirm."
+                          onClick={() => removeDealer(dealer)}>
+                          Delete shop
+                        </button>
+                      </div>
                     </td>
-                  </tr>,
-
-                  expanded ? (
-                    <tr key={`${dealer.id}-detail`} className="detail-row">
-                      <td colSpan={11}>
-                        <ShopListings dealerId={dealer.id} reload={tick} onChanged={reload} />
-                      </td>
-                    </tr>
-                  ) : null,
-                ];
+                  </tr>
+                );
               })}
             </tbody>
           </table>
           </div>
 
-          <p className="muted small legend">
-            <strong>In the deck</strong> is what a buyer can see right now: the watch is
-            active, unsold, and the shop is approved. <strong>Imported</strong> is every
-            watch we hold for them. <strong>Catalogue</strong> is what their site is
-            offering. <strong>Last refresh</strong> is the nightly job: when it last
-            finished, how many listings it published and skipped, and the last error
-            in the cell.
-            Photos are the live gallery on active, unsold watches. A gap between the
-            first two counts means some are sold or hidden — or that the shop is not
-            approved, in which case none of them show.
-          </p>
-
-          <p className="muted small legend">
-            <strong>Refresh from site</strong> reads their site again and then shows
-            what they have — free, and it imports nothing on its own.{' '}
-            <strong>Add watches</strong> opens that list without re-reading; importing
-            is the only step that spends a model call per watch. <strong>Publish</strong>{' '}
-            puts the watches in the deck. <strong>Pause</strong> takes a published shop
-            out of the deck and out of the nightly refresh until <strong>Resume</strong>.{' '}
-            <strong>Pull back</strong> revokes the shop. That is a separate decision
-            from pause, and publishing again is how a revoked shop comes back.
-          </p>
+          <details className="legend">
+            <summary className="muted small">What the columns mean</summary>
+            <p className="muted small">
+              <strong># listings</strong> is every watch you imported. <strong>View listings</strong>{' '}
+              opens Active and On site tabs. <strong>Last sync</strong> goes red after 48 hours without a
+              catalogue read or successful nightly refresh. <strong>Sync</strong> reads the site
+              then lets you import; you only pay when you confirm watches.
+            </p>
+          </details>
         </>
       )}
 
@@ -529,9 +566,46 @@ export function Dealers() {
           dealerId={picking.dealer.id}
           dealerName={picking.dealer.name}
           note={picking.note}
+          importing={busyId === picking.dealer.id}
+          activityLog={importLog}
+          onClearLog={() => setImportLog([])}
           onClose={() => setPicking(null)}
-          onImport={(candidates) => importSome(picking.dealer, candidates)}
+          onImport={(candidates) => importSome(picking.dealer, candidates, picking.skipSync)}
         />
+      ) : null}
+
+      {listingsFor ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setListingsFor(null)}>
+          <section
+            className="import-modal listings-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="listings-title"
+            onMouseDown={(event) => event.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <p className="eyebrow">Listings</p>
+                <h1 id="listings-title">{listingsFor.name}</h1>
+              </div>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Close listings"
+                onClick={() => setListingsFor(null)}>
+                ×
+              </button>
+            </header>
+            <ShopListings
+              dealerId={listingsFor.id}
+              inDeck={Number(listingsFor.listings_in_deck)}
+              catalogTotal={listingsFor.catalog_total}
+              canImport={listingsFor.can_import}
+              reload={tick}
+              onChanged={reload}
+              onImport={(candidates) => importSome(listingsFor, candidates)}
+            />
+          </section>
+        </div>
       ) : null}
     </section>
   );
@@ -541,10 +615,7 @@ function permissionQuestion(dealer: Row, permission: Permission): string {
   if (permission === 'paused') {
     return `Pause ${dealer.name}? Buyers stop seeing their watches, and the nightly refresh skips them, until you resume.`;
   }
-  if (permission === 'revoked') {
-    return `Revoke ${dealer.name}? Buyers stop seeing their watches. Publishing them again is a separate decision from resume.`;
-  }
-  if (dealer.permission === 'paused') {
+  if (dealer.permission === 'paused' || dealer.permission === 'revoked') {
     return `Resume ${dealer.name}? Their ${dealer.listings_held} imported watch(es) go back in front of buyers, and the nightly refresh includes them again.`;
   }
   return `Put ${dealer.name}'s ${dealer.listings_held} imported watch(es) in front of buyers?`;
@@ -554,116 +625,155 @@ function ShopPermission({
   dealer,
   busy,
   onSet,
+  compact,
 }: {
   dealer: Row;
   busy: boolean;
   onSet: (dealer: Row, permission: Permission) => void;
+  compact?: boolean;
 }) {
+  const btn = compact ? 'ghost compact' : 'ghost';
   if (dealer.permission === 'approved') {
     return (
-      <>
-        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'paused')}>
-          Pause
-        </button>
-        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'revoked')}>
-          Pull back
-        </button>
-      </>
+      <button
+        className={btn}
+        disabled={busy}
+        title="Remove this shop from the buyer deck and skip it in the nightly site refresh until you resume."
+        onClick={() => onSet(dealer, 'paused')}>
+        Pause
+      </button>
     );
   }
 
-  if (dealer.permission === 'paused') {
+  if (dealer.permission === 'paused' || dealer.permission === 'revoked') {
     return (
-      <>
-        <button disabled={busy} onClick={() => onSet(dealer, 'approved')}>
-          Resume
-        </button>
-        <button className="ghost" disabled={busy} onClick={() => onSet(dealer, 'revoked')}>
-          Pull back
-        </button>
-      </>
+      <button
+        className={compact ? 'compact' : undefined}
+        disabled={busy}
+        title="Put this shop back in the deck and include it in the nightly refresh again."
+        onClick={() => onSet(dealer, 'approved')}>
+        {dealer.permission === 'revoked' ? 'Publish' : 'Resume'}
+      </button>
     );
   }
 
   return (
-    <button disabled={busy} onClick={() => onSet(dealer, 'approved')}>
+    <button
+      className={compact ? 'compact' : undefined}
+      disabled={busy}
+      title="Approve the shop so buyers can see its imported watches in the deck."
+      onClick={() => onSet(dealer, 'approved')}>
       Publish
     </button>
   );
 }
 
-function newer(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+function ShopStatus({ dealer, onOpenInbox }: { dealer: Row; onOpenInbox?: (dealer: Row) => void }) {
+  const flags = dealer.neglect_flags ?? [];
+  return (
+    <div className="status-stack">
+      <span className={`badge ${dealer.permission === 'approved' ? 'ok' : 'wait'}`}>{dealer.permission}</span>
+      {flags.map((flag) => (
+        <span key={flag} className="badge wait">
+          {flag === 'quiet' ? 'quiet' : flag === 'unanswered' ? 'unanswered' : flag}
+        </span>
+      ))}
+      {dealer.unanswered_count > 0 ? (
+        <button
+          type="button"
+          className="ghost compact inbox-link"
+          title="Read threads and inquiries for this shop"
+          onClick={() => onOpenInbox?.(dealer)}>
+          {dealer.unanswered_count} waiting
+        </button>
+      ) : onOpenInbox ? (
+        <button
+          type="button"
+          className="ghost compact inbox-link"
+          title="Read threads for this shop"
+          onClick={() => onOpenInbox(dealer)}>
+          Inbox
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
-function RefreshStatus({ dealer }: { dealer: Row }) {
-  const nightly = dealer.last_refresh_at;
-  const sync = dealer.last_synced_at;
-  const when = newer(nightly, sync);
-  const syncIsNewer = Boolean(sync && nightly && new Date(sync).getTime() > new Date(nightly).getTime());
-  const errors = shopErrors(dealer);
+function RefreshBanner({ schedule }: { schedule: RefreshSchedule }) {
+  const alert = refreshAlert(schedule);
+  return (
+    <div className={`refresh-banner ${alert.level}`} role="status">
+      <strong>{alert.title}</strong>
+      <span className="muted small">{alert.detail}</span>
+    </div>
+  );
+}
 
-  if (!when && errors.length === 0) {
-    return <span className="muted">never</span>;
-  }
+function SyncStatus({ dealer }: { dealer: Row }) {
+  const okAt = dealer.last_refresh_ok_at;
+  const attemptAt = dealer.last_refresh_at;
+  const sync = dealer.last_synced_at;
+  const errors = shopErrors(dealer);
+  const attemptFailed =
+    attemptAt != null &&
+    dealer.last_refresh_attempt_ok === false &&
+    Boolean(dealer.last_refresh_error);
+
+  const lastSync = dealerLastSyncAt(dealer);
+  const tone = lastSyncTone(lastSync);
+
+  const detail = [
+    lastSync ? `Last sync ${new Date(lastSync).toLocaleString()}` : 'No catalogue read or nightly refresh logged',
+    okAt ? `Last ok nightly refresh ${new Date(okAt).toLocaleString()}` : null,
+    attemptAt
+      ? `Last attempt ${new Date(attemptAt).toLocaleString()} — ${
+          dealer.last_refresh_attempt_ok ? 'ok' : dealer.last_refresh_error ?? 'failed'
+        }`
+      : null,
+    sync ? `Catalogue read ${new Date(sync).toLocaleString()}` : null,
+    sync && dealer.last_sync_error ? dealer.last_sync_error : null,
+    ...errors.filter((e) => e !== dealer.last_refresh_error),
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const chips = [
+    attemptFailed ? (
+      <span key="refresh" className="badge bad" title={dealer.last_refresh_error ?? undefined}>
+        refresh failed
+      </span>
+    ) : null,
+    errors.length > 0 && !attemptFailed ? (
+      <span key="sync" className="badge bad" title={errors.join('\n')}>
+        sync error
+      </span>
+    ) : null,
+    dealer.last_sync_complete === false ? (
+      <span
+        key="partial"
+        className="badge wait"
+        title="Catalogue read hit the size limit; absence was not treated as sold.">
+        partial read
+      </span>
+    ) : null,
+  ].filter(Boolean);
 
   return (
-    <span>
-      {when ? (
-        <span title={new Date(when).toLocaleString()}>{formatAge(when)}</span>
-      ) : (
-        <span className="muted">never</span>
-      )}
-      {nightly ? (
-        <>
-          <br />
-          <span className="muted" title={new Date(nightly).toLocaleString()}>
-            {dealer.last_refresh_published ?? 0} published, {dealer.last_refresh_skipped ?? 0} skipped
-          </span>
-        </>
-      ) : null}
-      {sync && (!nightly || syncIsNewer) ? (
-        <>
-          <br />
-          <span className="muted" title={new Date(sync).toLocaleString()}>
-            read {dealer.last_sync_found ?? 0}, {dealer.last_sync_added ?? 0} new
-          </span>
-        </>
-      ) : null}
-      <br />
-      {dealer.photo_count > 0 || dealer.listings_missing_photos > 0 ? (
-        <span className="muted">{dealer.photo_count} photos</span>
-      ) : (
-        <span className="muted">no live listings</span>
-      )}
-      {dealer.listings_missing_photos > 0 ? (
-        <>
-          {' '}
-          <span className="badge wait">{dealer.listings_missing_photos} missing photos</span>
-        </>
-      ) : null}
-      {dealer.last_sync_complete === false ? (
-        <>
-          <br />
-          <span
-            className="badge wait"
-            title="The catalogue read stopped at the size limit; absence was not treated as sold.">
-            incomplete
-          </span>
-        </>
-      ) : null}
-      {errors.length > 0 ? (
-        <>
-          <br />
-          <span className="errtext" title={errors.join('\n')}>
-            {errors.join(' · ')}
-          </span>
-        </>
-      ) : null}
-    </span>
+    <div className="sync-stack" title={detail || undefined}>
+      <span className={`sync-age sync-age-${tone}`}>
+        {lastSync ? formatAge(lastSync) : 'never'}
+      </span>
+      {chips.length > 0 ? <div className="chips">{chips}</div> : null}
+    </div>
   );
+}
+
+function siteLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 function formatAge(iso: string): string {
@@ -678,35 +788,23 @@ function formatAge(iso: string): string {
   return `${days}d ago`;
 }
 
-/**
- * `chevron-right` from Material Community Icons, the set the app draws from,
- * as a path rather than a font: the console loads no icon font, and a typed
- * triangle (▸) is a character whose size and weight come from whatever the
- * system decided. CSS turns it a quarter when the row is open.
- */
-function Chevron() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M8.59 16.58 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.42Z" />
-    </svg>
-  );
-}
-
 function SortHeader({
   label,
   sortKey,
   sort,
   onSort,
   numeric,
+  title,
 }: {
   label: string;
   sortKey: SortKey;
   sort: SortKey;
   onSort: (key: SortKey) => void;
   numeric?: boolean;
+  title?: string;
 }) {
   return (
-    <th className={numeric ? 'num' : undefined}>
+    <th className={numeric ? 'num' : undefined} title={title}>
       <button
         className="sort"
         aria-pressed={sort === sortKey}
@@ -741,39 +839,51 @@ function ClaimLine({
   return (
     <span className="claim">
       {dealer.claimed_by ? (
-        <>
-          <span className="small">
-            Claimed by {dealer.claimer_name || 'an account'}
-            {dealer.claimer_handle ? ` (@${dealer.claimer_handle})` : ''}
-            {dealer.claimer_last_sign_in_at ? ` · signed in ${formatAge(dealer.claimer_last_sign_in_at)}` : ''}
+        <span className="claim-row">
+          <span className="muted small oneline">
+            {dealer.claimer_handle ? `@${dealer.claimer_handle}` : dealer.claimer_name || 'claimed'}
+            {dealer.claimer_last_sign_in_at ? ` · ${formatAge(dealer.claimer_last_sign_in_at)}` : ''}
           </span>
-          <button className="ghost" disabled={busy} onClick={onUnassign}>
+          <button
+            className="ghost compact"
+            disabled={busy}
+            title="Remove the dealer account from this shop and burn any live claim code."
+            onClick={onUnassign}>
             Unassign
           </button>
-        </>
+        </span>
       ) : (
-        <span className="muted small">Nobody has claimed this shop.</span>
+        <span className="claim-row">
+          <span className="muted small">unclaimed</span>
+          <button
+            className="ghost compact"
+            disabled={busy}
+            title="Create a 7-day code the dealer can use to claim this shop in the app."
+            onClick={onIssue}>
+            {liveUntil ? 'New code' : 'Code'}
+          </button>
+          {liveUntil ? (
+            <button
+              className="ghost compact"
+              disabled={busy}
+              title="Invalidate the current claim code so it can no longer be used."
+              onClick={onRevoke}>
+              Revoke
+            </button>
+          ) : null}
+        </span>
       )}
       {code ? (
         <span className="code">
           <input readOnly value={code.code} aria-label="Claim code" />
-          <button className="ghost" type="button" onClick={() => onCopy(code.code)}>
+          <button
+            className="ghost compact"
+            type="button"
+            title="Copy the claim code to send to the dealer."
+            onClick={() => onCopy(code.code)}>
             {copied ? 'Copied' : 'Copy'}
           </button>
         </span>
-      ) : null}
-      {liveUntil ? (
-        <span className="muted small">Code live until {new Date(liveUntil).toLocaleString()}</span>
-      ) : null}
-      {dealer.claimed_by ? null : (
-        <button className="ghost" disabled={busy} onClick={onIssue}>
-          {liveUntil ? 'New code' : 'Claim code'}
-        </button>
-      )}
-      {liveUntil ? (
-        <button className="ghost" disabled={busy} onClick={onRevoke}>
-          Revoke code
-        </button>
       ) : null}
     </span>
   );

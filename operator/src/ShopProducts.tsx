@@ -30,13 +30,11 @@ function day(stamp: string | null): string {
   return Number.isNaN(at.getTime()) ? '—' : at.toISOString().slice(0, 10);
 }
 
-type SortKey = 'title' | 'price' | 'photos' | 'published';
+type SortKey = 'title' | 'price' | 'published';
 
 /** Nulls last in both directions: an unknown is not cheaper than $500. */
 function compare(a: PreviewProduct, b: PreviewProduct, key: SortKey): number {
   if (key === 'title') return a.title.localeCompare(b.title);
-  if (key === 'photos') return a.photo_count - b.photo_count;
-
   const [left, right] =
     key === 'price'
       ? [a.price_cents, b.price_cents]
@@ -87,7 +85,7 @@ export function ShopProducts({ preview }: { preview: Preview }) {
 
   return (
     <div className="detail">
-      <div className="bar">
+      <div className="toolbar">
         <div className="tabs">
           {FILTERS.map((one) => (
             <button
@@ -113,13 +111,11 @@ export function ShopProducts({ preview }: { preview: Preview }) {
         <table className="inner">
           <thead>
             <tr>
-              <th />
               {heading('title', 'Product')}
               <th>Brand</th>
               <th>Type</th>
               {heading('price', 'Price', 'num')}
               <th>SKU</th>
-              {heading('photos', 'Photos', 'num')}
               {heading('published', 'Published')}
               <th>Updated</th>
               <th>State</th>
@@ -128,14 +124,6 @@ export function ShopProducts({ preview }: { preview: Preview }) {
           <tbody>
             {shown.map((product) => (
               <tr key={product.source_url} className={product.skipped ? 'dim' : undefined}>
-                <td className="thumb">
-                  {product.photo_url ? (
-                    <img src={product.photo_url} alt="" loading="lazy" />
-                  ) : (
-                    <span className="badge wait">none</span>
-                  )}
-                </td>
-
                 <td>
                   <a href={product.source_url} target="_blank" rel="noreferrer">
                     {product.title || product.source_url}
@@ -148,7 +136,6 @@ export function ShopProducts({ preview }: { preview: Preview }) {
                 </td>
                 <td className="num">{formatPrice(product.price_cents, product.currency)}</td>
                 <td className="small">{product.sku ?? <span className="muted">—</span>}</td>
-                <td className="num">{product.photo_count}</td>
                 <td className="small muted">{day(product.published_at)}</td>
                 <td className="small muted">{day(product.updated_at)}</td>
 
