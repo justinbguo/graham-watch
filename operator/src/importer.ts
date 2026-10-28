@@ -49,6 +49,8 @@ export type PreviewProduct = {
 
 export type Preview = {
   provider: string;
+  /** False when the walk stopped before the feed ended. Absent on an older function. */
+  complete?: boolean;
   counts: { read: number; for_sale: number; sold: number; skipped: number };
   listings: PreviewProduct[];
 };

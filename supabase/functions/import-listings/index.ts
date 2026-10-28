@@ -3,12 +3,12 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
-import { MAX_CATALOG_ITEMS, adapterItems, readCatalog, syncCatalog } from './catalog.ts';
+import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
-import type { SkippedItem, SourceItem } from './source.ts';
+import { catalogueComplete, type SkippedItem, type SourceItem } from './source.ts';
 
 let adminClient: SupabaseClient | null = null;
 
@@ -610,12 +610,15 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
         // Sold watches are returned rather than filtered out. Hiding them is
         // what made a shop's own numbers impossible to reconcile with ours,
         // and the caller can filter a field it can see.
-        const found = await adapterItems(sourceUrl, limit);
-        const { provider, items, skipped } = found ?? (await readCatalog(sourceUrl, limit));
+        // One walk. Calling the adapter here and again inside readCatalog
+        // fetched robots.txt and the first page twice.
+        const found = await readCatalog(sourceUrl, limit);
+        const { provider, items, skipped } = found;
 
         await meter(userId, sourceUrl, null, 'succeeded');
         return Response.json({
           provider,
+          complete: catalogueComplete(found, limit),
           counts: previewCounts(items, skipped),
           listings: previewFromItems(items, skipped),
         });
@@ -791,7 +794,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
             provider: result.provider,
             error: result.complete
               ? null
-              : `Stopped at ${limit} watches. Refresh again to read further.`,
+              : 'Stopped before the end of the catalogue. Watches that were not read were left alone.',
             finished_at: new Date().toISOString(),
           })
           .eq('id', job);

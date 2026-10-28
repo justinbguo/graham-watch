@@ -4,19 +4,26 @@ import { extractListings } from './extract.ts';
 import { contentFingerprint, textFingerprint } from './hash.ts';
 import { scrape } from './scrape.ts';
 import { fetchShopifyItems } from './shopify.ts';
-import { productKey, type AdapterRead, type SkippedItem, type SourceItem } from './source.ts';
+import {
+  catalogueComplete,
+  productKey,
+  type AdapterRead,
+  type SkippedItem,
+  type SourceItem,
+} from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
 
 /**
- * How deep a catalogue read goes. This is a read of feeds the shop publishes
- * anyway, with no model call behind it, so it can afford the whole shop where
- * the old import had to stop at what it could pay to extract in one request.
+ * How many watches one read may keep. Past this the read is incomplete, and
+ * an incomplete read must not retire a watch just because it was not seen.
  *
- * 1000 rather than 500 because a vintage dealer's shop is mostly sold stock:
- * Collectors Corner NY publish 970 products holding 87 watches for sale, and a
- * 500 cap read none of the second half — including whatever is for sale there.
+ * 10000 rather than 1000 because the cap counts the sold archive, and that
+ * archive is the bulk of a vintage shop. Danny's Vintage Watches publish
+ * about 4300 products and Craft + Tailored about 3700. A 1000 cap stopped
+ * inside the watches that are still for sale, then refused to retire anything
+ * that fell off the end. 10000 is the same budget as 40 Shopify pages of 250.
  */
-export const MAX_CATALOG_ITEMS = 1000;
+export const MAX_CATALOG_ITEMS = 10_000;
 
 /**
  * A grid tile sometimes carries one photo and the product page carries eight,
@@ -55,7 +62,11 @@ export async function adapterItems(
 ): Promise<{ provider: string } & AdapterRead | null> {
   for (const [name, run] of Object.entries(ADAPTERS)) {
     const read = await run(sourceUrl, limit, minPhotos);
-    if (read && (read.items.length || read.skipped.length)) return { provider: name, ...read };
+    // `recognized` covers a feed that answered and kept nothing. Without it an
+    // empty Shopify shop fell through to the scraper.
+    if (read && (read.recognized || read.items.length || read.skipped.length)) {
+      return { provider: name, ...read };
+    }
   }
   return null;
 }
@@ -67,6 +78,8 @@ export type CatalogRead = {
   skipped: SkippedItem[];
   /** Pre-typed by the page read, so these skip the extraction queue entirely. */
   extracted: Map<string, Record<string, unknown>>;
+  /** False when the walk stopped before the feed ended. See catalogueComplete. */
+  complete?: boolean;
 };
 
 /**
@@ -84,6 +97,7 @@ export async function readCatalog(sourceUrl: string, limit: number): Promise<Cat
       items: found.items,
       skipped: found.skipped,
       extracted: new Map(),
+      complete: found.complete,
     };
   }
 
@@ -119,7 +133,10 @@ export async function readCatalog(sourceUrl: string, limit: number): Promise<Cat
 
   // The extractor is asked for watches and returns watches, so there is no
   // discard pile on this path — anything it passed over left no record.
-  return { provider, items, skipped: [], extracted };
+  // One page is the whole of this path. Under the cap it still reports
+  // complete, which is the old behaviour: the scrape does not know the shop
+  // has another page.
+  return { provider, items, skipped: [], extracted, complete: items.length < limit };
 }
 
 export type SyncResult = {
@@ -154,7 +171,10 @@ export async function syncCatalog(
   sourceUrl: string,
   limit: number
 ): Promise<SyncResult> {
-  const { provider, items, skipped, extracted } = await readCatalog(sourceUrl, limit);
+  const { provider, items, skipped, extracted, complete: feedComplete } = await readCatalog(
+    sourceUrl,
+    limit
+  );
   const readAt = new Date().toISOString();
 
   const { data: before } = await supabase
@@ -226,7 +246,7 @@ export async function syncCatalog(
     .eq('dealer_id', dealerId)
     .gte('last_seen_at', readAt);
 
-  const complete = items.length < limit;
+  const complete = catalogueComplete({ items, complete: feedComplete }, limit);
   const availability = await supabase.rpc('sync_source_availability', {
     p_dealer_id: dealerId,
     p_seen_ids: (seen ?? []).map((row) => row.id),
