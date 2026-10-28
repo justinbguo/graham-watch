@@ -5,6 +5,7 @@ import {
   OPENAI_MAX_ATTEMPTS,
   OPENAI_MAX_DELAY_MS,
   extractFields,
+  openAIConcurrencyLimit,
   openAIFailureKind,
   openAIRetryDelayMs,
   retryHintMs,
@@ -96,6 +97,11 @@ Deno.test('caps one sleep, and does not retry a bad request, a rejected key, or 
   assertEquals(openAIFailureKind(401, ''), 'config');
   assertEquals(openAIFailureKind(429, 'insufficient_quota'), 'config');
   assertEquals(openAIFailureKind(400, ''), 'stop');
+});
+
+Deno.test('concurrency stays at one when OPENAI_CONCURRENCY cannot be read', () => {
+  // CI runs `deno test` without --allow-env. Reading the variable must not throw.
+  assertEquals(openAIConcurrencyLimit(), 1);
 });
 
 Deno.test('a past Retry-After means retry immediately, which is not the same as a missing hint', () => {

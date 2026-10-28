@@ -1,5 +1,10 @@
 -- Read-only messaging for operators. Tables stay behind RLS; these RPCs check
 -- require_operator() first.
+--
+-- Drop first so a hosted database that already has the function (SQL applied
+-- outside schema_migrations) can record this version on `db push`.
+
+drop function if exists public.operator_conversations(uuid, boolean, integer);
 
 create function public.operator_conversations(
   p_dealer_id uuid default null,
@@ -115,6 +120,8 @@ begin
 end;
 $$;
 
+drop function if exists public.operator_conversation_messages(uuid, integer);
+
 create function public.operator_conversation_messages(
   p_conversation_id uuid,
   p_limit integer default 250
@@ -162,6 +169,8 @@ begin
     limit greatest(1, least(coalesce(p_limit, 250), 500));
 end;
 $$;
+
+drop function if exists public.operator_inquiries(uuid, boolean, integer);
 
 create function public.operator_inquiries(
   p_dealer_id uuid default null,

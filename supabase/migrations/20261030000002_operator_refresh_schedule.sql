@@ -1,5 +1,12 @@
 -- Nightly refresh visibility: global schedule health for the operator banner,
 -- and per-shop last success vs last attempt in operator_dealers().
+--
+-- Drop-then-create, not bare CREATE. These functions can already exist on
+-- hosted when this version is missing from schema_migrations (the SQL was
+-- applied outside the history table). A bare CREATE then stops `db push`
+-- on "already exists" and the version is never recorded.
+
+drop function if exists public.operator_refresh_schedule();
 
 create function public.operator_refresh_schedule()
 returns table (
@@ -11,11 +18,18 @@ returns table (
   approved_shops bigint,
   last_catalog_sync_at timestamptz
 )
-language sql
+language plpgsql
 stable
 security definer
 set search_path = ''
 as $$
+begin
+  -- Granted to authenticated, so a buyer JWT can call it. The banner is
+  -- operator-only; without this check the latest error text is public to
+  -- every signed-in account.
+  perform public.require_operator();
+
+  return query
   select
     (
       select max(r.finished_at)
@@ -48,12 +62,13 @@ as $$
       where d.permission = 'approved'
         and d.last_sync_error is null
     );
+end;
 $$;
 
 revoke all on function public.operator_refresh_schedule() from public, anon;
 grant execute on function public.operator_refresh_schedule() to authenticated, service_role;
 
-drop function public.operator_dealers();
+drop function if exists public.operator_dealers();
 
 create function public.operator_dealers()
 returns table (
