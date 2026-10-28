@@ -1,6 +1,6 @@
 -- Drop has_photo from operator_conversation_messages; operators do not audit attachments here.
 
-drop function public.operator_conversation_messages(uuid, integer);
+drop function if exists public.operator_conversation_messages(uuid, integer);
 
 create function public.operator_conversation_messages(
   p_conversation_id uuid,

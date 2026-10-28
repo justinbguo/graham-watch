@@ -2024,6 +2024,16 @@ console.log('\noperators');
     `got ${overviewBefore.status}`
   );
 
+  const scheduleBefore = await api('/rest/v1/rpc/operator_refresh_schedule', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'a buyer cannot read the refresh schedule',
+    scheduleBefore.status >= 400,
+    `got ${scheduleBefore.status}`
+  );
+
   const logBefore = await api('/rest/v1/rpc/operator_activity', {
     token: buyer.token,
     method: 'POST',
@@ -2068,6 +2078,16 @@ console.log('\noperators');
     method: 'POST',
   });
   check('a granted account is an operator', nowOperator.body === true);
+
+  const schedule = await api('/rest/v1/rpc/operator_refresh_schedule', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'an operator can read the refresh schedule',
+    schedule.status < 300 && Array.isArray(schedule.body),
+    `${schedule.status} ${JSON.stringify(schedule.body)?.slice(0, 200)}`
+  );
 
   const byOperator = await publish(buyer.token, 'revoked');
   check(
@@ -2196,7 +2216,10 @@ console.log('\noperators');
     headers: { ...admin, Prefer: 'return=representation' },
     body: JSON.stringify({
       dealer_id: dealerId,
-      ok: true,
+      // operator_dealers() only returns last_refresh_error when the latest
+      // attempt failed. A successful row stores a null error on purpose, so
+      // this fixture has to be a failure or the console check below is vacant.
+      ok: false,
       published: 2,
       skipped_listings: 1,
       error: 'boom',
@@ -2216,7 +2239,8 @@ console.log('\noperators');
   const ran = withRun.body?.find((row) => row.id === dealerId);
   check(
     'the console shows that run’s published and skipped counts and its error',
-    ran?.last_refresh_published === 2 &&
+    ran?.last_refresh_attempt_ok === false &&
+      ran?.last_refresh_published === 2 &&
       ran?.last_refresh_skipped === 1 &&
       ran?.last_refresh_error === 'boom' &&
       typeof ran?.last_refresh_at === 'string',
@@ -2688,6 +2712,11 @@ console.log('\nwhat anon can reach');
     ['replace_listing_photos', { p_listing_id: listingId, p_photos: [] }],
     ['apply_source_item', { p_source_item_id: listingId }],
     ['lookup_claimable_dealer', { p_website: 'https://example.com' }],
+    ['operator_delete_dealer', { p_dealer_id: dealerId }],
+    ['operator_refresh_schedule', {}],
+    ['operator_conversations', {}],
+    ['operator_conversation_messages', { p_conversation_id: dealerId }],
+    ['operator_inquiries', {}],
   ]) {
     const attempt = await asAnon(fn, body);
     check(`anon cannot execute ${fn}`, attempt.status >= 400, `got ${attempt.status}`);
