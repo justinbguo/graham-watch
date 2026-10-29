@@ -51,3 +51,17 @@ export function facetsOf(cards: DeckCard[]): ShopFacet[] {
       .sort((a, b) => b.count - a.count),
   ];
 }
+
+/**
+ * Deck and search options, counted from watches already in hand. Same rows as
+ * `facetsOf`, plus the shop each watch comes from. Demo mode has no
+ * `listing_facets` call, so the filter panel reads this instead.
+ */
+export function catalogueFacets(cards: DeckCard[]): ShopFacet[] {
+  return [
+    ...facetsOf(cards),
+    ...tally(cards, 'dealer', (card) =>
+      card.dealer ? { value: card.dealer_id, label: card.dealer.name } : null,
+    ),
+  ];
+}

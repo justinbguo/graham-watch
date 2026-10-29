@@ -794,8 +794,12 @@ one pair of numbers. Typing after that replaces the rows with the range in the b
 ## Filter by dealer
 
 The catalogue is a handful of shops and people shop by the shop they trust, so dealer
-sits beside brand. The group is hidden when only one dealer has anything in the deck:
-a filter whose every option returns everything is furniture.
+sits beside brand. The group lists every shop that has a watch this screen can show,
+including when that is only one shop: the row is how a buyer sees who is selling, and
+its count is how many of that shop's watches are in the feed. It stays off a shop
+page, where you are already inside one dealer. A shop with no live listing is not
+offered — the list comes from `listing_facets`, so a dealer appears once a watch
+of theirs is actually on the deck.
 
 ## Where filters live
 
