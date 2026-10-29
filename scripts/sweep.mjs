@@ -42,7 +42,7 @@ for (const url of urls) {
     changed += result.changed;
     console.log(
       `${url}\n  read ${result.found}, ${result.changed} changed, ${result.retired} retired${
-        result.complete ? '' : ', stopped at the read limit'
+        result.complete ? '' : ', stopped before the end of the catalogue'
       }`
     );
   } catch (error) {

@@ -34,6 +34,17 @@ export type SkippedItem = {
 export type AdapterRead = {
   items: SourceItem[];
   skipped: SkippedItem[];
+  /**
+   * The feed answered in this adapter's shape. An empty shop is still its
+   * platform: falling through to the scraper would pay a model call to
+   * re-read a catalogue we already understood.
+   */
+  recognized?: boolean;
+  /**
+   * False when the walk stopped before the feed ended. Omitted means the
+   * caller infers it from the item cap, which is all a one-page scrape can do.
+   */
+  complete?: boolean;
 };
 
 /**
@@ -85,14 +96,41 @@ export function productKey(raw: string): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Json = any;
 
-export async function fetchJson(url: URL): Promise<Json | null> {
+/** A fetched body, or null when the socket failed before a status arrived. */
+export type TextResponse = { status: number; body: string };
+
+/**
+ * Whether a read may retire watches it did not see.
+ *
+ * Adapters that know set `complete`. A page cap or a failed page is false
+ * even when fewer watches were kept than the item limit — that used to look
+ * like the end of the shop, and a complete read retires whatever it missed.
+ */
+export function catalogueComplete(
+  read: { items: readonly unknown[]; complete?: boolean },
+  limit: number
+): boolean {
+  if (typeof read.complete === 'boolean') return read.complete;
+  return read.items.length < limit;
+}
+
+export async function fetchText(url: URL, accept: string): Promise<TextResponse | null> {
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      headers: { 'User-Agent': USER_AGENT, Accept: accept },
       signal: AbortSignal.timeout(TIMEOUT.source),
     });
-    if (!response.ok) return null;
-    return await response.json();
+    return { status: response.status, body: await response.text() };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchJson(url: URL): Promise<Json | null> {
+  const response = await fetchText(url, 'application/json');
+  if (!response || response.status < 200 || response.status >= 300) return null;
+  try {
+    return JSON.parse(response.body);
   } catch {
     return null;
   }

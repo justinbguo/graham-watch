@@ -2012,6 +2012,40 @@ export type Database = {
           title: string
         }[]
       }
+      operator_conversation_messages: {
+        Args: { p_conversation_id: string; p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string
+          deal_status: string
+          id: string
+          listing_label: string
+          sender_handle: string
+          sender_label: string
+          via: string
+        }[]
+      }
+      operator_conversations: {
+        Args: {
+          p_dealer_id?: string
+          p_limit?: number
+          p_unanswered_only?: boolean
+        }
+        Returns: {
+          buyer_handle: string
+          buyer_label: string
+          id: string
+          is_group: boolean
+          last_message_at: string
+          message_count: number
+          partner_handle: string
+          partner_label: string
+          preview: string
+          shop_id: string
+          shop_name: string
+          unanswered: boolean
+        }[]
+      }
       operator_dashboard: { Args: never; Returns: Json }
       operator_dealers: {
         Args: never
@@ -2057,39 +2091,23 @@ export type Database = {
         Args: { p_dealer_id: string }
         Returns: string[]
       }
-      operator_conversation_messages: {
-        Args: { p_conversation_id: string; p_limit?: number }
-        Returns: {
-          body: string
-          created_at: string
-          deal_status: string
-          id: string
-          listing_label: string
-          sender_handle: string
-          sender_label: string
-          via: string
-        }[]
+      operator_delete_listing: {
+        Args: { p_listing_id: string }
+        Returns: string[]
       }
-      operator_conversations: {
+      operator_edit_listing: {
         Args: {
-          p_dealer_id?: string
-          p_limit?: number
-          p_unanswered_only?: boolean
+          p_brand: string
+          p_case_size_mm?: number
+          p_condition?: string
+          p_description?: string
+          p_listing_id: string
+          p_model?: string
+          p_price_cents?: number
+          p_reference?: string
+          p_year?: number
         }
-        Returns: {
-          buyer_handle: string
-          buyer_label: string
-          id: string
-          is_group: boolean
-          last_message_at: string
-          message_count: number
-          partner_handle: string
-          partner_label: string
-          preview: string
-          shop_id: string
-          shop_name: string
-          unanswered: boolean
-        }[]
+        Returns: undefined
       }
       operator_inquiries: {
         Args: {
@@ -2109,36 +2127,6 @@ export type Database = {
           status: Database["public"]["Enums"]["inquiry_status"]
           unanswered: boolean
         }[]
-      }
-      operator_refresh_schedule: {
-        Args: never
-        Returns: {
-          approved_shops: number
-          last_attempt_at: string
-          last_attempt_error: string
-          last_attempt_ok: boolean
-          last_catalog_sync_at: string
-          last_success_at: string
-          recorded_runs: number
-        }[]
-      }
-      operator_delete_listing: {
-        Args: { p_listing_id: string }
-        Returns: string[]
-      }
-      operator_edit_listing: {
-        Args: {
-          p_brand: string
-          p_case_size_mm?: number
-          p_condition?: string
-          p_description?: string
-          p_listing_id: string
-          p_model?: string
-          p_price_cents?: number
-          p_reference?: string
-          p_year?: number
-        }
-        Returns: undefined
       }
       operator_issue_claim_code: {
         Args: { p_dealer_id: string }
@@ -2182,6 +2170,18 @@ export type Database = {
           last_active: string
           onboarded: boolean
           swipe_count: number
+        }[]
+      }
+      operator_refresh_schedule: {
+        Args: never
+        Returns: {
+          approved_shops: number
+          last_attempt_at: string
+          last_attempt_error: string
+          last_attempt_ok: boolean
+          last_catalog_sync_at: string
+          last_success_at: string
+          recorded_runs: number
         }[]
       }
       operator_revoke_claim_code: {

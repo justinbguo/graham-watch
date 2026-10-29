@@ -2024,6 +2024,16 @@ console.log('\noperators');
     `got ${overviewBefore.status}`
   );
 
+  const scheduleBefore = await api('/rest/v1/rpc/operator_refresh_schedule', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'a buyer cannot read the refresh schedule',
+    scheduleBefore.status >= 400,
+    `got ${scheduleBefore.status}`
+  );
+
   const logBefore = await api('/rest/v1/rpc/operator_activity', {
     token: buyer.token,
     method: 'POST',
@@ -2068,6 +2078,16 @@ console.log('\noperators');
     method: 'POST',
   });
   check('a granted account is an operator', nowOperator.body === true);
+
+  const schedule = await api('/rest/v1/rpc/operator_refresh_schedule', {
+    token: buyer.token,
+    method: 'POST',
+  });
+  check(
+    'an operator can read the refresh schedule',
+    schedule.status < 300 && Array.isArray(schedule.body),
+    `${schedule.status} ${JSON.stringify(schedule.body)?.slice(0, 200)}`
+  );
 
   const byOperator = await publish(buyer.token, 'revoked');
   check(
@@ -2196,7 +2216,10 @@ console.log('\noperators');
     headers: { ...admin, Prefer: 'return=representation' },
     body: JSON.stringify({
       dealer_id: dealerId,
-      ok: true,
+      // operator_dealers() only returns last_refresh_error when the latest
+      // attempt failed. A successful row stores a null error on purpose, so
+      // this fixture has to be a failure or the console check below is vacant.
+      ok: false,
       published: 2,
       skipped_listings: 1,
       error: 'boom',
@@ -2216,7 +2239,8 @@ console.log('\noperators');
   const ran = withRun.body?.find((row) => row.id === dealerId);
   check(
     'the console shows that run’s published and skipped counts and its error',
-    ran?.last_refresh_published === 2 &&
+    ran?.last_refresh_attempt_ok === false &&
+      ran?.last_refresh_published === 2 &&
       ran?.last_refresh_skipped === 1 &&
       ran?.last_refresh_error === 'boom' &&
       typeof ran?.last_refresh_at === 'string',
@@ -2688,6 +2712,11 @@ console.log('\nwhat anon can reach');
     ['replace_listing_photos', { p_listing_id: listingId, p_photos: [] }],
     ['apply_source_item', { p_source_item_id: listingId }],
     ['lookup_claimable_dealer', { p_website: 'https://example.com' }],
+    ['operator_delete_dealer', { p_dealer_id: dealerId }],
+    ['operator_refresh_schedule', {}],
+    ['operator_conversations', {}],
+    ['operator_conversation_messages', { p_conversation_id: dealerId }],
+    ['operator_inquiries', {}],
   ]) {
     const attempt = await asAnon(fn, body);
     check(`anon cannot execute ${fn}`, attempt.status >= 400, `got ${attempt.status}`);
@@ -2718,6 +2747,87 @@ console.log('\nwhat anon can reach');
     Array.isArray(anonDeck.body) && anonDeck.body.every((row) => row.status === 'active'),
     `got ${JSON.stringify(anonDeck.body)?.slice(0, 120)}`
   );
+
+  // A guest's auth.uid() is null, and an unclaimed shop's claimed_by is null.
+  // Those must not count as the same person, or the Buy tab hides every shop
+  // nobody has claimed — including one that was just approved and stocked.
+  const adminHeaders = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+  const guestShop = await fetch(`${URL}/rest/v1/dealers?select=id`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      name: 'Unclaimed Counter',
+      website: `https://unclaimed-${stamp}.test`,
+      created_by: importer.id,
+      permission: 'approved',
+    }),
+  }).then((response) => response.json());
+  const guestShopId = guestShop?.[0]?.id;
+  const guestListing = guestShopId
+    ? await fetch(`${URL}/rest/v1/listings?select=id`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          dealer_id: guestShopId,
+          imported_by: importer.id,
+          brand: 'Tudor',
+          model: 'Advisor',
+          price_cents: 180000,
+        }),
+      }).then((response) => response.json())
+    : null;
+  const guestListingId = guestListing?.[0]?.id;
+
+  const anonFacets = await asAnon('listing_facets', { p_exclude_own: true });
+  check(
+    'a guest sees an unclaimed shop in the dealer filter',
+    Boolean(guestShopId) &&
+      anonFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId),
+    `shop ${guestShopId} facets ${JSON.stringify(anonFacets.body?.filter((row) => row.kind === 'dealer'))}`
+  );
+
+  const anonByDealer = await asAnon('search_listings', {
+    p_limit: 20,
+    p_exclude_own: true,
+    p_dealers: guestShopId ? [guestShopId] : [],
+  });
+  check(
+    'a guest can filter the deck to that unclaimed shop',
+    Boolean(guestListingId) && anonByDealer.body?.some((row) => row.id === guestListingId),
+    `got ${anonByDealer.status}`
+  );
+
+  const importerFacets = await api('/rest/v1/rpc/listing_facets', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_exclude_own: true },
+  });
+  check(
+    'the importer does not see their own shop on the buy filter',
+    !importerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId)
+  );
+
+  const buyerFacets = await api('/rest/v1/rpc/listing_facets', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_exclude_own: true },
+  });
+  check(
+    'another buyer sees the unclaimed shop in the dealer filter',
+    buyerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId && Number(row.count) >= 1)
+  );
+
+  if (guestShopId) {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${guestShopId}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    });
+  }
 
   const anonListing = await api(`/rest/v1/listings?id=eq.${listingId}&select=id`);
   check(

@@ -32,9 +32,11 @@ jobs:
       # is the runner, same as operator/.
       - name: refresh planner
         run: >-
-          node --test scripts/refresh-run.test.mjs
+          node --test --experimental-strip-types
+          scripts/refresh-run.test.mjs
           scripts/refresh-health.test.mjs
           scripts/deploy-functions.test.mjs
+          scripts/dealer-filter.test.mjs
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing

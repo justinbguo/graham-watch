@@ -56,6 +56,18 @@ const DEALER = {
   logo_url: null,
 };
 
+const HARBOUR = {
+  id: 'demo-dealer-harbour',
+  name: 'Harbour Watch Co.',
+  website: 'https://harbourwatch.test',
+  description: 'A small shop of sports watches, serviced in house.',
+  instagram: 'harbourwatch',
+  logo_url: null,
+};
+
+/** Six fixtures across two shops, so the Buy filter has more than one dealer. */
+const SHOPS = [DEALER, DEALER, DEALER, HARBOUR, HARBOUR, DEALER];
+
 type Fixture = {
   brand: string;
   model: string;
@@ -165,52 +177,55 @@ const FIXTURES: Fixture[] = [
   },
 ];
 
-const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => ({
-  id: `demo-${index}`,
-  dealer_id: DEALER.id,
-  imported_by: 'demo-importer',
-  import_job_id: null,
-  source_url: `${DEALER.website}/${index}`,
-  brand: fixture.brand,
-  model: fixture.model,
-  reference: fixture.reference,
-  year: fixture.year,
-  caliber: fixture.caliber,
-  winding: fixture.winding,
-  case_size_mm: fixture.case_size_mm,
-  case_material: fixture.case_material,
-  dial_color: null,
-  style: fixture.style,
-  complications: fixture.complications,
-  brand_key: fixture.brand.toLowerCase().replace(/[^a-z0-9]/g, ''),
-  condition: fixture.condition,
-  has_box: index % 2 === 0,
-  has_papers: index % 3 === 0,
-  price_cents: fixture.price_cents,
-  cost_cents: null,
-  currency: 'USD',
-  description: fixture.description,
-  status: 'active',
-  // Demo mode is a deck to look at, and the deck never holds a sold watch.
-  sold_at: null,
-  sold_source: null,
-  availability_checked_at: null,
-  edited_fields: [],
-  created_at: new Date(Date.now() - index * 86_400_000).toISOString(),
-  // Three, so the carousel has something to page through in demo mode.
-  photos: [0, 1, 2].map((position) => {
-    const url = `https://picsum.photos/seed/${encodeURIComponent(fixture.reference)}-${position}/900/1200`;
-    return {
-      id: `demo-photo-${index}-${position}`,
-      listing_id: `demo-${index}`,
-      url,
-      source_url: url,
-      storage_path: null,
-      position,
-    };
-  }),
-  dealer: DEALER,
-}));
+const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => {
+  const shop = SHOPS[index] ?? DEALER;
+  return {
+    id: `demo-${index}`,
+    dealer_id: shop.id,
+    imported_by: 'demo-importer',
+    import_job_id: null,
+    source_url: `${shop.website}/${index}`,
+    brand: fixture.brand,
+    model: fixture.model,
+    reference: fixture.reference,
+    year: fixture.year,
+    caliber: fixture.caliber,
+    winding: fixture.winding,
+    case_size_mm: fixture.case_size_mm,
+    case_material: fixture.case_material,
+    dial_color: null,
+    style: fixture.style,
+    complications: fixture.complications,
+    brand_key: fixture.brand.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    condition: fixture.condition,
+    has_box: index % 2 === 0,
+    has_papers: index % 3 === 0,
+    price_cents: fixture.price_cents,
+    cost_cents: null,
+    currency: 'USD',
+    description: fixture.description,
+    status: 'active',
+    // Demo mode is a deck to look at, and the deck never holds a sold watch.
+    sold_at: null,
+    sold_source: null,
+    availability_checked_at: null,
+    edited_fields: [],
+    created_at: new Date(Date.now() - index * 86_400_000).toISOString(),
+    // Three, so the carousel has something to page through in demo mode.
+    photos: [0, 1, 2].map((position) => {
+      const url = `https://picsum.photos/seed/${encodeURIComponent(fixture.reference)}-${position}/900/1200`;
+      return {
+        id: `demo-photo-${index}-${position}`,
+        listing_id: `demo-${index}`,
+        url,
+        source_url: url,
+        storage_path: null,
+        position,
+      };
+    }),
+    dealer: shop,
+  };
+});
 
 // Swipes live for the life of the process, so the deck and the wishlist stay in sync
 // while you use the app. A reload starts over, which is what you want in a demo.
@@ -238,11 +253,12 @@ export function demoMailDraft(card: DeckCard, message: string) {
           maximumFractionDigits: 0,
         }).format(card.price_cents / 100);
 
+  const shop = card.dealer ?? DEALER;
   return {
-    to: `hello@${new URL(DEALER.website).hostname}`,
+    to: `hello@${new URL(shop.website ?? DEALER.website).hostname}`,
     subject: `Inquiry: ${subject}`,
     body: [
-      `Hi ${DEALER.name},`,
+      `Hi ${shop.name},`,
       '',
       `My name is ${name}. I'm interested in the ${subject} you have listed at ${price} — is it still available?`,
       ...(message.trim() ? ['', message.trim()] : []),
@@ -256,6 +272,9 @@ export function demoMailDraft(card: DeckCard, message: string) {
 }
 
 export const demo = {
+  /** Every fixture, including ones already swiped. Facets count the catalogue. */
+  catalogue: () => CARDS,
+
   deck: (filters?: Filters) =>
     CARDS.filter((card) => !swiped.has(card.id) && (!filters || matchesListing(card, filters))),
 

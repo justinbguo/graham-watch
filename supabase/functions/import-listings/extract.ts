@@ -120,10 +120,20 @@ the dealer's prose, without marketing superlatives.`;
  * call, so photograph copies still overlap. The gap is not a fixed six
  * seconds: a higher quota just proceeds, and a 429 waits for the hint
  * OpenAI sent.
+ *
+ * Override with OPENAI_CONCURRENCY (1–4) when the key allows more than one
+ * in flight. Unset means one. `deno test` does not grant env access, and
+ * Deno throws NotCapable instead of returning undefined — that is the same
+ * as unset, not a failed extraction.
  */
-/** Override with OPENAI_CONCURRENCY (1–4) when your key allows more than one in flight. */
 export function openAIConcurrencyLimit(): number {
-  const raw = Deno.env.get('OPENAI_CONCURRENCY');
+  let raw: string | undefined;
+  try {
+    raw = Deno.env.get('OPENAI_CONCURRENCY');
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotCapable)) throw error;
+    raw = undefined;
+  }
   const parsed = raw ? Number(raw) : 1;
   if (!Number.isFinite(parsed) || parsed < 1) return 1;
   return Math.min(Math.floor(parsed), 4);

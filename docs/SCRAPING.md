@@ -7,7 +7,7 @@ A refresh is split by what it costs.
 **Read the catalogue** (`action: 'sync'`). Ask the shop what it sells and store
 one row per product in `source_items`, with a hash of the prose and a hash of
 everything else. Costs HTTP and nothing more, so it walks the whole shop —
-`MAX_CATALOG_ITEMS`, currently 1000. Idempotent: run it twice and the second run
+`MAX_CATALOG_ITEMS`, currently 10000. Idempotent: run it twice and the second run
 writes nothing.
 
 **Publish** (`action: 'publish'`). Take a bounded slice of the queue, type each
@@ -168,15 +168,27 @@ tying extraction quality to the scrape vendor.
 
 ## Pagination
 
-Both adapters page their own feeds, to `MAX_CATALOG_ITEMS` (1000). A read that
-hits the cap reports `complete: false`; running it again reads no further today,
-because paging restarts from the top — a shop with more than 1000 products needs
-a cursor stored on the dealer, which is the next piece of work here.
+Shopify pages `/products.json` at 250 products a page until a short page, which
+is the end of the feed, and waits a second between requests. The reader sends
+`GrahamBot/0.1` and will not fetch a URL `robots.txt` disallows. A crawl-delay
+in that file can only slow it down. There is no availability filter on
+`products.json`, and Shopify's robots file disallows collection URLs that stack
+two `filter` parameters, so the whole feed is what a complete read walks.
+A collection handle is still honoured when the catalogue URL already points at
+one.
 
-The cap is 1000 rather than 500 because a vintage dealer's catalogue is mostly
-sold stock. Collectors Corner NY publish 970 products holding 79 watches for
-sale, scattered throughout, so a 500 cap read half the shop and no one could
-say which half.
+The walk stops incomplete — and absence is not treated as sold — when it hits
+40 pages or `MAX_CATALOG_ITEMS` (10000), when a page fails after one retry, or
+when a page repeats ids the read already stored. Refreshing starts again at
+page 1. It does not resume.
+
+10000 rather than 1000 because the cap counts sold stock. Danny's Vintage
+Watches publish about 4300 products and Craft + Tailored about 3700. The old
+cap stopped inside the watches still for sale, and the old 10-page stop
+(2500 products) did the same, and a stopped read never retired what it had
+not seen. Both shops fit under 10000, so a finished read can retire.
+
+Squarespace still pages its own collection JSON to the same item cap.
 
 The generic scrape path still reads one page only. Crawling — Firecrawl
 `/v2/crawl` or Browserbase clicking through — is what that would need.

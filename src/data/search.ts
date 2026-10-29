@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { catalogueFacets } from '@/features/filters/facets';
 import { toRpcArgs, type Filters } from '@/features/filters/types';
 import { demo, isDemo } from '@/lib/demo';
 import type { DeckCard } from '@/lib/models';
@@ -25,7 +26,9 @@ async function fetchSearch(filters: Filters, limit: number): Promise<DeckCard[]>
 }
 
 async function fetchFacets(excludeOwn: boolean): Promise<Facet[]> {
-  if (isDemo) return [];
+  // Demo fixtures belong to a stand-in importer, not the demo account, so
+  // exclude-own does not drop a shop here. The real call still passes the flag.
+  if (isDemo) return catalogueFacets(demo.catalogue());
 
   const { data, error } = await supabase.rpc('listing_facets', {
     p_exclude_own: excludeOwn,
