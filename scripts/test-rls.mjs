@@ -2748,6 +2748,87 @@ console.log('\nwhat anon can reach');
     `got ${JSON.stringify(anonDeck.body)?.slice(0, 120)}`
   );
 
+  // A guest's auth.uid() is null, and an unclaimed shop's claimed_by is null.
+  // Those must not count as the same person, or the Buy tab hides every shop
+  // nobody has claimed — including one that was just approved and stocked.
+  const adminHeaders = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+  const guestShop = await fetch(`${URL}/rest/v1/dealers?select=id`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      name: 'Unclaimed Counter',
+      website: `https://unclaimed-${stamp}.test`,
+      created_by: importer.id,
+      permission: 'approved',
+    }),
+  }).then((response) => response.json());
+  const guestShopId = guestShop?.[0]?.id;
+  const guestListing = guestShopId
+    ? await fetch(`${URL}/rest/v1/listings?select=id`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          dealer_id: guestShopId,
+          imported_by: importer.id,
+          brand: 'Tudor',
+          model: 'Advisor',
+          price_cents: 180000,
+        }),
+      }).then((response) => response.json())
+    : null;
+  const guestListingId = guestListing?.[0]?.id;
+
+  const anonFacets = await asAnon('listing_facets', { p_exclude_own: true });
+  check(
+    'a guest sees an unclaimed shop in the dealer filter',
+    Boolean(guestShopId) &&
+      anonFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId),
+    `shop ${guestShopId} facets ${JSON.stringify(anonFacets.body?.filter((row) => row.kind === 'dealer'))}`
+  );
+
+  const anonByDealer = await asAnon('search_listings', {
+    p_limit: 20,
+    p_exclude_own: true,
+    p_dealers: guestShopId ? [guestShopId] : [],
+  });
+  check(
+    'a guest can filter the deck to that unclaimed shop',
+    Boolean(guestListingId) && anonByDealer.body?.some((row) => row.id === guestListingId),
+    `got ${anonByDealer.status}`
+  );
+
+  const importerFacets = await api('/rest/v1/rpc/listing_facets', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_exclude_own: true },
+  });
+  check(
+    'the importer does not see their own shop on the buy filter',
+    !importerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId)
+  );
+
+  const buyerFacets = await api('/rest/v1/rpc/listing_facets', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_exclude_own: true },
+  });
+  check(
+    'another buyer sees the unclaimed shop in the dealer filter',
+    buyerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId && Number(row.count) >= 1)
+  );
+
+  if (guestShopId) {
+    await fetch(`${URL}/rest/v1/dealers?id=eq.${guestShopId}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    });
+  }
+
   const anonListing = await api(`/rest/v1/listings?id=eq.${listingId}&select=id`);
   check(
     'anon can read an approved listing',

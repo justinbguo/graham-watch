@@ -9,6 +9,7 @@ import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { filterChips } from './chips';
+import { dealerChoices } from './dealers';
 import { facetsOf } from './facets';
 import { FilterGroup } from './FilterGroup';
 import { FilterSummary } from './FilterSummary';
@@ -24,8 +25,9 @@ import {
 } from './types';
 
 /**
- * Price, era, size, brand, and dealer when the catalogue has more than one.
+ * Price, era, size, brand, and every dealer this surface can actually show.
  * Options come from `listing_facets` so nothing offered can only return zero rows.
+ * One shop is still listed: the row is how a buyer sees who is selling.
  */
 export function FilterPanel({
   surface,
@@ -46,6 +48,7 @@ export function FilterPanel({
   const matched = useFilterMatchCount(surface, dealerId);
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
+  const dealers = dealerChoices(facets, surface);
   const labelFor = useCallback(
     (kind: string, value: string) =>
       of(kind).find((facet) => facet.value === value)?.label ?? value,
@@ -151,10 +154,10 @@ export function FilterPanel({
           </FilterGroup>
         ) : null}
 
-        {of('dealer').length > 1 ? (
+        {dealers.length ? (
           <FilterGroup title="Dealer" selectedCount={filters.dealers.length || undefined}>
             {rows(
-              of('dealer').map((facet) => ({
+              dealers.map((facet) => ({
                 key: facet.value,
                 label: facet.label,
                 count: facet.count,

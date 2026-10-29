@@ -10,5 +10,14 @@
   // `operator` and `studio` are their own TypeScript projects. Compiled from
   // here, their path aliases and DOM types do not exist and every file fails.
   // Each has its own build, which type checks it.
-  "exclude": ["node_modules", "supabase/functions", "operator", "studio"]
+  "exclude": [
+    "node_modules",
+    "supabase/functions",
+    "operator",
+    "studio",
+    // Deno script. It imports the edge functions with `.ts` specifiers, and
+    // tsc follows those imports even though `supabase/functions` is excluded.
+    // `deno check` in the edge-functions job is what typechecks it.
+    "scripts/catalogue-preview.ts"
+  ]
 }
