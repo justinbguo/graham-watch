@@ -16,7 +16,7 @@ import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/S
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
-import { useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
+import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
@@ -220,7 +220,12 @@ export default function Deck() {
     </DeckHeader>
   );
 
-  if (isPending) {
+  // An empty pile is the end of the deck only when nothing matches. While
+  // `matched` is still above zero the next page is on its way, and the empty
+  // copy here would tell the buyer the catalogue was finished.
+  const showEmpty = showDeckEmpty(cards.length, counts?.matched);
+
+  if (isPending || (cards.length === 0 && !error && !showEmpty)) {
     return (
       <Screen titleControl={titleControl} inTabs>
         {frameDesktop(<Spinner />)}
@@ -241,7 +246,7 @@ export default function Deck() {
     );
   }
 
-  if (cards.length === 0) {
+  if (showEmpty) {
     return (
       <Screen titleControl={titleControl} inTabs>
         {frameDesktop(
