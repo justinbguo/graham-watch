@@ -331,7 +331,10 @@ console.log('\nafter approval');
   check('the deck includes approved listings', buyerDeck.body?.some((row) => row.id === listingId));
 
   const importerDeck = await api('/rest/v1/rpc/get_deck', { token: importer.token, method: 'POST', body: { p_limit: 50 } });
-  check('the deck never shows you your own import', !importerDeck.body?.some((row) => row.id === listingId));
+  check(
+    'the deck keeps a listing you imported until you claim the shop',
+    importerDeck.body?.some((row) => row.id === listingId)
+  );
 
   const ownerDeck = await api('/rest/v1/rpc/get_deck', { token: dealerUser.token, method: 'POST', body: { p_limit: 50 } });
   check(
@@ -346,14 +349,14 @@ console.log('\nafter approval');
   });
   check('search includes an approved shop', buyerSearch.body?.some((row) => row.id === listingId));
 
-  const importerHidden = await api('/rest/v1/rpc/search_listings', {
+  const importerDefault = await api('/rest/v1/rpc/search_listings', {
     token: importer.token,
     method: 'POST',
     body: { p_limit: 50, p_query: 'Speedmaster' },
   });
   check(
-    'search hides your own import unless asked not to',
-    !importerHidden.body?.some((row) => row.id === listingId)
+    'search keeps a listing you imported when you have not claimed the shop',
+    importerDefault.body?.some((row) => row.id === listingId)
   );
 
   const importerSearch = await api('/rest/v1/rpc/search_listings', {
@@ -388,7 +391,27 @@ console.log('\nafter approval');
   });
   const counted = Number(importerCount.body?.[0]?.matched ?? 0);
   const omitted = Number(importerDefaultCount.body?.[0]?.matched ?? 0);
-  check('search count includes a shop you imported', counted > omitted);
+  check(
+    'importing a listing does not change your deck count',
+    counted === omitted && counted >= 1,
+    `exclude_own false ${counted}, default ${omitted}`
+  );
+
+  const claimantAll = await api('/rest/v1/rpc/listing_counts', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_exclude_own: false, p_query: 'Speedmaster' },
+  });
+  const claimantOwn = await api('/rest/v1/rpc/listing_counts', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_query: 'Speedmaster' },
+  });
+  check(
+    'claiming a shop removes its watches from your deck count',
+    Number(claimantAll.body?.[0]?.matched ?? 0) > Number(claimantOwn.body?.[0]?.matched ?? 0),
+    `all ${claimantAll.body?.[0]?.matched}, own excluded ${claimantOwn.body?.[0]?.matched}`
+  );
 
   // Favourites rank the deck. If they ever start filtering it, this listing —
   // whose brand the buyer did not pick — disappears and the check fails.
@@ -2808,8 +2831,8 @@ console.log('\nwhat anon can reach');
     body: { p_exclude_own: true },
   });
   check(
-    'the importer does not see their own shop on the buy filter',
-    !importerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId)
+    'an importer still sees an unclaimed shop they stocked',
+    importerFacets.body?.some((row) => row.kind === 'dealer' && row.value === guestShopId)
   );
 
   const buyerFacets = await api('/rest/v1/rpc/listing_facets', {
@@ -2823,6 +2846,43 @@ console.log('\nwhat anon can reach');
   );
 
   if (guestShopId) {
+    const claimed = await fetch(`${URL}/rest/v1/dealers?id=eq.${guestShopId}`, {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: JSON.stringify({ claimed_by: buyer.id }),
+    });
+    check('the shop can be marked claimed', claimed.ok, `got ${claimed.status}`);
+
+    const claimantDeck = await api('/rest/v1/rpc/search_listings', {
+      token: buyer.token,
+      method: 'POST',
+      body: { p_limit: 20, p_exclude_own: true, p_dealers: [guestShopId] },
+    });
+    check(
+      'a claimed shop is hidden from the account that claimed it',
+      !claimantDeck.body?.some((row) => row.id === guestListingId)
+    );
+
+    const importerStill = await api('/rest/v1/rpc/search_listings', {
+      token: importer.token,
+      method: 'POST',
+      body: { p_limit: 20, p_exclude_own: true, p_dealers: [guestShopId] },
+    });
+    check(
+      'importing a watch does not hide it when someone else claimed the shop',
+      importerStill.body?.some((row) => row.id === guestListingId)
+    );
+
+    const guestStill = await asAnon('search_listings', {
+      p_limit: 20,
+      p_exclude_own: true,
+      p_dealers: [guestShopId],
+    });
+    check(
+      'a guest still sees a shop after someone else claims it',
+      guestStill.body?.some((row) => row.id === guestListingId)
+    );
+
     await fetch(`${URL}/rest/v1/dealers?id=eq.${guestShopId}`, {
       method: 'DELETE',
       headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },

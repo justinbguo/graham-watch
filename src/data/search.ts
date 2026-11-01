@@ -16,8 +16,9 @@ async function fetchSearch(filters: Filters, limit: number): Promise<DeckCard[]>
 
   const { data, error } = await supabase.rpc('search_listings', {
     p_limit: limit,
-    // The deck hides watches this account imported. Search is where you check
-    // a shop you just published is actually findable, so it keeps them.
+    // The deck hides watches from a shop this account has claimed. Search is
+    // where you check a shop you just published is actually findable, so it
+    // keeps them. Importing a listing does not hide it from the deck.
     p_exclude_own: false,
     ...toRpcArgs(filters),
   });

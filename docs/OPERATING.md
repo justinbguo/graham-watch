@@ -821,7 +821,7 @@ Working-as-designed, so do not debug these:
 | `Could not find the table 'public.operators' in the schema cache` | You are pointed at a project that migration has not reached. The error names the project and the local command to use instead. |
 | Operator sign-in says "Invalid login credentials" | One message covers a wrong password, an unknown address, and an account with no password set. `npm run dealers -- operator <email> --password "..."` fixes all three. |
 | The operator UI loads blank and the console names `VITE_SUPABASE_URL` | No `operator/.env.local`. `npm run env -- local` writes it. |
-| The deck is empty on a fresh `db:reset` | You are signed in as the account that owns the seeded shop. The deck hides listings you imported, so sign in as anybody else. |
+| The deck is empty on a fresh `db:reset` | You are signed in as the account that claimed the seeded shop. The deck hides a shop from the person who claimed it. Importing the rows does not hide them, and the seed shop is unclaimed. |
 
 Real bugs, by contrast, look like: a write that reports success and changes
 nothing, an `import_jobs` row stuck at `running`, a photo gallery that is empty

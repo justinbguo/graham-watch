@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
@@ -7,8 +7,20 @@ import { toRpcArgs, type Filters } from '@/features/filters/types';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session';
 
+import {
+  appendDeckPage,
+  deckPileFromPage,
+  DECK_LIMIT,
+  nextDeckOffset,
+  shouldRefillDeck,
+  showDeckEmpty,
+  type DeckPile,
+} from './deckPaging';
 import { keys } from './keys';
+
+export { DECK_LIMIT, showDeckEmpty };
 
 const PHOTO_BUCKET = 'listing-photos';
 
@@ -61,13 +73,16 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
   }));
 }
 
-async function fetchDeck(limit: number, filters: Filters): Promise<DeckCard[]> {
-  if (isDemo) return demo.deck(filters).slice(0, limit);
+async function fetchDeck(limit: number, filters: Filters, offset: number): Promise<DeckCard[]> {
+  if (isDemo) return demo.deck(filters).slice(offset, offset + limit);
 
   // The deck is search with the cards you have already judged removed, and with
-  // the brands you chose at sign-up dealt first.
+  // the brands you chose at sign-up dealt first. `p_exclude_own` hides a shop
+  // this account has claimed. Importing a listing does not hide it, and a guest
+  // has no account, so nothing is theirs to hide.
   const { data, error } = await supabase.rpc('search_listings', {
     p_limit: limit,
+    p_offset: offset,
     p_exclude_swiped: true,
     p_favorites_first: true,
     p_exclude_own: true,
@@ -133,33 +148,104 @@ export function usePrimeListing() {
 }
 
 /**
- * One pile at a time. The deck is not paged: it is fetched once, swiped down,
- * and refilled by a refresh, so this is also the most a screen can truthfully
- * say is left.
+ * One page at a time. The next page is fetched when five or fewer cards are
+ * left and `matched` still exceeds what this screen has loaded.
+ * The header does not count the pile: `listing_counts` is the number of
+ * watches, and the pile is only the ones in hand.
  */
-export const DECK_LIMIT = 20;
-
 export function useDeck(limit = DECK_LIMIT) {
   const { filters } = useFilters('deck');
   const guest = useGuest();
+  const { userId } = useSession();
+  const counts = useListingCounts();
+  const queryClient = useQueryClient();
+  const [refillError, setRefillError] = useState<Error | null>(null);
+  const generation = useRef(0);
 
   const query = useQuery({
     queryKey: keys.deck(filters),
-    queryFn: () => fetchDeck(limit, filters),
-    // The deck is consumed by swiping, not by refetching. Re-running it mid-pile
-    // would shuffle cards out from under the user's thumb.
+    queryFn: async () => deckPileFromPage(await fetchDeck(limit, filters, 0), limit),
+    // The deck is consumed by swiping, not by refetching. Re-running the first
+    // page mid-pile would shuffle cards out from under the user's thumb. The
+    // next page is appended below, on purpose.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
   // Guest judgments never reach `swipes`, so the RPC cannot exclude them. Drop
-  // them here so a refetch after a filter change does not resurrect a pass.
-  const data = useMemo(() => {
-    if (!query.data || guest.swipedIds.size === 0) return query.data;
-    return query.data.filter((card) => !guest.swipedIds.has(card.id));
+  // them here so a refill does not put a pass back on top of the pile.
+  const visible = useMemo(() => {
+    const cards = query.data?.cards ?? [];
+    if (guest.swipedIds.size === 0) return cards;
+    return cards.filter((card) => !guest.swipedIds.has(card.id));
   }, [query.data, guest.swipedIds]);
 
-  return { ...query, data };
+  const seen = query.data?.seen ?? 0;
+  const exhausted = query.data?.exhausted ?? false;
+  const wantMore =
+    query.data != null &&
+    shouldRefillDeck({
+      remaining: visible.length,
+      matched: counts.data?.matched,
+      seen,
+      exhausted,
+    });
+  const filterKey = JSON.stringify(keys.deck(filters));
+  const [attempt, setAttempt] = useState(0);
+  const attempts = useRef(0);
+  // Read when a refill starts. Listing the pile size as an effect dependency
+  // would cancel the request on every swipe, and a signed-in offset moves as
+  // cards leave.
+  const remainingRef = useRef(visible.length);
+  remainingRef.current = visible.length;
+
+  useEffect(() => {
+    if (!wantMore) return;
+    const pageOffset = nextDeckOffset({
+      guest: userId == null,
+      seen,
+      remaining: remainingRef.current,
+    });
+    const generationId = ++generation.current;
+    let cancelled = false;
+    void fetchDeck(limit, filters, pageOffset)
+      .then((page) => {
+        if (cancelled || generation.current !== generationId) return;
+        attempts.current = 0;
+        setRefillError(null);
+        queryClient.setQueryData<DeckPile<DeckCard>>(keys.deck(filters), (current) =>
+          current ? appendDeckPage(current, page, limit) : current,
+        );
+      })
+      .catch((err: unknown) => {
+        if (cancelled || generation.current !== generationId) return;
+        attempts.current += 1;
+        if (attempts.current <= 2) {
+          setAttempt((current) => current + 1);
+          return;
+        }
+        // Remember the failure even while cards remain. The screen only shows
+        // it once the pile is empty — a failed refill must not throw away the
+        // watch under the thumb — and Try again is that screen's existing button.
+        setRefillError(err instanceof Error ? err : new Error('Could not load more watches.'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantMore, seen, filterKey, userId, attempt, limit, filters, queryClient]);
+
+  const refetch = useCallback(() => {
+    attempts.current = 0;
+    setRefillError(null);
+    return query.refetch();
+  }, [query]);
+
+  return {
+    ...query,
+    data: visible,
+    error: query.error ?? (visible.length === 0 ? refillError : null),
+    refetch,
+  };
 }
 
 export type ListingCounts = { matched: number; total: number };
@@ -179,8 +265,8 @@ export async function fetchCounts(filters: Filters): Promise<ListingCounts> {
 
 /**
  * How many watches the filters leave, and how many the marketplace holds. The
- * deck cannot answer either: it is one pile deep, so its length tops out at
- * `DECK_LIMIT` and the header had to say "20+".
+ * pile cannot answer either: it is only the pages fetched so far, so its length
+ * used to freeze at `DECK_LIMIT` and the header had to say "20+".
  *
  * Counted in the database, in one round trip, by `listing_counts` — the same
  * predicate the deck is drawn with. A count assembled here from the rows we

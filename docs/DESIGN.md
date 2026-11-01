@@ -1446,8 +1446,9 @@ After a swipe they differ, and the line becomes "147 of 148 watches available".
 
 `matched` drops what you have already swiped, because that is what is left for you to
 look at. `total` keeps it: "on the marketplace" is a fact about the marketplace, not
-about your history. Both drop your own imports, since a shop's own window is not a
-listing offered to them.
+about your history. Both drop watches from a shop you have claimed. Importing a
+listing does not: `imported_by` is the account that fetched the row, and that
+account still shops the deck.
 
 The slot is `Screen`'s `subtitle`, so any screen can say what it is holding in the same
 place, in the same tone, without inventing a second header. Nothing shows until the count

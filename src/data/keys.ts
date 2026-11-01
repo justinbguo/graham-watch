@@ -1,3 +1,5 @@
+import { countsCacheKey, deckCacheKey } from './deckPaging';
+
 /**
  * Every cached query is identified by one of these keys. Keeping them in one
  * place is what makes invalidation safe — a mutation can look up exactly which
@@ -5,12 +7,13 @@
  */
 export const keys = {
   // The deck is cached per filter set: changing a filter is a different deck,
-  // not a stale one.
-  deck: (filters: unknown = null) => ['deck', filters] as const,
+  // not a stale one. The key is canonical, so Rolex-then-Tudor and a blank
+  // query share a pile with Tudor-then-Rolex and the default.
+  deck: (filters: unknown = null) => deckCacheKey(filters),
   search: (filters: unknown) => ['search', filters] as const,
   // Two numbers about the same filter set the deck is keyed on, but a separate
   // key: the deck is frozen while it is being swiped and these are not.
-  counts: (filters: unknown) => ['listing-counts', filters] as const,
+  counts: (filters: unknown) => countsCacheKey(filters),
   // Same function as the deck's counts, asked the way Search is: include the
   // caller's own imports, and do not drop watches they have already swiped.
   searchCount: (filters: unknown) => ['listing-counts', 'search', filters] as const,
