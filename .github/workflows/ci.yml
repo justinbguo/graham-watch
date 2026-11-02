@@ -38,6 +38,7 @@ jobs:
           scripts/deploy-functions.test.mjs
           scripts/dealer-filter.test.mjs
           scripts/deck-paging.test.mjs
+          scripts/filter-spec.test.mjs
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing
