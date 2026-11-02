@@ -1128,6 +1128,15 @@ Three gestures, one surface, and they must not fight:
 - Tap the photograph's left or right to page it, long press to open it full
   screen, pinch to magnify it. Only the top card takes any of this.
 
+The two cards behind that one are already the finished card: same size, same
+`shadow.card`, gesture already attached. A swipe does not build the next one
+and it does not wait out the exit. The card that just left keeps flying — a
+pass fades off, a save is the flight to the wishlist — and the next card takes
+the thumb on the next frame, shadow included. Sibling order does not change
+for a card that stays; paint order is z-index. Moving those views to put the
+new top last was rebuilding the shadow at the moment it should already have
+been in the hand.
+
 The listing route still exists for the surfaces with no card to scroll: a wishlist
 row, a search result, a grid tile. It shows the same block under a bigger
 headline, and adds the Save toggle a deck card does not need — there a right
