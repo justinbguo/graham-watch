@@ -78,7 +78,7 @@ export function useSearchCount(filters: Filters) {
  */
 export function useFacets(excludeOwn = true, enabled = true) {
   return useQuery({
-    queryKey: [...keys.facets, excludeOwn],
+    queryKey: keys.facetsQuery(excludeOwn),
     queryFn: () => fetchFacets(excludeOwn),
     staleTime: 5 * 60_000,
     enabled,

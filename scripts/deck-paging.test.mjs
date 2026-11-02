@@ -8,11 +8,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { NO_FILTERS } from '../src/features/filters/types.ts';
+import { countsCacheKey, deckCacheKey } from '../src/features/filters/spec.ts';
 import {
   appendDeckPage,
-  countsCacheKey,
   DECK_LIMIT,
-  deckCacheKey,
   deckPileFromPage,
   dropJudgedCard,
   nextDeckOffset,

@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useDealerShop } from '@/data/dealers';
+import { keys } from '@/data/keys';
 import { fetchCounts } from '@/data/listings';
 import { useSearchCount } from '@/data/search';
-import { useDealerShop } from '@/data/dealers';
+
 import { matchesListing } from './match';
 import { useFilters, type Surface } from './provider';
 
@@ -13,7 +15,7 @@ export function useFilterMatchCount(surface: Surface, dealerId?: string) {
   const shop = useDealerShop(surface === 'shop' ? (dealerId ?? '') : '');
 
   const deck = useQuery({
-    queryKey: ['filter-match', 'deck', api.filters],
+    queryKey: keys.filterMatch(api.filters),
     enabled: surface === 'deck',
     queryFn: () => fetchCounts(api.filters).then((row) => row.matched),
     placeholderData: (previous) => previous,

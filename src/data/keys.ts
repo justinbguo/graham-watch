@@ -1,4 +1,4 @@
-import { countsCacheKey, deckCacheKey } from './deckPaging';
+import { countsCacheKey, deckCacheKey, facetsQueryKey, filterCacheToken } from '@/features/filters/spec';
 
 /**
  * Every cached query is identified by one of these keys. Keeping them in one
@@ -7,17 +7,22 @@ import { countsCacheKey, deckCacheKey } from './deckPaging';
  */
 export const keys = {
   // The deck is cached per filter set: changing a filter is a different deck,
-  // not a stale one. The key is canonical, so Rolex-then-Tudor and a blank
-  // query share a pile with Tudor-then-Rolex and the default.
+  // not a stale one. The key is the FilterSpec token — sorted, deduped,
+  // defaults omitted — so Rolex-then-Tudor and a blank query share a pile
+  // with Tudor-then-Rolex and the default.
   deck: (filters: unknown = null) => deckCacheKey(filters),
-  search: (filters: unknown) => ['search', filters] as const,
+  search: (filters: unknown) => ['search', filterCacheToken(filters)] as const,
   // Two numbers about the same filter set the deck is keyed on, but a separate
   // key: the deck is frozen while it is being swiped and these are not.
   counts: (filters: unknown) => countsCacheKey(filters),
   // Same function as the deck's counts, asked the way Search is: include the
   // caller's own imports, and do not drop watches they have already swiped.
-  searchCount: (filters: unknown) => ['listing-counts', 'search', filters] as const,
+  searchCount: (filters: unknown) => ['listing-counts', 'search', filterCacheToken(filters)] as const,
+  /** Prefix. Invalidation matches every `facetsQuery`, whatever the token is. */
   facets: ['facets'] as const,
+  facetsQuery: (excludeOwn: boolean, filters: unknown = null) => facetsQueryKey(excludeOwn, filters),
+  /** Match count in the filter sheet. Same deck predicate as `counts`, own cache. */
+  filterMatch: (filters: unknown) => ['filter-match', 'deck', filterCacheToken(filters)] as const,
   profile: (userId: string) => ['profile', userId] as const,
   /** Saved ship-to and payment stand-in for deal checkout. */
   checkoutDefaults: (userId: string) => ['checkout-defaults', userId] as const,
