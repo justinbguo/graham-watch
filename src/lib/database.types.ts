@@ -1936,6 +1936,17 @@ export type Database = {
           total: number
         }[]
       }
+      listing_counts_v2: {
+        Args: {
+          p_exclude_own?: boolean
+          p_exclude_swiped?: boolean
+          p_spec?: Json
+        }
+        Returns: {
+          matched: number
+          total: number
+        }[]
+      }
       listing_facets: {
         Args: { p_exclude_own?: boolean }
         Returns: {
@@ -1944,6 +1955,13 @@ export type Database = {
           label: string
           value: string
         }[]
+      }
+      listing_matches: {
+        Args: {
+          p_listing: Database["public"]["Tables"]["listings"]["Row"]
+          p_spec: Json
+        }
+        Returns: boolean
       }
       listing_photo_counts: {
         Args: never
@@ -2359,6 +2377,21 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      search_listings_v2: {
+        Args: {
+          p_cursor?: string
+          p_exclude_own?: boolean
+          p_exclude_swiped?: boolean
+          p_favorites_first?: boolean
+          p_limit?: number
+          p_sort?: string
+          p_spec?: Json
+        }
+        Returns: {
+          cursor: string
+          listing: Database["public"]["Tables"]["listings"]["Row"]
+        }[]
       }
       set_dealer_permission: {
         Args: {

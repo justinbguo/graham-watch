@@ -159,6 +159,12 @@ jobs:
       - name: rls
         run: npm run test:rls
 
+      # v2 search and v2 counts share listing_matches. This is the check that
+      # they still agree with each other, with v1, and with matchesListing,
+      # and that a keyset walk visits every row once.
+      - name: filter contract
+        run: npm run test:filters
+
       - name: generated types match the schema
         run: |
           npm run db:types

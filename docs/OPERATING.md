@@ -578,6 +578,7 @@ mailbox to every buyer.
 | `deno check --config supabase/functions/deno.ci.json …` | Type errors in the five edge functions | Logic, and whether they are deployed |
 | `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace, Shopify, and sitemap parsers, against payloads a real shop returned | Extraction, photos, and the write path |
 | `npm run test:rls` | Every security policy, over HTTP, from a buyer's side of the wire | Anything above the database |
+| `npm run test:filters` | v2 search, v2 counts, v1, and `matchesListing` return the same watches, and keyset pages do not skip or repeat | Anything above the database |
 
 Run `npm run typecheck` and `npm run test:rls` before every commit; both are
 seconds. CI runs all of them on every push and pull request:
@@ -587,7 +588,7 @@ seconds. CI runs all of them on every push and pull request:
 | `app` | `npm run typecheck`, a web bundle, and the refresh and deploy planner tests |
 | `operator ui` | `npm run build`, `oxlint --deny-warnings`, and `npm test`, in `operator/` |
 | `edge functions` | `deno check` on all five, then `deno test` over the directory |
-| `database` | every migration from empty, `npm run test:rls`, generated types |
+| `database` | every migration from empty, `npm run test:rls`, `npm run test:filters`, generated types |
 
 Deploying the functions is a different workflow, `Deploy edge functions`, and
 it runs only on a push to `main` that touches function code or
