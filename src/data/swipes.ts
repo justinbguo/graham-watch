@@ -7,7 +7,7 @@ import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
-import { dropJudgedCard, restorePassedCard, type DeckPile } from './deckPaging';
+import { deckHasCard, dropJudgedCard, restorePassedCard, type DeckCache } from './deckPaging';
 import { keys } from './keys';
 import type { ListingCounts } from './listings';
 
@@ -83,25 +83,30 @@ export function useRecordSwipe(actorId: string | null) {
     onMutate: ({ listingId }) => {
       // Every cached deck, not just the current filter's: the card is judged and
       // must not reappear by changing a filter and changing it back.
-      const previous = queryClient.getQueriesData<DeckPile<DeckCard>>({ queryKey: ['deck'] });
+      const previous = queryClient.getQueriesData<DeckCache<DeckCard>>({ queryKey: ['deck'] });
       const previousCounts = queryClient.getQueriesData<ListingCounts>({
         queryKey: ['listing-counts'],
       });
 
       // The header reads `matched`, which is what is left to see. Drop it with
       // the card, and only for a pile that actually held the watch — a filter
-      // it never matched keeps its number. Waiting for `listing_counts` would
-      // leave the line a swipe behind the card. `seen` stays: the next page is
-      // addressed from how many rows have already come back, not how many are
-      // still in hand.
+      // it never matched keeps its number. Waiting for `listing_counts_v2`
+      // would leave the line a swipe behind the card. The page's cursor stays:
+      // the next page is the bookmark the database returned, not a count of
+      // cards still in hand. Two sorts of one filter share that count, so a
+      // watch sitting in both piles decrements it once.
+      const counted = new Set<unknown>();
       for (const [key, deck] of previous) {
-        if (!deck?.cards.some((card) => card.id === listingId)) continue;
-        queryClient.setQueryData<ListingCounts>(keys.counts(key[1]), (counts) =>
+        if (!deckHasCard(deck, listingId)) continue;
+        const token = key[1];
+        if (counted.has(token)) continue;
+        counted.add(token);
+        queryClient.setQueryData<ListingCounts>(keys.counts(token), (counts) =>
           counts ? { ...counts, matched: Math.max(0, counts.matched - 1) } : counts
         );
       }
 
-      queryClient.setQueriesData<DeckPile<DeckCard>>({ queryKey: ['deck'] }, (deck) =>
+      queryClient.setQueriesData<DeckCache<DeckCard>>({ queryKey: ['deck'] }, (deck) =>
         deck ? dropJudgedCard(deck, listingId) : deck
       );
 
@@ -150,14 +155,14 @@ export function useUndoPass(actorId: string | null) {
       return deleteSwipe(actorId, card.id);
     },
     onMutate: (card) => {
-      const deck = queryClient.getQueryData<DeckPile<DeckCard>>(deckKey);
-      const already = deck?.cards.some((entry) => entry.id === card.id) ?? false;
+      const deck = queryClient.getQueryData<DeckCache<DeckCard>>(deckKey);
+      const already = deckHasCard(deck, card.id);
       const previousCounts = queryClient.getQueryData<ListingCounts>(keys.counts(filters));
 
       // Onto the top of the pile, not wherever the server would rank it. The
       // user is correcting a thumb slip and expects that same watch back.
       if (!already) {
-        queryClient.setQueryData<DeckPile<DeckCard>>(deckKey, (current) =>
+        queryClient.setQueryData<DeckCache<DeckCard>>(deckKey, (current) =>
           restorePassedCard(current, card)
         );
         queryClient.setQueryData<ListingCounts>(keys.counts(filters), (counts) =>
@@ -169,7 +174,7 @@ export function useUndoPass(actorId: string | null) {
     },
     onError: (_error, card, context) => {
       if (context?.already) return;
-      queryClient.setQueryData<DeckPile<DeckCard>>(deckKey, (deck) =>
+      queryClient.setQueryData<DeckCache<DeckCard>>(deckKey, (deck) =>
         deck ? dropJudgedCard(deck, card.id) : deck
       );
       if (context?.previousCounts) {
