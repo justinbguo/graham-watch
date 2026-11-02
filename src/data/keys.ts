@@ -27,7 +27,8 @@ export const keys = {
   searchCount: (filters: unknown) => ['listing-counts', 'search', filterCacheToken(filters)] as const,
   /** Prefix. Invalidation matches every `facetsQuery`, whatever the token is. */
   facets: ['facets'] as const,
-  facetsQuery: (excludeOwn: boolean, filters: unknown = null) => facetsQueryKey(excludeOwn, filters),
+  facetsQuery: (excludeOwn: boolean, filters: unknown = null, excludeSwiped = false) =>
+    facetsQueryKey(excludeOwn, filters, excludeSwiped),
   /** Match count in the filter sheet. Same deck predicate as `counts`, own cache. */
   filterMatch: (filters: unknown) => ['filter-match', 'deck', filterCacheToken(filters)] as const,
   profile: (userId: string) => ['profile', userId] as const,

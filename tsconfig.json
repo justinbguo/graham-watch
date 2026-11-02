@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Node's type stripper, which runs the app tests, resolves a relative
+    // import only when it names the .ts file. tsc allows that extension
+    // because this project typechecks with noEmit and does not rewrite paths.
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["./src/*"]
     }
