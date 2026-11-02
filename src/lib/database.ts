@@ -12,6 +12,7 @@ export type { Json } from './database.types';
  *   has no max. SQL arrays hold nulls; the generator types them `number[]`.
  * - Function arguments are typed non-null, but a SQL argument with no
  *   `strict` takes null: a new post has no id, a trade has no price.
+ *   `search_listings_v2` also returns a null cursor on the last page.
  * - `author_number` is set by a trigger, so an insert leaves it out.
  */
 type G = Generated['public'];
@@ -29,12 +30,21 @@ type Bands = {
 
 type WithArgs<F extends { Args: unknown }, A> = Omit<F, 'Args'> & { Args: Omit<F['Args'], keyof A> & A };
 
+type SearchV2 = Fn['search_listings_v2'];
+type SearchV2Row = SearchV2['Returns'][number];
+
 type Functions = Omit<
   Fn,
-  'search_listings' | 'listing_counts' | 'save_exchange_post' | 'exchange_vote'
+  'search_listings' | 'listing_counts' | 'search_listings_v2' | 'save_exchange_post' | 'exchange_vote'
 > & {
   search_listings: WithArgs<Fn['search_listings'], Bands>;
   listing_counts: WithArgs<Fn['listing_counts'], Bands>;
+  // The next-page cursor is null on the last page, and the first call passes
+  // null. The generator types both as a plain string.
+  search_listings_v2: Omit<SearchV2, 'Args' | 'Returns'> & {
+    Args: Omit<SearchV2['Args'], 'p_cursor'> & { p_cursor?: string | null };
+    Returns: (Omit<SearchV2Row, 'cursor'> & { cursor: string | null })[];
+  };
   save_exchange_post: WithArgs<
     Fn['save_exchange_post'],
     { p_post_id?: string | null; p_price_cents?: number | null }
