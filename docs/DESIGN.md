@@ -948,6 +948,18 @@ photographs, described under Search. The wishlist has its own compact row,
 described below. The row or tile does not decide — a tap opens the listing,
 and Pass or Save there is the verdict.
 
+The grid is the same pile as the cards, one page at a time. The cards refill
+when the pile is down to its last few, because a swipe throws a watch away.
+The grid keeps every watch it has drawn, so it asks for the next page when
+the tail of the list is on screen. A small spinner sits under the last row
+while that page is on its way. Once there is no next page, that spot is the
+tally — the same line the cards show at the bottom of their scroll, centred,
+in `caption` and `textMuted`. A page that fails leaves the watches already
+on screen and offers Try again. It does not say the catalogue has ended. A
+different filter is a different pile: the list returns to the top and the
+first page. A tile's key is its listing id, so a watch that arrives on two
+pages is still one tile.
+
 Wishlist and shop rows that still use `ListingRow` size the photograph at
 `layout.gridScanWidthShare` of the row, capped at `size.gridPhoto`, so the
 thumb grows on a wide row without becoming a poster. `size.gridScan` is only
@@ -1462,7 +1474,8 @@ account still shops the deck.
 The slot is `Screen`'s `subtitle`, so any screen can say what it is holding in the same
 place, in the same tone, without inventing a second header. Nothing shows until the count
 lands; a number that changes once the query returns is worse than a line that arrives
-late.
+late. The grid has no subtitle. That same line is the list's footer, and it waits
+until the last page has arrived.
 
 ## The end of the deck
 

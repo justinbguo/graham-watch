@@ -23,6 +23,7 @@ import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type Listing
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
+import { filterCacheToken } from '@/features/filters/spec';
 import { activeCount } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
@@ -41,7 +42,18 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Deck() {
   const { userId, isSignedIn } = useSession();
   const guest = useGuest();
-  const { data: cards = [], isPending, error, refetch } = useDeck();
+  const {
+    data: cards = [],
+    isPending,
+    error,
+    refetch,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
+    latestPageAdded,
+  } = useDeck();
   // Cards still playing their exit stay mounted in the slot they already
   // occupy. The set is updated before the pile drops them, so the render that
   // follows a swipe does not move the native views underneath.
@@ -214,6 +226,10 @@ export default function Deck() {
     setView((current) => (current === 'cards' ? 'grid' : 'cards'));
   }, []);
 
+  const loadMore = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
+
   const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0;
   const cardSwipeKeysOn = deckKeysOn && view === 'cards';
 
@@ -363,18 +379,28 @@ export default function Deck() {
           <Animated.View
             key="grid"
             entering={FadeIn.duration(motion.base)}
-            style={styles.view}>
+            style={[styles.view, styles.gridView]}>
+            {/* Same pile as the cards. The list asks when its tail is on
+                screen; the cards ask when the pile is thin. A new filter is
+                a new query, and this key sends the list back to the top. */}
             <DeckGrid
+              key={filterCacheToken(filters)}
               cards={cards}
               active={deckOnTop}
+              paging={{
+                hasNextPage,
+                isFetching,
+                isFetchingNextPage,
+                isFetchNextPageError,
+                latestPageAdded,
+                onLoadMore: loadMore,
+                endLabel: remaining,
+              }}
               onOpen={(card) => {
                 primeListing(card);
                 open('listing/[listingId]', { listingId: card.id }, `/listing/${card.id}`);
               }}
             />
-            {remaining ? (
-              <Text style={[styles.deckFooter, isDesktopWeb && styles.deckFooterGrid]}>{remaining}</Text>
-            ) : null}
           </Animated.View>
         )}
       </Screen>
@@ -544,6 +570,10 @@ const deckStyles = (_theme: Theme) => ({
   view: {
     flex: 1,
   },
+  // The list, not the page, has to be the scroller once more pages append.
+  gridView: {
+    minHeight: 0,
+  },
   desktopDeck: {
     flex: 1,
     minHeight: 0,
@@ -588,10 +618,6 @@ const deckStyles = (_theme: Theme) => ({
     paddingTop: space.sm,
     paddingBottom: space.sm,
     marginHorizontal: inset.screen,
-  },
-  deckFooterGrid: {
-    paddingBottom: 0,
-    marginHorizontal: 0,
   },
   deckFooterFloat: {
     position: 'absolute' as const,
