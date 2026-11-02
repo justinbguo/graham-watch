@@ -1,8 +1,10 @@
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -113,14 +115,19 @@ export type SwipeCardHandle = {
   fling: (direction: SwipeDirection) => void;
 };
 
-export const SwipeCard = forwardRef<
+export const SwipeCard = memo(forwardRef<
   SwipeCardHandle,
   {
     card: DeckCard;
     /** `releaseX` is where the card sat when the thumb let go, so a save can fly
-        on from there rather than restarting at centre. */
-    onSwipe: (direction: SwipeDirection, releaseX: number) => void;
-    onExpandPhoto: (index: number) => void;
+        on from there rather than restarting at centre. False means the deck
+        refused the swipe — the guest budget is spent — and the card springs back. */
+    onSwipe: (card: DeckCard, direction: SwipeDirection, releaseX: number) => boolean;
+    onExpandPhoto: (card: DeckCard, index: number) => void;
+    /** The exit animation finished. The deck can drop the slot it was holding. */
+    onExitDone?: (id: string) => void;
+    /** Paint order. Sibling index stays put so the native view is not moved. */
+    zIndex?: number;
     isTop: boolean;
     /** The photograph of the watch behind this one. Lifting the card shows it. */
     nextPhoto?: string;
@@ -140,6 +147,8 @@ export const SwipeCard = forwardRef<
     card,
     onSwipe,
     onExpandPhoto,
+    onExitDone,
+    zIndex = 0,
     isTop,
     nextPhoto,
     returning = false,
@@ -181,9 +190,6 @@ export const SwipeCard = forwardRef<
   // declined swipe does. Opacity is derived from cardX, so the fade comes
   // back with it.
   const cardX = useSharedValue(returning ? -offScreen : 0);
-  useEffect(() => {
-    if (returning) cardX.value = withTiming(0, settleConfig);
-  }, [cardX, returning]);
   const lift = useSharedValue(0);
   const thresholdFired = useSharedValue(false);
   const previewFired = useSharedValue(false);
@@ -202,9 +208,22 @@ export const SwipeCard = forwardRef<
   const web = Platform.OS === 'web';
   /** Web card view: photo left, copy scrolls on the right. */
   const webSplit = web;
+  // Whether this card currently owns the thumb. Written during render so the
+  // gesture, which is created once, sees the promotion on the next frame
+  // without the native handler being torn down and attached again.
+  const top = useSharedValue(isTop);
+  top.value = isTop;
+  const handedOff = useSharedValue(false);
+  const off = useSharedValue(offScreen);
+  off.value = offScreen;
+  const drivesFooter = useSharedValue(isTop);
+  drivesFooter.value = isTop;
   const settleConfig = { duration: cardSettleDuration(web), easing: SETTLE_EASING };
   // The wheel listener needs the scroll view to have mounted.
   const [portReady, setPortReady] = useState(false);
+  // Touches pass through once the swipe is committed, one render before the
+  // deck has promoted the card underneath.
+  const [handsOff, setHandsOff] = useState(false);
   // Measured rather than taken from `Dimensions`: the card is capped on a wide
   // window, and a browser resize has to move the commit point with it. A
   // module-scope snapshot is read once at import and then never updates.
@@ -216,46 +235,89 @@ export const SwipeCard = forwardRef<
   }, [canPreview, nextPhoto]);
   // A key fling in flight. A second press must not stack two exits on one card.
   const leaving = useRef(false);
+  const cardRef = useRef(card);
+  cardRef.current = card;
+  const onSwipeRef = useRef(onSwipe);
+  onSwipeRef.current = onSwipe;
+  const onExitDoneRef = useRef(onExitDone);
+  onExitDoneRef.current = onExitDone;
   const photoPlateRef = useRef<ViewType>(null);
   const openFullScreen = useCallback(
     (at: number) => {
       photoPlateRef.current?.measureInWindow((x, y, width, height) => {
         setPhotoLaunchRect({ x, y, width, height });
-        onExpandPhoto(at);
+        onExpandPhoto(card, at);
       });
     },
-    [onExpandPhoto],
+    [card, onExpandPhoto],
   );
   useEffect(() => {
     leaving.current = false;
-  }, [card.id]);
+    handedOff.value = false;
+    setHandsOff(false);
+  }, [card.id, handedOff]);
+
+  useEffect(() => {
+    if (!returning) return;
+    // Undo of a card that is still flying: stop treating the exit as committed
+    // and bring it back by the edge it left.
+    leaving.current = false;
+    handedOff.value = false;
+    setHandsOff(false);
+    cardX.value = withTiming(0, settleConfig);
+    // settleConfig is a fresh object every render; the animation should start
+    // when the card is restored, not on every paint after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardX, handedOff, returning]);
+
+  const commit = useCallback((direction: SwipeDirection, releaseX: number) => {
+    const accepted = onSwipeRef.current(cardRef.current, direction, releaseX);
+    if (!accepted) {
+      leaving.current = false;
+      handedOff.value = false;
+      setHandsOff(false);
+      dragX.value = 0;
+      cardX.value = withTiming(0, { duration: cardSettleDuration(web), easing: SETTLE_EASING });
+      return;
+    }
+    // Drop touches on this card before the next paint, so the one underneath
+    // — already mounted, gesture already attached — can take the next thumb
+    // while this one is still leaving.
+    if (direction === 'left') setHandsOff(true);
+  }, [cardX, dragX, handedOff, web]);
+
+  const exitDone = useCallback(() => {
+    onExitDoneRef.current?.(cardRef.current.id);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     fling: (direction) => {
-      if (!isTop || leaving.current) return;
+      if (!top.value || handedOff.value || leaving.current) return;
+      handedOff.value = true;
       leaving.current = true;
       impact();
 
       if (direction === 'right') {
         // Same as a committed right drag: the flight overlay takes the card
         // from centre rather than flinging it off the edge first.
-        onSwipe('right', 0);
+        commit('right', 0);
         return;
       }
 
-      const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
+      const distance = cardWidth.value > 0 ? cardWidth.value : off.value;
       cardX.value = withTiming(
         -distance,
         { duration: cardDismissDuration(distance, web), easing: SETTLE_EASING },
         (finished) => {
-        if (!finished) {
-          leaving.current = false;
-          return;
-        }
-        scheduleOnRN(onSwipe, 'left', -distance);
-      });
+          'worklet';
+          if (finished) scheduleOnRN(exitDone);
+        },
+      );
+      // The deck promotes the next card now. Waiting for this timing to finish
+      // was the gap where the next card sat there and would not move.
+      commit('left', -distance);
     },
-  }));
+  }), [commit, exitDone]);
 
   const applyWebScroll = useCallback(
     (offset: number) => {
@@ -307,7 +369,9 @@ export const SwipeCard = forwardRef<
 
   function syncFooterReveal() {
     'worklet';
-    if (!footerReveal) return;
+    // Every mounted card shares the catalogue line. Only the one in hand
+    // should move it, or a card behind would write over the scroll.
+    if (!drivesFooter.value || !footerReveal) return;
     const view = portHeight.value > 0 ? portHeight.value : cardHeight.value;
     const max = Math.max(0, contentHeight.value - view);
     if (max <= 8) {
@@ -343,133 +407,156 @@ export const SwipeCard = forwardRef<
     scrollTo(scroller, 0, next, false);
   }
 
-  const pan = Gesture.Pan()
-    .withRef(panRef)
-    .enabled(isTop)
-    .manualActivation(true)
-    .onTouchesDown((event, state) => {
-      // Two fingers on the card is a pinch on the photograph, not a drag. The
-      // first finger has usually moved before the second lands, so this has
-      // to undo a swipe or a scroll already under way: the card goes back to
-      // centre and the pan stands down.
-      if (event.numberOfTouches > 1) {
-        const wasActive = mode.value !== 'undecided' && mode.value !== 'pinch';
-        mode.value = 'pinch';
-        dragX.value = 0;
-        dragY.value = 0;
-        cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
-        lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
-        if (wasActive) state.end();
-        else state.fail();
-        return;
-      }
-      const touch = event.allTouches[0];
-      if (!touch) return;
-      touchX.value = touch.x;
-      touchY.value = touch.y;
-      mode.value = 'undecided';
-      thresholdFired.value = false;
-      previewFired.value = false;
-    })
-    .onTouchesMove((event, state) => {
-      if (mode.value !== 'undecided') return;
-      const touch = event.allTouches[0];
-      if (!touch) return;
-      const dx = touch.x - touchX.value;
-      const dy = touch.y - touchY.value;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+  // Created once. `.enabled(isTop)` used to flip when the card was promoted,
+  // and that rebind is what sat between "the card is showing" and "the card
+  // moves". The handler stays attached; `top` says whether this one may take
+  // the thumb. `place` is the scroll worklet from the first render — it only
+  // reads shared values, which keep their current numbers.
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .withRef(panRef)
+        .manualActivation(true)
+        .onTouchesDown((event, state) => {
+          'worklet';
+          if (!top.value || handedOff.value) {
+            state.fail();
+            return;
+          }
+          // Two fingers on the card is a pinch on the photograph, not a drag. The
+          // first finger has usually moved before the second lands, so this has
+          // to undo a swipe or a scroll already under way: the card goes back to
+          // centre and the pan stands down.
+          if (event.numberOfTouches > 1) {
+            const wasActive = mode.value !== 'undecided' && mode.value !== 'pinch';
+            mode.value = 'pinch';
+            dragX.value = 0;
+            dragY.value = 0;
+            cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
+            lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
+            if (wasActive) state.end();
+            else state.fail();
+            return;
+          }
+          const touch = event.allTouches[0];
+          if (!touch) return;
+          touchX.value = touch.x;
+          touchY.value = touch.y;
+          mode.value = 'undecided';
+          thresholdFired.value = false;
+          previewFired.value = false;
+        })
+        .onTouchesMove((event, state) => {
+          'worklet';
+          if (mode.value !== 'undecided') return;
+          const touch = event.allTouches[0];
+          if (!touch) return;
+          const dx = touch.x - touchX.value;
+          const dy = touch.y - touchY.value;
+          if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
 
-      // Horizontal still wins. A diagonal thumb reading the spec table must
-      // not fling the watch, and it must not slide it either.
-      if (Math.abs(dx) > Math.abs(dy)) {
-        mode.value = 'swipe';
-        lift.value = 0;
-        dragX.value = dx;
-        cardX.value = resist(dx, cardWidth.value * COMMIT_FRACTION);
-        state.activate();
-        return;
-      }
+          // Horizontal still wins. A diagonal thumb reading the spec table must
+          // not fling the watch, and it must not slide it either.
+          if (Math.abs(dx) > Math.abs(dy)) {
+            mode.value = 'swipe';
+            lift.value = 0;
+            dragX.value = dx;
+            cardX.value = resist(dx, cardWidth.value * COMMIT_FRACTION);
+            state.activate();
+            return;
+          }
 
-      // At the top of the scroll a downward drag has nowhere to go, so the
-      // card slides down until the watch behind fills the frame.
-      if (canPreview.value && dy > 0 && scrollY.value <= 1) {
-        mode.value = 'peek';
-        dragY.value = dy;
-        lift.value = resistDown(dy, cardHeight.value);
-        state.activate();
-        return;
-      }
+          // At the top of the scroll a downward drag has nowhere to go, so the
+          // card slides down until the watch behind fills the frame.
+          if (canPreview.value && dy > 0 && scrollY.value <= 1) {
+            mode.value = 'peek';
+            dragY.value = dy;
+            lift.value = resistDown(dy, cardHeight.value);
+            state.activate();
+            return;
+          }
 
-      // On web the photograph is a fixed column; only the right pane scrolls.
-      if (webSplit && touchX.value < cardWidth.value * 0.5) {
-        state.fail();
-        return;
-      }
+          // On web the photograph is a fixed column; only the right pane scrolls.
+          if (webSplit && touchX.value < cardWidth.value * 0.5) {
+            state.fail();
+            return;
+          }
 
-      mode.value = 'scroll';
-      place(scrollY.value - dy);
-      state.activate();
-    })
-    .onTouchesUp((_event, state) => {
-      if (mode.value === 'undecided') state.fail();
-    })
-    .onChange((event) => {
-      if (mode.value === 'swipe') {
-        dragX.value += event.changeX;
-        cardX.value = resist(dragX.value, cardWidth.value * COMMIT_FRACTION);
-        return;
-      }
-      if (mode.value === 'peek') {
-        dragY.value += event.changeY;
-        lift.value = resistDown(dragY.value, cardHeight.value);
-        return;
-      }
-      if (mode.value === 'scroll') {
-        place(scrollY.value - event.changeY);
-      }
-    })
-    .onEnd((event) => {
-      if (mode.value !== 'swipe') return;
+          mode.value = 'scroll';
+          place(scrollY.value - dy);
+          state.activate();
+        })
+        .onTouchesUp((_event, state) => {
+          'worklet';
+          if (mode.value === 'undecided') state.fail();
+        })
+        .onChange((event) => {
+          'worklet';
+          if (mode.value === 'swipe') {
+            dragX.value += event.changeX;
+            cardX.value = resist(dragX.value, cardWidth.value * COMMIT_FRACTION);
+            return;
+          }
+          if (mode.value === 'peek') {
+            dragY.value += event.changeY;
+            lift.value = resistDown(dragY.value, cardHeight.value);
+            return;
+          }
+          if (mode.value === 'scroll') {
+            place(scrollY.value - event.changeY);
+          }
+        })
+        .onEnd((event) => {
+          'worklet';
+          if (mode.value !== 'swipe' || handedOff.value) return;
 
-      const commit = cardWidth.value * COMMIT_FRACTION;
-      const committed =
-        (commit > 0 && Math.abs(dragX.value) > commit) ||
-        Math.abs(event.velocityX) > FLING_VELOCITY;
+          const mark = cardWidth.value * COMMIT_FRACTION;
+          const committed =
+            (mark > 0 && Math.abs(dragX.value) > mark) || Math.abs(event.velocityX) > FLING_VELOCITY;
 
-      if (committed) {
-        const direction: SwipeDirection =
-          (dragX.value || event.velocityX) > 0 ? 'right' : 'left';
-        scheduleOnRN(impact);
+          if (committed) {
+            const direction: SwipeDirection = (dragX.value || event.velocityX) > 0 ? 'right' : 'left';
+            handedOff.value = true;
+            scheduleOnRN(impact);
 
-        // A save hands the card straight to the flight overlay, which picks it
-        // up where the thumb left it and carries it to the Wishlist tab. Flinging
-        // it off the right edge first would put two cards on screen for one
-        // save, travelling in different directions.
-        if (direction === 'right') {
-          scheduleOnRN(onSwipe, 'right', cardX.value);
-          return;
-        }
+            // A save hands the card straight to the flight overlay, which picks it
+            // up where the thumb left it and carries it to the Wishlist tab. Flinging
+            // it off the right edge first would put two cards on screen for one
+            // save, travelling in different directions.
+            if (direction === 'right') {
+              scheduleOnRN(commit, 'right', cardX.value);
+              return;
+            }
 
-        // One card-width, not off the window. Travelling on to 1.5 screens
-        // put the last of the fade past the edge. The opacity follows cardX,
-        // so this finish is the drag's fade carried to its end.
-        const distance = cardWidth.value > 0 ? cardWidth.value : offScreen;
-        cardX.value = withTiming(
-          -distance,
-          { duration: dismissTiming(distance, web), easing: SETTLE_EASING },
-          () => scheduleOnRN(onSwipe, 'left', cardX.value)
-        );
-        return;
-      }
+            // One card-width, not off the window. Travelling on to 1.5 screens
+            // put the last of the fade past the edge. The opacity follows cardX,
+            // so this finish is the drag's fade carried to its end. The deck hears
+            // about the pass now, not when the timing ends, so the next card can
+            // be swiped while this one is still leaving.
+            const distance = cardWidth.value > 0 ? cardWidth.value : off.value;
+            cardX.value = withTiming(
+              -distance,
+              { duration: dismissTiming(distance, web), easing: SETTLE_EASING },
+              (finished) => {
+                'worklet';
+                if (finished) scheduleOnRN(exitDone);
+              },
+            );
+            scheduleOnRN(commit, 'left', -distance);
+            return;
+          }
 
-      dragX.value = 0;
-      cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
-    })
-    .onFinalize(() => {
-      if (mode.value !== 'peek') return;
-      dragY.value = 0;
-      lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
-    });
+          dragX.value = 0;
+          cardX.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
+        })
+        .onFinalize(() => {
+          'worklet';
+          if (mode.value !== 'peek') return;
+          dragY.value = 0;
+          lift.value = withTiming(0, { duration: settleTiming(web), easing: SETTLE_EASING });
+        }),
+    [commit, exitDone],
+  );
 
   useAnimatedReaction(
     () => {
@@ -539,6 +626,7 @@ export const SwipeCard = forwardRef<
   return (
     <GestureDetector gesture={pan}>
       <Animated.View
+        testID={`deck-card-${card.id}`}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           cardWidth.value = width;
@@ -547,7 +635,14 @@ export const SwipeCard = forwardRef<
             current.width === width && current.height === height ? current : { width, height }
           );
         }}
-        style={[styles.frame, swipeStyle]}>
+        style={[
+          styles.frame,
+          swipeStyle,
+          // The shadow lives on `styles.frame`, which does not change when this
+          // card is promoted. A new z-index paints it in front; it does not
+          // rebuild the layer. Touches go to the card in hand only.
+          { zIndex, pointerEvents: isTop && !handsOff ? ('auto' as const) : ('none' as const) },
+        ]}>
         <View style={styles.shell}>
         {/* The card behind is the same size and already painted under this one.
             This one moves out of the way whole, as far as it is tall. */}
@@ -645,7 +740,7 @@ export const SwipeCard = forwardRef<
       </Animated.View>
     </GestureDetector>
   );
-});
+}));
 
 const cardStyles = (theme: Theme) => ({
   // The frame holds the shadow and the movement. The shell only rounds the

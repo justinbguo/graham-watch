@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
@@ -8,7 +8,10 @@ import { DeckRailButton } from '@/components/DeckRailButton';
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
 import { DeckCoach } from '@/features/deck/DeckCoach';
+import { deckCardZ } from '@/features/deck/stack';
+import { useDeckStack } from '@/features/deck/useDeckStack';
 import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
+import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
 import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
@@ -51,6 +54,22 @@ export default function Deck() {
     fetchNextPage,
     latestPageAdded,
   } = useDeck();
+  // Cards still playing their exit stay mounted in the slot they already
+  // occupy. The set is updated before the pile drops them, so the render that
+  // follows a swipe does not move the native views underneath.
+  const retainedRef = useRef(new Set<string>());
+  const [, setRetainEpoch] = useState(0);
+  const retainCard = useCallback((id: string) => {
+    if (retainedRef.current.has(id)) return;
+    retainedRef.current.add(id);
+    setRetainEpoch((n) => n + 1);
+  }, []);
+  const releaseCard = useCallback((id: string) => {
+    if (!retainedRef.current.delete(id)) return;
+    setRetainEpoch((n) => n + 1);
+  }, []);
+  const { slots } = useDeckStack(cards, retainedRef.current);
+  usePrefetchDeckPhotos(cards);
   const { data: counts } = useListingCounts();
   const swipe = useRecordSwipe(userId);
   const primeListing = usePrimeListing();
@@ -92,7 +111,24 @@ export default function Deck() {
   const stageRect = useRef<Rect | null>(null);
   const [stageFrame, setStageFrame] = useState({ width: 0, height: 0 });
   const plateHeight = deckPhotoHeight(stageFrame);
-  const topCard = useRef<SwipeCardHandle>(null);
+  // One ref moved between cards was null for the whole exit: React detached
+  // the leaving card's handle and the next card's handle did not stick until
+  // the leaving card unmounted. Each card keeps its own handle instead.
+  const cardHandles = useRef(new Map<string, SwipeCardHandle>());
+  const bindCard = useRef(new Map<string, (handle: SwipeCardHandle | null) => void>());
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const handleFor = (id: string) => {
+    let bind = bindCard.current.get(id);
+    if (!bind) {
+      bind = (handle: SwipeCardHandle | null) => {
+        if (handle) cardHandles.current.set(id, handle);
+        else cardHandles.current.delete(id);
+      };
+      bindCard.current.set(id, bind);
+    }
+    return bind;
+  };
 
   const measureStage = useCallback(() => {
     stage.current?.measureInWindow((x, y, width, height) => {
@@ -111,32 +147,43 @@ export default function Deck() {
 
   // One step back, and only for a pass. A save is recoverable from the wishlist
   // tab, so a right swipe retires the offer instead of queueing behind it.
-  const judge = (card: DeckCard, direction: SwipeDirection, from?: Rect) => {
-    if (!isSignedIn && guest.exhausted) {
-      guest.openSignIn('budget');
-      return;
-    }
-
-    // A save flies from wherever it was judged, and only the view that judged
-    // it knows where that was: the card stage here, the tile in the grid.
-    if (direction === 'right' && from) {
-      launch({ from, photo: card.photos[0]?.url });
-    }
-
-    const used = guest.swipes.length + 1;
-    swipe.mutate(
-      { listingId: card.id, direction },
-      {
-        onSuccess: () => {
-          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) {
-            guest.openSignIn('budget');
-          }
-        },
+  const guestRef = useRef(guest);
+  guestRef.current = guest;
+  const judge = useCallback(
+    (card: DeckCard, direction: SwipeDirection, from?: Rect) => {
+      const current = guestRef.current;
+      if (!isSignedIn && current.exhausted) {
+        current.openSignIn('budget');
+        return false;
       }
-    );
-    setLastPass(direction === 'left' ? card : null);
-    setReturning(null);
-  };
+
+      // A save flies from wherever it was judged, and only the view that judged
+      // it knows where that was: the card stage here, the tile in the grid.
+      if (direction === 'right' && from) {
+        launch({ from, photo: card.photos[0]?.url });
+      }
+
+      // Hold the slot before the pile drops the card, so the exit keeps the
+      // same native view and the cards behind it do not shift.
+      if (direction === 'left') retainCard(card.id);
+
+      const used = current.swipes.length + 1;
+      swipe.mutate(
+        { listingId: card.id, direction },
+        {
+          onSuccess: () => {
+            if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) {
+              current.openSignIn('budget');
+            }
+          },
+        },
+      );
+      setLastPass(direction === 'left' ? card : null);
+      setReturning(null);
+      return true;
+    },
+    [isSignedIn, launch, retainCard, swipe],
+  );
 
   const multiPhoto = (topListing?.photos.length ?? 0) > 1;
   const { active: tutorialStep, finishListings } = useDeckTutorial({
@@ -144,11 +191,22 @@ export default function Deck() {
     photoIndex,
   });
 
-  const judgeCard = (card: DeckCard, direction: SwipeDirection, releaseX: number) => {
-    if (tutorialStep === 'listings') finishListings();
-    const from = stageRect.current;
-    judge(card, direction, from ? { ...from, x: from.x + releaseX } : undefined);
-  };
+  const openPhoto = useCallback(
+    (card: DeckCard, index: number) => {
+      primeListing(card);
+      open('photos/[listingId]', { listingId: card.id, index: String(index) }, `/photos/${card.id}?index=${index}`);
+    },
+    [open, primeListing],
+  );
+
+  const judgeCard = useCallback(
+    (card: DeckCard, direction: SwipeDirection, releaseX: number) => {
+      if (tutorialStep === 'listings') finishListings();
+      const from = stageRect.current;
+      return judge(card, direction, from ? { ...from, x: from.x + releaseX } : undefined);
+    },
+    [finishListings, judge, tutorialStep],
+  );
 
   const stepPhoto = useCallback(
     (by: number) => {
@@ -176,8 +234,18 @@ export default function Deck() {
   const cardSwipeKeysOn = deckKeysOn && view === 'cards';
 
   useWebArrowSwipe(
-    cardSwipeKeysOn ? () => topCard.current?.fling('left') : undefined,
-    cardSwipeKeysOn ? () => topCard.current?.fling('right') : undefined,
+    cardSwipeKeysOn
+      ? () => {
+          const id = cardsRef.current[0]?.id;
+          if (id) cardHandles.current.get(id)?.fling('left');
+        }
+      : undefined,
+    cardSwipeKeysOn
+      ? () => {
+          const id = cardsRef.current[0]?.id;
+          if (id) cardHandles.current.get(id)?.fling('right');
+        }
+      : undefined,
     deckKeysOn,
     cardSwipeKeysOn && multiPhoto ? () => stepPhoto(-1) : undefined,
     cardSwipeKeysOn && multiPhoto ? () => stepPhoto(1) : undefined,
@@ -186,6 +254,7 @@ export default function Deck() {
 
   const undo = lastPass
     ? () => {
+        releaseCard(lastPass.id);
         undoPass.mutate(lastPass);
         setReturning(lastPass.id);
         setLastPass(null);
@@ -338,8 +407,7 @@ export default function Deck() {
     );
   }
 
-  // Render a few cards deep so the next one shows under the top card.
-  const visible = cards.slice(0, 3).reverse();
+  const topId = cards[0]?.id;
 
   const roll = (
     <View style={[styles.roll, isDesktopWeb && styles.rollDesktop]}>
@@ -371,28 +439,37 @@ export default function Deck() {
                 ref={stage}
                 onLayout={onStageLayout}
                 style={[styles.stage, isDesktopWeb && styles.stageDesktop]}>
-          {visible.map((card, index) => {
-            const onTop = index === visible.length - 1;
+          {slots.map((card, index) => {
+            if (!card) {
+              return (
+                <View
+                  key={`deck-hole-${index}`}
+                  collapsable={false}
+                  style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
+                />
+              );
+            }
+            const onTop = card.id === topId;
+            const neighbor = cards[cards.findIndex((item) => item.id === card.id) + 1];
             return (
               <SwipeCard
                 key={card.id}
-                ref={onTop ? topCard : undefined}
+                ref={handleFor(card.id)}
                 card={card}
+                zIndex={deckCardZ(
+                  card.id,
+                  cards.slice(0, 3).map((item) => item.id),
+                  retainedRef.current,
+                )}
                 isTop={onTop}
                 photoIndex={onTop ? photoIndex : undefined}
                 onPhotoIndexChange={onTop ? setPhotoIndex : undefined}
                 returning={card.id === returning}
-                nextPhoto={onTop ? cards[1]?.photos[0]?.url : undefined}
-                onSwipe={(direction, releaseX) => judgeCard(card, direction, releaseX)}
-                onExpandPhoto={(photoIndex) => {
-                  primeListing(card);
-                  open(
-                    'photos/[listingId]',
-                    { listingId: card.id, index: String(photoIndex) },
-                    `/photos/${card.id}?index=${photoIndex}`
-                  );
-                }}
-                footerReveal={onTop ? footerReveal : undefined}
+                nextPhoto={onTop ? neighbor?.photos[0]?.url : undefined}
+                onSwipe={judgeCard}
+                onExitDone={releaseCard}
+                onExpandPhoto={openPhoto}
+                footerReveal={footerReveal}
                 plateHeight={plateHeight}
               />
             );

@@ -172,6 +172,9 @@ export function PhotoCarousel({
       style={StyleSheet.absoluteFill}
       contentFit={isViewer ? 'contain' : 'cover'}
       transition={motion.fast}
+      // The deck mounts the next cards underneath. Decode those photographs
+      // while they are covered, so promoting one does not wait on the bitmap.
+      priority={isViewer ? 'normal' : 'high'}
       recyclingKey={current.id}
       onLoad={
         isViewer

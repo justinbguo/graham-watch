@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { Gesture, type GestureType } from 'react-native-gesture-handler';
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -60,110 +60,129 @@ export function usePinchZoom({
   // magnified the paging taps underneath it are off, or a finger lifting from
   // a pinch advances the roll. Set twice per gesture, not per frame.
   const [zoomed, setZoomed] = useState(false);
-
-  const box = content?.width && content?.height ? content : frame;
-  const settle = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
-
-  const limitX = (at: number) => {
-    'worklet';
-    return Math.max((box.width * at - frame.width) / 2, 0);
-  };
-  const limitY = (at: number) => {
-    'worklet';
-    return Math.max((box.height * at - frame.height) / 2, 0);
-  };
-  const clamp = (value: number, limit: number) => {
-    'worklet';
-    return Math.min(Math.max(value, -limit), limit);
-  };
-
-  /**
-   * Magnify about a point and leave what was under it there. A pinch that
-   * scales about the frame's middle slides the part you were looking at out
-   * from under your fingers.
-   */
-  const zoomAbout = (next: number, focalX: number, focalY: number) => {
-    'worklet';
-    const was = from.value;
-    const ratio = next / was.scale;
-    scale.value = next;
-    offsetX.value = clamp(focalX - (focalX - was.x) * ratio, limitX(next));
-    offsetY.value = clamp(focalY - (focalY - was.y) * ratio, limitY(next));
-  };
-
-  const rest = () => {
-    'worklet';
-    scale.value = withTiming(1, settle);
-    offsetX.value = withTiming(0, settle);
-    offsetY.value = withTiming(0, settle);
-    scheduleOnRN(setZoomed, false);
-  };
+  const zoomedSV = useSharedValue(false);
+  const frameSV = useSharedValue(frame);
+  const boxSV = useSharedValue(content?.width && content?.height ? content : frame);
+  frameSV.value = frame;
+  boxSV.value = content?.width && content?.height ? content : frame;
 
   useEffect(() => {
     if (!resetKey) return;
     scale.value = 1;
     offsetX.value = 0;
     offsetY.value = 0;
+    zoomedSV.value = false;
     setZoomed(false);
-  }, [resetKey, offsetX, offsetY, scale]);
+  }, [resetKey, offsetX, offsetY, scale, zoomedSV]);
 
-  const begin = (focalX: number, focalY: number) => {
-    'worklet';
-    from.value = {
-      scale: scale.value,
-      x: offsetX.value,
-      y: offsetY.value,
-      // Measured from the frame's middle, which is what the scale transform
-      // grows away from.
-      focalX: focalX - frame.width / 2,
-      focalY: focalY - frame.height / 2,
+  // The parent's handler tag is assigned when the parent attaches, which is
+  // after this child's first attach. One rebuild pairs the pinch with the
+  // swipe. Rebuilding on every render was rebinding the photograph's gesture
+  // on each swipe, which is the same hitch as the card itself.
+  const [paired, setPaired] = useState(false);
+  useEffect(() => {
+    setPaired(true);
+  }, []);
+
+  const gesture = useMemo(() => {
+    const limitX = (at: number) => {
+      'worklet';
+      return Math.max((boxSV.value.width * at - frameSV.value.width) / 2, 0);
     };
-  };
+    const limitY = (at: number) => {
+      'worklet';
+      return Math.max((boxSV.value.height * at - frameSV.value.height) / 2, 0);
+    };
+    const clamp = (value: number, limit: number) => {
+      'worklet';
+      return Math.min(Math.max(value, -limit), limit);
+    };
+    const zoomAbout = (next: number, focalX: number, focalY: number) => {
+      'worklet';
+      const was = from.value;
+      const ratio = next / was.scale;
+      scale.value = next;
+      offsetX.value = clamp(focalX - (focalX - was.x) * ratio, limitX(next));
+      offsetY.value = clamp(focalY - (focalY - was.y) * ratio, limitY(next));
+    };
+    const rest = () => {
+      'worklet';
+      const settle = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
+      scale.value = withTiming(1, settle);
+      offsetX.value = withTiming(0, settle);
+      offsetY.value = withTiming(0, settle);
+      zoomedSV.value = false;
+      scheduleOnRN(setZoomed, false);
+    };
+    const begin = (focalX: number, focalY: number) => {
+      'worklet';
+      from.value = {
+        scale: scale.value,
+        x: offsetX.value,
+        y: offsetY.value,
+        // Measured from the frame's middle, which is what the scale transform
+        // grows away from.
+        focalX: focalX - frameSV.value.width / 2,
+        focalY: focalY - frameSV.value.height / 2,
+      };
+    };
 
-  const pinch = Gesture.Pinch();
-  if (alongside) pinch.simultaneousWithExternalGesture(alongside);
-  pinch
-    .onStart((event) => {
-      begin(event.focalX, event.focalY);
-      scheduleOnRN(setZoomed, true);
-    })
-    .onUpdate((event) => {
-      const next = Math.min(Math.max(from.value.scale * event.scale, 1), MAX_SCALE);
-      zoomAbout(next, from.value.focalX, from.value.focalY);
-    })
-    .onEnd(() => {
-      if (!hold || scale.value <= REST) {
-        rest();
-        return;
-      }
-      // Kept, but pulled back inside its own edges: the pinch may have ended
-      // with the photograph held off centre.
-      offsetX.value = withTiming(clamp(offsetX.value, limitX(scale.value)), settle);
-      offsetY.value = withTiming(clamp(offsetY.value, limitY(scale.value)), settle);
-    });
+    const pinch = Gesture.Pinch();
+    if (alongside) pinch.simultaneousWithExternalGesture(alongside);
+    pinch
+      .onStart((event) => {
+        'worklet';
+        begin(event.focalX, event.focalY);
+        zoomedSV.value = true;
+        scheduleOnRN(setZoomed, true);
+      })
+      .onUpdate((event) => {
+        'worklet';
+        const next = Math.min(Math.max(from.value.scale * event.scale, 1), MAX_SCALE);
+        zoomAbout(next, from.value.focalX, from.value.focalY);
+      })
+      .onEnd(() => {
+        'worklet';
+        if (!hold || scale.value <= REST) {
+          rest();
+          return;
+        }
+        // Kept, but pulled back inside its own edges: the pinch may have ended
+        // with the photograph held off centre.
+        const settle = { duration: motion.settle, easing: Easing.out(Easing.cubic) };
+        offsetX.value = withTiming(clamp(offsetX.value, limitX(scale.value)), settle);
+        offsetY.value = withTiming(clamp(offsetY.value, limitY(scale.value)), settle);
+      });
 
-  // One finger moves a photograph that is already magnified. Only where the
-  // zoom is held: on a card that same finger is the swipe.
-  const drag = Gesture.Pan()
-    .enabled(hold && zoomed)
-    .onChange((event) => {
-      offsetX.value = clamp(offsetX.value + event.changeX, limitX(scale.value));
-      offsetY.value = clamp(offsetY.value + event.changeY, limitY(scale.value));
-    });
+    // One finger moves a photograph that is already magnified. Only where the
+    // zoom is held: on a card that same finger is the swipe.
+    const drag = Gesture.Pan()
+      .enabled(hold)
+      .onChange((event) => {
+        'worklet';
+        if (!zoomedSV.value) return;
+        offsetX.value = clamp(offsetX.value + event.changeX, limitX(scale.value));
+        offsetY.value = clamp(offsetY.value + event.changeY, limitY(scale.value));
+      });
 
-  // The way out of a held zoom, and the way in without two fingers.
-  const doubleTap = Gesture.Tap()
-    .enabled(hold)
-    .numberOfTaps(2)
-    .onEnd((event) => {
-      if (scale.value > REST) {
-        rest();
-        return;
-      }
-      begin(event.x, event.y);
-      zoomAbout(TAP_SCALE, from.value.focalX, from.value.focalY);
-      scheduleOnRN(setZoomed, true);
-    });
+    // The way out of a held zoom, and the way in without two fingers.
+    const doubleTap = Gesture.Tap()
+      .enabled(hold)
+      .numberOfTaps(2)
+      .onEnd((event) => {
+        'worklet';
+        if (scale.value > REST) {
+          rest();
+          return;
+        }
+        begin(event.x, event.y);
+        zoomAbout(TAP_SCALE, from.value.focalX, from.value.focalY);
+        zoomedSV.value = true;
+        scheduleOnRN(setZoomed, true);
+      });
+
+    return Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, drag));
+  }, [alongside, hold, paired, boxSV, frameSV, from, offsetX, offsetY, scale, zoomedSV]);
 
   const style = useAnimatedStyle(() => ({
     // Translate before scale: the offsets are distances on the screen, not in
@@ -176,7 +195,7 @@ export function usePinchZoom({
   }));
 
   return {
-    gesture: Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, drag)),
+    gesture,
     style,
     zoomed,
   };
