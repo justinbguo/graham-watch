@@ -4,13 +4,13 @@ import { ScrollView, Text, View } from 'react-native';
 import { CheckRow } from '@/components/CheckRow';
 import { Field } from '@/components/ui';
 import { useDealerShop } from '@/data/dealers';
-import { useFacets } from '@/data/search';
+import { useFilterFacets } from '@/data/search';
 import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { filterChips } from './chips';
 import { dealerChoices } from './dealers';
-import { facetsOf } from './facets';
+import { facetsOf, UNKNOWN_FACET_VALUE } from './facets';
 import { FilterGroup } from './FilterGroup';
 import { FilterSummary } from './FilterSummary';
 import { useFilters, type Surface } from './provider';
@@ -26,8 +26,11 @@ import {
 
 /**
  * Price, era, size, brand, and every dealer this surface can actually show.
- * Options come from `listing_facets` so nothing offered can only return zero rows.
- * One shop is still listed: the row is how a buyer sees who is selling.
+ * Deck and search ask `listing_facets_v2` with the canonical spec, so a count
+ * beside a brand already reflects the price and the era, and not the brand
+ * you have selected. A shop counts the watches already on the page: a claimed
+ * shop would vanish from that function. Unknown is a bucket for the total,
+ * not a choice, so it is not offered.
  */
 export function FilterPanel({
   surface,
@@ -42,9 +45,15 @@ export function FilterPanel({
   const dropdown = variant === 'dropdown';
   const api = useFilters(surface, dealerId);
   const { filters, toggle, setPrice, togglePrice, replace, clear } = api;
-  const { data: catalogue = [] } = useFacets(surface === 'deck', surface !== 'shop');
+  const { data: catalogue = [] } = useFilterFacets(filters, {
+    excludeOwn: surface === 'deck',
+    excludeSwiped: surface === 'deck',
+    enabled: surface !== 'shop',
+  });
   const shop = useDealerShop(surface === 'shop' ? (dealerId ?? '') : '');
-  const facets = surface === 'shop' ? facetsOf(shop.data?.listings ?? []) : catalogue;
+  const facets = (
+    surface === 'shop' ? facetsOf(shop.data?.listings ?? [], filters) : catalogue
+  ).filter((facet) => facet.value !== UNKNOWN_FACET_VALUE);
   const matched = useFilterMatchCount(surface, dealerId);
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);

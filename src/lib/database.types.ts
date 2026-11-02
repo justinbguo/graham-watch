@@ -1956,6 +1956,19 @@ export type Database = {
           value: string
         }[]
       }
+      listing_facets_v2: {
+        Args: {
+          p_exclude_own?: boolean
+          p_exclude_swiped?: boolean
+          p_spec?: Json
+        }
+        Returns: {
+          count: number
+          kind: string
+          label: string
+          value: string
+        }[]
+      }
       listing_matches: {
         Args: {
           p_listing: Database["public"]["Tables"]["listings"]["Row"]

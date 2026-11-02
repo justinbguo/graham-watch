@@ -200,11 +200,18 @@ export function countsCacheKey(filters: unknown = null) {
 }
 
 /**
- * Facet rows for the filter panel. `listing_facets` takes no filter yet, so
- * the token is the empty spec unless a caller passes one. The deck, the
- * counts, and this list still share one identity. Invalidation uses the
- * `['facets']` prefix, which matches either way.
+ * Facet rows for the filter sheet.
+ *
+ * The token is the canonical spec, the same one the deck and its counts use.
+ * `excludeSwiped` is part of the key because the deck drops watches already
+ * judged and search does not. The same brands with a different flag are a
+ * different list. Invalidation uses the `['facets']` prefix, which matches
+ * either way.
  */
-export function facetsQueryKey(excludeOwn = true, filters: unknown = null) {
-  return ['facets', filterCacheToken(filters), excludeOwn] as const;
+export function facetsQueryKey(
+  excludeOwn = true,
+  filters: unknown = null,
+  excludeSwiped = false,
+) {
+  return ['facets', filterCacheToken(filters), excludeOwn, excludeSwiped] as const;
 }

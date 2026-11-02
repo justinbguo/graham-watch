@@ -798,7 +798,7 @@ sits beside brand. The group lists every shop that has a watch this screen can s
 including when that is only one shop: the row is how a buyer sees who is selling, and
 its count is how many of that shop's watches are in the feed. It stays off a shop
 page, where you are already inside one dealer. A shop with no live listing is not
-offered — the list comes from `listing_facets`, so a dealer appears once a watch
+offered — the list comes from `listing_facets_v2`, so a dealer appears once a watch
 of theirs is actually on the deck.
 
 ## Where filters live
@@ -826,7 +826,7 @@ case size, and the price rows. The sheet keeps price, era, case size, brand, and
 dealer (deck and search only). Style, case material, winding, and complications
 stay out of the panel so the first pass stays short.
 
-Only offer a filter something can match. Options come from `listing_facets`, so a brand
+Only offer a filter something can match. Options come from `listing_facets_v2`, so a brand
 appears once a visible listing is that brand. A filter that can only return nothing is a
 dead end the user has to reverse out of.
 

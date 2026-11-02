@@ -22,6 +22,10 @@ const MIGRATION = new URL(
   '../supabase/migrations/20261102000001_listing_matches.sql',
   import.meta.url,
 );
+const FACETS_MIGRATION = new URL(
+  '../supabase/migrations/20261102064025_listing_facets_v2.sql',
+  import.meta.url,
+);
 
 test('v2 search and counts call listing_matches, and v1 is not replaced', () => {
   const sql = readFileSync(MIGRATION, 'utf8');
@@ -34,6 +38,21 @@ test('v2 search and counts call listing_matches, and v1 is not replaced', () => 
   assert.match(counts, /public\.listing_matches\(/);
   assert.doesNotMatch(sql, /function public\.search_listings\(/);
   assert.doesNotMatch(sql, /function public\.listing_counts\(/);
+});
+
+test('listing_facets_v2 is built on listing_matches and leaves v1 in place', () => {
+  const sql = readFileSync(FACETS_MIGRATION, 'utf8');
+  assert.match(sql, /create function public\.listing_facets_v2\(/);
+  assert.match(sql, /public\.listing_matches\(/);
+  assert.match(sql, /args\.spec - 'brands'/);
+  assert.match(sql, /args\.spec - 'styles'/);
+  assert.match(sql, /args\.spec - 'materials'/);
+  assert.match(sql, /args\.spec - 'windings'/);
+  assert.match(sql, /args\.spec - 'complications'/);
+  assert.match(sql, /args\.spec - 'dealers'/);
+  assert.match(sql, /'Unknown'/);
+  // v1 stays. Onboarding still calls it, and this file must not replace it.
+  assert.doesNotMatch(sql, /function public\.listing_facets\(/);
 });
 
 function asFilters(spec) {
@@ -297,6 +316,12 @@ test.before(async () => {
     permission: 'approved',
     created_by: buyer.id,
   });
+  dealers.facet = await insertDealer({
+    name: `Contract Facet ${stamp}`,
+    website: `https://contract-facet-${stamp}.test`,
+    permission: 'approved',
+    created_by: buyer.id,
+  });
 
   const base = {
     imported_by: buyer.id,
@@ -536,6 +561,49 @@ test.before(async () => {
     year: 1982,
     created_at: at(17),
   });
+  rows.facetKnown = await insertListing({
+    ...base,
+    dealer_id: dealers.facet.id,
+    brand: 'Rolex',
+    model: 'Facet',
+    reference: `kq7-facet-${stamp}`,
+    style: 'diver',
+    case_material: 'steel',
+    winding: 'automatic',
+    complications: ['date'],
+    price_cents: 100_000,
+    case_size_mm: 40,
+    year: 1968,
+    created_at: at(18),
+  });
+  rows.facetBlank = await insertListing({
+    ...base,
+    dealer_id: dealers.facet.id,
+    brand: '???',
+    model: 'Blank',
+    reference: `kq7-blank-${stamp}`,
+    style: null,
+    case_material: null,
+    winding: null,
+    complications: [],
+    price_cents: null,
+    case_size_mm: null,
+    year: null,
+    created_at: at(19),
+  });
+  // The brand trigger fills a key from the letters in the name. "???" has
+  // none, but clear it anyway so the Unknown bucket is the thing under test
+  // even if that trigger starts keeping a key.
+  const cleared = await api(`/rest/v1/listings?id=eq.${rows.facetBlank.id}&select=*`, {
+    token: service,
+    method: 'PATCH',
+    prefer: 'return=representation',
+    body: { brand_key: null },
+  });
+  if (cleared.status !== 200) {
+    throw new Error(`clear brand_key: ${cleared.status} ${JSON.stringify(cleared.body)}`);
+  }
+  rows.facetBlank = cleared.body[0];
 
   universe = [
     rows.sub,
@@ -1009,4 +1077,166 @@ test('null prices and years sort last, and favorites stay ahead of a newer watch
     sorted(v1fav.map((row) => row.id)),
     sorted(fav.map((row) => row.listing.id)),
   );
+});
+
+// Brand, dealer, style, material, and winding hold one value. Unknown is the
+// watches missing it. Complications are not in this list: one watch can carry
+// two, so those rows are not a partition.
+const PARTITION = [
+  ['brand', 'brands'],
+  ['dealer', 'dealers'],
+  ['style', 'styles'],
+  ['case_material', 'materials'],
+  ['winding', 'windings'],
+];
+
+function sumKind(rows, kind) {
+  return rows.filter((row) => row.kind === kind).reduce((total, row) => total + Number(row.count), 0);
+}
+
+function withoutDimension(specObj, key) {
+  const next = { ...specObj };
+  delete next[key];
+  return next;
+}
+
+async function facetsV2(specObj, options = {}) {
+  const res = await api('/rest/v1/rpc/listing_facets_v2', {
+    token: options.token ?? anon,
+    method: 'POST',
+    body: {
+      p_spec: specObj,
+      p_exclude_swiped: options.excludeSwiped ?? false,
+      p_exclude_own: options.excludeOwn ?? false,
+    },
+  });
+  if (!res.ok) throw new Error(rpcBodyError('listing_facets_v2', res));
+  return res.body ?? [];
+}
+
+async function assertFacetPartitions(specObj, options = {}) {
+  const rows = await facetsV2(specObj, options);
+  for (const [kind, key] of PARTITION) {
+    const baseline = await counts('v2', withoutDimension(specObj, key), options);
+    const got = sumKind(rows, kind);
+    assert.equal(
+      got,
+      baseline.matched,
+      `${kind} summed to ${got}, listing_counts_v2 matched ${baseline.matched} without ${key}`,
+    );
+    const unknown = rows.filter((row) => row.kind === kind && row.label === 'Unknown');
+    assert.ok(unknown.length <= 1, `${kind} returned ${unknown.length} Unknown rows`);
+    for (const row of unknown) assert.equal(row.value, '');
+    if (!Object.prototype.hasOwnProperty.call(specObj, key)) {
+      const same = await counts('v2', specObj, options);
+      assert.equal(got, same.matched, `${kind} should equal listing_counts_v2 matched`);
+    }
+  }
+  return rows;
+}
+
+test('facet counts, with Unknown, add up to listing_counts_v2 matched', async () => {
+  const open = await assertFacetPartitions(spec());
+  const unknownStyle = open.find((row) => row.kind === 'style' && row.value === '');
+  assert.equal(unknownStyle.label, 'Unknown');
+  assert.equal(Number(unknownStyle.count), 1);
+
+  const priced = spec({ prices: [{ min: null, max: 500_000 }] });
+  const pricedRows = await assertFacetPartitions(priced);
+  // GMT at $4,500 and the Datejust at $5,000. The Explorer has no price, so it
+  // is not in this Rolex count, and neither is the Submariner at $8,000.
+  assert.equal(Number(pricedRows.find((row) => row.kind === 'brand' && row.value === 'rolex').count), 2);
+
+  // Rolex plus dress plus under $5k. Brand counts ignore Rolex, so Tudor stays.
+  // The matched count of the whole spec is smaller than that brand total.
+  const selected = spec({
+    brands: ['rolex'],
+    styles: ['dress'],
+    prices: [{ min: null, max: 500_000 }],
+  });
+  const selectedRows = await assertFacetPartitions(selected);
+  assert.equal(selectedRows.some((row) => row.kind === 'brand' && row.value === 'tudor'), true);
+  const full = await counts('v2', selected);
+  const brandsOpen = await counts('v2', spec({ styles: ['dress'], prices: [{ min: null, max: 500_000 }] }));
+  assert.equal(sumKind(selectedRows, 'brand'), brandsOpen.matched);
+  assert.ok(brandsOpen.matched > full.matched);
+});
+
+test('a missing attribute is the Unknown bucket, and two complications are two rows', async () => {
+  assert.equal(rows.facetBlank.brand_key, null);
+  const blankSpec = canonicalize({ dealers: [dealers.facet.id] }).spec;
+  const blankRows = await assertFacetPartitions(blankSpec);
+  const matched = await counts('v2', blankSpec);
+  assert.equal(matched.matched, 2);
+  for (const kind of ['brand', 'style', 'case_material', 'winding']) {
+    const unknown = blankRows.find((row) => row.kind === kind && row.value === '');
+    assert.equal(unknown.label, 'Unknown', kind);
+    assert.equal(Number(unknown.count), 1, kind);
+  }
+  assert.equal(Number(blankRows.find((row) => row.kind === 'brand' && row.value === 'rolex').count), 1);
+  // One complication on one watch, none on the other. Those two rows add up.
+  assert.equal(sumKind(blankRows, 'complication'), matched.matched);
+
+  const open = await facetsV2(spec());
+  const openCount = await counts('v2', spec());
+  // The Moonwatch is chronograph and date, so it is counted twice.
+  assert.ok(sumKind(open, 'complication') > openCount.matched);
+  const unknown = open.find((row) => row.kind === 'complication' && row.value === '');
+  const withAny = universe.filter((row) => (row.complications ?? []).length > 0).length;
+  assert.equal(Number(unknown.count) + withAny, openCount.matched);
+});
+
+test('facets follow the same visibility, swipe, and claimed-shop rules as the counts', async () => {
+  for (const dealer of [dealers.pending, dealers.paused]) {
+    const hiddenSpec = canonicalize({ dealers: [dealer.id] }).spec;
+    const matched = await counts('v2', hiddenSpec);
+    assert.equal(matched.matched, 0);
+    const got = await facetsV2(hiddenSpec);
+    // Brand counts keep the dealer cut, so a shop that is not on the deck
+    // contributes nothing. Dealer counts drop that cut, and the shop is still
+    // absent: it is not approved, so it is not a row someone can pick.
+    assert.equal(sumKind(got, 'brand'), 0);
+    assert.equal(
+      got.some((row) => row.kind === 'dealer' && row.value === dealer.id),
+      false,
+    );
+  }
+
+  const claimedSpec = canonicalize({ dealers: [dealers.claimed.id] }).spec;
+  const hidden = await facetsV2(claimedSpec, { token: buyer.token, excludeOwn: true });
+  const shown = await facetsV2(claimedSpec, { token: buyer.token, excludeOwn: false });
+  assert.equal(sumKind(hidden, 'brand'), 0);
+  assert.equal(sumKind(shown, 'brand'), 1);
+  const guest = await facetsV2(claimedSpec, { excludeOwn: true });
+  assert.equal(sumKind(guest, 'brand'), 1);
+
+  // Omitted flags use the function defaults: drop a claimed shop, keep swipes.
+  // This buyer claimed the shop, so the default hides its watch.
+  const omitted = await api('/rest/v1/rpc/listing_facets_v2', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_spec: claimedSpec },
+  });
+  if (!omitted.ok) throw new Error(rpcBodyError('listing_facets_v2', omitted));
+  assert.equal(sumKind(omitted.body ?? [], 'brand'), 0);
+
+  const swiped = await api('/rest/v1/swipes', {
+    token: service,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { actor_id: buyer.id, listing_id: rows.facetKnown.id, direction: 'left' },
+  });
+  assert.equal(swiped.status, 201, JSON.stringify(swiped.body));
+
+  const facetSpec = canonicalize({ dealers: [dealers.facet.id] }).spec;
+  const kept = await counts('v2', facetSpec, { token: buyer.token, excludeSwiped: false });
+  const dropped = await counts('v2', facetSpec, { token: buyer.token, excludeSwiped: true });
+  assert.equal(kept.matched, 2);
+  assert.equal(dropped.matched, 1);
+  const rowsAfter = await assertFacetPartitions(facetSpec, { token: buyer.token, excludeSwiped: true });
+  assert.equal(
+    rowsAfter.some((row) => row.kind === 'brand' && row.value === 'rolex'),
+    false,
+  );
+  assert.equal(Number(rowsAfter.find((row) => row.kind === 'brand' && row.value === '').count), 1);
 });

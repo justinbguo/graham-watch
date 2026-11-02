@@ -127,6 +127,10 @@ export function useRecordSwipe(actorId: string | null) {
       if (variables.direction === 'right') {
         track('save', { listing_id: variables.listingId });
       }
+      // The deck's facet list drops a judged watch. A brand's new total is a
+      // question for `listing_facets_v2`, so the sheet asks again instead of
+      // guessing which row changed.
+      queryClient.invalidateQueries({ queryKey: keys.facets });
       if (!actorId) return;
       // Both lists, whichever way the thumb went. The write is an upsert, so
       // saving a watch from the listing screen after passing on it in the deck
@@ -198,6 +202,7 @@ export function useUndoPass(actorId: string | null) {
         queryKey: ['listing-counts'],
         predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(keys.counts(filters)),
       });
+      queryClient.invalidateQueries({ queryKey: keys.facets });
     },
   });
 }
@@ -223,6 +228,7 @@ export function useStartOver(actorId: string | null) {
       // Every cached deck: the passes are gone for every filter, not just this one.
       queryClient.invalidateQueries({ queryKey: ['deck'] });
       queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
+      queryClient.invalidateQueries({ queryKey: keys.facets });
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
@@ -258,6 +264,7 @@ export function useUnsave(actorId: string | null) {
       // until something else forces a refetch.
       queryClient.invalidateQueries({ queryKey: ['deck'] });
       queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
+      queryClient.invalidateQueries({ queryKey: keys.facets });
       if (actorId) queryClient.invalidateQueries({ queryKey: keys.passes(actorId) });
     },
   });
