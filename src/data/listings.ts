@@ -1,22 +1,27 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
-import { toRpcArgs, type Filters } from '@/features/filters/types';
+import { canonicalize } from '@/features/filters/spec';
+import type { Filters } from '@/features/filters/types';
+import type { Json } from '@/lib/database';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
-import { useSession } from '@/providers/session';
 
 import {
-  appendDeckPage,
-  deckPileFromPage,
+  DECK_FAVORITES_FIRST,
   DECK_LIMIT,
-  nextDeckOffset,
+  DECK_SORT,
+  newCardsOnLastPage,
+  nextDeckCursor,
   shouldRefillDeck,
   showDeckEmpty,
-  type DeckPile,
+  visibleDeckCards,
+  type DeckCache,
+  type DeckPage,
+  type DeckSort,
 } from './deckPaging';
 import { keys } from './keys';
 
@@ -73,23 +78,62 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
   }));
 }
 
-async function fetchDeck(limit: number, filters: Filters, offset: number): Promise<DeckCard[]> {
-  if (isDemo) return demo.deck(filters).slice(offset, offset + limit);
+/**
+ * One page of the Buy deck.
+ *
+ * `p_spec` is the canonical filter: the same object `canonicalize()` returns,
+ * not the panel's empty arrays. `p_cursor` is null on the first page and, after
+ * that, the bookmark the previous page came back with. Demo mode has no
+ * database, so it mints its own bookmark; the hook still treats that string
+ * as opaque.
+ */
+async function fetchDeckPage(
+  limit: number,
+  filters: Filters,
+  cursor: string | null,
+  sort: DeckSort,
+  favoritesFirst: boolean,
+): Promise<DeckPage<DeckCard>> {
+  if (isDemo) return demoDeckPage(filters, cursor, limit);
 
-  // The deck is search with the cards you have already judged removed, and with
-  // the brands you chose at sign-up dealt first. `p_exclude_own` hides a shop
-  // this account has claimed. Importing a listing does not hide it, and a guest
-  // has no account, so nothing is theirs to hide.
-  const { data, error } = await supabase.rpc('search_listings', {
+  // The deck hides watches already judged, and a shop this account has claimed.
+  // Importing a listing does not hide it. A guest has no account, so nothing
+  // is theirs to hide and `swipes` has no rows for them — the cursor is what
+  // moves a guest forward, the same way it moves a signed-in buyer.
+  const { data, error } = await supabase.rpc('search_listings_v2', {
+    p_spec: canonicalize(filters).spec as Json,
     p_limit: limit,
-    p_offset: offset,
+    p_cursor: cursor,
     p_exclude_swiped: true,
-    p_favorites_first: true,
     p_exclude_own: true,
-    ...toRpcArgs(filters),
+    p_sort: sort,
+    p_favorites_first: favoritesFirst,
   });
   if (error) throw error;
-  return hydrate(data ?? []);
+
+  const rows = data ?? [];
+  return {
+    cards: await hydrate(rows.map((row) => row.listing)),
+    // One bookmark for the page. Null means there is no next page.
+    cursor: rows[0]?.cursor ?? null,
+  };
+}
+
+/** Stand-in for `search_listings_v2` when the app is running on fixtures. */
+function demoDeckPage(filters: Filters, cursor: string | null, limit: number): DeckPage<DeckCard> {
+  const all = demo.deck(filters);
+  let start = 0;
+  if (cursor != null) {
+    const id = cursor.startsWith('demo:') ? cursor.slice('demo:'.length) : '';
+    const at = all.findIndex((card) => card.id === id);
+    // The anchor was judged and dropped out of the fixture list. Stop, rather
+    // than starting the pile over from the first watch.
+    start = at >= 0 ? at + 1 : all.length;
+  }
+  const cards = all.slice(start, start + limit);
+  const last = cards[cards.length - 1];
+  const more = start + cards.length < all.length;
+  return { cards, cursor: more && last ? `demo:${last.id}` : null };
 }
 
 async function fetchSaved(actorId: string): Promise<DeckCard[]> {
@@ -149,101 +193,72 @@ export function usePrimeListing() {
 
 /**
  * One page at a time. The next page is fetched when five or fewer cards are
- * left and `matched` still exceeds what this screen has loaded.
- * The header does not count the pile: `listing_counts` is the number of
- * watches, and the pile is only the ones in hand.
+ * left and the last page came back with a cursor.
+ *
+ * The header does not count the pile: `listing_counts_v2` is the number of
+ * watches, and the pile is only the ones in hand. The empty copy waits for
+ * that count to be zero. An empty page, or a count that has not loaded, is
+ * not the end of the catalogue.
+ *
+ * `useInfiniteQuery` keeps each page with the cursor that fetched it, under
+ * the query key. Changing the filter or the sort changes the key, and the new
+ * query starts at `initialPageParam: null` — the first page, not the previous
+ * sort's bookmark.
  */
 export function useDeck(limit = DECK_LIMIT) {
   const { filters } = useFilters('deck');
   const guest = useGuest();
-  const { userId } = useSession();
-  const counts = useListingCounts();
-  const queryClient = useQueryClient();
-  const [refillError, setRefillError] = useState<Error | null>(null);
-  const generation = useRef(0);
+  const sort = DECK_SORT;
+  const favoritesFirst = DECK_FAVORITES_FIRST;
 
-  const query = useQuery({
-    queryKey: keys.deck(filters),
-    queryFn: async () => deckPileFromPage(await fetchDeck(limit, filters, 0), limit),
+  const query = useInfiniteQuery<
+    DeckPage<DeckCard>,
+    Error,
+    DeckCache<DeckCard>,
+    ReturnType<typeof keys.deck>,
+    string | null
+  >({
+    queryKey: keys.deck(filters, sort, favoritesFirst),
+    initialPageParam: null,
+    queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, sort, favoritesFirst),
+    getNextPageParam: (lastPage) => nextDeckCursor(lastPage),
     // The deck is consumed by swiping, not by refetching. Re-running the first
     // page mid-pile would shuffle cards out from under the user's thumb. The
-    // next page is appended below, on purpose.
+    // next page is appended by the query, on purpose, and only while the key
+    // is unchanged.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
-  // Guest judgments never reach `swipes`, so the RPC cannot exclude them. Drop
-  // them here so a refill does not put a pass back on top of the pile.
-  const visible = useMemo(() => {
-    const cards = query.data?.cards ?? [];
-    if (guest.swipedIds.size === 0) return cards;
-    return cards.filter((card) => !guest.swipedIds.has(card.id));
-  }, [query.data, guest.swipedIds]);
+  const visible = useMemo(
+    () => visibleDeckCards(query.data, guest.swipedIds),
+    [query.data, guest.swipedIds],
+  );
 
-  const seen = query.data?.seen ?? 0;
-  const exhausted = query.data?.exhausted ?? false;
   const wantMore =
     query.data != null &&
     shouldRefillDeck({
       remaining: visible.length,
-      matched: counts.data?.matched,
-      seen,
-      exhausted,
+      hasNextPage: query.hasNextPage,
+      latestPageAdded: newCardsOnLastPage(query.data),
     });
-  const filterKey = JSON.stringify(keys.deck(filters));
-  const [attempt, setAttempt] = useState(0);
-  const attempts = useRef(0);
-  // Read when a refill starts. Listing the pile size as an effect dependency
-  // would cancel the request on every swipe, and a signed-in offset moves as
-  // cards leave.
-  const remainingRef = useRef(visible.length);
-  remainingRef.current = visible.length;
 
   useEffect(() => {
-    if (!wantMore) return;
-    const pageOffset = nextDeckOffset({
-      guest: userId == null,
-      seen,
-      remaining: remainingRef.current,
-    });
-    const generationId = ++generation.current;
-    let cancelled = false;
-    void fetchDeck(limit, filters, pageOffset)
-      .then((page) => {
-        if (cancelled || generation.current !== generationId) return;
-        attempts.current = 0;
-        setRefillError(null);
-        queryClient.setQueryData<DeckPile<DeckCard>>(keys.deck(filters), (current) =>
-          current ? appendDeckPage(current, page, limit) : current,
-        );
-      })
-      .catch((err: unknown) => {
-        if (cancelled || generation.current !== generationId) return;
-        attempts.current += 1;
-        if (attempts.current <= 2) {
-          setAttempt((current) => current + 1);
-          return;
-        }
-        // Remember the failure even while cards remain. The screen only shows
-        // it once the pile is empty — a failed refill must not throw away the
-        // watch under the thumb — and Try again is that screen's existing button.
-        setRefillError(err instanceof Error ? err : new Error('Could not load more watches.'));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wantMore, seen, filterKey, userId, attempt, limit, filters, queryClient]);
+    // A failed next page stays failed until Try again. Calling again here
+    // would spin on the same cursor while the cards still in hand are fine.
+    if (!wantMore || query.isFetchingNextPage || query.isFetchNextPageError) return;
+    void query.fetchNextPage();
+  }, [wantMore, query.isFetchingNextPage, query.isFetchNextPageError, query.fetchNextPage]);
 
-  const refetch = useCallback(() => {
-    attempts.current = 0;
-    setRefillError(null);
-    return query.refetch();
-  }, [query]);
+  const refetch = useCallback(() => query.refetch(), [query.refetch]);
 
   return {
     ...query,
     data: visible,
-    error: query.error ?? (visible.length === 0 ? refillError : null),
+    // A failed refill must not replace the watch under the thumb. The screen
+    // shows the error once the pile is empty, and Try again is that screen's
+    // existing button. The first page's error has no cards to protect.
+    error: visible.length === 0 ? query.error : null,
     refetch,
   };
 }
@@ -253,9 +268,12 @@ export type ListingCounts = { matched: number; total: number };
 export async function fetchCounts(filters: Filters): Promise<ListingCounts> {
   if (isDemo) return demo.counts(filters);
 
-  const { data, error } = await supabase.rpc('listing_counts', {
+  const { data, error } = await supabase.rpc('listing_counts_v2', {
+    p_spec: canonicalize(filters).spec as Json,
     p_exclude_swiped: true,
-    ...toRpcArgs(filters),
+    // The deck hides a claimed shop. The count has to use that same cut, or
+    // the header would include a watch the pile will never show.
+    p_exclude_own: true,
   });
   if (error) throw error;
 
@@ -268,10 +286,11 @@ export async function fetchCounts(filters: Filters): Promise<ListingCounts> {
  * pile cannot answer either: it is only the pages fetched so far, so its length
  * used to freeze at `DECK_LIMIT` and the header had to say "20+".
  *
- * Counted in the database, in one round trip, by `listing_counts` — the same
- * predicate the deck is drawn with. A count assembled here from the rows we
- * happen to hold would be a different number from the deck's the moment a
- * dealer is approved.
+ * Counted in the database, in one round trip, by `listing_counts_v2` — the same
+ * `listing_matches` predicate the deck is drawn with. A count assembled here
+ * from the rows we happen to hold would be a different number from the deck's
+ * the moment a dealer is approved. Sort is not part of this key: order does
+ * not change how many watches match.
  */
 export function useListingCounts() {
   const { filters } = useFilters('deck');

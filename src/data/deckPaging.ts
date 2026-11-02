@@ -1,10 +1,18 @@
+import type { InfiniteData } from '@tanstack/react-query';
+
 /**
  * How the Buy deck asks for the next page.
  *
- * `search_listings` returns one page. The pile used to be that page and nothing
- * else: after about twenty swipes the screen was empty even though `matched`
- * said more watches fit the filters. A refill asks for the next page while a
- * few cards are still in hand, so the pile never has to hit the table.
+ * `search_listings_v2` returns one page and an opaque cursor. The cursor is a
+ * bookmark the database made for this filter, this sort, and this
+ * favorites-first setting. The next request sends that string back and does
+ * not read it. A cursor from a different sort is rejected, so the query key
+ * includes the sort: a new sort is a new query, and a new query starts with
+ * no cursor.
+ *
+ * The pile used to be one page and nothing else. After about twenty swipes
+ * the screen was empty even though more watches fit the filters. A refill
+ * asks for the next page while a few cards are still in hand.
  */
 
 export const DECK_LIMIT = 20;
@@ -12,101 +20,145 @@ export const DECK_LIMIT = 20;
 /** Fetch the next page once the pile is this thin, while the top card is still up. */
 export const DECK_REFILL_AT = 5;
 
-export type DeckPile<T> = {
+/**
+ * The deck's order. `search_listings_v2` rejects a cursor built for a
+ * different one of these, or for the other favorites-first setting.
+ */
+export const DECK_SORTS = ['newest', 'price_asc', 'price_desc', 'oldest', 'newest_watch'] as const;
+
+export type DeckSort = (typeof DECK_SORTS)[number];
+
+/** What the deck asks for until a sort control exists. Same order the offset deck used. */
+export const DECK_SORT: DeckSort = 'newest';
+
+/** Favorite brands still lead the pile, as they did before the cursor. */
+export const DECK_FAVORITES_FIRST = true;
+
+export type DeckPage<T> = {
   cards: T[];
   /**
-   * Rows the server has returned for this filter. Swipes take cards out of
-   * `cards` but not out of `seen`: a guest's next page is addressed by this
-   * count, and the server still has the rows they already judged.
+   * Bookmark for the following page. The same value on every row the database
+   * returned, and null when this page is the last. Opaque: pass it back, do
+   * not parse it.
    */
-  seen: number;
-  /** The last page was short, or it repeated cards we already hold. */
-  exhausted: boolean;
+  cursor: string | null;
 };
 
-export function deckPileFromPage<T>(page: readonly T[], limit: number): DeckPile<T> {
-  return {
-    cards: [...page],
-    seen: page.length,
-    exhausted: page.length < limit,
-  };
+/** One deck query: the pages `useInfiniteQuery` stores, keyed with the cursor that fetched each one. */
+export type DeckCache<T> = InfiniteData<DeckPage<T>, string | null>;
+
+/**
+ * The cursor to ask for next, or nothing when the database said this was the
+ * last page. `useInfiniteQuery` treats `undefined` as "stop". Null is what
+ * the database sends for that; the two are the same fact.
+ */
+export function nextDeckCursor(page: { cursor: string | null }): string | undefined {
+  return page.cursor ?? undefined;
 }
 
-export function dropJudgedCard<T extends { id: string }>(pile: DeckPile<T>, listingId: string): DeckPile<T> {
-  if (!pile.cards.some((card) => card.id === listingId)) return pile;
-  return { ...pile, cards: pile.cards.filter((card) => card.id !== listingId) };
-}
-
-/** Undo puts the watch back on top. `seen` stays: the row was already fetched. */
-export function restorePassedCard<T extends { id: string }>(
-  pile: DeckPile<T> | undefined,
-  card: T,
-): DeckPile<T> {
-  if (!pile) return { cards: [card], seen: 1, exhausted: false };
-  if (pile.cards.some((entry) => entry.id === card.id)) return pile;
-  return { ...pile, cards: [card, ...pile.cards] };
-}
-
-export function appendDeckPage<T extends { id: string }>(
-  pile: DeckPile<T>,
-  page: readonly T[],
-  limit: number,
-): DeckPile<T> {
-  const have = new Set(pile.cards.map((card) => card.id));
-  const added = page.filter((card) => {
-    if (have.has(card.id)) return false;
-    have.add(card.id);
-    return true;
-  });
-  // A page of cards we already hold did not move the window. Counting it in
-  // `seen` would skip rows, and asking again would spin on the same offset.
-  if (added.length === 0) return { ...pile, exhausted: true };
-  return {
-    cards: [...pile.cards, ...added],
-    seen: pile.seen + page.length,
-    exhausted: page.length < limit,
-  };
+export function cardsInDeck<T extends { id: string }>(data: DeckCache<T> | undefined): T[] {
+  if (!data) return [];
+  const seen = new Set<string>();
+  const cards: T[] = [];
+  for (const page of data.pages) {
+    for (const card of page.cards) {
+      if (seen.has(card.id)) continue;
+      seen.add(card.id);
+      cards.push(card);
+    }
+  }
+  return cards;
 }
 
 /**
- * Refill when the pile is down to its last few cards and the catalogue still
- * has more matches than we have loaded.
+ * Cards the buyer can still judge. A guest's passes never reach `swipes`, so
+ * a refetch of a page would hand those watches back. Signed-in swipes are
+ * already gone on the server; the set is empty and this is the pile unchanged.
+ */
+export function visibleDeckCards<T extends { id: string }>(
+  data: DeckCache<T> | undefined,
+  hiddenIds: ReadonlySet<string>,
+): T[] {
+  const cards = cardsInDeck(data);
+  if (hiddenIds.size === 0) return cards;
+  return cards.filter((card) => !hiddenIds.has(card.id));
+}
+
+export function deckHasCard<T extends { id: string }>(
+  data: DeckCache<T> | undefined,
+  listingId: string,
+): boolean {
+  return data?.pages.some((page) => page.cards.some((card) => card.id === listingId)) ?? false;
+}
+
+/**
+ * How many cards on the latest page were not already on an earlier page.
+ * Zero means the cursor did not move the pile forward. Asking again would
+ * spin on the same watches.
+ */
+export function newCardsOnLastPage<T extends { id: string }>(data: DeckCache<T> | undefined): number | undefined {
+  const pages = data?.pages;
+  if (!pages?.length) return undefined;
+  const last = pages[pages.length - 1];
+  const prior = new Set<string>();
+  for (const page of pages.slice(0, -1)) {
+    for (const card of page.cards) prior.add(card.id);
+  }
+  let added = 0;
+  for (const card of last.cards) {
+    if (!prior.has(card.id)) added += 1;
+  }
+  return added;
+}
+
+export function dropJudgedCard<T extends { id: string }>(data: DeckCache<T>, listingId: string): DeckCache<T> {
+  let hit = false;
+  const pages = data.pages.map((page) => {
+    if (!page.cards.some((card) => card.id === listingId)) return page;
+    hit = true;
+    return { ...page, cards: page.cards.filter((card) => card.id !== listingId) };
+  });
+  if (!hit) return data;
+  return { ...data, pages };
+}
+
+/** Undo puts the watch back on top. The page's cursor stays: the row was already fetched. */
+export function restorePassedCard<T extends { id: string }>(
+  data: DeckCache<T> | undefined,
+  card: T,
+): DeckCache<T> {
+  if (!data) return { pages: [{ cards: [card], cursor: null }], pageParams: [null] };
+  if (deckHasCard(data, card.id)) return data;
+  const [first, ...rest] = data.pages;
+  if (!first) return { ...data, pages: [{ cards: [card], cursor: null }] };
+  return { ...data, pages: [{ ...first, cards: [card, ...first.cards] }, ...rest] };
+}
+
+/**
+ * Refill when the pile is down to its last few cards and the database handed
+ * back a cursor.
  *
- * `matched` is the live count: `listing_counts`, then one less on every swipe.
- * `seen` still includes those swipes. Putting the judgments back
- * (`matched + seen - remaining`) is what "more matches than the cards loaded
- * so far" means. Comparing the live count to `seen` directly stops a signed-in
- * pile on the second page, because every swipe lowered `matched` and left `seen`
- * where it was.
+ * The cursor is null on the last page, so this does not ask again when the
+ * catalogue is finished. `matched` is not the signal: it drops on every
+ * swipe, and comparing it to "how many rows came back" used to stop a
+ * signed-in pile on the second page. The empty state is what reads `matched`.
  */
 export function shouldRefillDeck(input: {
   remaining: number;
-  matched: number | undefined;
-  seen: number;
-  exhausted?: boolean;
+  hasNextPage: boolean;
+  latestPageAdded?: number;
 }): boolean {
-  if (input.exhausted) return false;
-  if (input.matched == null) return false;
-  if (input.remaining > DECK_REFILL_AT) return false;
-  const judged = Math.max(0, input.seen - input.remaining);
-  const matchedWhenLoaded = input.matched + judged;
-  return matchedWhenLoaded > input.seen;
+  if (!input.hasNextPage) return false;
+  if (input.latestPageAdded === 0) return false;
+  return input.remaining <= DECK_REFILL_AT;
 }
 
 /**
- * The empty copy is the end of the catalogue. An empty pile while `matched` is
- * still above zero is a refill that has not landed, not "nothing left".
+ * The empty copy is the end of the catalogue. An empty pile while `matched`
+ * is still above zero — or still loading — is a refill that has not landed,
+ * not "nothing left". A page that comes back empty is the same: wait for the
+ * count, do not treat the page as the answer.
  */
 export function showDeckEmpty(remaining: number, matched: number | undefined): boolean {
   return remaining === 0 && matched === 0;
-}
-
-/**
- * Signed-in search drops rows already in `swipes`, so the cards still in hand
- * are the start of the next result. A guest's judgments never reach that
- * table — there is no account, so `auth.uid()` is null — and the same offset
- * repeats the first page. Guests advance by every row already returned.
- */
-export function nextDeckOffset(input: { guest: boolean; seen: number; remaining: number }): number {
-  return input.guest ? input.seen : input.remaining;
 }

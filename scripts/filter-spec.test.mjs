@@ -95,10 +95,10 @@ test('canonicalize is idempotent', () => {
 
 test('deck, counts, and facets cache the same token', () => {
   const token = canonicalize(scrambled).key;
-  assert.deepEqual(deckCacheKey(scrambled), ['deck', token]);
+  assert.deepEqual(deckCacheKey(scrambled), ['deck', token, 'newest', true]);
   assert.deepEqual(countsCacheKey(scrambled), ['listing-counts', token]);
   assert.equal(deckCacheKey(scrambled)[1], countsCacheKey(ordered)[1]);
-  assert.deepEqual(deckCacheKey(null), ['deck', '{}']);
+  assert.deepEqual(deckCacheKey(null), ['deck', '{}', 'newest', true]);
   assert.deepEqual(countsCacheKey(NO_FILTERS), ['listing-counts', '{}']);
   assert.deepEqual(facetsQueryKey(true), ['facets', '{}', true]);
   assert.deepEqual(facetsQueryKey(false), ['facets', '{}', false]);
@@ -120,7 +120,7 @@ test('the deck, the counts, and the facets list take their keys from the spec', 
   const keys = readFileSync(new URL('../src/data/keys.ts', import.meta.url), 'utf8');
   const spec = readFileSync(new URL('../src/features/filters/spec.ts', import.meta.url), 'utf8');
 
-  assert.match(listings, /queryKey: keys\.deck\(filters\)/);
+  assert.match(listings, /queryKey: keys\.deck\(filters, sort, favoritesFirst\)/);
   assert.match(listings, /queryKey: keys\.counts\(filters\)/);
   assert.match(search, /queryKey: keys\.facetsQuery\(excludeOwn\)/);
   assert.match(match, /queryKey: keys\.filterMatch\(api\.filters\)/);
