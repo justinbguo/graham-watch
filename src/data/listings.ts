@@ -192,8 +192,10 @@ export function usePrimeListing() {
 }
 
 /**
- * One page at a time. The next page is fetched when five or fewer cards are
- * left and the last page came back with a cursor.
+ * One page at a time. On the cards, the next page is fetched when five or
+ * fewer are left and the last page came back with a cursor. The grid shows
+ * every card still in hand, so that pile never gets thin — the grid calls
+ * `fetchNextPage` itself when its tail is on screen. Same query either way.
  *
  * The header does not count the pile: `listing_counts_v2` is the number of
  * watches, and the pile is only the ones in hand. The empty copy waits for
@@ -235,12 +237,14 @@ export function useDeck(limit = DECK_LIMIT) {
     [query.data, guest.swipedIds],
   );
 
+  const latestPageAdded = newCardsOnLastPage(query.data);
+
   const wantMore =
     query.data != null &&
     shouldRefillDeck({
       remaining: visible.length,
       hasNextPage: query.hasNextPage,
-      latestPageAdded: newCardsOnLastPage(query.data),
+      latestPageAdded,
     });
 
   useEffect(() => {
@@ -260,6 +264,9 @@ export function useDeck(limit = DECK_LIMIT) {
     // existing button. The first page's error has no cards to protect.
     error: visible.length === 0 ? query.error : null,
     refetch,
+    // The grid's scroll asks `shouldLoadMoreGrid` with this. A page that
+    // added nothing must not be asked for again, or the tail would spin.
+    latestPageAdded,
   };
 }
 
