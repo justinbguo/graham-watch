@@ -1,7 +1,8 @@
 import type { DeckCard } from '@/lib/models';
 
-import { matchesListing } from './match';
-import { NO_FILTERS, type Filters } from './types';
+// Node's type stripper, used by the app tests, will not resolve `./match`.
+import { matchesListing } from './match.ts';
+import { NO_FILTERS, type Filters } from './types.ts';
 
 export type ShopFacet = { kind: string; value: string; label: string; count: number };
 

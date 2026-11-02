@@ -1,6 +1,7 @@
 import type { DeckCard } from '@/lib/models';
 
-import { toRpcArgs, type Filters } from './types';
+// Same constraint as facets.ts: the app tests load this file in Node.
+import { toRpcArgs, type Filters } from './types.ts';
 
 /** A value matches when it sits in any chosen band. No bands means no filter. */
 function inSomeBand(
