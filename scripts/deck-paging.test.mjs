@@ -6,6 +6,10 @@
  * A refill asks for the next page while five or fewer cards are in hand.
  * The cursor is a bookmark. The client sends it back and does not read it.
  * A different filter or sort is a different query, so it starts with no cursor.
+ *
+ * The grid keeps every card, so "five left" never happens and the refill
+ * does not run. Scrolling to the tail asks for the next page on that same
+ * cursor, and stops while a fetch is in flight or the last page added nothing.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -20,8 +24,11 @@ import {
   cardsInDeck,
   dropJudgedCard,
   newCardsOnLastPage,
+  GRID_END_THRESHOLD,
+  isNearListEnd,
   nextDeckCursor,
   restorePassedCard,
+  shouldLoadMoreGrid,
   shouldRefillDeck,
   showDeckEmpty,
   visibleDeckCards,
@@ -331,4 +338,181 @@ test('deck and counts keys ignore filter order and defaults', () => {
   const keysSource = readFileSync(new URL('../src/data/keys.ts', import.meta.url), 'utf8');
   assert.match(keysSource, /deckCacheKey\(filters, sort, favoritesFirst\)/);
   assert.match(keysSource, /counts: \(filters: unknown\) => countsCacheKey\(filters\)/);
+});
+
+/**
+ * The grid's scroll. One page is appended only when the tail is on screen,
+ * another page exists, and nothing is already fetching. The walk is what
+ * a buyer does with an empty filter: keep scrolling until the cursor is null.
+ */
+function walkGrid(total) {
+  const server = createCatalogue(total);
+  const sent = [];
+  let data;
+
+  function take(cursor) {
+    sent.push(cursor);
+    const page = server.page({ cursor, judged: new Set(), guest: false });
+    data = data
+      ? { pages: [...data.pages, page], pageParams: [...data.pageParams, cursor] }
+      : { pages: [page], pageParams: [cursor] };
+    return page;
+  }
+
+  take(null);
+  let guard = 0;
+  while (guard++ < total + 5) {
+    const last = data.pages[data.pages.length - 1];
+    const hasNext = nextDeckCursor(last) !== undefined;
+    const input = {
+      hasNextPage: hasNext,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: newCardsOnLastPage(data),
+    };
+    // Sitting on the tail. A fetch already in flight must not start another.
+    assert.equal(isNearListEnd({ contentHeight: 4000, viewportHeight: 800, offsetY: 3600 }), true);
+    assert.equal(shouldLoadMoreGrid({ ...input, isFetchingNextPage: true, isFetching: true }), false);
+    if (!shouldLoadMoreGrid(input)) break;
+    take(nextDeckCursor(last));
+  }
+
+  return { sent, cards: cardsInDeck(data), lastCursor: data.pages[data.pages.length - 1].cursor };
+}
+
+test('the grid loads the next page from the tail, once, until the cursor ends', () => {
+  assert.equal(GRID_END_THRESHOLD, 0.5);
+
+  const viewport = 800;
+  const content = 5000;
+  const limit = viewport * GRID_END_THRESHOLD;
+  const atEnd = content - viewport - limit;
+  // Top of a long list. Opening the grid must not walk every page.
+  assert.equal(isNearListEnd({ contentHeight: content, viewportHeight: viewport, offsetY: 0 }), false);
+  assert.equal(isNearListEnd({ contentHeight: content, viewportHeight: viewport, offsetY: atEnd }), true);
+  assert.equal(isNearListEnd({ contentHeight: content, viewportHeight: viewport, offsetY: atEnd - 1 }), false);
+  // Shorter than the screen: there is nowhere to scroll, so the next page can fill it.
+  assert.equal(isNearListEnd({ contentHeight: 400, viewportHeight: viewport, offsetY: 0 }), true);
+  // Layout has not run. A 0 height is not the end.
+  assert.equal(isNearListEnd({ contentHeight: 0, viewportHeight: 0, offsetY: 0 }), false);
+  assert.equal(isNearListEnd({ contentHeight: content, viewportHeight: 0, offsetY: 0 }), false);
+  assert.equal(isNearListEnd({ contentHeight: content, viewportHeight: viewport, offsetY: Number.NaN }), false);
+
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: true,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: 20,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: false,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: 4,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: true,
+      isFetching: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: 20,
+    }),
+    false,
+  );
+  // A failed page stays failed until Try again. Scrolling must not spin.
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: true,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: true,
+      latestPageAdded: 20,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: true,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: 0,
+    }),
+    false,
+  );
+
+  // An empty filter over the live catalogue is about this many watches.
+  const walked = walkGrid(464);
+  assert.equal(walked.cards.length, 464);
+  assert.equal(new Set(walked.cards.map((card) => card.id)).size, 464);
+  assert.deepEqual(
+    walked.cards.map((card) => card.id),
+    Array.from({ length: 464 }, (_, index) => String(index).padStart(3, '0')),
+  );
+  assert.equal(walked.sent[0], null);
+  assert.equal(walked.sent.length, Math.ceil(464 / DECK_LIMIT));
+  assert.equal(new Set(walked.sent).size, walked.sent.length);
+  assert.equal(walked.lastCursor, null);
+  assert.equal(walked.sent.length, 24);
+
+  // A repeated page does not draw a second tile, and does not ask again.
+  const repeated = {
+    pages: [
+      { cards: walked.cards.slice(0, 2), cursor: 'c1' },
+      { cards: [walked.cards[1], walked.cards[2]], cursor: 'c2' },
+    ],
+    pageParams: [null, 'c1'],
+  };
+  assert.deepEqual(
+    cardsInDeck(repeated).map((card) => card.id),
+    ['000', '001', '002'],
+  );
+  assert.equal(
+    shouldLoadMoreGrid({
+      hasNextPage: true,
+      isFetching: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      latestPageAdded: newCardsOnLastPage({
+        pages: [...repeated.pages, { cards: [walked.cards[1], walked.cards[2]], cursor: 'c3' }],
+        pageParams: [...repeated.pageParams, 'c2'],
+      }),
+    }),
+    false,
+  );
+});
+
+test('a new filter starts the grid at the first page and drops the old cursor', () => {
+  const full = walkGrid(40);
+  assert.equal(typeof full.sent[1], 'string');
+
+  const narrowed = createCatalogue(30);
+  const first = narrowed.page({ cursor: null, judged: new Set(), guest: false });
+  assert.equal(first.cards[0].id, '000');
+  assert.equal(first.cards.length, DECK_LIMIT);
+  // The bookmark belonged to the unfiltered catalogue. The database rejects
+  // it for a different filter, which is why the query key starts over at null.
+  assert.throws(() => narrowed.page({ cursor: full.sent[1], judged: new Set(), guest: false }));
+
+  const grid = readFileSync(new URL('../src/components/DeckGrid.tsx', import.meta.url), 'utf8');
+  const screen = readFileSync(new URL('../src/app/(app)/(tabs)/index.tsx', import.meta.url), 'utf8');
+  assert.match(grid, /onEndReached=/);
+  assert.match(grid, /onScroll=\{rememberScroll\}/);
+  assert.match(grid, /shouldLoadMoreGrid/);
+  assert.match(grid, /isNearListEnd/);
+  assert.match(grid, /keyExtractor=\{\(card\) => card\.id\}/);
+  assert.match(grid, /onEndReachedThreshold=\{GRID_END_THRESHOLD\}/);
+  assert.match(screen, /void fetchNextPage\(\)/);
+  assert.match(screen, /key=\{filterCacheToken\(filters\)\}/);
+  assert.match(screen, /endLabel: remaining/);
 });

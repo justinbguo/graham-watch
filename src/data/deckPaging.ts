@@ -13,6 +13,10 @@ import type { InfiniteData } from '@tanstack/react-query';
  * The pile used to be one page and nothing else. After about twenty swipes
  * the screen was empty even though more watches fit the filters. A refill
  * asks for the next page while a few cards are still in hand.
+ *
+ * The grid shows every card still in the pile, so the pile never gets thin
+ * and that refill never runs. The grid asks on its own when the tail of the
+ * list is on screen (`shouldLoadMoreGrid`), on this same cursor.
  */
 
 export const DECK_LIMIT = 20;
@@ -162,3 +166,66 @@ export function shouldRefillDeck(input: {
 export function showDeckEmpty(remaining: number, matched: number | undefined): boolean {
   return remaining === 0 && matched === 0;
 }
+
+/**
+ * How close the tail has to be, as a fraction of the viewport, before the
+ * grid asks for the next page. Half a screen is soon enough that the next
+ * page arrives as the last row comes up, and late enough that opening the
+ * grid does not walk the catalogue.
+ */
+export const GRID_END_THRESHOLD = 0.5;
+
+export type ListScrollMetrics = {
+  contentHeight: number;
+  viewportHeight: number;
+  offsetY: number;
+};
+
+/**
+ * The tail is on screen, or the list is shorter than the screen and there
+ * is nowhere to scroll. A viewport that has not been laid out yet is not
+ * the end — that measurement is 0, and treating it as the end would ask
+ * for every page on mount.
+ */
+export function isNearListEnd(metrics: ListScrollMetrics, threshold = GRID_END_THRESHOLD): boolean {
+  const { contentHeight, viewportHeight, offsetY } = metrics;
+  if (!(viewportHeight > 0) || !(contentHeight > 0) || !Number.isFinite(offsetY)) return false;
+  const distanceFromEnd = contentHeight - viewportHeight - offsetY;
+  return distanceFromEnd <= viewportHeight * threshold;
+}
+
+/**
+ * The grid's ask. The card view uses `shouldRefillDeck` instead, because a
+ * swipe throws a watch away and the pile gets thin. The grid keeps every
+ * watch, so "five left" never happens.
+ *
+ * Nothing in flight: a scroll event fires for every frame the tail is
+ * visible, and a second request would repeat the page. A failed page stays
+ * failed until Try again — calling again here would spin on the same
+ * cursor. Zero new cards means the cursor did not move the pile forward.
+ */
+export function shouldLoadMoreGrid(input: {
+  hasNextPage: boolean;
+  isFetching: boolean;
+  isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
+  latestPageAdded?: number;
+}): boolean {
+  if (!input.hasNextPage) return false;
+  if (input.isFetchNextPageError) return false;
+  if (input.isFetching || input.isFetchingNextPage) return false;
+  if (input.latestPageAdded === 0) return false;
+  return true;
+}
+
+/** What the grid needs from the deck query in order to turn the page. */
+export type GridPaging = {
+  hasNextPage: boolean;
+  isFetching: boolean;
+  isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
+  latestPageAdded?: number;
+  onLoadMore: () => void;
+  /** The tally, once the count has landed. The footer has its own line until then. */
+  endLabel?: string;
+};
