@@ -22,6 +22,10 @@
     // Deno script. It imports the edge functions with `.ts` specifiers, and
     // tsc follows those imports even though `supabase/functions` is excluded.
     // `deno check` in the edge-functions job is what typechecks it.
-    "scripts/catalogue-preview.ts"
+    "scripts/catalogue-preview.ts",
+    // Node's test runner. It imports the drop selector, which lives next to
+    // the edge function. `deno check` covers that function; this file is run
+    // with `node --test --experimental-strip-types`.
+    "scripts/drops-select.test.ts"
   ]
 }

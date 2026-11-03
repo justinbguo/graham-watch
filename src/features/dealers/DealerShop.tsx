@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
@@ -8,6 +8,7 @@ import { ListingRow } from '@/components/ListingRow';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { dealerPicture } from '@/features/dealers/picture';
 import { useDealerShop } from '@/data/dealers';
+import { useMarkDropsSeen } from '@/data/drops';
 import { usePrimeListing } from '@/data/listings';
 import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
@@ -24,6 +25,13 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
   const primeListing = usePrimeListing();
   const { filters } = useFilters('shop', dealerId);
   const { data, isPending, error } = useDealerShop(dealerId);
+  const { mutate: markSeen } = useMarkDropsSeen();
+
+  // Opening the shop is seeing its new watches. The feed's count drops by
+  // this shop even if the buyer came here from a card, not from the badge.
+  useEffect(() => {
+    markSeen(dealerId);
+  }, [dealerId, markSeen]);
   const listings = data?.listings ?? [];
   const shown = useMemo(
     () => listings.filter((card) => matchesListing(card, filters)),

@@ -193,6 +193,7 @@ console.log('\navatars');
 
 console.log('\ndealers');
 let dealerId;
+let dropDealerId;
 {
   const escalation = await api('/rest/v1/dealers?select=id,name,permission', {
     token: importer.token,
@@ -3161,7 +3162,7 @@ console.log('\ndelete account');
 async function cleanUp() {
   const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
 
-  for (const id of [dealerId, codeDealerId, acceptedDealerId]) {
+  for (const id of [dealerId, codeDealerId, acceptedDealerId, dropDealerId]) {
     if (id) await fetch(`${URL}/rest/v1/dealers?id=eq.${id}`, { method: 'DELETE', headers: admin });
   }
   for (const user of [
@@ -4216,6 +4217,336 @@ console.log('\npush tokens');
       buyerAfter: buyerAfter.body,
       importerAfter: importerAfter.body,
     }),
+  );
+}
+
+console.log('\ndrops');
+{
+  const adminHeaders = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+
+  const created = await fetch(`${URL}/rest/v1/dealers?select=id`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      name: 'Craft + Tailored',
+      website: `https://craft-${stamp}.test`,
+      permission: 'approved',
+      created_by: importer.id,
+    }),
+  });
+  const createdBody = await created.json();
+  dropDealerId = createdBody?.[0]?.id;
+  check('a drop shop can be created for the test', created.status === 201 && Boolean(dropDealerId), JSON.stringify(createdBody));
+
+  const buyerFollow = await api('/rest/v1/dealer_follows', {
+    token: buyer.token,
+    method: 'POST',
+    body: { user_id: buyer.id, dealer_id: dropDealerId },
+    prefer: 'return=minimal',
+  });
+  const otherFollow = await api('/rest/v1/dealer_follows', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { user_id: dealerUser.id, dealer_id: dropDealerId },
+    prefer: 'return=minimal',
+  });
+  check('a buyer can follow an approved shop', buyerFollow.status < 300, `got ${buyerFollow.status}`);
+  check('a second buyer can follow the same shop', otherFollow.status < 300, `got ${otherFollow.status}`);
+
+  await fetch(`${URL}/rest/v1/dealer_follows?dealer_id=eq.${dropDealerId}`, {
+    method: 'PATCH',
+    headers: adminHeaders,
+    body: JSON.stringify({ created_at: '2020-06-01T00:00:00.000Z' }),
+  });
+
+  async function insertListing(fields) {
+    const response = await fetch(`${URL}/rest/v1/listings?select=id`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        dealer_id: dropDealerId,
+        imported_by: importer.id,
+        brand: 'Omega',
+        model: 'Speedmaster',
+        price_cents: 1000000,
+        ...fields,
+      }),
+    });
+    const body = await response.json();
+    return { status: response.status, id: body?.[0]?.id, body };
+  }
+
+  const oldListing = await insertListing({ created_at: '2019-01-01T00:00:00.000Z' });
+  check('a listing from before the follow is stored', oldListing.status === 201, JSON.stringify(oldListing.body));
+
+  const before = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check('a watch listed before the follow is not unseen', before.body === 0, JSON.stringify(before.body));
+
+  const day = 24 * 60 * 60 * 1000;
+  const stale = await insertListing({
+    created_at: new Date(Date.now() - 20 * day).toISOString(),
+  });
+  const staleCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'a watch older than 14 days is not unseen even when the follow is older',
+    stale.status === 201 && staleCount.body === 0,
+    JSON.stringify({ stale: stale.body, count: staleCount.body }),
+  );
+
+  const fresh = await insertListing({ created_at: new Date(Date.now() - day).toISOString() });
+  const sold = await insertListing({
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    sold_at: new Date().toISOString(),
+  });
+  const hidden = await insertListing({
+    created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    status: 'hidden',
+  });
+  check(
+    'new, sold, and hidden listings are stored',
+    fresh.status === 201 && sold.status === 201 && hidden.status === 201,
+    JSON.stringify({ fresh: fresh.body, sold: sold.body, hidden: hidden.body }),
+  );
+
+  const buyerCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  const otherCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {},
+  });
+  const strangerCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: importer.token,
+    method: 'POST',
+    body: {},
+  });
+  check('the follower has one unseen watch', buyerCount.body === 1, JSON.stringify(buyerCount.body));
+  check('the other follower has their own unseen watch', otherCount.body === 1, JSON.stringify(otherCount.body));
+  check('someone who does not follow has no unseen watches', strangerCount.body === 0, JSON.stringify(strangerCount.body));
+
+  const byDealer = await api('/rest/v1/rpc/unseen_drops_by_dealer', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'the per-shop count names that shop',
+    Array.isArray(byDealer.body) &&
+      byDealer.body.length === 1 &&
+      byDealer.body[0].dealer_id === dropDealerId &&
+      byDealer.body[0].unseen === 1,
+    JSON.stringify(byDealer.body),
+  );
+
+  const feed = await api('/rest/v1/rpc/followed_new_listing_ids', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  const feedIds = Array.isArray(feed.body) ? feed.body.map((row) => row.id) : [];
+  check(
+    'the feed is watches listed after the follow, not the sold or hidden ones',
+    feedIds.length === 1 && feedIds[0] === fresh.id,
+    JSON.stringify(feed.body),
+  );
+
+  const marked = await api('/rest/v1/rpc/mark_drops_seen', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dropDealerId },
+  });
+  const afterMark = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  const otherStill = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'opening the shop clears that buyer only',
+    marked.body === 1 && afterMark.body === 0 && otherStill.body === 1,
+    JSON.stringify({ marked: marked.body, afterMark: afterMark.body, otherStill: otherStill.body }),
+  );
+
+  const feedAfter = await api('/rest/v1/rpc/followed_new_listing_ids', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'the feed still lists the watch after the count clears',
+    Array.isArray(feedAfter.body) && feedAfter.body.some((row) => row.id === fresh.id),
+    JSON.stringify(feedAfter.body),
+  );
+
+  const views = await api('/rest/v1/drop_views?select=user_id,listing_id', { token: buyer.token });
+  const otherViews = await api(
+    `/rest/v1/drop_views?user_id=eq.${buyer.id}&select=listing_id`,
+    { token: dealerUser.token },
+  );
+  check(
+    'a buyer reads their own seen rows',
+    Array.isArray(views.body) && views.body.some((row) => row.listing_id === fresh.id && row.user_id === buyer.id),
+    JSON.stringify(views.body),
+  );
+  check(
+    "a buyer cannot read someone else's seen rows",
+    Array.isArray(otherViews.body) && otherViews.body.length === 0,
+    JSON.stringify(otherViews.body),
+  );
+
+  const forged = await api('/rest/v1/drop_views', {
+    token: buyer.token,
+    method: 'POST',
+    body: { user_id: dealerUser.id, listing_id: fresh.id },
+    prefer: 'return=minimal',
+  });
+  check('a buyer cannot write a seen row for someone else', forged.status >= 400, `got ${forged.status}`);
+
+  const paused = await fetch(`${URL}/rest/v1/dealers?id=eq.${dropDealerId}`, {
+    method: 'PATCH',
+    headers: adminHeaders,
+    body: JSON.stringify({ permission: 'paused' }),
+  });
+  const pausedCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'a paused shop drops out of the unseen count',
+    paused.ok && pausedCount.body === 0,
+    JSON.stringify(pausedCount.body),
+  );
+  await fetch(`${URL}/rest/v1/dealers?id=eq.${dropDealerId}`, {
+    method: 'PATCH',
+    headers: adminHeaders,
+    body: JSON.stringify({ permission: 'approved' }),
+  });
+
+  const note = await fetch(`${URL}/rest/v1/drop_notifications?select=id,opened_at`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      user_id: buyer.id,
+      listing_ids: [fresh.id],
+      dealer_ids: [dropDealerId],
+      title: 'New watches',
+      body: '1 new watch from Craft + Tailored',
+      destination: 'dealer',
+      dealer_id: dropDealerId,
+      notified_through: '2026-11-01T00:00:00.000Z',
+      status: 'sent',
+    }),
+  });
+  const noteBody = await note.json();
+  const noteId = noteBody?.[0]?.id;
+  check('the service role can log a drop', note.status === 201 && Boolean(noteId), JSON.stringify(noteBody));
+
+  const ownNote = await api(`/rest/v1/drop_notifications?id=eq.${noteId}&select=body,user_id`, {
+    token: buyer.token,
+  });
+  const hiddenNote = await api(`/rest/v1/drop_notifications?id=eq.${noteId}&select=id`, {
+    token: dealerUser.token,
+  });
+  const anonNote = await api(`/rest/v1/drop_notifications?select=id&id=eq.${noteId}`);
+  check(
+    'a buyer can read their own drop log',
+    Array.isArray(ownNote.body) && ownNote.body[0]?.user_id === buyer.id,
+    JSON.stringify(ownNote.body),
+  );
+  check(
+    "a buyer cannot read someone else's drop log",
+    Array.isArray(hiddenNote.body) && hiddenNote.body.length === 0,
+    JSON.stringify(hiddenNote.body),
+  );
+  check('a signed-out caller cannot read the drop log', anonNote.status >= 400, `got ${anonNote.status}`);
+
+  const clientInsert = await api('/rest/v1/drop_notifications', {
+    token: buyer.token,
+    method: 'POST',
+    body: {
+      user_id: buyer.id,
+      listing_ids: [fresh.id],
+      dealer_ids: [dropDealerId],
+      title: 'New watches',
+      body: 'forged',
+      destination: 'drops',
+      notified_through: '2026-11-01T00:00:00.000Z',
+    },
+    prefer: 'return=minimal',
+  });
+  check('a buyer cannot insert a drop log row', clientInsert.status >= 400, `got ${clientInsert.status}`);
+
+  const rewrite = await api(`/rest/v1/drop_notifications?id=eq.${noteId}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { title: 'Changed' },
+    prefer: 'return=minimal',
+  });
+  check('a buyer cannot rewrite the drop log', rewrite.status >= 400, `got ${rewrite.status}`);
+
+  const opened = await api('/rest/v1/rpc/record_drop_opened', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_id: noteId },
+  });
+  const openedRow = await api(`/rest/v1/drop_notifications?id=eq.${noteId}&select=opened_at`, {
+    token: buyer.token,
+  });
+  const openedAt = openedRow.body?.[0]?.opened_at;
+  check(
+    'opening the push stamps the log with the current time',
+    opened.status < 300 && typeof openedAt === 'string' && !openedAt.startsWith('2000'),
+    JSON.stringify(openedRow.body),
+  );
+
+  const backdated = await api(`/rest/v1/drop_notifications?id=eq.${noteId}`, {
+    token: buyer.token,
+    method: 'PATCH',
+    body: { opened_at: '2000-01-01T00:00:00.000Z' },
+    prefer: 'return=representation',
+  });
+  const still = await api(`/rest/v1/drop_notifications?id=eq.${noteId}&select=opened_at,title`, {
+    token: buyer.token,
+  });
+  check(
+    'a later open does not move the stamp or the copy',
+    still.body?.[0]?.opened_at === openedAt && still.body?.[0]?.title === 'New watches',
+    JSON.stringify({ backdated: backdated.body, still: still.body }),
+  );
+
+  const stolenOpen = await api('/rest/v1/rpc/record_drop_opened', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_id: noteId },
+  });
+  const afterStolen = await api(`/rest/v1/drop_notifications?id=eq.${noteId}&select=opened_at`, {
+    token: buyer.token,
+  });
+  check(
+    "someone else cannot mark your drop opened",
+    stolenOpen.status < 300 && afterStolen.body?.[0]?.opened_at === openedAt,
+    JSON.stringify(afterStolen.body),
   );
 }
 

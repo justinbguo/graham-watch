@@ -4,12 +4,15 @@ import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { isDemo } from '@/lib/demo';
-import { conversationIdFromNotification, syncPushRegistration } from '@/lib/push';
+import { recordDropOpened, routeFromNotification, syncPushRegistration } from '@/lib/push';
 import { useSession } from '@/providers/session';
 
 /**
- * Keeps this phone's push token current, and opens the thread a notification
- * named. Mounted once under the session so it survives navigation.
+ * Keeps this phone's push token current, and opens what a notification named.
+ * Permission is asked on the last onboarding step and after the first follow.
+ * This bridge does not prompt on launch.
+ *
+ * Mounted once under the session so it survives navigation.
  */
 export function PushBridge() {
   const { userId } = useSession();
@@ -27,10 +30,16 @@ export function PushBridge() {
       if (!response) return;
       const key = response.notification.request.identifier;
       if (handled.current === key) return;
-      const conversationId = conversationIdFromNotification(response);
-      if (!conversationId) return;
+      const route = routeFromNotification(response);
+      if (!route) return;
       handled.current = key;
-      router.push(`/conversation/${conversationId}`);
+      if (route.type === 'conversation') {
+        router.push(`/conversation/${route.conversationId}`);
+        return;
+      }
+      void recordDropOpened(route.dropNotificationId).catch(() => undefined);
+      if (route.dealerId) router.push(`/dealer/${route.dealerId}`);
+      else router.push('/drops');
     };
 
     // Wait for a session. A tap that launches the app arrives before the

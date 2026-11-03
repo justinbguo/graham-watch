@@ -671,6 +671,108 @@ export type Database = {
           },
         ]
       }
+      drop_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          dealer_id: string | null
+          dealer_ids: string[]
+          destination: string
+          expo_ticket_ids: string[]
+          id: string
+          listing_ids: string[]
+          notified_on: string
+          notified_through: string
+          opened_at: string | null
+          sent_at: string
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          dealer_id?: string | null
+          dealer_ids: string[]
+          destination: string
+          expo_ticket_ids?: string[]
+          id?: string
+          listing_ids: string[]
+          notified_on?: string
+          notified_through: string
+          opened_at?: string | null
+          sent_at?: string
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          dealer_id?: string | null
+          dealer_ids?: string[]
+          destination?: string
+          expo_ticket_ids?: string[]
+          id?: string
+          listing_ids?: string[]
+          notified_on?: string
+          notified_through?: string
+          opened_at?: string | null
+          sent_at?: string
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drop_notifications_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drop_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drop_views: {
+        Row: {
+          listing_id: string
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          listing_id: string
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          listing_id?: string
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drop_views_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drop_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_comments: {
         Row: {
           author_handle: string | null
@@ -1796,6 +1898,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      drop_max_age: { Args: never; Returns: string }
       exchange_feed: {
         Args: never
         Returns: {
@@ -1852,6 +1955,13 @@ export type Database = {
       expire_conversation_deals: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      followed_new_listing_ids: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+        }[]
       }
       format_deal_amount: {
         Args: { p_amount_cents: number; p_currency: string }
@@ -2000,6 +2110,7 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      mark_drops_seen: { Args: { p_dealer_id?: string }; Returns: number }
       my_dealer_application: {
         Args: never
         Returns: {
@@ -2284,6 +2395,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_drop_opened: { Args: { p_id: string }; Returns: undefined }
       record_operator_action: {
         Args: {
           p_action: string
@@ -2476,6 +2588,14 @@ export type Database = {
         Returns: string
       }
       unregister_push_token: { Args: { p_token: string }; Returns: undefined }
+      unseen_drop_count: { Args: never; Returns: number }
+      unseen_drops_by_dealer: {
+        Args: never
+        Returns: {
+          dealer_id: string
+          unseen: number
+        }[]
+      }
       url_path: { Args: { p_url: string }; Returns: string }
       verify_application_email: {
         Args: { p_application_id: string; p_code: string }

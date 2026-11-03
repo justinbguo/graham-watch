@@ -461,6 +461,11 @@ deno_version = 2
 [functions.import-listings]
 verify_jwt = true
 
+# Same door as the nightly refresh: service-role JWT plus GRAHAM_CRON_SECRET.
+# No separate secret. verify_jwt stays on so the anon key alone cannot fan out.
+[functions.notify-drops]
+verify_jwt = true
+
 [analytics]
 # Vector bind-mounts the host container socket, which Colima's VM cannot pass
 # through. This only disables the Logs tab in Studio.
