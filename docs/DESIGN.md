@@ -1427,8 +1427,8 @@ row is spoken as verified. Every shop in the list wears it. There is no
 separate verified flag on a dealer, so the mark is the list's, not a second
 status. A person does not wear it, and neither does a watch row.
 
-When a followed shop has listed watches since the follow that this buyer has
-not opened, the row adds `3 new` in `caption` / `textMuted` between the name
+When a followed shop has listed watches in the last 14 days, after the follow,
+that this buyer has not opened, the row adds `3 new` in `caption` / `textMuted` between the name
 and the mark. It is type, not a pill: a box around a count would look like
 another control. Above Following, the same news is one row, `title`, "New from
 dealers you follow", with the total in that same caption at the end of the

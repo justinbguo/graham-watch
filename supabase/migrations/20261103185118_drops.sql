@@ -102,11 +102,28 @@ comment on table public.drop_views is
 create index listings_dealer_created_idx
   on public.listings (dealer_id, created_at desc);
 
+-- The only place the database names the drop window. DROP_MAX_AGE_DAYS in
+-- supabase/functions/notify-drops/select.ts is the same number of days. The
+-- push and the Profile count both keep a watch created at this exact age.
+create function public.drop_max_age()
+returns interval
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select interval '14 days';
+$$;
+
+comment on function public.drop_max_age() is
+  'How far back a listing still counts as a drop. Matches DROP_MAX_AGE_DAYS.';
+
 /**
  * How many unseen new watches each followed shop has for the signed-in buyer.
  *
- * New means the listing was created after the follow. The back catalogue of a
- * shop you just followed is not a drop. Sold and hidden watches are not either.
+ * New means the listing was created after the follow and within drop_max_age.
+ * The back catalogue of a shop you just followed is not a drop, and neither is
+ * a watch listed before that window. Sold and hidden watches are not either.
  * security invoker so the listing policy still applies: a paused shop drops
  * out because its watches are not readable.
  */
@@ -127,6 +144,7 @@ as $$
    and l.status = 'active'
    and l.sold_at is null
    and l.created_at > f.created_at
+   and l.created_at >= now() - public.drop_max_age()
   where f.user_id = (select auth.uid())
     and not exists (
       select 1
@@ -149,9 +167,9 @@ as $$
 $$;
 
 /**
- * The newest watches listed after the buyer followed, whether or not the
- * badge still counts them. Opening the feed marks them seen; the list stays
- * so the screen is not empty on the frame the count clears.
+ * The newest watches in the drop window, whether or not the badge still
+ * counts them. Opening the feed marks them seen; the list stays so the
+ * screen is not empty on the frame the count clears.
  */
 create function public.followed_new_listing_ids()
 returns table (id uuid, created_at timestamptz)
@@ -171,6 +189,7 @@ as $$
   where l.status = 'active'
     and l.sold_at is null
     and l.created_at > f.created_at
+    and l.created_at >= now() - public.drop_max_age()
   order by l.created_at desc, l.id desc
   limit 100;
 $$;
@@ -207,6 +226,7 @@ begin
   where l.status = 'active'
     and l.sold_at is null
     and l.created_at > f.created_at
+    and l.created_at >= now() - public.drop_max_age()
     and (p_dealer_id is null or l.dealer_id = p_dealer_id)
   on conflict do nothing;
 
@@ -287,6 +307,7 @@ before update on public.drop_notifications
 for each row
 execute function public.drop_notifications_touch_opened();
 
+revoke all on function public.drop_max_age() from public, anon;
 revoke all on function public.unseen_drops_by_dealer() from public, anon;
 revoke all on function public.unseen_drop_count() from public, anon;
 revoke all on function public.followed_new_listing_ids() from public, anon;
@@ -294,6 +315,7 @@ revoke all on function public.mark_drops_seen(uuid) from public, anon;
 revoke all on function public.record_drop_opened(uuid) from public, anon;
 revoke all on function public.drop_notifications_touch_opened() from public, anon, authenticated;
 
+grant execute on function public.drop_max_age() to authenticated;
 grant execute on function public.unseen_drops_by_dealer() to authenticated;
 grant execute on function public.unseen_drop_count() to authenticated;
 grant execute on function public.followed_new_listing_ids() to authenticated;

@@ -4291,13 +4291,28 @@ console.log('\ndrops');
   });
   check('a watch listed before the follow is not unseen', before.body === 0, JSON.stringify(before.body));
 
-  const fresh = await insertListing({ created_at: '2026-11-01T00:00:00.000Z' });
+  const day = 24 * 60 * 60 * 1000;
+  const stale = await insertListing({
+    created_at: new Date(Date.now() - 20 * day).toISOString(),
+  });
+  const staleCount = await api('/rest/v1/rpc/unseen_drop_count', {
+    token: buyer.token,
+    method: 'POST',
+    body: {},
+  });
+  check(
+    'a watch older than 14 days is not unseen even when the follow is older',
+    stale.status === 201 && staleCount.body === 0,
+    JSON.stringify({ stale: stale.body, count: staleCount.body }),
+  );
+
+  const fresh = await insertListing({ created_at: new Date(Date.now() - day).toISOString() });
   const sold = await insertListing({
-    created_at: '2026-11-01T01:00:00.000Z',
-    sold_at: '2026-11-02T00:00:00.000Z',
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    sold_at: new Date().toISOString(),
   });
   const hidden = await insertListing({
-    created_at: '2026-11-01T02:00:00.000Z',
+    created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     status: 'hidden',
   });
   check(

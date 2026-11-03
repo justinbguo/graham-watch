@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { dropCopy, selectDrops, utcDay, type DropFollow, type DropListing, type DropNotice, type DropToken } from '../supabase/functions/notify-drops/select.ts';
+import {
+  DROP_MAX_AGE_DAYS,
+  dropCopy,
+  dropCutoff,
+  selectDrops,
+  utcDay,
+  type DropFollow,
+  type DropListing,
+  type DropNotice,
+  type DropToken,
+} from '../supabase/functions/notify-drops/select.ts';
 import { dropPushMessages, readTickets, ticketsFromExpoBody } from '../supabase/functions/notify-drops/expo.ts';
 import { routeFromPushData } from '../src/lib/pushRoute.ts';
 
@@ -232,6 +242,25 @@ test('two shops collapse into one message and open the feed', () => {
   assert.equal(plans[0]!.dealerId, null);
   assert.deepEqual(plans[0]!.listingIds, [WATCH_SENT, WATCH_NEW, WATCH_OTHER]);
   assert.deepEqual(plans[0]!.dealerIds, [CRAFT, TAILORED].sort());
+});
+
+test('an old follower first push is only the last 14 days, including the boundary', () => {
+  assert.equal(DROP_MAX_AGE_DAYS, 14);
+  const cutoff = new Date(dropCutoff(NOW)).toISOString();
+  const justOlder = new Date(dropCutoff(NOW) - 1).toISOString();
+  const plans = run({
+    follows: [follow(ADA, CRAFT, 'Craft + Tailored', '2020-01-01T00:00:00.000Z')],
+    listings: [
+      listing(WATCH_OLD, CRAFT, '2024-06-01T00:00:00.000Z'),
+      listing(WATCH_SENT, CRAFT, justOlder),
+      listing(WATCH_NEW, CRAFT, cutoff),
+      listing(WATCH_OTHER, CRAFT, '2026-11-02T06:30:00.000Z'),
+    ],
+    tokens: [token(ADA)],
+  });
+  assert.equal(plans.length, 1);
+  assert.deepEqual(plans[0]!.listingIds, [WATCH_OTHER, WATCH_NEW]);
+  assert.equal(plans[0]!.body, '2 new watches from Craft + Tailored');
 });
 
 test('the same listing id twice is one watch', () => {

@@ -1898,6 +1898,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      drop_max_age: { Args: never; Returns: string }
       exchange_feed: {
         Args: never
         Returns: {

@@ -4,7 +4,10 @@
  * Pure on purpose: the edge function loads rows and this decides. The rules:
  *
  * * A watch counts when it was created after the follow, is still for sale,
- *   and the shop is approved. Following a shop does not announce its catalogue.
+ *   was created within DROP_MAX_AGE_DAYS, and the shop is approved.
+ *   Following a shop does not announce its catalogue, and a first push does
+ *   not dump a year of inventory. The same window is public.drop_max_age()
+ *   in the drops migration, which the Profile count uses.
  * * A watch already stored on a pending or sent notification is not sent again.
  *   A failed send does not count: those watches are eligible the next day.
  * * One notification per buyer per UTC day, whatever shops listed overnight.
@@ -60,6 +63,19 @@ export type DropPlan = {
 };
 
 const COVERS = new Set(['pending', 'sent']);
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * A listing older than this is not a drop, even when the follow is older and
+ * the buyer has never been notified. Inclusive: a watch created at this exact
+ * instant still counts. public.drop_max_age() is this many days.
+ */
+export const DROP_MAX_AGE_DAYS = 14;
+
+/** Start of the drop window. Listings created at this millisecond are included. */
+export function dropCutoff(now: Date): number {
+  return now.getTime() - DROP_MAX_AGE_DAYS * MS_PER_DAY;
+}
 
 export function utcDay(now: Date): string {
   return now.toISOString().slice(0, 10);
@@ -153,6 +169,7 @@ export function selectDrops(input: {
   }
 
   const plans: DropPlan[] = [];
+  const cutoff = dropCutoff(input.now);
   const userIds = [...followByUser.keys()].sort();
   for (const userId of userIds) {
     if (noticedToday.has(userId)) continue;
@@ -163,7 +180,9 @@ export function selectDrops(input: {
     for (const [dealerId, follow] of shops) {
       for (const listing of listingsByDealer.get(dealerId) ?? []) {
         if (already.has(listing.id)) continue;
-        if (time(listing.createdAt) <= follow.at) continue;
+        const created = time(listing.createdAt);
+        if (created < cutoff) continue;
+        if (created <= follow.at) continue;
         chosen.push(listing);
       }
     }

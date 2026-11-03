@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 import { chunk, dropPushMessages, EXPO_CHUNK, EXPO_PUSH_URL, readTickets, ticketsFromExpoBody } from './expo.ts';
 import {
+  dropCutoff,
   selectDrops,
   utcDay,
   type DropFollow,
@@ -94,16 +95,11 @@ async function loadFollows(db: SupabaseClient): Promise<DropFollow[]> {
   });
 }
 
-async function loadListings(db: SupabaseClient, follows: DropFollow[]): Promise<DropListing[]> {
+async function loadListings(db: SupabaseClient, follows: DropFollow[], now: Date): Promise<DropListing[]> {
   const approved = follows.filter((follow) => follow.permission === 'approved');
   if (approved.length === 0) return [];
-  let earliestMs = Number.POSITIVE_INFINITY;
-  for (const follow of approved) {
-    const at = Date.parse(follow.followedAt);
-    if (Number.isFinite(at) && at < earliestMs) earliestMs = at;
-  }
-  if (!Number.isFinite(earliestMs)) return [];
-  const earliest = new Date(earliestMs).toISOString();
+  // Same instant dropCutoff uses. gte keeps a watch created exactly 14 days ago.
+  const earliest = new Date(dropCutoff(now)).toISOString();
   const dealerIds = [...new Set(approved.map((follow) => follow.dealerId))];
   const listings: DropListing[] = [];
   for (const ids of chunksOf(dealerIds)) {
@@ -120,7 +116,7 @@ async function loadListings(db: SupabaseClient, follows: DropFollow[]): Promise<
         .in('dealer_id', ids)
         .eq('status', 'active')
         .is('sold_at', null)
-        .gt('created_at', earliest)
+        .gte('created_at', earliest)
         .order('id')
         .range(from, to),
     );
@@ -247,7 +243,7 @@ Deno.serve(async (req) => {
     const follows = await loadFollows(db);
     const userIds = [...new Set(follows.map((follow) => follow.userId))];
     const [listings, notices, tokens] = await Promise.all([
-      loadListings(db, follows),
+      loadListings(db, follows, now),
       loadNotices(db, userIds),
       loadTokens(db, userIds),
     ]);
