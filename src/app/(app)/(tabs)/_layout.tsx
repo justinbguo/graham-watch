@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 
 import { BuyTabIcon } from '@/components/BuyTabIcon';
 import { TabBar } from '@/components/TabBar';
+import { useUnseenDropCount } from '@/data/drops';
 import { useUnreadCount } from '@/features/messages/count';
 import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
 import { ProfileTabIcon } from '@/features/profile/ProfileTabIcon';
@@ -32,6 +33,7 @@ export default function TabsLayout() {
   const isWide = useIsWide();
   const saved = useSavedCount();
   const unread = useUnreadCount();
+  const drops = useUnseenDropCount();
   const { shop, ready } = useClaimedDealerShop();
   const sellerHub = ready && shop;
   const theme = useTheme();
@@ -88,6 +90,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          tabBarBadge: drops || undefined,
           tabBarIcon: ({ color, focused }) => <ProfileTabIcon color={color} focused={focused} />,
         }}
       />

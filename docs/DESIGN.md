@@ -1427,6 +1427,15 @@ row is spoken as verified. Every shop in the list wears it. There is no
 separate verified flag on a dealer, so the mark is the list's, not a second
 status. A person does not wear it, and neither does a watch row.
 
+When a followed shop has listed watches since the follow that this buyer has
+not opened, the row adds `3 new` in `caption` / `textMuted` between the name
+and the mark. It is type, not a pill: a box around a count would look like
+another control. Above Following, the same news is one row, `title`, "New from
+dealers you follow", with the total in that same caption at the end of the
+line. It opens the New feed. The Profile tab carries the total the way
+Wishlist carries a count. Opening the feed, or opening that shop, clears the
+number. The feed's rows stay; only the count leaves.
+
 ## A contact address is never spelled out on screen
 
 Claiming a shop offers to mail the address on the shop's site, and names it as

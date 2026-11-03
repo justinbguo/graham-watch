@@ -171,6 +171,39 @@ if (exitCode !== 0) {
   process.exit(exitCode);
 }
 
+await notifyDrops();
+
+// A failed drop must not fail the catalogue. The watches are already published;
+// the next successful night sends whatever was not logged.
+async function notifyDrops() {
+  try {
+    const response = await fetch(`${url}/functions/v1/notify-drops`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'x-graham-cron-secret': secret,
+      },
+      body: '{}',
+      signal: AbortSignal.timeout(60_000),
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      const detail = `Drops were not sent (${response.status}). The catalogue refresh still finished.`;
+      console.error(detail);
+      if (text) console.error(text.slice(0, 500));
+      annotation('warning', 'Drops', detail);
+      return;
+    }
+    console.log(`Drops: ${text}`);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Drops were not sent.';
+    console.error(`Drops were not sent. The catalogue refresh still finished. ${detail}`);
+    annotation('warning', 'Drops', detail);
+  }
+}
+
 function stepSummary(markdown) {
   if (!process.env.GITHUB_STEP_SUMMARY) return;
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);

@@ -40,6 +40,7 @@ jobs:
           scripts/deck-paging.test.mjs
           scripts/deck-stack.test.mjs
           scripts/filter-spec.test.mjs
+          scripts/drops-select.test.ts
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing
@@ -115,6 +116,7 @@ jobs:
           supabase/functions/inquiry-draft/index.ts
           supabase/functions/claim-dealer/index.ts
           supabase/functions/verify-application/index.ts
+          supabase/functions/notify-drops/index.ts
 
       # Pure functions over a shop's feed: the shapes are real payloads a
       # dealer's site returned, which no other job here exercises.

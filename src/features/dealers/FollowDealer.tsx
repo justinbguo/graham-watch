@@ -2,6 +2,8 @@ import { Pressable, Text } from 'react-native';
 
 import { GlyphTurn } from '@/components/GlyphTurn';
 import { useFollows, useToggleFollow } from '@/data/follows';
+import { requestNotificationPermission } from '@/features/onboarding/notifications';
+import { isDemo } from '@/lib/demo';
 import { tick } from '@/lib/haptics';
 import { size, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
@@ -32,10 +34,12 @@ export function FollowDealer({
   const { userId } = useSession();
   const theme = useTheme();
   const styles = useThemedStyles(followStyles);
-  const { data: follows = [] } = useFollows(userId);
+  const { data: follows = [], isSuccess } = useFollows(userId);
   const toggle = useToggleFollow(userId);
   const following = follows.some((shop) => shop.id === dealer.id);
   const label = following ? 'Following' : 'Follow';
+  // The first follow is the moment a drop has someone to reach. Onboarding
+  // already asked; this covers Not now. Cold start does not ask again.
 
   if (!userId) return null;
 
@@ -47,12 +51,20 @@ export function FollowDealer({
       hitSlop={dealerSocialHitSlop()}
       onPress={() => {
         tick();
-        toggle.mutate({
-          id: dealer.id,
-          name: dealer.name,
-          logo_url: dealer.logo_url ?? null,
-          following: !following,
-        });
+        const firstFollow = isSuccess && follows.length === 0 && !following;
+        toggle.mutate(
+          {
+            id: dealer.id,
+            name: dealer.name,
+            logo_url: dealer.logo_url ?? null,
+            following: !following,
+          },
+          {
+            onSuccess: () => {
+              if (firstFollow && !isDemo) void requestNotificationPermission();
+            },
+          },
+        );
       }}
       style={({ pressed }) => [
         styles.button,
