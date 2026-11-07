@@ -961,7 +961,7 @@ export type Database = {
           provider: string
           source_url: string
           status: Database["public"]["Enums"]["import_status"]
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -973,7 +973,7 @@ export type Database = {
           provider: string
           source_url: string
           status?: Database["public"]["Enums"]["import_status"]
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -985,7 +985,7 @@ export type Database = {
           provider?: string
           source_url?: string
           status?: Database["public"]["Enums"]["import_status"]
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1283,6 +1283,7 @@ export type Database = {
       operator_actions: {
         Row: {
           action: string
+          actor: string | null
           after: Json | null
           before: Json | null
           created_at: string
@@ -1293,6 +1294,7 @@ export type Database = {
         }
         Insert: {
           action: string
+          actor?: string | null
           after?: Json | null
           before?: Json | null
           created_at?: string
@@ -1303,6 +1305,7 @@ export type Database = {
         }
         Update: {
           action?: string
+          actor?: string | null
           after?: Json | null
           before?: Json | null
           created_at?: string
@@ -1697,6 +1700,13 @@ export type Database = {
           p_permission?: Database["public"]["Enums"]["dealer_permission"]
         }
         Returns: string
+      }
+      bot_set_dealer_permission: {
+        Args: {
+          p_dealer_id: string
+          p_permission: Database["public"]["Enums"]["dealer_permission"]
+        }
+        Returns: Database["public"]["Enums"]["dealer_permission"]
       }
       brand_key: { Args: { p_brand: string }; Returns: string }
       can_claim_with_email: {
@@ -2411,6 +2421,16 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      record_bot_action: {
+        Args: {
+          p_action: string
+          p_after: Json
+          p_before: Json
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: undefined
       }
       record_dealer_sync: {
         Args: {
