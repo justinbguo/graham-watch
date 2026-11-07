@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@^2'
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from '../import-listings/catalog.ts';
 import { discover } from '../import-listings/discover.ts';
 import { fixtureImportAllowed } from '../import-listings/fixture.ts';
+import { DEFAULT_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from '../import-listings/source.ts';
 
 import { FixtureImportOff, OperatorError, type FixtureWatch, type OperatorDeps } from './handler.ts';
@@ -19,6 +20,21 @@ function admin(): SupabaseClient {
 }
 
 const NEW_SHOPS_PER_HOUR = 200;
+const PUBLISH_PASSES = 5;
+
+async function publishQueued(dealerId: string) {
+  const totals = { processed: 0, published: 0, skipped: 0, failed: 0, pending: 0 };
+  for (let pass = 0; pass < PUBLISH_PASSES; pass += 1) {
+    const batch = await publishBatch(admin(), admin(), dealerId, DEFAULT_BATCH);
+    totals.processed += batch.processed;
+    totals.published += batch.published;
+    totals.skipped += batch.skipped;
+    totals.failed += batch.failed;
+    totals.pending = batch.pending;
+    if (batch.pending === 0 || batch.processed === 0) break;
+  }
+  return totals;
+}
 
 async function assertBudget() {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -185,8 +201,10 @@ export function liveDeps(): OperatorDeps {
       const dealer = await ensureDealer(input.sourceUrl, input.dealerName, input.dealerEmail);
       try {
         const result = await syncCatalog(admin(), dealer.id, input.sourceUrl, MAX_CATALOG_ITEMS);
+        await queuePublish(admin(), dealer.id);
+        const publish = await publishQueued(dealer.id);
         await meter(input.sourceUrl, dealer.id, 'succeeded', result.provider);
-        return { dealerId: dealer.id, permission: dealer.permission, ...result };
+        return { dealerId: dealer.id, permission: dealer.permission, ...result, publish };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Import failed.';
         await meter(input.sourceUrl, dealer.id, 'failed', 'catalog', message);

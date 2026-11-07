@@ -279,7 +279,7 @@ The script and the console end up in the same functions. See
 
 A bot on another machine can run the operator calls with one stored value, the project's secret key (`sb_secret_...`). That key is not a JWT. `import-listings` still requires a signed-in session, and the gateway rejects a non-JWT there. The bot calls `operator-bot` instead.
 
-Set the function secret to that same key, then deploy `operator-bot` by pushing the function (the Deploy edge functions workflow). Apply migration `20261107200000_operator_bot.sql` on purpose. This guide does not apply it.
+Set the function secret to that same key, then deploy `operator-bot` by pushing the function (the Deploy edge functions workflow). Apply migration `20261107195155_operator_bot.sql` on purpose. This guide does not apply it. A later migration, `20261107201000_bot_publish_unowned_shop.sql`, lets that import publish a shop that has no owner. Apply that one too. It is not already on the hosted database.
 
 ```
 supabase secrets set GRAHAM_OPERATOR_SECRET="$GRAHAM_OPERATOR_SECRET"
@@ -325,7 +325,7 @@ curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
   -d '{"action":"report","dealerId":"00000000-0000-4000-8000-000000000000"}'
 ```
 
-`import` creates the shop as `pending` when the website is new, and reads the catalogue into `source_items`. It does not publish watches onto the deck and it does not approve the shop. `approve` sets `dealers.permission` to `approved`. `unapprove` sets it back to `pending`. A `revoked` shop stays revoked. `report` returns the permission, active and total listing counts, and the latest `import_jobs` row.
+`import` creates the shop as `pending` when the website is new. It reads the catalogue into `source_items`, marks the for-sale rows for publish, and runs `publishBatch`, the same function the operator console calls when it imports watches. That writes `listings` and `listing_photos`. It does not approve the shop. One call publishes up to 40 watches. When `publish.pending` is still above zero, call `import` again. `approve` sets `dealers.permission` to `approved`, which is what puts those watches on the Buy deck. `unapprove` sets the shop back to `pending`. A `revoked` shop stays revoked. `report` returns the permission, active and total listing counts, and the latest `import_jobs` row.
 
 Each successful discover, inspect, import, and report writes `operator_actions` with `actor` `operator-bot`. Approve and unapprove write that actor inside `bot_set_dealer_permission`. The operator console shows the actor as "operator bot".
 

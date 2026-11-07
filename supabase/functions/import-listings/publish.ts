@@ -189,6 +189,16 @@ async function publishOne(
  * ran out of time. Progress now lives in `source_items`, so a failed batch
  * costs that batch and the next call picks up where it stopped.
  */
+/** Marks every for-sale catalogue row for publish. Already-linked rows stay in the queue only when their hashes disagree. */
+export async function queuePublish(supabase: SupabaseClient, dealerId: string) {
+  const { error } = await supabase
+    .from('source_items')
+    .update({ publish: true, error: null })
+    .eq('dealer_id', dealerId)
+    .eq('available', true);
+  if (error) throw new Error(error.message);
+}
+
 export async function publishBatch(
   supabase: SupabaseClient,
   storage: SupabaseClient,

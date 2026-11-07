@@ -328,6 +328,47 @@ function clip(text: string): string {
   return `${flat.slice(0, 500)}…`;
 }
 
+const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+
+function envGet(name: string): string {
+  try {
+    return Deno.env.get(name) ?? '';
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotCapable)) throw error;
+    return '';
+  }
+}
+
+/**
+ * Hosted always calls OpenAI. A local stack may set OPENAI_BASE_URL to a
+ * stand-in that returns the same chat-completion JSON. The override is
+ * ignored unless SUPABASE_URL is a local host.
+ */
+export function openAIChatUrl(): string {
+  const override = envGet('OPENAI_BASE_URL').trim();
+  const supabase = envGet('SUPABASE_URL');
+  if (!override || supabase.includes('hbxgxtbtefpyutyqafoi')) return OPENAI_CHAT_URL;
+  let host = '';
+  try {
+    host = new URL(supabase).hostname;
+  } catch {
+    return OPENAI_CHAT_URL;
+  }
+  const local =
+    host === '127.0.0.1' ||
+    host === 'localhost' ||
+    host === 'kong' ||
+    host === 'host.docker.internal';
+  if (!local) return OPENAI_CHAT_URL;
+  try {
+    const parsed = new URL(override);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return OPENAI_CHAT_URL;
+  } catch {
+    return OPENAI_CHAT_URL;
+  }
+  return override;
+}
+
 async function chat(
   apiKey: string,
   system: string,
@@ -339,7 +380,7 @@ async function chat(
 
   let waited = 0;
   for (let attempt = 0; attempt < OPENAI_MAX_ATTEMPTS; attempt += 1) {
-    const response = await client.fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await client.fetch(openAIChatUrl(), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

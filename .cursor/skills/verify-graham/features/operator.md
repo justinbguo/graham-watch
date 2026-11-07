@@ -21,6 +21,7 @@ Preconditions:
 
 - **The harness does not start Vite or sign into the console.** There is no `operator` subcommand. Do not report the console verified because `doctor` can read dealers.
 - **Headless approve is `verify-operator`.** It needs `up` and `seed`. The command imports a fixture shop with `GRAHAM_OPERATOR_SECRET`, checks that the anon key, a wrong key, and the buyer token get 401, approves the shop, and screenshots Buy once `Bot Proof Secret Door` is on the deck. It writes `operator-deck.png`, `operator-deck.webm`, and `operator-report.json`. That is not a pass of the console's Dealers screen.
+- **`verify-operator-catalog` is the hosted import shape.** The body has no `listings` array. A local Shopify stand-in answers `products.json`, and a local chat stand-in answers the extractor. The function still runs `syncCatalog`, `queuePublish`, and `publishBatch`. The screenshot is `catalog-deck.png`. Hosted import calls the shop and OpenAI, not those stand-ins.
 - **Approval in the Drops proof is not this screen.** `seed` inserts Test Bench with `permission` `approved` through the local service role so a buyer can follow it. That is setup, not a pass of the Dealers screen.
 
 ## Gotchas

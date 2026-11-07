@@ -88,7 +88,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 | `verify-application` | `src/data/applications.ts` | A code for an application mailbox. |
 | `inquiry-draft` | `src/data/inquiries.ts` | Nothing. Returns the email text. The dealer address stays on the server. |
 | `send-inquiry` | `src/data/inquiries.ts` | Sends the inquiry mail and updates the inquiry row. |
-| `operator-bot` | A bot that holds `GRAHAM_OPERATOR_SECRET` and calls the function over HTTPS. No signed-in session. | Discover, inspect, and catalogue import. Fixture import on a local stack. Approve and unapprove through `bot_set_dealer_permission`. Reads one shop's listing counts and latest `import_jobs` row. Audit rows in `operator_actions` with `actor` `operator-bot`. |
+| `operator-bot` | A bot that holds `GRAHAM_OPERATOR_SECRET` and calls the function over HTTPS. No signed-in session. | Discover, inspect, and import. Import syncs the catalogue and publishes listings and photos through `publishBatch`. Fixture import on a local stack. Approve and unapprove through `bot_set_dealer_permission`. Reads one shop's listing counts and latest `import_jobs` row. Audit rows in `operator_actions` with `actor` `operator-bot`. |
 
 `npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops, then calls `notify-drops`. A failed notify call fails the job.
 
