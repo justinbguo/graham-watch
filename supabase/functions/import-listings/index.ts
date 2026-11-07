@@ -7,7 +7,7 @@ import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
 import { fixtureImportAllowed, parseFixtureListings } from './fixture.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
-import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch } from './publish.ts';
+import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from './source.ts';
 
@@ -396,15 +396,6 @@ async function recordSyncFailure(supabase: SupabaseClient, dealerId: string, mes
  * Marks every for-sale catalogue row for publish so the nightly job can drain
  * new watches without a human ticking them. Already-linked rows stay published.
  */
-async function autoQueuePublish(supabase: SupabaseClient, dealerId: string) {
-  const { error } = await supabase
-    .from('source_items')
-    .update({ publish: true, error: null })
-    .eq('dealer_id', dealerId)
-    .eq('available', true);
-  if (error) throw new Error(error.message);
-}
-
 type ApprovedShop = { id: string; name: string; website: string };
 
 function approvedShops(supabase: SupabaseClient) {
@@ -489,7 +480,7 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
 
     const sync = await syncCatalog(supabase, approved.id, approved.website, MAX_CATALOG_ITEMS);
     await recordSync(supabase, approved.id, sync);
-    await autoQueuePublish(supabase, approved.id);
+    await queuePublish(supabase, approved.id);
     const counts = await supabase.rpc('pending_source_item_count', {
       p_dealer_id: approved.id,
     });
@@ -730,7 +721,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
       if (!dealerId) return bad('queue-publish needs a dealerId.');
 
       try {
-        await autoQueuePublish(ctx.supabase, dealerId);
+        await queuePublish(ctx.supabase, dealerId);
         const counts = await ctx.supabase.rpc('pending_source_item_count', {
           p_dealer_id: dealerId,
         });

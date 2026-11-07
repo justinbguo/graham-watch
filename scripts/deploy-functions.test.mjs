@@ -7,6 +7,7 @@ import {
   deployArgs,
   deployAuthFailure,
   importListingsKeepsJwt,
+  operatorBotSkipsJwt,
   probeManagementApi,
   selectFunctions,
 } from './deploy-functions.mjs';
@@ -99,6 +100,16 @@ test('the management probe reports the status and does not send the token anywhe
   assert.match(result.body, /Invalid access token/);
   assert.equal(seen.url, 'https://api.supabase.com/v1/projects/hbxgxtbtefpyutyqafoi/functions');
   assert.equal(seen.authorization, 'Bearer test-token');
+});
+
+test('operator-bot skips JWT verification and import-listings does not', () => {
+  const config = readFileSync('supabase/config.toml', 'utf8');
+  assert.equal(operatorBotSkipsJwt(config), true);
+  assert.equal(importListingsKeepsJwt(config), true);
+  assert.equal(
+    operatorBotSkipsJwt('[functions.operator-bot]\nverify_jwt = true\n'),
+    false,
+  );
 });
 
 test('import-listings is pinned to verify_jwt true in config.toml', () => {
