@@ -136,46 +136,43 @@ async function publishOne(
   const photoUrls = item.photoUrls.slice(0, MAX_PHOTOS_PER_LISTING);
   const photosHash = await photosFingerprint(photoUrls);
 
-  // Copying a gallery is the slowest thing in a batch, so it only reruns when
-  // the shop's own gallery changed.
-  if (photosHash !== row.photos_hash) {
-    try {
-      const photos = await copyPhotos(storage, listingId, photoUrls);
-
-      // One statement, because a delete that lands without its insert leaves a
-      // live listing with no photographs and the deck does not filter those out.
-      const written = await supabase.rpc('replace_listing_photos', {
-        p_listing_id: listingId,
-        p_photos: photos,
-      });
-      if (written.error) throw new Error(written.error.message);
-
-      // A failed stamp costs one repeated copy on the next pass and nothing else,
-      // so it is reported rather than thrown — failing the row here would retire
-      // a watch that did publish.
-      const stamped = await supabase
+  // A matching fingerprint still recopies when the stored gallery is short.
+  // That is the row a killed worker leaves behind: hashes can agree while
+  // listing_photos does not yet have three rows.
+  let rewrite = photosHash !== row.photos_hash;
+  if (!rewrite) {
+    const existing = await supabase
+      .from('listing_photos')
+      .select('id', { count: 'exact', head: true })
+      .eq('listing_id', listingId);
+    if (existing.error) throw new Error(existing.error.message);
+    rewrite = (existing.count ?? 0) < MIN_PHOTOS_PER_LISTING;
+  }
+  if (rewrite) {
+    const photos = await copyPhotos(storage, listingId, photoUrls);
+    if (photos.length < MIN_PHOTOS_PER_LISTING) {
+      const noted = await supabase
         .from('source_items')
-        .update({ photos_hash: photosHash })
+        .update({
+          error: `Only ${photos.length} photographs could be stored. A listing needs ${MIN_PHOTOS_PER_LISTING}.`,
+        })
         .eq('id', row.id);
-      if (stamped.error) {
-        console.error('photos_hash stamp failed', row.id, stamped.error.message);
-      }
-    } catch (error) {
-      // `apply_source_item` already stamped `applied_hash`, and the queue only
-      // offers rows whose hashes disagree. So the row above is finished as far
-      // as the queue is concerned while its listing is live with the wrong
-      // gallery — or none, which the deck shows as a card with nothing on it.
-      // Unstamping puts the watch back in the queue, where clearing the error
-      // this failure is about to record will pick it up again.
-      const unstamped = await supabase
-        .from('source_items')
-        .update({ applied_hash: null })
-        .eq('id', row.id);
-      if (unstamped.error) {
-        console.error('could not requeue after a photo failure', row.id, unstamped.error.message);
-      }
-      throw error;
+      if (noted.error) console.error('skip note failed', row.id, noted.error.message);
+      return 'skipped';
     }
+    const written = await supabase.rpc('replace_listing_photos', {
+      p_listing_id: listingId,
+      p_photos: photos,
+    });
+    if (written.error) throw new Error(written.error.message);
+  }
+
+  const stamped = await supabase
+    .from('source_items')
+    .update({ photos_hash: photosHash, applied_hash: row.content_hash })
+    .eq('id', row.id);
+  if (stamped.error) {
+    console.error('gallery stamp failed', row.id, stamped.error.message);
   }
 
   return 'published';
@@ -189,7 +186,6 @@ async function publishOne(
  * ran out of time. Progress now lives in `source_items`, so a failed batch
  * costs that batch and the next call picks up where it stopped.
  */
-/** Marks every for-sale catalogue row for publish. Already-linked rows stay in the queue only when their hashes disagree. */
 export async function queuePublish(supabase: SupabaseClient, dealerId: string) {
   const { error } = await supabase
     .from('source_items')
@@ -246,12 +242,15 @@ export async function publishBatch(
   if (unavailable) throw unavailable;
 
   const counts = await supabase.rpc('pending_source_item_count', { p_dealer_id: dealerId });
+  if (counts.error) throw new Error(counts.error.message);
+  const pending = counts.data?.[0]?.pending;
+  if (pending == null) throw new Error('Could not count the publish queue.');
 
   return {
     processed: rows.length,
     published: outcomes.filter((outcome) => outcome === 'published').length,
     skipped: outcomes.filter((outcome) => outcome === 'skipped').length,
     failed: outcomes.filter((outcome) => outcome === 'failed').length,
-    pending: counts.data?.[0]?.pending ?? 0,
+    pending,
   };
 }

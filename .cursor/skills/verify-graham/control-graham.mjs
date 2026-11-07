@@ -1837,11 +1837,17 @@ async function commandVerifyOperatorCatalog(dryRun) {
   startCatalogShop();
   const evidence = evidenceDir();
   mkdirSync(evidence, { recursive: true });
-  const imported = await operatorCall(status, {
-    action: 'import',
-    sourceUrl: `${CATALOG_ORIGIN}/`,
-    dealerName: 'Catalog Proof',
-  }, OPERATOR_SECRET);
+  let imported = null;
+  for (let pass = 0; pass < 8; pass += 1) {
+    imported = await operatorCall(status, {
+      action: 'import',
+      sourceUrl: `${CATALOG_ORIGIN}/`,
+      dealerName: 'Catalog Proof',
+    }, OPERATOR_SECRET);
+    if (!imported.ok || !imported.body?.dealerId) break;
+    const pending = imported.body?.publish?.pending ?? 0;
+    if (pending === 0 && imported.body?.catalogue === 'reused') break;
+  }
   if (!imported.ok || !imported.body?.dealerId) {
     fail(
       'The operator secret did not import the catalogue shop.',
@@ -1982,6 +1988,294 @@ const withoutDry = raw.filter((arg) => arg !== '--dry-run');
 const asFlag = flag(withoutDry, '--as');
 const [command, ...rest] = asFlag.args;
 
+const RESUME_SITE = 'https://resume-proof.graham.test';
+const RESUME_SOURCE = `${RESUME_SITE}/collections/watches`;
+const RESUME_COUNT = 240;
+
+async function listingCounts(status) {
+  const dealers = await api(status.url, '/rest/v1/dealers?select=id,name,website', {
+    key: status.serviceKey,
+  });
+  if (!dealers.ok) return null;
+  const counts = {};
+  for (const dealer of dealers.body ?? []) {
+    const rows = await api(
+      status.url,
+      `/rest/v1/listings?dealer_id=eq.${dealer.id}&select=id`,
+      { key: status.serviceKey },
+    );
+    counts[dealer.website] = { name: dealer.name, listings: rows.body?.length ?? -1 };
+  }
+  return counts;
+}
+
+async function commandVerifyPublishResume(dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'verify-publish-resume',
+      dryRun: true,
+      queued: RESUME_COUNT,
+      batch: 2,
+      repairs: 'a listing stamped applied with no photographs',
+    });
+    return;
+  }
+  const status = requireStack();
+  if (edgeEnv('GRAHAM_OPERATOR_SECRET') !== OPERATOR_SECRET) {
+    fail(
+      'The edge runtime has no local operator secret.',
+      'Run up before verify-publish-resume.',
+    );
+  }
+  startCatalogShop();
+  const before = await listingCounts(status);
+  const dealer = await api(status.url, '/rest/v1/dealers', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: {
+      name: 'Resume Proof',
+      website: RESUME_SITE,
+      permission: 'pending',
+    },
+  });
+  const dealerId = dealer.body?.[0]?.id;
+  if (!dealer.ok || !dealerId) {
+    fail('Could not create the resume shop.', 'The insert uses the local service role.', { detail: dealer.body });
+  }
+  const job = await api(status.url, '/rest/v1/import_jobs', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: {
+      dealer_id: dealerId,
+      source_url: RESUME_SOURCE,
+      provider: 'shopify',
+      status: 'succeeded',
+      finished_at: new Date().toISOString(),
+      listings_created: 0,
+    },
+  });
+  if (!job.ok) {
+    fail('Could not record a fresh catalogue read.', 'A succeeded import_jobs row is what skips the site.', { detail: job.body });
+  }
+
+  const photo = (n) => `${CATALOG_ORIGIN}/photos/${n}.jpg`;
+  const broken = await api(status.url, '/rest/v1/listings', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: {
+      dealer_id: dealerId,
+      brand: 'Resume',
+      model: 'Interrupted',
+      price_cents: 120000,
+      status: 'active',
+    },
+  });
+  const brokenId = broken.body?.[0]?.id;
+  if (!brokenId) fail('Could not store the interrupted listing.', 'It is inserted with the service role and no photographs.', { detail: broken.body });
+
+  const rows = [{
+    dealer_id: dealerId,
+    provider: 'shopify',
+    external_id: 'interrupted',
+    source_url: `${RESUME_SITE}/products/interrupted`,
+    raw: {
+      externalId: 'interrupted',
+      sourceUrl: `${RESUME_SITE}/products/interrupted`,
+      title: 'Resume Interrupted',
+      text: 'A 1968 proof watch whose gallery was never copied.',
+      priceCents: 120000,
+      currency: 'USD',
+      available: true,
+      photoUrls: [photo(1), photo(2), photo(3)],
+    },
+    text_hash: 'interrupted-text',
+    content_hash: 'interrupted-content',
+    extracted_hash: 'interrupted-text',
+    applied_hash: 'interrupted-content',
+    photos_hash: null,
+    listing_id: brokenId,
+    publish: true,
+    available: true,
+    extracted: {
+      brand: 'Resume',
+      model: 'Interrupted',
+      priceCents: 120000,
+      currency: 'USD',
+      year: 1968,
+    },
+    first_seen_at: '2020-01-01T00:00:00.000Z',
+  }];
+  for (let i = 0; i < RESUME_COUNT; i += 1) {
+    const id = `resume-${String(i).padStart(4, '0')}`;
+    rows.push({
+      dealer_id: dealerId,
+      provider: 'shopify',
+      external_id: id,
+      source_url: `${RESUME_SITE}/products/${id}`,
+      raw: {
+        externalId: id,
+        sourceUrl: `${RESUME_SITE}/products/${id}`,
+        title: `Resume ${i}`,
+        text: 'A 1968 proof watch.',
+        priceCents: 100000 + i,
+        currency: 'USD',
+        available: true,
+        photoUrls: [photo(1), photo(2), photo(3)],
+      },
+      text_hash: `text-${id}`,
+      content_hash: `content-${id}`,
+      extracted_hash: null,
+      applied_hash: null,
+      photos_hash: null,
+      listing_id: null,
+      publish: true,
+      available: true,
+      extracted: null,
+      first_seen_at: new Date(Date.UTC(2021, 0, 1) + i * 1000).toISOString(),
+    });
+  }
+  for (let i = 0; i < rows.length; i += 40) {
+    const inserted = await api(status.url, '/rest/v1/source_items', {
+      key: status.serviceKey,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: rows.slice(i, i + 40),
+    });
+    if (!inserted.ok) {
+      fail('Could not queue the catalogue.', 'source_items are inserted with the service role.', { detail: inserted.body });
+    }
+  }
+
+  const calls = [];
+  let pending = null;
+  for (let n = 0; n < 200; n += 1) {
+    const started = Date.now();
+    const response = await operatorCall(status, { action: 'import', sourceUrl: RESUME_SOURCE }, OPERATOR_SECRET);
+    const body = response.body ?? {};
+    const publish = body.publish ?? {};
+    calls.push({
+      status: response.status,
+      catalogue: body.catalogue ?? null,
+      processed: publish.processed ?? null,
+      pending: publish.pending ?? null,
+      failed: publish.failed ?? null,
+      ms: Date.now() - started,
+    });
+    if (!response.ok) break;
+    pending = publish.pending;
+    if (pending === 0 && body.catalogue === 'reused') break;
+  }
+
+  const photos = await api(
+    status.url,
+    `/rest/v1/listing_photos?listing_id=eq.${brokenId}&select=position`,
+    { key: status.serviceKey },
+  );
+  const repaired = await api(
+    status.url,
+    `/rest/v1/source_items?listing_id=eq.${brokenId}&select=applied_hash,photos_hash`,
+    { key: status.serviceKey },
+  );
+  const queued = await api(status.url, '/rest/v1/rpc/pending_source_item_count', {
+    key: status.serviceKey,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  const after = await listingCounts(status);
+
+  const gate = await api(status.url, '/rest/v1/dealers', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { name: 'Gallery Gate', website: 'https://gallery-gate.graham.test', permission: 'approved' },
+  });
+  const gateId = gate.body?.[0]?.id;
+  const thin = await api(status.url, '/rest/v1/listings', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { dealer_id: gateId, brand: 'Gate', model: 'Thin', price_cents: 100, status: 'active' },
+  });
+  const thick = await api(status.url, '/rest/v1/listings', {
+    key: status.serviceKey,
+    method: 'POST',
+    prefer: 'return=representation',
+    body: { dealer_id: gateId, brand: 'Gate', model: 'Ready', price_cents: 100, status: 'active' },
+  });
+  const thinId = thin.body?.[0]?.id;
+  const thickId = thick.body?.[0]?.id;
+  if (thinId) {
+    await api(status.url, '/rest/v1/listing_photos', {
+      key: status.serviceKey,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { listing_id: thinId, position: 0, source_url: photo(1) },
+    });
+  }
+  if (thickId) {
+    await api(status.url, '/rest/v1/listing_photos', {
+      key: status.serviceKey,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: [0, 1, 2].map((position) => ({ listing_id: thickId, position, source_url: photo(position + 1) })),
+    });
+  }
+  const anonThin = await api(status.url, `/rest/v1/listings?id=eq.${thinId}&select=id`, { key: status.anonKey });
+  const anonThick = await api(status.url, `/rest/v1/listings?id=eq.${thickId}&select=id`, { key: status.anonKey });
+
+  const untouched = Object.keys(before ?? {}).every((website) => {
+    if (website === RESUME_SITE || website === 'https://gallery-gate.graham.test') return true;
+    return before[website].listings === after?.[website]?.listings;
+  });
+  const publishCalls = calls.filter((call) => call.catalogue === 'reused');
+  const bounded = publishCalls.every((call) => call.processed <= 2 && call.status === 200);
+  const repairedPhotos = photos.body?.length ?? 0;
+  const stamp = repaired.body?.[0];
+  const queueRow = Array.isArray(queued.body) ? queued.body[0] : queued.body;
+  const queuePending = typeof queueRow === 'number' ? queueRow : queueRow?.pending;
+  const report = {
+    command: 'verify-publish-resume',
+    dealerId,
+    queued: RESUME_COUNT + 1,
+    calls: calls.length,
+    catalogueReads: calls.filter((call) => call.catalogue === 'read').length,
+    maxProcessed: Math.max(0, ...publishCalls.map((call) => call.processed ?? 0)),
+    pending,
+    queueCount: queuePending,
+    repairedPhotos,
+    appliedHash: stamp?.applied_hash ?? null,
+    photosHash: stamp?.photos_hash ?? null,
+    thinVisible: (anonThin.body?.length ?? 0) > 0,
+    readyVisible: (anonThick.body?.length ?? 0) === 1,
+    untouched,
+    bounded,
+    errors: calls.filter((call) => call.status !== 200).slice(0, 3),
+  };
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  writeFileSync(path.join(evidence, 'publish-resume.json'), JSON.stringify({ ...report, calls }, null, 2));
+  const passed = pending === 0
+    && bounded
+    && repairedPhotos >= 3
+    && stamp?.applied_hash
+    && stamp?.photos_hash
+    && report.thinVisible === false
+    && report.readyVisible === true
+    && untouched
+    && queuePending === 0;
+  if (!passed) {
+    fail(
+      'The resumable publish proof did not hold.',
+      'A killed gallery stays queued, each call publishes at most two watches, and a shop with fewer than three photographs stays off the deck.',
+      { detail: report },
+    );
+  }
+  ok(report);
+}
+
 const commands = {
   doctor: () => commandDoctor(),
   up: () => commandUp(dryRun),
@@ -1999,13 +2293,14 @@ const commands = {
   'verify-drops': () => commandVerify(dryRun),
   'verify-operator': () => commandVerifyOperator(dryRun),
   'verify-operator-catalog': () => commandVerifyOperatorCatalog(dryRun),
+  'verify-publish-resume': () => commandVerifyPublishResume(dryRun),
 };
 
 const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume.',
   );
 }
 

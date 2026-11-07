@@ -2097,6 +2097,10 @@ export type Database = {
           value: string
         }[]
       }
+      listing_gallery_ready: {
+        Args: { p_listing_id: string }
+        Returns: boolean
+      }
       listing_matches: {
         Args: {
           p_listing: Database["public"]["Tables"]["listings"]["Row"]

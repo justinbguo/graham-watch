@@ -158,7 +158,20 @@ async function insertListing(fields) {
     body: fields,
   });
   if (res.status !== 201) throw new Error(`listing insert: ${res.status} ${JSON.stringify(res.body)}`);
-  return res.body[0];
+  const listing = res.body[0];
+  const photoUrl = 'https://images.squarespace-cdn.com/content/v1/64d53a504f5aee6d2b32ee14/19e5672c-8f2f-4bc3-ac40-a2c141dc78c7/B0004038.jpg?format=1500w';
+  const photos = await api('/rest/v1/listing_photos', {
+    token: service,
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: [0, 1, 2].map((position) => ({
+      listing_id: listing.id,
+      position,
+      source_url: `${photoUrl}&pos=${position}`,
+    })),
+  });
+  if (photos.status !== 201) throw new Error(`photo insert: ${photos.status} ${JSON.stringify(photos.body)}`);
+  return listing;
 }
 
 function rpcBodyError(name, res) {
