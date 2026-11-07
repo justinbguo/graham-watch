@@ -242,12 +242,15 @@ export async function publishBatch(
   if (unavailable) throw unavailable;
 
   const counts = await supabase.rpc('pending_source_item_count', { p_dealer_id: dealerId });
+  if (counts.error) throw new Error(counts.error.message);
+  const pending = counts.data?.[0]?.pending;
+  if (pending == null) throw new Error('Could not count the publish queue.');
 
   return {
     processed: rows.length,
     published: outcomes.filter((outcome) => outcome === 'published').length,
     skipped: outcomes.filter((outcome) => outcome === 'skipped').length,
     failed: outcomes.filter((outcome) => outcome === 'failed').length,
-    pending: counts.data?.[0]?.pending ?? 0,
+    pending,
   };
 }
