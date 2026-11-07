@@ -28,6 +28,7 @@ import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { impact, tick } from '@/lib/haptics';
+import { deckStage } from '@/lib/layout';
 import { setPhotoLaunchRect } from '@/lib/photoLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import {
@@ -206,8 +207,9 @@ export const SwipeCard = memo(forwardRef<
   const contentHeight = useSharedValue(0);
   const portHeight = useSharedValue(0);
   const web = Platform.OS === 'web';
-  /** Web card view: photo left, copy scrolls on the right. */
-  const webSplit = web;
+  const split = deckStage(Platform.OS, windowWidth).split;
+  const webSplit = useSharedValue(split);
+  webSplit.value = split;
   // Whether this card currently owns the thumb. Written during render so the
   // gesture, which is created once, sees the promotion on the next frame
   // without the native handler being torn down and attached again.
@@ -477,7 +479,7 @@ export const SwipeCard = memo(forwardRef<
           }
 
           // On web the photograph is a fixed column; only the right pane scrolls.
-          if (webSplit && touchX.value < cardWidth.value * 0.5) {
+          if (webSplit.value && touchX.value < cardWidth.value * 0.5) {
             state.fail();
             return;
           }
@@ -647,7 +649,7 @@ export const SwipeCard = memo(forwardRef<
         {/* The card behind is the same size and already painted under this one.
             This one moves out of the way whole, as far as it is tall. */}
         <View style={styles.card}>
-        {webSplit ? (
+        {split ? (
           <View style={styles.webRow}>
             <View style={styles.webPhotoColumn}>
               <View ref={photoPlateRef} style={styles.webPhoto}>

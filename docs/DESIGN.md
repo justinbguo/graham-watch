@@ -616,7 +616,7 @@ opens before a tile passes `gridTileMax`.
 | `layout.reading` | 560 | Prose, forms, lists, detail screens. The default. |
 | `layout.dealSheet` | 640 | Offer-deal sheet over a thread; Profile tab column. |
 | `layout.card` | 480 | The swipe stage. |
-| `layout.cardWeb` | 960 | Web swipe stage with photo and copy side by side. |
+| `layout.cardWeb` | 960 | Web swipe stage with photo and copy side by side, once the window is wider than `layout.card`. |
 | `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
@@ -648,8 +648,11 @@ from `src/lib/desktopSplit.ts` — do not hand-roll another width or colour.
 
 `Screen` applies the cap and centres the column in the window, so a new screen
 is capped without doing anything. The type inside that column aligns left.
-Pass `width` only to leave the default: the deck asks for `card` in swipe
-view on native, `cardWeb` on web, and `grid` in grid view.
+Pass `width` only to leave the default. Phone-width web
+(`windowWidth` <= `layout.card`) uses `card` and the stacked photograph.
+Web wider than `layout.card` still uses the side-by-side stage, `cardWeb`,
+or `deckFrameWeb` at `WIDE_BREAKPOINT`. Native swipe view uses `card`.
+Grid view uses `grid`.
 
 A phone is narrower than all three, so these values change nothing on a phone.
 They exist for the case the app already supports and nobody looks at.

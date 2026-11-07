@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
@@ -27,7 +27,7 @@ import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
 import { activeCount } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
-import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
+import { deckStage, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 import { setSearchLaunchRect } from '@/lib/searchLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
@@ -79,6 +79,7 @@ export default function Deck() {
   const undoPass = useUndoPass(userId);
   const isWide = useIsWide();
   const isDesktopWeb = useIsDesktopWeb();
+  const { width: windowWidth } = useWindowDimensions();
   const styles = useThemedStyles(deckStyles);
   const open = useOpenStack();
   const pathname = usePathname();
@@ -423,7 +424,7 @@ export default function Deck() {
       titleControl={titleControl}
       desktopBleed
       subhead={isDesktopWeb ? undefined : roll}
-      width={isDesktopWeb ? 'deckFrameWeb' : Platform.OS === 'web' ? 'cardWeb' : 'card'}
+      width={deckStage(Platform.OS, windowWidth).width}
       inTabs>
       {frameDesktop(
         <View style={styles.desktopDeck}>

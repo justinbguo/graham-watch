@@ -8,6 +8,7 @@ import {
 } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
@@ -18,8 +19,10 @@ import { Telemetry } from '@/features/telemetry/Telemetry';
 import { haasFonts } from '@/lib/fonts';
 import { installErrorReporter } from '@/lib/report';
 import { applySystemChrome } from '@/lib/systemChrome';
+import { bindVisibleViewport } from '@/lib/visibleViewport';
 
 installErrorReporter();
+if (Platform.OS === 'web') bindVisibleViewport();
 import { QueryProvider } from '@/providers/query';
 import { RevenueCatProvider } from '@/providers/revenuecat';
 import { SessionProvider, useSession } from '@/providers/session';
