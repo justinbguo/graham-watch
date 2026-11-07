@@ -40,6 +40,7 @@ jobs:
           scripts/dealer-filter.test.mjs
           scripts/deck-paging.test.mjs
           scripts/deck-stack.test.mjs
+          scripts/deck-stage.test.mjs
           scripts/filter-spec.test.mjs
           scripts/drops-select.test.ts
           scripts/fixture-import.test.ts

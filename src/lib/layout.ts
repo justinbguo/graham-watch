@@ -1,7 +1,18 @@
-import { Platform, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform, useSafeAreaInsets, useWindowDimensions } from './platform.ts';
+import { inset, layout, space, WIDE_BREAKPOINT } from './design.ts';
 
-import { inset, layout, space, WIDE_BREAKPOINT } from '@/lib/design';
+export type DeckStage = {
+  width: 'card' | 'cardWeb' | 'deckFrameWeb';
+  split: boolean;
+};
+
+/** Stacked photograph at `layout.card` and below. Side by side above it, desktop frame at `WIDE_BREAKPOINT`. */
+export function deckStage(platform: string, windowWidth: number): DeckStage {
+  if (platform !== 'web') return { width: 'card', split: false };
+  if (windowWidth >= WIDE_BREAKPOINT) return { width: 'deckFrameWeb', split: true };
+  if (windowWidth > layout.card) return { width: 'cardWeb', split: true };
+  return { width: 'card', split: false };
+}
 
 /** End-to-end width of the swipe card: column minus the deck's side gutters. */
 export function deckContentWidth(windowWidth: number, insetLeft: number, insetRight: number) {

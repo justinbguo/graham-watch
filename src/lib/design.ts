@@ -1,4 +1,6 @@
-import { Platform, type TextStyle, type ViewStyle } from 'react-native';
+import type { TextStyle, ViewStyle } from 'react-native';
+
+import { Platform } from './platform.ts';
 
 /**
  * Live design tokens. docs/DESIGN.md is the why; this file is the numbers the
@@ -553,6 +555,7 @@ export const layout = {
   /**
    * Web card view with the photograph beside the copy. Twice `card` so each
    * column keeps the hand-sized width the vertical stack used to give the photo.
+   * Side by side only above `layout.card`.
    */
   cardWeb: 960,
   /** The browse grid, which spends width on columns rather than line length. */
