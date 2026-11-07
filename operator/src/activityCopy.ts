@@ -5,6 +5,11 @@
 
 const VERBS: Record<string, string> = {
   approve_shop: 'Published a shop',
+  unapprove_shop: 'Unpublished a shop',
+  discover_shop: 'Read a shop domain',
+  inspect_shop: 'Inspected a catalogue',
+  import_shop: 'Imported a shop',
+  read_shop: 'Read a shop',
   resume_shop: 'Resumed a shop',
   pause_shop: 'Paused a shop',
   revoke_shop: 'Revoked a shop',

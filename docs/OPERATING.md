@@ -269,9 +269,77 @@ the claim flow.
 Not in the phone app, and never reachable by a dealer: RLS blocks approving a
 shop you created, so publishing is somebody else's decision by construction.
 
-Two surfaces do it. This script, holding the service-role key, and the web UI
-below, holding the anon key and an `operators` row. Both end up in the same
-functions — see [Why an operator is a row](#why-an-operator-is-a-row).
+Three surfaces do it. This script, holding the service-role key. The web UI
+below, holding the anon key and an `operators` row. And `operator-bot`, which
+checks `GRAHAM_OPERATOR_SECRET` and then calls `bot_set_dealer_permission`.
+The script and the console end up in the same functions. See
+[Why an operator is a row](#why-an-operator-is-a-row).
+
+### Headless operator
+
+A bot on another machine can run the operator calls with one stored value, the project's secret key (`sb_secret_...`). That key is not a JWT. `import-listings` still requires a signed-in session, and the gateway rejects a non-JWT there. The bot calls `operator-bot` instead.
+
+Set the function secret to that same key, then deploy `operator-bot` by pushing the function (the Deploy edge functions workflow). Apply migration `20261107190000_operator_bot.sql` on purpose. This guide does not apply it.
+
+```
+supabase secrets set GRAHAM_OPERATOR_SECRET="$GRAHAM_OPERATOR_SECRET"
+```
+
+`$GRAHAM_OPERATOR_SECRET` is the secret key. `$SUPABASE_URL` is the project URL, such as `https://<project-ref>.supabase.co`. Send the secret as both headers. The gateway accepts it as the API key. The function compares the bearer token to `GRAHAM_OPERATOR_SECRET`. Anon keys, user access tokens, and a wrong value get `401` and write nothing.
+
+```
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"discover","domain":"example.com"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"inspect","sourceUrl":"https://example.com/collections/watches"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"import","sourceUrl":"https://example.com/collections/watches","dealerName":"Example"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"approve","dealerId":"00000000-0000-4000-8000-000000000000"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"unapprove","dealerId":"00000000-0000-4000-8000-000000000000"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"report","dealerId":"00000000-0000-4000-8000-000000000000"}'
+```
+
+`import` creates the shop as `pending` when the website is new, and reads the catalogue into `source_items`. It does not publish watches onto the deck and it does not approve the shop. `approve` sets `dealers.permission` to `approved`. `unapprove` sets it back to `pending`. A `revoked` shop stays revoked. `report` returns the permission, active and total listing counts, and the latest `import_jobs` row.
+
+Each successful discover, inspect, import, and report writes `operator_actions` with `actor` `operator-bot`. Approve and unapprove write that actor inside `bot_set_dealer_permission`. The operator console shows the actor as "operator bot".
+
+A local stack can import fixture listings without scraping. The hosted function returns 404 for that shape and writes nothing. The edge runtime needs `GRAHAM_ALLOW_FIXTURE_IMPORT=1` and a local `SUPABASE_URL`. The same call twice does not insert the same `source_url` again, and it does not move an already approved shop back to pending.
+
+```
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"import","sourceUrl":"https://bot-proof.graham.test","dealerName":"Bot Proof","listings":[{"brand":"Bot Proof","model":"Secret Door","reference":"BOT-1","year":1968,"price_cents":100000,"description":"A short proof watch.","source_url":"https://bot-proof.graham.test/watches/secret-door","photo_url":"https://images.squarespace-cdn.com/content/v1/64d53a504f5aee6d2b32ee14/19e5672c-8f2f-4bc3-ac40-a2c141dc78c7/B0004038.jpg?format=1500w"}]}'
+```
+
+The function compares the bearer token. When Authorization is absent it compares the apikey header. The curls send the secret as both, so a gateway that checks the API key and the function that checks the bearer see the same value. A wrong bearer is rejected even when the apikey header is the secret.
 
 ```
 npm run dealers                          # who is in, and whether we can email them
@@ -585,7 +653,7 @@ mailbox to every buyer.
 | `npx expo export --platform web` | Broken route tree, missing assets, bad imports | Logic |
 | `npm run build` in `operator/` | Type errors and a broken bundle in the operator UI | Logic |
 | `npx oxlint --deny-warnings` in `operator/` | Lint in the operator UI | The Expo app, which has no linter |
-| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the six edge functions | Logic, and whether they are deployed |
+| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the seven edge functions | Logic, and whether they are deployed |
 | `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace, Shopify, and sitemap parsers, against payloads a real shop returned | Extraction, photos, and the write path |
 | `npm run test:rls` | Every security policy, over HTTP, from a buyer's side of the wire | Anything above the database |
 | `npm run test:filters` | v2 search, v2 counts, v1, and `matchesListing` return the same watches, and keyset pages do not skip or repeat | Anything above the database |
@@ -597,7 +665,7 @@ seconds. CI runs all of them on every push and pull request:
 | --- | --- |
 | `app` | `npm run typecheck`, a web bundle, and the refresh and deploy planner tests |
 | `operator ui` | `npm run build`, `oxlint --deny-warnings`, and `npm test`, in `operator/` |
-| `edge functions` | `deno check` on all six, then `deno test` over the directory |
+| `edge functions` | `deno check` on all seven, then `deno test` over the directory |
 | `database` | every migration from empty, `npm run test:rls`, `npm run test:filters`, generated types |
 | `drops verification` | `npm run verify:drops` against one local stack |
 

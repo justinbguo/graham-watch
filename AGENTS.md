@@ -78,7 +78,7 @@ Row-level security is on for these tables. The anon key ships in the app. Polici
 
 ## Edge functions
 
-Code is `supabase/functions`. `verify_jwt` stays on. Deploy is the `Deploy edge functions` workflow, not a pull request check. Do not deploy from an agent session unless someone asked.
+Code is `supabase/functions`. `verify_jwt` stays on for every function except `operator-bot`. A project secret key (`sb_secret_...`) is not a JWT, so the gateway would reject it before that function could check `GRAHAM_OPERATOR_SECRET`. Deploy is the `Deploy edge functions` workflow, not a pull request check. Do not deploy from an agent session unless someone asked.
 
 | Function | Who calls it | What it writes |
 | --- | --- | --- |
@@ -88,6 +88,7 @@ Code is `supabase/functions`. `verify_jwt` stays on. Deploy is the `Deploy edge 
 | `verify-application` | `src/data/applications.ts` | A code for an application mailbox. |
 | `inquiry-draft` | `src/data/inquiries.ts` | Nothing. Returns the email text. The dealer address stays on the server. |
 | `send-inquiry` | `src/data/inquiries.ts` | Sends the inquiry mail and updates the inquiry row. |
+| `operator-bot` | A bot that holds `GRAHAM_OPERATOR_SECRET` and calls the function over HTTPS. No signed-in session. | Discover, inspect, and catalogue import. Fixture import on a local stack. Approve and unapprove through `bot_set_dealer_permission`. Reads one shop's listing counts and latest `import_jobs` row. Audit rows in `operator_actions` with `actor` `operator-bot`. |
 
 `npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops, then calls `notify-drops`. A failed notify call fails the job.
 
@@ -95,7 +96,7 @@ Code is `supabase/functions`. `verify_jwt` stays on. Deploy is the `Deploy edge 
 
 | Workflow | When | Jobs |
 | --- | --- | --- |
-| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all six, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, generated types), `drops verification` (`npm run verify:drops`) |
+| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, generated types), `drops verification` (`npm run verify:drops`) |
 | `Catalogue refresh` | Cron `0 6 * * *`, and manual | `npm run refresh` against hosted |
 | `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships changed functions. Does not apply migrations. |
 
@@ -113,7 +114,9 @@ Operator UI: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 
 Studio server: `HF_API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 
-Edge functions: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GRAHAM_CRON_SECRET`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONCURRENCY`, `SCRAPE_PROVIDER`, `JINA_API_KEY`, `FIRECRAWL_API_KEY`, `EXPO_ACCESS_TOKEN`, `EXPO_PUSH_URL`, `APP_ORIGIN`, `SUPPORT_EMAIL`, `INQUIRY_FROM`, `RESEND_API_KEY`, `SMTP_HOST`, `SMTP_PORT`.
+Edge functions: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GRAHAM_CRON_SECRET`, `GRAHAM_OPERATOR_SECRET`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONCURRENCY`, `SCRAPE_PROVIDER`, `JINA_API_KEY`, `FIRECRAWL_API_KEY`, `EXPO_ACCESS_TOKEN`, `EXPO_PUSH_URL`, `APP_ORIGIN`, `SUPPORT_EMAIL`, `INQUIRY_FROM`, `RESEND_API_KEY`, `SMTP_HOST`, `SMTP_PORT`.
+
+`GRAHAM_OPERATOR_SECRET` is the project's secret key (`sb_secret_...`), set with `supabase secrets set`. The bot stores that one value and sends it as the bearer token. The calls are in [docs/OPERATING.md](docs/OPERATING.md).
 
 GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GRAHAM_CRON_SECRET`.
 

@@ -25,6 +25,7 @@ const FIXTURE = path.join(SKILL, 'fixtures', 'drop-watch.json');
 
 const PRODUCTION_REF = 'hbxgxtbtefpyutyqafoi';
 const CRON_SECRET = 'graham-local-verify-cron';
+const OPERATOR_SECRET = 'sb_secret_local_operator_bot';
 const CAPTURE_NAME = 'graham-push-capture';
 const CAPTURE_URL = `http://${CAPTURE_NAME}:8799/push`;
 const WEB_PORT = 8091;
@@ -423,6 +424,7 @@ function writeFunctionEnv() {
   const next = {
     ...current,
     GRAHAM_CRON_SECRET: CRON_SECRET,
+    GRAHAM_OPERATOR_SECRET: OPERATOR_SECRET,
     GRAHAM_ALLOW_FIXTURE_IMPORT: '1',
     EXPO_PUSH_URL: CAPTURE_URL,
   };
@@ -493,6 +495,7 @@ async function commandUp(dryRun) {
       GRAHAM_ALLOW_FIXTURE_IMPORT: '1',
       EXPO_PUSH_URL: CAPTURE_URL,
       GRAHAM_CRON_SECRET: 'set locally, not printed',
+      GRAHAM_OPERATOR_SECRET: 'set locally, not printed',
     },
   };
   if (dryRun) {
@@ -505,7 +508,10 @@ async function commandUp(dryRun) {
   relaxLegacyForward();
   writeFunctionEnv();
   const running = stack();
-  const envMatches = running && edgeEnv('EXPO_PUSH_URL') === CAPTURE_URL && edgeEnv('GRAHAM_ALLOW_FIXTURE_IMPORT') === '1';
+  const envMatches = running
+    && edgeEnv('EXPO_PUSH_URL') === CAPTURE_URL
+    && edgeEnv('GRAHAM_ALLOW_FIXTURE_IMPORT') === '1'
+    && edgeEnv('GRAHAM_OPERATOR_SECRET') === OPERATOR_SECRET;
   if (!envMatches) {
     if (running) {
       note('Restarting the local stack so the edge runtime picks up the capture URL.');
@@ -1291,6 +1297,7 @@ async function commandDoctor() {
     stack: local ? { url: local.url, apiOk, refused: Boolean(local.refused) } : null,
     functions: {
       cronSecretSet: Boolean(env.GRAHAM_CRON_SECRET),
+      operatorSecret: env.GRAHAM_OPERATOR_SECRET ? 'set' : 'missing',
       fixtureImport: env.GRAHAM_ALLOW_FIXTURE_IMPORT === '1',
       expoPushUrl: env.EXPO_PUSH_URL ?? null,
       runtimeExpoPushUrl: edgeEnv('EXPO_PUSH_URL'),
@@ -1511,6 +1518,248 @@ async function commandReset(dryRun) {
   ok({ command: 'reset-proof', dealerId, users: ids.length });
 }
 
+const BOT_SHOP = 'https://bot-proof.graham.test';
+const BOT_WATCH = 'https://bot-proof.graham.test/watches/secret-door';
+const BOT_PHOTO = 'https://images.squarespace-cdn.com/content/v1/64d53a504f5aee6d2b32ee14/19e5672c-8f2f-4bc3-ac40-a2c141dc78c7/B0004038.jpg?format=1500w';
+
+function operatorCall(status, body, token) {
+  return api(status.url, '/functions/v1/operator-bot', {
+    key: status.anonKey,
+    token,
+    method: 'POST',
+    body,
+  });
+}
+
+async function deckHasBotProof(status) {
+  const found = await api(status.url, '/rest/v1/rpc/search_listings_v2', {
+    key: status.anonKey,
+    method: 'POST',
+    body: {
+      p_spec: {},
+      p_limit: 20,
+      p_cursor: null,
+      p_exclude_swiped: true,
+      p_exclude_own: true,
+      p_sort: 'newest',
+      p_favorites_first: true,
+    },
+  });
+  const rows = Array.isArray(found.body) ? found.body : [];
+  const hit = rows.some((row) => row?.listing?.brand === 'Bot Proof' && row?.listing?.model === 'Secret Door');
+  return { ok: found.ok, status: found.status, hit };
+}
+
+async function ensureWeb() {
+  if (webUp()) return null;
+  const child = spawnSync(process.execPath, [process.argv[1], 'web'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 15 * 60 * 1000,
+  });
+  if (child.status !== 0 || !webUp()) {
+    return 'The web build is not being served. The web command did not start, so the deck screenshot was skipped.';
+  }
+  return null;
+}
+
+async function commandVerifyOperator(dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'verify-operator',
+      dryRun: true,
+      calls: ['import fixture', 'report', 'reject anon', 'reject wrong key', 'reject buyer', 'approve', 'search_listings_v2', 'deck'],
+    });
+    return;
+  }
+  const status = requireStack();
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  const cleared = await api(
+    status.url,
+    `/rest/v1/dealers?website=eq.${encodeURIComponent(BOT_SHOP)}`,
+    { key: status.serviceKey, method: 'DELETE', prefer: 'return=minimal' },
+  );
+  if (!cleared.ok) {
+    fail('Could not clear a previous Bot Proof shop.', 'The delete uses the local service role so the proof can start pending.', {
+      status: cleared.status,
+      body: cleared.body,
+    });
+  }
+  const imported = await operatorCall(status, {
+    action: 'import',
+    sourceUrl: BOT_SHOP,
+    dealerName: 'Bot Proof',
+    listings: [{
+      brand: 'Bot Proof',
+      model: 'Secret Door',
+      reference: 'BOT-1',
+      year: 1968,
+      price_cents: 100000,
+      description: 'A fixture watch imported with the operator secret.',
+      source_url: BOT_WATCH,
+      photo_url: BOT_PHOTO,
+    }],
+  }, OPERATOR_SECRET);
+  if (!imported.ok || imported.body?.permission !== 'pending' || !imported.body?.dealerId) {
+    fail(
+      'The operator secret did not import a pending fixture shop.',
+      'Run up so the edge runtime has GRAHAM_OPERATOR_SECRET and GRAHAM_ALLOW_FIXTURE_IMPORT=1. The hosted function refuses fixture import.',
+      { status: imported.status, body: imported.body },
+    );
+  }
+  const dealerId = imported.body.dealerId;
+  const report = await operatorCall(status, { action: 'report', dealerId }, OPERATOR_SECRET);
+  if (!report.ok || report.body?.permission !== 'pending' || report.body?.listings?.active !== 1) {
+    fail('The report did not show a pending shop with one active listing.', 'report reads dealers and listings as the service role.', {
+      status: report.status,
+      body: report.body,
+    });
+  }
+  const again = await operatorCall(status, {
+    action: 'import',
+    sourceUrl: BOT_SHOP,
+    dealerName: 'Bot Proof',
+    listings: [{
+      brand: 'Bot Proof',
+      model: 'Secret Door',
+      reference: 'BOT-1',
+      year: 1968,
+      price_cents: 100000,
+      description: 'A fixture watch imported with the operator secret.',
+      source_url: BOT_WATCH,
+      photo_url: BOT_PHOTO,
+    }],
+  }, OPERATOR_SECRET);
+  const againReport = await operatorCall(status, { action: 'report', dealerId }, OPERATOR_SECRET);
+  if (!again.ok || again.body?.published !== 0 || againReport.body?.listings?.active !== 1 || againReport.body?.permission !== 'pending') {
+    fail('A second fixture import duplicated the watch or changed permission.', 'The same source_url for that shop is inserted once, and an approved shop would stay approved.', {
+      again: again.body,
+      report: againReport.body,
+    });
+  }
+  const hidden = await deckHasBotProof(status);
+  if (!hidden.ok || hidden.hit) {
+    fail('The pending shop was already on the deck.', 'search_listings_v2 only returns approved shops.', hidden);
+  }
+  const buyer = await signIn(status, PEOPLE.buyer);
+  const rejected = [];
+  for (const [name, token] of [
+    ['anon', status.anonKey],
+    ['wrong', 'sb_secret_wrong'],
+    ['buyer', buyer.accessToken],
+  ]) {
+    const attempt = await operatorCall(status, { action: 'approve', dealerId }, token);
+    rejected.push({ name, status: attempt.status, error: attempt.body?.error ?? null });
+    if (attempt.status !== 401) {
+      fail(`The ${name} token was not rejected.`, 'operator-bot returns 401 unless the bearer is GRAHAM_OPERATOR_SECRET.', {
+        rejected,
+      });
+    }
+  }
+  const still = await api(status.url, `/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
+    key: status.serviceKey,
+  });
+  if (still.body?.[0]?.permission !== 'pending') {
+    fail('A rejected approve changed the shop.', 'Anon, a wrong key, and a buyer token must leave permission pending.', {
+      permission: still.body,
+    });
+  }
+  const approved = await operatorCall(status, { action: 'approve', dealerId }, OPERATOR_SECRET);
+  if (!approved.ok || approved.body?.permission !== 'approved') {
+    fail('The operator secret did not approve the shop.', 'approve calls bot_set_dealer_permission.', {
+      status: approved.status,
+      body: approved.body,
+    });
+  }
+  const bumped = await api(status.url, `/rest/v1/listings?dealer_id=eq.${dealerId}&reference=eq.BOT-1`, {
+    key: status.serviceKey,
+    method: 'PATCH',
+    prefer: 'return=minimal',
+    body: { created_at: new Date().toISOString() },
+  });
+  if (!bumped.ok) {
+    fail('The fixture watch could not be moved to the front of the deck.', 'Buy sorts newest first. The proof sets created_at so the card is the one on screen.', {
+      status: bumped.status,
+      body: bumped.body,
+    });
+  }
+  const visible = await deckHasBotProof(status);
+  if (!visible.ok || !visible.hit) {
+    fail('The approved shop is not on the deck.', 'Anon search_listings_v2 uses the guest arguments from src/data/listings.ts and should return brand Bot Proof.', visible);
+  }
+  const shot = path.join(evidence, 'operator-deck.png');
+  const videoPath = path.join(evidence, 'operator-deck.webm');
+  const reportFile = path.join(evidence, 'operator-report.json');
+  const httpSummary = {
+    dealerId,
+    imported: { status: imported.status, permission: imported.body.permission, published: imported.body.published },
+    report: report.body,
+    repeated: { published: again.body?.published, active: againReport.body?.listings?.active, permission: againReport.body?.permission },
+    rejected,
+    deckBeforeApprove: hidden.hit,
+    deckAfterApprove: visible.hit,
+    web: { status: 'pending' },
+  };
+  writeFileSync(reportFile, `${JSON.stringify(httpSummary, null, 2)}\n`);
+  const webReason = await ensureWeb();
+  if (webReason) {
+    const skipped = { ...httpSummary, web: { status: 'skipped', reason: webReason } };
+    writeFileSync(reportFile, `${JSON.stringify(skipped, null, 2)}\n`);
+    ok({ command: 'verify-operator', ...skipped, reportFile, operatorSecret: 'set' });
+    return;
+  }
+  const videoDir = path.join(evidence, 'operator-video-tmp');
+  rmSync(videoDir, { recursive: true, force: true });
+  mkdirSync(videoDir, { recursive: true });
+  const chromium = await loadChromium();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    recordVideo: { dir: videoDir, size: { width: 390, height: 844 } },
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(90_000);
+  try {
+    await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    await ensureSignedIn(page, PEOPLE.buyer.email);
+    const card = page.getByText('Bot Proof Secret Door', { exact: true }).first();
+    await card.waitFor({ state: 'visible', timeout: 30_000 });
+    await card.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await shoot(page, shot);
+  } catch (error) {
+    const failed = path.join(evidence, 'operator-deck-failed.png');
+    await shoot(page, failed).catch(() => undefined);
+    if (error && error.code === 'GRAHAM_FAIL') throw error;
+    fail(
+      'The deck did not show the fixture watch.',
+      'After approve, Buy shows Bot Proof Secret Door. The sign-in sheet has to close first.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  } finally {
+    const video = page.video();
+    await context.close();
+    await browser.close();
+    if (video) {
+      const recorded = await video.path();
+      if (recorded && existsSync(recorded)) renameSync(recorded, videoPath);
+    }
+    rmSync(videoDir, { recursive: true, force: true });
+  }
+  if (!existsSync(shot) || !existsSync(videoPath)) {
+    fail('The deck proof files were not saved.', 'operator-deck.png and operator-deck.webm stay in the evidence directory.');
+  }
+  const summary = {
+    ...httpSummary,
+    web: { status: 'captured' },
+    shot,
+    video: videoPath,
+  };
+  writeFileSync(reportFile, `${JSON.stringify(summary, null, 2)}\n`);
+  ok({ command: 'verify-operator', ...summary, reportFile, operatorSecret: 'set' });
+}
+
 function flag(args, name) {
   const index = args.indexOf(name);
   if (index === -1) return { args, value: null };
@@ -1540,13 +1789,14 @@ const commands = {
   cleanup: () => commandCleanup(dryRun),
   'reset-proof': () => commandReset(dryRun),
   'verify-drops': () => commandVerify(dryRun),
+  'verify-operator': () => commandVerifyOperator(dryRun),
 };
 
 const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator.',
   );
 }
 
