@@ -34,6 +34,9 @@ export default function TabsLayout() {
   const saved = useSavedCount();
   const unread = useUnreadCount();
   const drops = useUnseenDropCount();
+  // The bar has one count per tab. Threads waiting and unseen drops are both
+  // reasons to open Messages, so they share that count.
+  const messagesWaiting = unread + drops;
   const { shop, ready } = useClaimedDealerShop();
   const sellerHub = ready && shop;
   const theme = useTheme();
@@ -66,7 +69,7 @@ export default function TabsLayout() {
         options={{
           title: sellerHub ? 'Deal' : 'Messages',
           tabBarAccessibilityLabel: sellerHub ? 'Deal' : 'Messages',
-          tabBarBadge: unread || undefined,
+          tabBarBadge: messagesWaiting || undefined,
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons
               name={sellerHub ? 'storefront-outline' : 'chat-outline'}
@@ -90,7 +93,6 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarBadge: drops || undefined,
           tabBarIcon: ({ color, focused }) => <ProfileTabIcon color={color} focused={focused} />,
         }}
       />

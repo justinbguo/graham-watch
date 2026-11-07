@@ -8,7 +8,7 @@
  * the command fails.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -775,12 +775,56 @@ function webUp() {
   return null;
 }
 
+function newestMtime(dir) {
+  let newest = 0;
+  if (!existsSync(dir)) return newest;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) newest = Math.max(newest, newestMtime(full));
+    else newest = Math.max(newest, statSync(full).mtimeMs);
+  }
+  return newest;
+}
+
+function exportIsStale() {
+  const indexHtml = path.join(WEB_DIR, 'index.html');
+  if (!existsSync(indexHtml)) return true;
+  return statSync(indexHtml).mtimeMs < newestMtime(path.join(ROOT, 'src'));
+}
+
+async function stopWebServer() {
+  const existing = webUp();
+  if (!existing) return;
+  try {
+    process.kill(existing, 'SIGTERM');
+  } catch {
+  }
+  writeState({ webPid: null });
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(`http://127.0.0.1:${WEB_PORT}/`);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  fail(
+    'The previous web server is still answering.',
+    'The export is older than src. verify-drops restarts it so the proof is this build. Stop the process on port 8091 and rerun.',
+  );
+}
+
 async function commandWeb(dryRun) {
   if (dryRun) {
     ok({ command: 'web', dryRun: true, port: WEB_PORT, dir: WEB_DIR });
     return;
   }
   requireStack();
+  if (exportIsStale()) {
+    await stopWebServer();
+    rmSync(WEB_DIR, { recursive: true, force: true });
+  }
   const existing = webUp();
   if (existing) {
     ok({ command: 'web', url: `http://127.0.0.1:${WEB_PORT}`, pid: existing, reused: true });
@@ -857,115 +901,323 @@ async function mailpitCode(email, since) {
   return null;
 }
 
-async function commandScreenshot(route, file, userName) {
-  if (!route?.startsWith('/')) {
-    fail('screenshot needs a route.', 'Example: screenshot /profile artifacts/profile.png --as buyer');
-  }
-  if (!file) fail('screenshot needs an output path.', 'Pass the png path after the route.');
-  const who = person(userName ?? 'buyer');
-  if (!webUp()) {
-    fail('The web build is not being served.', 'Run the web command first. screenshot does not start a second server.');
-  }
-  let chromium;
+const DROPS_BUTTON = /New from dealers you follow, [1-9]/;
+const MESSAGES_TAB = /Messages, [1-9]/;
+const WATCH_NAME = 'Fixture Drop, 1968';
+
+async function loadChromium() {
   try {
-    ({ chromium } = await import('playwright'));
+    const { chromium } = await import('playwright');
+    return chromium;
   } catch {
     fail(
       'Playwright is not installed.',
       'From the repo root: npm install --save-dev playwright && npx playwright install chromium',
     );
   }
+}
+
+async function pageText(page) {
+  return page.locator('body').innerText().catch(() => '');
+}
+
+async function shoot(page, file) {
+  mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  await page.screenshot({ path: path.resolve(file), fullPage: true });
+}
+
+async function ensureSignedIn(page, email) {
+  const gate = page.getByRole('button', { name: 'Log in or create an account' });
+  const buy = page.getByRole('tab', { name: 'Buy' });
+  try {
+    await Promise.race([
+      gate.waitFor({ state: 'visible', timeout: 30_000 }),
+      buy.waitFor({ state: 'visible', timeout: 30_000 }),
+    ]);
+  } catch (error) {
+    fail(
+      'The web export did not show sign-in or the tab bar.',
+      'The page should offer Log in or create an account, or the Buy tab when a session is already stored.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  if (!(await gate.isVisible().catch(() => false))) return;
+
+  await gate.click();
+  await page.getByRole('button', { name: 'Continue with email' }).click();
+  await page.getByPlaceholder('you@example.com').fill(email);
+  const since = Date.now();
+  await page.getByRole('button', { name: 'Send me a code' }).click();
+  const code = await mailpitCode(email, since);
+  if (!code) {
+    fail(
+      'Mailpit did not receive a sign-in code.',
+      'The local stack includes mailpit on port 54324. Run up, then seed, then screenshot again.',
+    );
+  }
+  const field = page.getByLabel('Sign-in code');
+  if ((await field.inputValue().catch(() => '')).trim().length !== 6) {
+    await field.fill(code);
+    await page.getByRole('button', { name: 'Continue' }).click();
+  }
+  // Continue stores the session, then the sheet goes back to Buy.
+  // Clicking a tab before that storage lands dismisses the sheet instead.
+  try {
+    await page.waitForFunction(
+      () =>
+        Object.keys(localStorage).some((key) => {
+          const value = localStorage.getItem(key) ?? '';
+          return key.includes('auth-token') && value.includes('access_token');
+        }),
+      { timeout: 20_000 },
+    );
+  } catch {
+    fail(
+      'The sign-in code was not accepted.',
+      'Mailpit has the code. The field is Sign-in code and the button is Continue. If the page says a code was already sent, wait and use the newest Mailpit message.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800) },
+    );
+  }
+}
+
+async function openMessages(page) {
+  const tab = page.getByRole('tab', { name: MESSAGES_TAB });
+  try {
+    await tab.first().waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const failed = path.join(evidenceDir(), 'messages-tab-missing.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      'The Messages tab did not show the unseen count.',
+      'The count sits on Messages, not Profile. Sign-in returns to Buy, and the tab name includes the count once the drops query resolves.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  const badge = page.getByRole('button', { name: DROPS_BUTTON });
+  if (!(await badge.isVisible().catch(() => false))) await tab.first().click();
+  try {
+    await badge.waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const failed = path.join(evidenceDir(), 'messages-row-missing.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      'Messages did not show the drops row.',
+      'The button is New from dealers you follow, N. It is the first row of the inbox.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  const profileBadge = await page.getByRole('tab', { name: /Profile, [1-9]/ }).count();
+  if (profileBadge) {
+    fail('Profile still wears the drops count.', 'The unseen badge belongs on the Messages tab.');
+  }
+  return {
+    badgeLabel: (await badge.getAttribute('aria-label')) ?? (await badge.innerText()),
+    tabLabel: await tab.first().getAttribute('aria-label'),
+  };
+}
+
+async function openProfile(page) {
+  await page.getByRole('tab', { name: 'Profile', exact: true }).click();
+  const shop = page.getByRole('button', { name: 'Test Bench, verified' });
+  try {
+    await shop.waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const failed = path.join(evidenceDir(), 'profile-following-missing.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      'Profile did not show the Following list.',
+      'The shops stay on Profile. The drops row and the N new count do not.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  const drops = await page.getByRole('button', { name: /New from dealers you follow/ }).isVisible().catch(() => false);
+  const profileBadge = await page.getByRole('tab', { name: /Profile, [1-9]/ }).count();
+  const fresh = await page.getByText(/^\d+ new$/).isVisible().catch(() => false);
+  if (drops || profileBadge || fresh) {
+    fail(
+      'Profile still shows Drops.',
+      'The unseen row, the tab count, and the per-shop N new label now live with Messages.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), drops, profileBadge, fresh },
+    );
+  }
+  return {
+    messagesTab: await page.getByRole('tab', { name: MESSAGES_TAB }).first().getAttribute('aria-label'),
+    profileTab: 'Profile',
+    following: 'Test Bench, verified',
+  };
+}
+
+async function waitForWatch(page) {
+  // The feed stays mounted under the dealer-scoped one, so the title can match twice.
+  const title = page.getByText('New watches', { exact: true }).filter({ visible: true });
+  const watch = page.getByRole('button', { name: WATCH_NAME }).filter({ visible: true });
+  await title.first().waitFor({ state: 'visible', timeout: 20_000 });
+  await watch.first().waitFor({ state: 'visible' });
+}
+
+async function commandScreenshot(route, file, userName) {
+  if (!route?.startsWith('/')) {
+    fail('screenshot needs a route.', 'Example: screenshot /messages artifacts/messages.png --as buyer');
+  }
+  if (!file) fail('screenshot needs an output path.', 'Pass the png path after the route.');
+  const who = person(userName ?? 'buyer');
+  if (!webUp()) {
+    fail('The web build is not being served.', 'Run the web command first. screenshot does not start a second server.');
+  }
+  const chromium = await loadChromium();
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.setDefaultTimeout(90_000);
   const target = `http://127.0.0.1:${WEB_PORT}${route}`;
   try {
     await page.goto(target, { waitUntil: 'domcontentloaded' });
-    const gate = page.getByRole('button', { name: 'Log in or create an account' });
-    const signedInTab = page.getByRole('tab', { name: /Profile, [1-9]/ });
-    // The export paints after domcontentloaded. Waiting only for the event
-    // misses the guest gate and skips sign-in.
-    await Promise.race([
-      gate.waitFor({ state: 'visible', timeout: 30_000 }),
-      signedInTab.waitFor({ state: 'visible', timeout: 30_000 }),
-    ]);
-    if (await gate.isVisible().catch(() => false)) {
-      await gate.click();
-      await page.getByRole('button', { name: 'Continue with email' }).click();
-      await page.getByPlaceholder('you@example.com').fill(who.email);
-      const since = Date.now();
-      await page.getByRole('button', { name: 'Send me a code' }).click();
-      const code = await mailpitCode(who.email, since);
-      if (!code) {
-        fail(
-          'Mailpit did not receive a sign-in code.',
-          'The local stack includes mailpit on port 54324. Run up, then seed, then screenshot again.',
-        );
-      }
-      const field = page.getByLabel('Sign-in code');
-      if ((await field.inputValue().catch(() => '')).trim().length !== 6) {
-        await field.fill(code);
-        await page.getByRole('button', { name: 'Continue' }).click();
-      }
-      // Continue stores the session, then the sheet goes back to Buy.
-      // Clicking the tab before that storage lands dismisses the sheet instead.
-      try {
-        await page.waitForFunction(
-          () =>
-            Object.keys(localStorage).some((key) => {
-              const value = localStorage.getItem(key) ?? '';
-              return key.includes('auth-token') && value.includes('access_token');
-            }),
-          { timeout: 20_000 },
-        );
-      } catch {
-        const text = await page.locator('body').innerText().catch(() => '');
-        fail(
-          'The sign-in code was not accepted.',
-          'Mailpit has the code. The field is Sign-in code and the button is Continue. If the page says a code was already sent, wait and use the newest Mailpit message.',
-          { url: page.url(), text: text.slice(0, 800) },
-        );
-      }
+    await ensureSignedIn(page, who.email);
+    const pathOnly = route.split('?')[0];
+    let detail = {};
+    if (pathOnly === '/messages') detail = await openMessages(page);
+    else if (pathOnly === '/profile') detail = await openProfile(page);
+    else if (pathOnly === '/drops') {
+      await page.goto(target, { waitUntil: 'domcontentloaded' });
+      await waitForWatch(page);
+      detail = { url: page.url() };
+    } else {
+      await page.goto(target, { waitUntil: 'domcontentloaded' });
     }
-    // The sheet returns to Buy once the session is in React, which is after
-    // the token lands in localStorage. The Profile tab's name includes the
-    // count only then. Press that tab. Loading /profile does not select it.
-    const badge = page.getByRole('button', { name: /New from dealers you follow, [1-9]/ });
-    const profileTab = page.getByRole('tab', { name: /Profile, [1-9]/ });
-    await profileTab.first().waitFor({ state: 'visible' });
-    if (!(await badge.isVisible().catch(() => false))) {
-      await profileTab.first().click();
-    }
-    try {
-      await badge.waitFor({ state: 'visible', timeout: 20_000 });
-    } catch (error) {
-      const failedShot = `${path.resolve(file)}.failed.png`;
-      await page.screenshot({ path: failedShot, fullPage: true }).catch(() => undefined);
-      const text = await page.locator('body').innerText().catch(() => '');
-      fail(
-        'Profile did not show the unseen count.',
-        'Sign-in returns to Buy. Press the Profile tab after the code. The failed screenshot and the visible text are in detail.',
-        { url: page.url(), text: text.slice(0, 800), failedShot, cause: error instanceof Error ? error.message : String(error) },
-      );
-    }
-    const badgeLabel = (await badge.getAttribute('aria-label')) ?? (await badge.innerText());
-    const tab = page.getByRole('tab', { name: /Profile, [1-9]/ });
-    const tabLabel = (await tab.count()) > 0 ? await tab.first().getAttribute('aria-label') : null;
-    mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-    await page.screenshot({ path: path.resolve(file), fullPage: true });
-    const unseen = Number(badgeLabel.match(/(\d+)/)?.[1] ?? '0');
+    await shoot(page, file);
+    const badgeLabel = detail.badgeLabel ?? null;
+    const unseen = Number(String(badgeLabel ?? '').match(/(\d+)/)?.[1] ?? '0');
     ok({
       command: 'screenshot',
       route,
       path: path.resolve(file),
       user: who.email,
-      badgeLabel,
-      tabLabel,
       unseen,
+      ...detail,
     });
   } finally {
     await browser.close();
   }
+}
+
+async function commandTour(dealerId, dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'tour',
+      dryRun: true,
+      writes: ['messages.png', 'profile.png', 'drops.png', 'deep-link.png', 'drops-messages.webm'],
+    });
+    return;
+  }
+  if (!dealerId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dealerId)) {
+    fail('tour needs the dealer id.', 'Pass the Test Bench id from follow. The deep link is /drops?dealerId=<id>.');
+  }
+  if (!webUp()) {
+    fail('The web build is not being served.', 'Run the web command first. tour does not start a second server.');
+  }
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  const videoDir = path.join(evidence, 'video-tmp');
+  rmSync(videoDir, { recursive: true, force: true });
+  mkdirSync(videoDir, { recursive: true });
+  const files = {
+    messages: path.join(evidence, 'messages.png'),
+    profile: path.join(evidence, 'profile.png'),
+    drops: path.join(evidence, 'drops.png'),
+    deepLink: path.join(evidence, 'deep-link.png'),
+    video: path.join(evidence, 'drops-messages.webm'),
+  };
+  const chromium = await loadChromium();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    recordVideo: { dir: videoDir, size: { width: 390, height: 844 } },
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(90_000);
+  const who = person('buyer');
+  let detail = null;
+  try {
+    await page.goto(`http://127.0.0.1:${WEB_PORT}/messages`, { waitUntil: 'domcontentloaded' });
+    await ensureSignedIn(page, who.email);
+    const messages = await openMessages(page);
+    await page.waitForTimeout(800);
+    await shoot(page, files.messages);
+    const profile = await openProfile(page);
+    await page.waitForTimeout(800);
+    await shoot(page, files.profile);
+    await page.getByRole('tab', { name: MESSAGES_TAB }).click();
+    const row = page.getByRole('button', { name: DROPS_BUTTON });
+    await row.waitFor({ state: 'visible' });
+    await row.click();
+    await page.waitForURL(/\/drops$/, { timeout: 20_000 });
+    await waitForWatch(page);
+    await page.getByText('From dealers you follow', { exact: true }).filter({ visible: true }).first().waitFor({ state: 'visible' });
+    await page.waitForTimeout(800);
+    await shoot(page, files.drops);
+    // A new document does not restore the session, so this uses the bundle's push.
+    const pushed = await page.evaluate((id) => {
+      const requireModule = window.__r;
+      if (typeof requireModule !== 'function') return false;
+      for (let moduleId = 0; moduleId < 3000; moduleId += 1) {
+        let loaded;
+        try {
+          loaded = requireModule(moduleId);
+        } catch {
+          continue;
+        }
+        if (!loaded || typeof loaded.push !== 'function' || typeof loaded.linkTo !== 'function') continue;
+        loaded.push(`/drops?dealerId=${id}`);
+        return true;
+      }
+      return false;
+    }, dealerId);
+    if (!pushed) {
+      fail(
+        'The dealer drops route did not open.',
+        'The tour pushes /drops?dealerId through the running app. A full page load of that URL does not keep the session.',
+      );
+    }
+    await page.waitForURL(new RegExp(`dealerId=${dealerId}`), { timeout: 20_000 });
+    await waitForWatch(page);
+    await page.waitForTimeout(800);
+    await shoot(page, files.deepLink);
+    detail = { messages, profile, deepLink: page.url() };
+  } catch (error) {
+    const failed = path.join(evidence, 'tour-failed.png');
+    await shoot(page, failed).catch(() => undefined);
+    if (error && error.code === 'GRAHAM_FAIL') throw error;
+    fail(
+      'The Messages drops tour did not finish.',
+      'messages.png is the badge, profile.png has no drops row, drops.png is the feed, and deep-link.png is /drops?dealerId.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  } finally {
+    const video = page.video();
+    await context.close();
+    await browser.close();
+    if (video) {
+      const recorded = await video.path();
+      if (recorded && existsSync(recorded)) renameSync(recorded, files.video);
+    }
+    rmSync(videoDir, { recursive: true, force: true });
+  }
+  if (!detail || !existsSync(files.video)) {
+    fail('The tour video was not saved.', 'Playwright writes it when the browser context closes. The png files should still be in the evidence directory.');
+  }
+  ok({
+    command: 'tour',
+    user: who.email,
+    badgeLabel: detail.messages.badgeLabel,
+    tabLabel: detail.messages.tabLabel,
+    unseen: Number(String(detail.messages.badgeLabel).match(/(\d+)/)?.[1] ?? '0'),
+    profile: detail.profile,
+    deepLink: detail.deepLink,
+    messages: files.messages,
+    profileShot: files.profile,
+    drops: files.drops,
+    deepLinkShot: files.deepLink,
+    video: files.video,
+  });
 }
 
 async function commandDoctor() {
@@ -1027,7 +1279,6 @@ function commandCleanup(dryRun) {
     try {
       process.kill(webPid, 'SIGTERM');
     } catch {
-      // Already gone.
     }
   }
   spawnSync('docker', ['rm', '-f', CAPTURE_NAME], { encoding: 'utf8' });
@@ -1082,13 +1333,17 @@ async function commandVerify(dryRun) {
     ok({
       command: 'verify-drops',
       dryRun: true,
-      steps: ['up', 'seed', 'reset-proof', 'follow buyer', 'follow quiet', 'import', 'notify-drops', 'drops-status', 'web', 'screenshot', 'cleanup'],
+      steps: ['up', 'seed', 'reset-proof', 'follow buyer', 'follow quiet', 'import', 'notify-drops', 'drops-status', 'web', 'tour', 'cleanup'],
     });
     return;
   }
   const evidence = evidenceDir();
   mkdirSync(evidence, { recursive: true });
-  const shot = path.join(evidence, 'profile.png');
+  const shot = path.join(evidence, 'messages.png');
+  const profileShot = path.join(evidence, 'profile.png');
+  const dropsShot = path.join(evidence, 'drops.png');
+  const deepShot = path.join(evidence, 'deep-link.png');
+  const video = path.join(evidence, 'drops-messages.webm');
   const steps = {};
   steps.up = child(['up']);
   steps.seed = child(['seed']);
@@ -1100,7 +1355,7 @@ async function commandVerify(dryRun) {
   steps.buyer = child(['drops-status', 'buyer']);
   steps.quiet = child(['drops-status', 'quiet']);
   steps.web = child(['web']);
-  steps.screenshot = child(['screenshot', '/profile', shot, '--as', 'buyer']);
+  steps.tour = child(['tour', steps.followBuyer.dealerId]);
 
   const notes = steps.buyer.notifications ?? [];
   const captured = steps.notify.captured ?? [];
@@ -1121,7 +1376,15 @@ async function commandVerify(dryRun) {
   if ((skipped.noTokenWithListings ?? 0) < 1) problems.push(`noTokenWithListings: ${skipped.noTokenWithListings}`);
   if ((steps.quiet.notifications ?? []).length !== 0) problems.push('quiet follower has a drop_notifications row');
   if ((steps.buyer.unseen ?? 0) < 1) problems.push(`buyer unseen: ${steps.buyer.unseen}`);
-  if ((steps.screenshot.unseen ?? 0) < 1) problems.push('profile screenshot badge is not greater than 0');
+  if ((steps.tour.unseen ?? 0) < 1) problems.push('messages screenshot badge is not greater than 0');
+  if (!String(steps.tour.tabLabel ?? '').startsWith('Messages,')) problems.push(`tab label: ${steps.tour.tabLabel}`);
+  if (!String(steps.tour.badgeLabel ?? '').startsWith('New from dealers you follow,')) {
+    problems.push(`drops row: ${steps.tour.badgeLabel}`);
+  }
+  if (steps.tour.profile?.following !== 'Test Bench, verified') problems.push('profile following row changed');
+  if (!String(steps.tour.deepLink ?? '').includes(`dealerId=${steps.followBuyer.dealerId}`)) {
+    problems.push(`deep link: ${steps.tour.deepLink}`);
+  }
   const quietCaptured = (steps.quiet.captured ?? []).length;
   if (quietCaptured !== 0) problems.push('quiet follower was included in a captured push');
 
@@ -1133,7 +1396,7 @@ async function commandVerify(dryRun) {
     quiet: { notifications: steps.quiet.notifications, unseen: steps.quiet.unseen },
     notify: steps.notify.response,
     captured,
-    screenshot: steps.screenshot,
+    tour: steps.tour,
   };
   const reportPath = path.join(evidence, 'report.json');
   writeFileSync(reportPath, JSON.stringify(redact(report), null, 2));
@@ -1145,23 +1408,28 @@ async function commandVerify(dryRun) {
     });
   }
   const cleaned = child(['cleanup']);
-  const shotRemains = existsSync(shot);
-  const reportRemains = existsSync(reportPath);
-  if (!shotRemains || !reportRemains) {
+  const proof = [shot, profileShot, dropsShot, deepShot, video, reportPath];
+  const missing = proof.filter((file) => !existsSync(file));
+  if (missing.length) {
     fail(
       'Cleanup removed the proof.',
       'Evidence must stay in the evidence directory. cleanup should only stop the stack, the web server, and the capture container.',
-      { shot, reportPath },
+      { missing },
     );
   }
   ok({
     command: 'verify-drops',
     passed: true,
     evidence,
-    screenshot: shot,
+    messages: shot,
+    profile: profileShot,
+    drops: dropsShot,
+    deepLink: deepShot,
+    video,
     report: reportPath,
-    unseen: steps.screenshot.unseen,
-    badgeLabel: steps.screenshot.badgeLabel,
+    unseen: steps.tour.unseen,
+    badgeLabel: steps.tour.badgeLabel,
+    tabLabel: steps.tour.tabLabel,
     skipped,
     cleanup: cleaned.command,
   });
@@ -1225,6 +1493,7 @@ const commands = {
   'drops-status': () => commandDropsStatus(rest[0]),
   web: () => commandWeb(dryRun),
   screenshot: () => commandScreenshot(rest[0], rest[1], asFlag.value),
+  tour: () => commandTour(rest[0], dryRun),
   cleanup: () => commandCleanup(dryRun),
   'reset-proof': () => commandReset(dryRun),
   'verify-drops': () => commandVerify(dryRun),
@@ -1234,7 +1503,7 @@ const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, reset-proof, verify-drops, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, cleanup, reset-proof, verify-drops.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops.',
   );
 }
 
