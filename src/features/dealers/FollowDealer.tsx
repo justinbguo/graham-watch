@@ -5,7 +5,7 @@ import { useFollows, useToggleFollow } from '@/data/follows';
 import { requestNotificationPermission } from '@/features/onboarding/notifications';
 import { isDemo } from '@/lib/demo';
 import { tick } from '@/lib/haptics';
-import { size, type Theme } from '@/lib/theme';
+import { dealerSocial, size, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -26,14 +26,17 @@ import { dealerSocialButtonStyles, dealerSocialHitSlop } from './socialButton';
 export function FollowDealer({
   dealer,
   block = false,
+  compact = false,
 }: {
   dealer: { id: string; name: string; logo_url?: string | null };
   /** On a row of its own: the row's width, at the same height. */
   block?: boolean;
+  /** Community directory. Same shape, shorter, so the shop name keeps the row. */
+  compact?: boolean;
 }) {
   const { userId } = useSession();
   const theme = useTheme();
-  const styles = useThemedStyles(followStyles);
+  const styles = useThemedStyles(compact ? followCompactStyles : followStyles);
   const { data: follows = [], isSuccess } = useFollows(userId);
   const toggle = useToggleFollow(userId);
   const following = follows.some((shop) => shop.id === dealer.id);
@@ -48,7 +51,7 @@ export function FollowDealer({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: following }}
-      hitSlop={dealerSocialHitSlop()}
+      hitSlop={dealerSocialHitSlop(compact ? dealerSocial.compactMinHeight : dealerSocial.minHeight)}
       onPress={() => {
         tick();
         const firstFollow = isSuccess && follows.length === 0 && !following;
@@ -76,7 +79,7 @@ export function FollowDealer({
         on={following}
         from="account-plus-outline"
         to="account-check-outline"
-        size={size.dealerSocialMark}
+        size={compact ? size.iconSmall : size.dealerSocialMark}
         color={following ? theme.color.text : theme.color.background}
       />
       <Text style={[styles.label, !following && styles.solidLabel]} numberOfLines={1}>
@@ -87,3 +90,4 @@ export function FollowDealer({
 }
 
 const followStyles = (theme: Theme) => dealerSocialButtonStyles(theme);
+const followCompactStyles = (theme: Theme) => dealerSocialButtonStyles(theme, true);

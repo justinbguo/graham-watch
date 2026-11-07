@@ -320,6 +320,10 @@ export const demo = {
       ? [{ id: DEALER.id, name: DEALER.name, logo_url: DEALER.logo_url }]
       : [],
 
+  directory: (): { id: string; name: string; logo_url: string | null }[] => [
+    { id: DEALER.id, name: DEALER.name, logo_url: DEALER.logo_url },
+  ],
+
   follow: (dealerId: string) => {
     followed.add(dealerId);
   },

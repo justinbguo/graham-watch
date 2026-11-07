@@ -4,11 +4,20 @@ import {
   dealerSocial,
   size,
   space,
+  type,
   type Theme,
 } from '@/lib/theme';
 
+/** Compact Follow. `lineHeight` matches the size so the word sits on the glyph. */
+const typeCaption = {
+  fontFamily: type.caption.fontFamily,
+  fontSize: type.caption.fontSize,
+  lineHeight: type.caption.fontSize,
+  includeFontPadding: false,
+} as const;
+
 /** Shared chrome for Follow and Message on a shop. */
-export function dealerSocialButtonStyles(theme: Theme) {
+export function dealerSocialButtonStyles(theme: Theme, compact = false) {
   return {
     button: {
       flexDirection: 'row' as const,
@@ -16,8 +25,8 @@ export function dealerSocialButtonStyles(theme: Theme) {
       alignSelf: 'flex-start' as const,
       justifyContent: 'center' as const,
       gap: space.xs,
-      minHeight: dealerSocial.minHeight,
-      paddingHorizontal: dealerSocial.paddingX,
+      minHeight: compact ? dealerSocial.compactMinHeight : dealerSocial.minHeight,
+      paddingHorizontal: compact ? dealerSocial.compactPaddingX : dealerSocial.paddingX,
       borderRadius: dealerSocial.radius,
       borderWidth: 1,
       borderColor: theme.color.text,
@@ -41,7 +50,7 @@ export function dealerSocialButtonStyles(theme: Theme) {
       opacity: 0.72,
     },
     label: {
-      ...controlText.label,
+      ...(compact ? typeCaption : controlText.label),
       color: theme.color.text,
     },
     solidLabel: {
@@ -54,6 +63,6 @@ export function dealerSocialButtonStyles(theme: Theme) {
   };
 }
 
-export function dealerSocialHitSlop() {
-  return (HIT_TARGET - dealerSocial.minHeight) / 2;
+export function dealerSocialHitSlop(minHeight: number = dealerSocial.minHeight) {
+  return (HIT_TARGET - minHeight) / 2;
 }
