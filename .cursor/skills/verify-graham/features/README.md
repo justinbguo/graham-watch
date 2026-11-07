@@ -34,8 +34,8 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 - [Onboarding](./onboarding.md) — name, username, birthday, and the questions before the deck.
 - [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save.
 - [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
-- [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count. This is the proven flow.
+- [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count on Messages. This is the proven flow.
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.
-- [Profile](./profile.md) — the signed-in profile, including the Drops count.
+- [Profile](./profile.md) — the signed-in profile and the shops they follow.
 - [Dealer shop management](./dealer-shop.md) — a claimed shop edited by the dealer.
 - [Operator console](./operator.md) — the separate console an operator uses to approve shops.

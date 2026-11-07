@@ -71,7 +71,7 @@ node .cursor/skills/verify-graham/control-graham.mjs notify-drops
 node .cursor/skills/verify-graham/control-graham.mjs drops-status buyer
 node .cursor/skills/verify-graham/control-graham.mjs drops-status quiet
 node .cursor/skills/verify-graham/control-graham.mjs web
-node .cursor/skills/verify-graham/control-graham.mjs screenshot /profile /opt/cursor/artifacts/verify-graham/profile.png --as buyer
+node .cursor/skills/verify-graham/control-graham.mjs tour <dealerId>
 node .cursor/skills/verify-graham/control-graham.mjs verify-drops
 node .cursor/skills/verify-graham/control-graham.mjs cleanup
 ```
@@ -92,15 +92,19 @@ Fixture people, created by `seed`:
 
 `notify-drops` POSTs to the local function with the service-role JWT and `x-graham-cron-secret`. The edge runtime's `EXPO_PUSH_URL` is `http://graham-push-capture:8799/push`. The function ignores that override unless `SUPABASE_URL` is a local host, so a hosted function still posts to `https://exp.host/--/api/v2/push/send`.
 
-`screenshot` opens the route in headless Chromium at 390×844. On `/profile` it signs in through the sheet: button `Log in or create an account`, button `Continue with email`, placeholder `you@example.com`, textbox `Sign-in code`, button `Continue`. The sheet then returns to Buy, so the command presses the tab `Profile` and waits for the button whose accessible name matches `New from dealers you follow, <count>`.
+`screenshot` opens the route in headless Chromium at 390×844. It signs in through the sheet: button `Log in or create an account`, button `Continue with email`, placeholder `you@example.com`, textbox `Sign-in code`, button `Continue`. The sheet then returns to Buy. `/messages` presses the Messages tab and waits for the button whose accessible name matches `New from dealers you follow, <count>`. `/profile` presses Profile and checks that the drops row is gone. `/drops` opens the feed.
+
+`tour <dealerId>` does that sign-in once and writes the Messages badge, Profile without the drops row, the drops feed, the one-dealer deep link, and a video.
 
 Stable handles for the Drops proof, not coordinates:
 
-- Profile guest gate: button `Log in or create an account`
+- Guest gate: button `Log in or create an account`
 - Email door: button `Continue with email`
 - Code field: `Sign-in code`
-- Unseen count: button `New from dealers you follow, N`
-- Phone-width tab: tab `Profile, N`
+- Unseen count: button `New from dealers you follow, N` on Messages
+- Phone-width tab: tab `Messages, N`
+- Following row: button `Test Bench, verified`
+- Drops feed: text `New watches` and button `Fixture Drop, 1968`
 
 ## Evidence
 
@@ -108,13 +112,17 @@ Proof files live in `/opt/cursor/artifacts/verify-graham` when `/opt/cursor/arti
 
 `verify-drops` writes:
 
-- `profile.png` — Profile after email sign-in, with the unseen count visible
+- `messages.png` — Messages after email sign-in, with the unseen count on the tab and the drops row
+- `profile.png` — Profile after the same sign-in, Following present, no drops row and no Profile badge
+- `drops.png` — the New watches feed opened from that row
+- `deep-link.png` — `/drops?dealerId=<id>`, the one-shop push target
+- `drops-messages.webm` — the same path, in order
 - `report.json` — assertions, skip counts, the notification row, the captured push
 - `notify.json` — the function's JSON response and the captured Expo body
 
 Standards for a proof:
 
-- Exercise the user path. Follow is the same `dealer_follows` insert the app performs. Sign-in on web types the Mailpit code. The badge is the Profile button, not a direct DOM edit.
+- Exercise the user path. Follow is the same `dealer_follows` insert the app performs. Sign-in on web types the Mailpit code. The badge is the Messages button and the Messages tab, not a direct DOM edit.
 - Capture the action and the resulting state. `notify-drops` records the function response and the body the capture server stored. `drops-status` reads `drop_notifications` and `unseen_drop_count` as the buyer.
 - Check side effects. Exactly one `drop_notifications` row for the buyer, status `sent`, title `New watches`, listing id equal to the import. Exactly one captured push to the buyer's token, `data.kind` `drop`, `data.dealerId` the Test Bench id, `data.dropNotificationId` the row id. The quiet follower has no row and no push. The response's `skipped.noTokenWithListings` is at least 1.
 - The push mock is the production boundary. `notify-drops` already posts to Expo's URL. Locally that URL is a capture server. Confirm the capture file received the payload. An empty capture with `sent: 1` is a failure, not a pass.
@@ -134,7 +142,7 @@ This stops only what the harness started:
 - `docker rm -f graham-push-capture` (that name only)
 - `supabase stop` in this repo, which stops the `graham-watch` project
 
-It does not delete evidence, and it does not kill processes by name. `verify-drops` runs cleanup after the proof and then checks that `profile.png` and `report.json` are still on disk. If they are gone, the run fails.
+It does not delete evidence, and it does not kill processes by name. `verify-drops` runs cleanup after the proof and then checks that `messages.png`, `profile.png`, `drops.png`, `deep-link.png`, `drops-messages.webm`, and `report.json` are still on disk. If any are gone, the run fails.
 
 After a failed attempt, run `cleanup` before starting again so ports and containers are not left behind. Evidence from the failed attempt stays.
 
