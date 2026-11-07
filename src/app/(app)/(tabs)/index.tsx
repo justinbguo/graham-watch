@@ -22,6 +22,7 @@ import { Button, Centered, Heading, Message, Screen, Spinner } from '@/component
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
+import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
 import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
 import { activeCount } from '@/features/filters/types';
@@ -86,6 +87,7 @@ export default function Deck() {
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
   const deckOnTop = pathname === '/' || pathname === '/index';
+  useSignInOnArrival(deckOnTop);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
@@ -263,7 +265,7 @@ export default function Deck() {
 
   const deckToolsMobile = (
     <>
-      {Platform.OS !== 'ios' && !isSignedIn ? (
+      {Platform.OS === 'android' && !isSignedIn ? (
         <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
       ) : null}
       <UndoButton onPress={undo} />
@@ -274,9 +276,6 @@ export default function Deck() {
 
   const deckToolsDesktop = (
     <>
-      {Platform.OS !== 'ios' && !isSignedIn ? (
-        <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
-      ) : null}
       <DeckRailButton
         label="Rewind"
         icon="undo-variant"
@@ -372,7 +371,7 @@ export default function Deck() {
     return (
       <Screen
         titleControl={titleControl}
-        width={isDesktopWeb ? 'deckFrameWeb' : 'grid'}
+        width="grid"
         desktopBleed={isDesktopWeb}
         inTabs>
         {frameDesktop(

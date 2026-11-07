@@ -9,7 +9,7 @@ import { useSession } from '@/providers/session';
 
 /**
  * Sign-in as a sheet over the app. Guests browse the deck first; this opens from
- * the top-right control or after the swipe budget. Dismissible — the next swipe
+ * itself when a web guest lands on Buy, and again after the swipe budget. Dismissible — the next swipe
  * asks again if the budget is spent.
  */
 export default function SignInSheet() {
