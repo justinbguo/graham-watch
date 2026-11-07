@@ -616,6 +616,8 @@ Every screen is a centred column with a ceiling, from `layout`:
 | `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
+| `layout.communityRail` | 320 | Community follow list beside the feed on desktop web. |
+| `layout.communityFrameWeb` | 1308 | Community cap: feed column plus that list. |
 | `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
 | `layout.desktopColumnShare` | 0.75 | Desktop web tabs: one centred column for each tab's body. |
 | `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |
@@ -1731,6 +1733,17 @@ what is on offer now, not a ranking.
 The payment line is not on the feed. An information icon sits beside the plus. It says
 you pay the other person directly, and that Graham does not hold the money or the watch.
 Comment on a post before you deal with them. The comments go with a deleted post.
+
+On desktop web that same line is the rail button "How deals work". Under it, a
+list of every approved shop: mark, name, the verified check, and Follow. The
+name is `labelStrong`. The mark and the check are `iconSmall`. Follow is the
+same control as on the shop, at `dealerSocial.compactMinHeight` with `caption`
+type, so the name and the button share the rail. The list
+scrolls in the rail; the feed scrolls on its own. Pending, paused, and revoked
+shops stay off it. The phone keeps the information icon and does not show the
+list: there is no column under that icon, and the first post stays under the
+header. The block is `width="communityFrameWeb"` so the list's `communityRail`
+does not take width from the feed.
 
 On their own post the author gets three dots at the far end of the byline, holding Edit
 and Delete in `danger`. Two full-width buttons under every post

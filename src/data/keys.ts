@@ -46,6 +46,8 @@ export const keys = {
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,
+  /** Every approved shop, for the community follow list. Not per user. */
+  dealerDirectory: ['dealer-directory'] as const,
   /** Unseen new watches per followed shop. */
   dropCounts: (userId: string) => ['drop-counts', userId] as const,
   dropFeed: (userId: string) => ['drop-feed', userId] as const,
