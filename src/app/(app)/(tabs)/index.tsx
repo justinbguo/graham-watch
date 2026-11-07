@@ -372,7 +372,7 @@ export default function Deck() {
     return (
       <Screen
         titleControl={titleControl}
-        width={isDesktopWeb ? 'deckFrameWeb' : 'grid'}
+        width="grid"
         desktopBleed={isDesktopWeb}
         inTabs>
         {frameDesktop(

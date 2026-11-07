@@ -603,9 +603,12 @@ One codebase, one visual language. Web is not a separate design — it is the
 same design with room left over, and the rules below decide what we do with
 that room. The answer is almost never "stretch".
 
-### Nothing fills the window
+### The page fills the window
 
-Every screen is a centred column with a ceiling, from `layout`:
+The desktop web page paints edge to edge. Prose, the swipe card, and the
+community feed stay in a centred column with a ceiling, from `layout`. A line
+or a card does not stretch. The buy grid does use the width: another column
+opens before a tile passes `gridTileMax`.
 
 | Token | Width | Job |
 | --- | --- | --- |
@@ -616,17 +619,20 @@ Every screen is a centred column with a ceiling, from `layout`:
 | `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
-| `layout.gridColumns` | 4 | Tile columns on the wide home grid. |
-| `layout.desktopColumnShare` | 0.75 | Desktop web tabs: one centred column for each tab's body. |
+| `layout.gridColumns` | 4 | Tile columns on the wide native home grid. |
+| `layout.gridColumnsWeb` | 2 | Fewest tile columns on the desktop web home grid. |
+| `layout.gridTileMax` | 640 | Widest a desktop web grid tile gets before another column opens. |
+| `layout.desktopColumnShare` | 1 | Desktop web tabs: the tab column is the window. |
 | `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |
 
-On desktop web inside `(tabs)`, `Screen` uses the centred `desktopColumnShare`
-column. `DesktopTabHeader` uses `desktopContentWidth` — the same width as a
-padded tab body such as Seller Hub's section nav (`inset.screen` gutters). The
-swipe deck is the exception: pass `desktopBleed`
+On desktop web inside `(tabs)`, `Screen` uses the `desktopColumnShare` column,
+which is the window. `DesktopTabHeader` uses `desktopContentWidth` — the same
+width as a padded tab body such as Seller Hub's section nav (`inset.screen`
+gutters). The swipe deck is the exception: pass `desktopBleed`
 and `width="deckFrameWeb"` so the capped block is wide enough for the tool rail
-plus a full `cardWeb` stage, centred in the tab column with `space.lg` under the
-header.
+plus a full `cardWeb` stage, centred in the window with `space.lg` under the
+header. The buy grid passes `width="grid"` with `desktopBleed` and no ceiling,
+so the wall fills the window.
 
 A left rail and the column beside it share one top edge. Padding belongs on both
 columns or on neither — not a one-off `paddingTop` on the rail to chase a roll,
@@ -652,10 +658,11 @@ Why each one:
   the eye cannot find the start of the next line.
 - A swipe card stays hand-sized. Stretched to a desktop window it is a
   billboard, and the gesture that matches it is a shove rather than a flick.
-- The grid is a tile wall on a wide window: `layout.gridColumns` across,
-  photograph above the copy. On a phone it stays one watch per row. The
-  column still caps at `layout.grid`, so tiles do not stretch into banners
-  on an ultrawide monitor.
+- The grid is a tile wall: photograph above the copy. On a phone, two
+  across. On a wide native window, `layout.gridColumns`, capped at
+  `layout.grid`. On desktop web the wall fills the window, and another
+  column opens once a tile would pass `layout.gridTileMax`, so a photo
+  does not become a banner.
 
 ### Size comes from measurement, not from the window
 

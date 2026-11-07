@@ -1,7 +1,7 @@
 import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { inset, layout, WIDE_BREAKPOINT } from '@/lib/design';
+import { inset, layout, space, WIDE_BREAKPOINT } from '@/lib/design';
 
 /** End-to-end width of the swipe card: column minus the deck's side gutters. */
 export function deckContentWidth(windowWidth: number, insetLeft: number, insetRight: number) {
@@ -30,9 +30,20 @@ export function desktopAvailableWidth(windowWidth: number, insetLeft: number, in
   return windowWidth - insetLeft - insetRight;
 }
 
-/** Centred desktop web column: `layout.desktopColumnShare` of the safe width. */
+/** Desktop web tab column: `layout.desktopColumnShare` of the safe width. */
 export function desktopColumnWidth(windowWidth: number, insetLeft: number, insetRight: number) {
   return desktopAvailableWidth(windowWidth, insetLeft, insetRight) * layout.desktopColumnShare;
+}
+
+/**
+ * Buy grid columns on desktop web. At least `gridColumnsWeb`. Another column
+ * opens once a tile would pass `gridTileMax`, so the wall fills the window.
+ */
+export function desktopGridColumns(windowWidth: number, insetLeft: number, insetRight: number) {
+  const rail = layout.deckToolRail + space.lg + space.xs + space.lg;
+  const available = Math.max(0, desktopAvailableWidth(windowWidth, insetLeft, insetRight) - rail);
+  const columns = Math.ceil((available + space.sm) / (layout.gridTileMax + space.sm));
+  return Math.max(layout.gridColumnsWeb, columns);
 }
 
 export function useDesktopColumnWidth() {

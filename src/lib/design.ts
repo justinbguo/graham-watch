@@ -531,9 +531,9 @@ export const controlTextNudge = {
  * Maximum content widths. A phone is narrower than every value here, so these
  * are inert on a phone and only bite once a window has room to spare.
  *
- * Nothing stretches to fill a desktop window. A 1600px line of body type loses
- * the reader between one line and the next, and a swipe card that wide stops
- * reading as a card.
+ * The page paints the whole window. A line of body type and a swipe card still
+ * have a ceiling: a 1600px line loses the reader, and a card that wide is a
+ * billboard. The buy grid spends extra width on more columns.
  */
 export const layout = {
   /** Prose, forms, lists, detail screens. About 64 characters of `type.body`. */
@@ -576,8 +576,14 @@ export const layout = {
   gridColumns: 4,
   /** Phone home grid: two tiles across the column. */
   gridColumnsPhone: 2,
-  /** Desktop web home grid: two swipe-photo columns across `cardWeb`. */
+  /** Desktop web home grid: at least two swipe-photo columns. */
   gridColumnsWeb: 2,
+  /**
+   * Widest a desktop web grid tile gets. Another column opens past this, so
+   * the wall can fill the window without a photo becoming a banner.
+   * Target is half of `cardWeb` (480); this ceiling keeps a laptop at two.
+   */
+  gridTileMax: 640,
   /**
    * Scan and wishlist rows: photograph width as a share of the row, capped at
    * `gridPhoto` so a list row does not become a poster.
@@ -590,8 +596,12 @@ export const layout = {
   deckGridPhotoAspect: 0.76,
   /** Buy header: search door width as a share of the title row (icons take the rest). */
   deckHeaderSearchShare: 0.6,
-  /** Desktop web: header and tab content share one centred column (swipe deck excepted). */
-  desktopColumnShare: 0.75,
+  /**
+   * Desktop web tab column, as a share of the safe width. 1 paints the page
+   * to the window edge. A smaller share left the rest unpainted browser gray:
+   * the column's pixel width became the page width, and it sat on the left.
+   */
+  desktopColumnShare: 1,
   /** Photo roll track width as a share of the card column (centered over the stack). */
   photoRollTrackShare: 0.62,
   /**
@@ -612,6 +622,7 @@ export type LayoutWidth = Exclude<
   | 'rail'
   | 'gridColumns'
   | 'gridColumnsWeb'
+  | 'gridTileMax'
   | 'deckGridPhotoAspect'
   | 'deckHeaderSearchShare'
   | 'desktopColumnShare'

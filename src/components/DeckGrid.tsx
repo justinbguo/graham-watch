@@ -4,11 +4,13 @@ import {
   FlatList,
   Platform,
   Text,
+  useWindowDimensions,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ListingTile } from '@/components/ListingTile';
 import { Button, Message } from '@/components/ui';
@@ -19,7 +21,7 @@ import {
   type GridPaging,
   type ListScrollMetrics,
 } from '@/data/deckPaging';
-import { useIsDesktopWeb, useIsWide } from '@/lib/layout';
+import { desktopGridColumns, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
 import { layout, space, type, type Theme } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
@@ -55,12 +57,14 @@ export function DeckGrid({
 }) {
   const wide = useIsWide();
   const isDesktopWeb = useIsDesktopWeb();
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(gridStyles);
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
   const columns = wide
     ? isDesktopWeb
-      ? layout.gridColumnsWeb
+      ? desktopGridColumns(windowWidth, insets.left, insets.right)
       : layout.gridColumns
     : layout.gridColumnsPhone;
 

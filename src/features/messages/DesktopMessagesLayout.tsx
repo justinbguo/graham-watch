@@ -37,7 +37,10 @@ export function DesktopMessagesLayout({
 }: DesktopMessagesLayoutProps) {
   const styles = useThemedStyles(layoutStyles);
   const columnWidth = useDesktopColumnWidth();
-  const inboxWidth = Math.round(columnWidth * layout.messagesPaneShare);
+  // The split is capped at the swipe frame. The share is of that frame, not
+  // the window, or a wide window makes the inbox half of a narrow panel.
+  const frame = Math.min(columnWidth, layout.deckFrameWeb);
+  const inboxWidth = Math.round(frame * layout.messagesPaneShare);
   const open = useOpenStack();
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>('all');
 

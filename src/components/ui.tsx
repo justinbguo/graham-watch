@@ -116,9 +116,14 @@ export function Screen({
   const padBottom = inTabs && !isWide && !isDesktopWeb ? 0 : insets.bottom;
   const inDesktopColumn = isDesktopWeb && inTabs;
   // Most tab screens use the full desktop column. Named narrow caps (wishlist,
-  // card, grid) still apply so the block stays centred inside the shell.
+  // card, the swipe deck) still apply so that block stays centred in the shell.
+  // The buy grid is the exception: it fills the window and adds columns.
   const columnCap =
-    inDesktopColumn && !desktopBleed && width === 'reading' ? undefined : layout[width];
+    inDesktopColumn && !desktopBleed && width === 'reading'
+      ? undefined
+      : inDesktopColumn && desktopBleed && width === 'grid'
+        ? undefined
+        : layout[width];
   // Top nav names the tab; nested stacks still show a title when `back` is set.
   const hideTabTitle = inDesktopColumn && !back;
   const showTitle = Boolean(title && !hideTabTitle);
