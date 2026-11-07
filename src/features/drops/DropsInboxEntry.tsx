@@ -5,13 +5,7 @@ import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-/**
- * One inbox row for every followed shop's new watches. It is not a thread.
- * Opening it is the same feed Profile used to open, and that feed marks them seen.
- *
- * On web, `router.push` is what puts `/drops` in the address and shows the feed.
- * The phone uses the stack dispatch, because a push from a tab is dropped there.
- */
+/** On web, `router.push` is what puts `/drops` in the address and shows the feed. */
 export function DropsInboxEntry({ unseen }: { unseen: number }) {
   const open = useOpenStack();
   const styles = useThemedStyles(entryStyles);

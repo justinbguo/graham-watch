@@ -13,10 +13,7 @@ export type DropCount = {
   unseen: number;
 };
 
-/**
- * Unseen watches listed after the buyer followed, one number per shop.
- * The Messages badge and the inbox row read this same cache.
- */
+/** Unseen watches listed after the buyer followed, one number per shop. */
 export function useDropCounts(userId: string | null) {
   return useQuery({
     queryKey: keys.dropCounts(userId ?? 'none'),

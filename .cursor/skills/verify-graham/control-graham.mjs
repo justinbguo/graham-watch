@@ -798,7 +798,6 @@ async function stopWebServer() {
   try {
     process.kill(existing, 'SIGTERM');
   } catch {
-    // Already gone.
   }
   writeState({ webPid: null });
   const deadline = Date.now() + 5_000;
@@ -1155,12 +1154,29 @@ async function commandTour(dealerId, dryRun) {
     await page.getByText('From dealers you follow', { exact: true }).filter({ visible: true }).first().waitFor({ state: 'visible' });
     await page.waitForTimeout(800);
     await shoot(page, files.drops);
-    // A full load of this URL sends a signed-in browser back to Buy.
-    // router.push is the same call the notification tap makes.
-    await page.waitForFunction(() => typeof window.__grahamNavigate === 'function');
-    await page.evaluate((id) => {
-      window.__grahamNavigate(`/drops?dealerId=${id}`);
+    // A new document does not restore the session, so this uses the bundle's push.
+    const pushed = await page.evaluate((id) => {
+      const requireModule = window.__r;
+      if (typeof requireModule !== 'function') return false;
+      for (let moduleId = 0; moduleId < 3000; moduleId += 1) {
+        let loaded;
+        try {
+          loaded = requireModule(moduleId);
+        } catch {
+          continue;
+        }
+        if (!loaded || typeof loaded.push !== 'function' || typeof loaded.linkTo !== 'function') continue;
+        loaded.push(`/drops?dealerId=${id}`);
+        return true;
+      }
+      return false;
     }, dealerId);
+    if (!pushed) {
+      fail(
+        'The dealer drops route did not open.',
+        'The tour pushes /drops?dealerId through the running app. A full page load of that URL does not keep the session.',
+      );
+    }
     await page.waitForURL(new RegExp(`dealerId=${dealerId}`), { timeout: 20_000 });
     await waitForWatch(page);
     await page.waitForTimeout(800);
@@ -1263,7 +1279,6 @@ function commandCleanup(dryRun) {
     try {
       process.kill(webPid, 'SIGTERM');
     } catch {
-      // Already gone.
     }
   }
   spawnSync('docker', ['rm', '-f', CAPTURE_NAME], { encoding: 'utf8' });
