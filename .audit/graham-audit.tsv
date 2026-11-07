@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-11-07T18:21:20Z	start	Audit of Graham on main 4ca8e43	Future agents need one map, and the inbox gap was the known incongruity	origin/main 4ca8e43	open
+2026-11-07T18:21:20Z	frame	Done means one open PR to main with green CI, a verify-graham proof of buyer dealer and Messages, and a report of branches left untouched	The user named that predicate and forbade prod writes, merges, and branch deletion	user query	predicate set
+2026-11-07T18:21:20Z	git	Fast-forwarded local main to origin/main	The snapshot was behind the desktop web merge	4ca8e43	main matches origin
+2026-11-07T18:21:20Z	git	Main CI for 4ca8e43 succeeded	The user asked to confirm main is green before branching	https://github.com/justinbguo/graham-watch/actions/runs/42399991123	success
+2026-11-07T18:21:20Z	inbox	Pinned the empty Messages copy under the drops row	Centered plus flexGrow parked No messages yet in the leftover height	src/features/messages/ConversationList.tsx	typecheck passed, screenshot still to run
