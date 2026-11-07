@@ -13,7 +13,7 @@ import {
 } from '@/data/messages';
 import { DropsInboxEntry } from '@/features/drops/DropsInboxEntry';
 import { useFollows } from '@/data/follows';
-import { inset, space, type Theme } from '@/lib/theme';
+import { inset, space, stack, type Theme } from '@/lib/theme';
 import { normalizeUsername, usernameIsValid } from '@/lib/username';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -177,27 +177,26 @@ export function ConversationList({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={
             shown.length === 0 && !canMessage
-              ? [styles.empty, layout.list]
+              ? unseenDrops > 0
+                ? [styles.list, layout.list, styles.emptyUnderDrops]
+                : [styles.empty, layout.list]
               : [styles.list, layout.list]
           }
           ListEmptyComponent={
-            canMessage ? null : term || inboxFilter !== 'all' ? (
-              <Centered>
-                <Message
-                  text={term ? 'No messages match.' : inboxFilterEmptyMessage(inboxFilter)}
-                />
-              </Centered>
-            ) : (
-              <Centered>
-                <Heading>No messages yet</Heading>
-                <Message
-                  text={
-                    embedded
-                      ? 'Use the button below to message someone, or search for a username.'
-                      : 'Tap + to message someone, ask a shop about a watch, or write from a post.'
-                  }
-                />
-              </Centered>
+            canMessage ? null : (
+              <EmptyThreads
+                pinned={unseenDrops > 0}
+                title={term || inboxFilter !== 'all' ? null : 'No messages yet'}
+                text={
+                  term
+                    ? 'No messages match.'
+                    : inboxFilter !== 'all'
+                      ? inboxFilterEmptyMessage(inboxFilter)
+                      : embedded
+                        ? 'Use the button below to message someone, or search for a username.'
+                        : 'Tap + to message someone, ask a shop about a watch, or write from a post.'
+                }
+              />
             )
           }
           renderItem={({ item }) => (
@@ -213,6 +212,26 @@ export function ConversationList({
       )}
     </View>
   );
+}
+
+function EmptyThreads({
+  pinned,
+  title,
+  text,
+}: {
+  pinned: boolean;
+  title: string | null;
+  text: string;
+}) {
+  const styles = useThemedStyles(listStyles);
+  const copy = (
+    <>
+      {title ? <Heading>{title}</Heading> : null}
+      <Message text={text} />
+    </>
+  );
+  if (pinned) return <View style={styles.emptyCopy}>{copy}</View>;
+  return <Centered>{copy}</Centered>;
 }
 
 function said(error: unknown): string {
@@ -315,6 +334,15 @@ const listStyles = (theme: Theme) => ({
   },
   empty: {
     flexGrow: 1,
+  },
+  emptyUnderDrops: {
+    flexGrow: 0,
+    justifyContent: 'flex-start' as const,
+  },
+  emptyCopy: {
+    alignItems: 'flex-start' as const,
+    gap: stack.related,
+    paddingTop: space.md,
   },
   note: {
     paddingHorizontal: inset.screen,
