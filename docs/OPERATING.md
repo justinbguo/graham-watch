@@ -279,7 +279,7 @@ The script and the console end up in the same functions. See
 
 A bot on another machine can run the operator calls with one stored value, the project's secret key (`sb_secret_...`). That key is not a JWT. `import-listings` still requires a signed-in session, and the gateway rejects a non-JWT there. The bot calls `operator-bot` instead.
 
-Set the function secret to that same key, then deploy `operator-bot` by pushing the function (the Deploy edge functions workflow). Apply migration `20261107190000_operator_bot.sql` on purpose. This guide does not apply it.
+Set the function secret to that same key, then deploy `operator-bot` by pushing the function (the Deploy edge functions workflow). Apply migration `20261107200000_operator_bot.sql` on purpose. This guide does not apply it.
 
 ```
 supabase secrets set GRAHAM_OPERATOR_SECRET="$GRAHAM_OPERATOR_SECRET"
