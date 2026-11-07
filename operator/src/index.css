@@ -699,7 +699,7 @@ table.dealers col.email {
 }
 
 table.dealers col.description {
-  width: 18%;
+  width: 16%;
 }
 
 table.dealers col.stock {
@@ -710,12 +710,89 @@ table.dealers col.sync {
   width: 11%;
 }
 
+table.dealers col.new-sync {
+  width: 9%;
+}
+
 table.dealers col.status {
-  width: 10%;
+  width: 9%;
 }
 
 table.dealers col.actions {
-  width: 22%;
+  width: 20%;
+}
+
+table.dealers th.new-sync,
+table.dealers td.new-sync {
+  text-align: center;
+  white-space: normal;
+}
+
+button.sync-count {
+  background: none;
+  color: var(--text);
+  border: none;
+  border-radius: var(--radius-sm);
+  min-height: 0;
+  height: auto;
+  padding: 2px 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  filter: none;
+}
+
+button.sync-count.never {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+button.sync-count:hover:not(:disabled) {
+  background: var(--fill);
+  filter: none;
+}
+
+.last-sync {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm);
+  padding-top: var(--sm);
+}
+
+.last-sync-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.last-sync-list li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.last-sync-list img,
+.last-sync-list .thumb-gap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--fill);
+  object-fit: cover;
+}
+
+.last-sync-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.last-sync-links {
+  display: flex;
+  gap: 12px;
 }
 
 table.dealers td.email-cell,

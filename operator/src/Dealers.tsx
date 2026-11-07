@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import {
   shopErrors,
@@ -24,6 +24,8 @@ import {
   type PublishTotals,
 } from './importer';
 import { refreshAllShops, shopsToRefresh, summariseRefreshAll } from './refreshAll';
+import { LastSyncButton, LastSyncDetail } from './LastSync';
+import { lastSyncCell } from './lastSync';
 import { ShopListings } from './ShopListings';
 import { confirmDelete, confirmWrite, supabase, type OperatorDealer, type Permission } from './supabase';
 
@@ -64,6 +66,8 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
   const [codes, setCodes] = useState<Record<string, { code: string; expiresAt: string }>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<RefreshSchedule | null>(null);
+  const [newCounts, setNewCounts] = useState<Record<string, number> | null>(null);
+  const [openSyncId, setOpenSyncId] = useState<string | null>(null);
   const [reloadPublish, setReloadPublish] = useState(false);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((value) => value + 1);
@@ -114,14 +118,26 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
       // The scraped profile comes alongside in one read for every shop, rather
       // than a read per shop when a row is opened. It is three short columns,
       // and they are columns on this table now.
-      const [{ data, error: failed }, shops, health] = await Promise.all([
+      const [{ data, error: failed }, shops, health, additions] = await Promise.all([
         supabase.rpc('operator_dealers'),
         supabase.from('dealers').select('id, description, instagram'),
         supabase.rpc('operator_refresh_schedule'),
+        supabase.rpc('operator_last_sync_counts'),
       ]);
 
       if (!live) return;
-      setError(failed?.message ?? shops.error?.message ?? health.error?.message ?? null);
+      setError(
+        failed?.message ??
+          shops.error?.message ??
+          health.error?.message ??
+          additions.error?.message ??
+          null,
+      );
+      setNewCounts(
+        additions.error
+          ? null
+          : Object.fromEntries((additions.data ?? []).map((row) => [row.dealer_id, Number(row.new_count)])),
+      );
       setRows(data ?? []);
       setSchedule((health.data?.[0] as RefreshSchedule | undefined) ?? null);
       setProfiles(
@@ -404,6 +420,7 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
               <col className="description" />
               <col className="stock" />
               <col className="sync" />
+              <col className="new-sync" />
               <col className="status" />
               <col className="actions" />
             </colgroup>
@@ -427,6 +444,11 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
                   onSort={setSort}
                   title="Last catalogue read or successful nightly refresh. Turns red after 48 hours."
                 />
+                <th
+                  className="new-sync"
+                  title="Watches first seen on the latest catalogue read. Never means this shop has no read recorded. 0 means the last read added no watches.">
+                  New on last sync
+                </th>
                 <SortHeader label="Status" sortKey="status" sort={sort} onSort={setSort} />
                 <th>Actions</th>
               </tr>
@@ -435,9 +457,15 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
               {shown.map((dealer) => {
                 const listingCount = Number(dealer.listings_held);
                 const profile = profiles[dealer.id];
+                const syncCell =
+                  dealer.last_synced_at && newCounts === null
+                    ? null
+                    : lastSyncCell(dealer.last_synced_at, newCounts?.[dealer.id] ?? 0);
+                const syncOpen = openSyncId === dealer.id;
 
                 return (
-                  <tr key={dealer.id}>
+                  <Fragment key={dealer.id}>
+                  <tr className={syncOpen ? 'open' : undefined}>
                     <td>
                       <div className="shopcell">
                         <div className="grow">
@@ -508,6 +536,18 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
                       <SyncStatus dealer={dealer} />
                     </td>
 
+                    <td className="new-sync">
+                      {syncCell ? (
+                        <LastSyncButton
+                          cell={syncCell}
+                          expanded={syncOpen}
+                          onToggle={() => setOpenSyncId(syncOpen ? null : dealer.id)}
+                        />
+                      ) : (
+                        <span className="muted">…</span>
+                      )}
+                    </td>
+
                     <td className="status">
                       <ShopStatus dealer={dealer} onOpenInbox={onOpenInbox} />
                     </td>
@@ -543,6 +583,14 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
                       </div>
                     </td>
                   </tr>
+                  {syncOpen && syncCell ? (
+                    <tr className="detail-row">
+                      <td colSpan={8}>
+                        <LastSyncDetail dealerId={dealer.id} cell={syncCell} />
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -554,8 +602,10 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
             <p className="muted small">
               <strong># listings</strong> is every watch you imported. <strong>View listings</strong>{' '}
               opens Active and On site tabs. <strong>Last sync</strong> goes red after 48 hours without a
-              catalogue read or successful nightly refresh. <strong>Sync</strong> reads the site
-              then lets you import; you only pay when you confirm watches.
+              catalogue read or successful nightly refresh. <strong>New on last sync</strong> is the
+              watches whose catalogue row was first seen on that read. Never means no read is recorded.
+              0 means the read added no watches. <strong>Sync</strong> reads the site then lets you
+              import; you only pay when you confirm watches.
             </p>
           </details>
         </>

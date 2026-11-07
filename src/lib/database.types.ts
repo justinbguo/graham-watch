@@ -2023,6 +2023,14 @@ export type Database = {
         }
         Returns: unknown
       }
+      last_sync_additions: {
+        Args: { p_dealer_id?: string }
+        Returns: {
+          added_at: string
+          dealer_id: string
+          listing_id: string
+        }[]
+      }
       listing_counts: {
         Args: {
           p_brands?: string[]
@@ -2275,6 +2283,28 @@ export type Database = {
         Returns: {
           code: string
           expires_at: string
+        }[]
+      }
+      operator_last_sync_counts: {
+        Args: never
+        Returns: {
+          dealer_id: string
+          new_count: number
+        }[]
+      }
+      operator_last_sync_listings: {
+        Args: { p_dealer_id: string }
+        Returns: {
+          added_at: string
+          brand: string
+          currency: string
+          id: string
+          model: string
+          price_cents: number
+          shop_url: string
+          source_url: string
+          thumb_path: string
+          thumb_source_url: string
         }[]
       }
       operator_listings: {
