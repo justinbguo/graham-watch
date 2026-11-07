@@ -1,9 +1,9 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
-import { chunk, dropPushMessages, EXPO_CHUNK, EXPO_PUSH_URL, readTickets, ticketsFromExpoBody } from './expo.ts';
+import { chunk, dropPushMessages, EXPO_CHUNK, resolveExpoPushUrl, readTickets, ticketsFromExpoBody } from './expo.ts';
 import {
   dropCutoff,
-  selectDrops,
+  reportDrops,
   utcDay,
   type DropFollow,
   type DropListing,
@@ -161,6 +161,21 @@ async function loadNotices(db: SupabaseClient, userIds: string[]): Promise<DropN
   return notices;
 }
 
+/** User ids that have a device row. The token string stays out of this query. */
+async function loadTokenUserIds(db: SupabaseClient): Promise<Set<string>> {
+  const rows = await eachPage<{ user_id: string }>((from, to) =>
+    db.from('device_push_tokens').select('user_id').order('user_id').range(from, to),
+  );
+  return new Set(rows.map((row) => row.user_id));
+}
+
+function insertProblem(error: { code?: string }): string {
+  if (error.code === '42501') return '42501 row-level security refused the insert';
+  if (error.code === '23514') return '23514 a drop row failed its check constraint';
+  if (error.code === '23503') return '23503 a drop row referenced a missing user or dealer';
+  return error.code ? `insert ${error.code}` : 'insert failed';
+}
+
 async function loadTokens(db: SupabaseClient, userIds: string[]): Promise<DropToken[]> {
   const tokens: DropToken[] = [];
   for (const ids of chunksOf(userIds)) {
@@ -180,7 +195,7 @@ async function postExpo(messages: ReturnType<typeof dropPushMessages>): Promise<
   const accessToken = Deno.env.get('EXPO_ACCESS_TOKEN');
   if (accessToken) headers.authorization = `Bearer ${accessToken}`;
 
-  const response = await fetch(EXPO_PUSH_URL, {
+  const response = await fetch(resolveExpoPushUrl(Deno.env), {
     method: 'POST',
     headers,
     body: JSON.stringify(messages),
@@ -242,12 +257,21 @@ Deno.serve(async (req) => {
     const now = new Date();
     const follows = await loadFollows(db);
     const userIds = [...new Set(follows.map((follow) => follow.userId))];
-    const [listings, notices, tokens] = await Promise.all([
+    const [listings, notices, tokens, tokenAccounts] = await Promise.all([
       loadListings(db, follows, now),
       loadNotices(db, userIds),
       loadTokens(db, userIds),
+      loadTokenUserIds(db),
     ]);
-    const plan = selectDrops({ now, follows, listings, notices, tokens });
+    const report = reportDrops({ now, follows, listings, notices, tokens });
+    const plan = report.plans;
+    const followerIds = new Set(follows.map((follow) => follow.userId));
+    let tokensOnFollowers = 0;
+    let tokensOnOtherAccounts = 0;
+    for (const id of tokenAccounts) {
+      if (followerIds.has(id)) tokensOnFollowers += 1;
+      else tokensOnOtherAccounts += 1;
+    }
     const tokensByUser = new Map<string, string[]>();
     for (const row of tokens) {
       const list = tokensByUser.get(row.userId) ?? [];
@@ -258,6 +282,8 @@ Deno.serve(async (req) => {
     let sent = 0;
     let failed = 0;
     let tokensRemoved = 0;
+    let alreadyClaimed = 0;
+    const problems: string[] = [];
     const day = utcDay(now);
 
     for (const drop of plan) {
@@ -280,8 +306,13 @@ Deno.serve(async (req) => {
 
       if (inserted.error) {
         // The other run already took today's slot.
-        if (inserted.error.code === '23505') continue;
+        if (inserted.error.code === '23505') {
+          alreadyClaimed += 1;
+          continue;
+        }
         failed += 1;
+        const label = insertProblem(inserted.error);
+        if (!problems.includes(label)) problems.push(label);
         continue;
       }
 
@@ -298,14 +329,30 @@ Deno.serve(async (req) => {
           .update({ status, expo_ticket_ids: result.okIds })
           .eq('id', id);
         if (result.anyOk) sent += 1;
-        else failed += 1;
+        else {
+          failed += 1;
+          if (!problems.includes('expo accepted no device')) problems.push('expo accepted no device');
+        }
       } catch {
         await db.from('drop_notifications').update({ status: 'failed' }).eq('id', id);
         failed += 1;
+        if (!problems.includes('expo push failed')) problems.push('expo push failed');
       }
     }
 
-    return json({ users: plan.length, sent, failed, tokensRemoved });
+    const body = {
+      users: plan.length,
+      sent,
+      failed,
+      tokensRemoved,
+      alreadyClaimed,
+      skipped: report.skipped,
+      tokensOnFollowers,
+      tokensOnOtherAccounts,
+      problems,
+    };
+    console.log(JSON.stringify(body));
+    return json(body);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Drops failed.';
     return json({ error: message }, 500);

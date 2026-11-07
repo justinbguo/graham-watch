@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "playwright": "^1.65.0",
     "supabase": "2.117.0",
     "typescript": "~6.0.3"
   },
@@ -70,6 +71,7 @@
     "build:preview:ios": "npx eas-cli@latest build --profile preview --platform ios",
     "operator": "cd operator && { test -d node_modules || npm install; } && npm run dev",
     "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
+    "verify:drops": "node .cursor/skills/verify-graham/control-graham.mjs verify-drops",
     "test:filters": "GRAHAM_TARGET=local node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-ts.mjs scripts/filter-contract.test.mjs",
     "mock:users": "node scripts/mock-users.mjs",
     "mock:signin": "node scripts/mock-signin.mjs",

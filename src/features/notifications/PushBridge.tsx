@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 
 import { isDemo } from '@/lib/demo';
 import { recordDropOpened, routeFromNotification, syncPushRegistration } from '@/lib/push';
+import { pathForPushRoute } from '@/lib/pushRoute';
 import { useSession } from '@/providers/session';
 
 /**
@@ -38,8 +39,7 @@ export function PushBridge() {
         return;
       }
       void recordDropOpened(route.dropNotificationId).catch(() => undefined);
-      if (route.dealerId) router.push(`/dealer/${route.dealerId}`);
-      else router.push('/drops');
+      router.push(pathForPushRoute(route));
     };
 
     // Wait for a session. A tap that launches the app arrives before the

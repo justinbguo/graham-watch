@@ -13,10 +13,7 @@ export type DropCount = {
   unseen: number;
 };
 
-/**
- * Unseen watches listed after the buyer followed, one number per shop.
- * The Profile badge and the "3 new" on each row read this same cache.
- */
+/** Unseen watches listed after the buyer followed, one number per shop. */
 export function useDropCounts(userId: string | null) {
   return useQuery({
     queryKey: keys.dropCounts(userId ?? 'none'),
@@ -67,7 +64,7 @@ export function useDropFeed(userId: string | null) {
   });
 }
 
-/** Opening a shop clears that shop. Opening the feed clears every shop. */
+/** Opening a shop clears that shop. Opening the feed clears every shop, or one shop when a dealer is named. */
 export function useMarkDropsSeen() {
   const { userId } = useSession();
   const queryClient = useQueryClient();

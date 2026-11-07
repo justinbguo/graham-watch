@@ -3,6 +3,7 @@ import { FlatList, View } from 'react-native';
 
 import { SearchField, searchFieldInset } from '@/components/SearchBar';
 import { Centered, Heading, Message, Spinner } from '@/components/ui';
+import { useUnseenDropCount } from '@/data/drops';
 import {
   BODY_SEARCH_MIN,
   useConversations,
@@ -10,6 +11,7 @@ import {
   useMessagesMatching,
   type ConversationSummary,
 } from '@/data/messages';
+import { DropsInboxEntry } from '@/features/drops/DropsInboxEntry';
 import { useFollows } from '@/data/follows';
 import { inset, space, type Theme } from '@/lib/theme';
 import { normalizeUsername, usernameIsValid } from '@/lib/username';
@@ -62,6 +64,7 @@ export function ConversationList({
   onInboxFilterChange?: (next: InboxFilter) => void;
 }) {
   const styles = useThemedStyles(listStyles);
+  const unseenDrops = useUnseenDropCount();
   const openConversation = useOpenConversation();
   const openParty = useOpenParty();
   const { data: conversations = [], isPending, error } = useConversations(userId);
@@ -154,6 +157,11 @@ export function ConversationList({
             desktop={desktopInbox}
             onPress={sendToHandle}
           />
+        </View>
+      ) : null}
+      {unseenDrops > 0 ? (
+        <View style={styles.drops}>
+          <DropsInboxEntry unseen={unseenDrops} />
         </View>
       ) : null}
       {isPending ? (
@@ -296,6 +304,10 @@ const listStyles = (theme: Theme) => ({
   },
   compose: {
     paddingHorizontal: inset.screen,
+  },
+  drops: {
+    paddingHorizontal: inset.screen,
+    paddingBottom: space.sm,
   },
   list: {
     paddingHorizontal: inset.screen,

@@ -1,6 +1,43 @@
 /** Expo's push API. One message per token so a dead device can be dropped on its own. */
 
 export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+const PRODUCTION_REF = 'hbxgxtbtefpyutyqafoi';
+
+/**
+ * Where a push is posted.
+ *
+ * Hosted always uses Expo. A local stack may set EXPO_PUSH_URL to a capture
+ * server so verification can read the payload without sending a real push.
+ * The override is ignored unless SUPABASE_URL is a local host, so a hosted
+ * function with the variable set still talks to Expo.
+ */
+export function resolveExpoPushUrl(env: { get(name: string): string | undefined }): string {
+  const override = env.get('EXPO_PUSH_URL')?.trim() ?? '';
+  if (!override || !isLocalSupabaseUrl(env.get('SUPABASE_URL') ?? '')) return EXPO_PUSH_URL;
+  try {
+    const parsed = new URL(override);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return EXPO_PUSH_URL;
+  } catch {
+    return EXPO_PUSH_URL;
+  }
+  return override;
+}
+
+export function isLocalSupabaseUrl(url: string): boolean {
+  if (!url || url.includes(PRODUCTION_REF)) return false;
+  try {
+    const host = new URL(url).hostname;
+    return (
+      host === '127.0.0.1' ||
+      host === 'localhost' ||
+      host === 'kong' ||
+      host === 'host.docker.internal'
+    );
+  } catch {
+    return false;
+  }
+}
 export const EXPO_CHUNK = 100;
 export const PUSH_CHANNEL_ID = 'watch-updates';
 

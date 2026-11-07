@@ -1,9 +1,11 @@
 name: Catalogue refresh
 
 # Keeps every approved shop current: re-read the catalogue, retire sold watches,
-# auto-publish new and changed ones. Secrets live in the repo settings — the
-# same trio as scripts/.env.operator.local, plus GRAHAM_CRON_SECRET which must
-# also be set on the hosted import-listings function.
+# auto-publish new and changed ones, then call notify-drops. Secrets live in
+# the repo settings — the same trio as scripts/.env.operator.local, plus
+# GRAHAM_CRON_SECRET which must also be set as a hosted edge-function secret
+# (import-listings and notify-drops both read it). A failed notify-drops call
+# fails this job. A night with nobody to notify stays green and prints why.
 
 on:
   schedule:
@@ -34,8 +36,11 @@ jobs:
       #
       # One shop's error, an empty catalogue, missing photos, or a week of
       # nothing new is a warning annotation. It does not fail this job.
-      # Hosted import-listings is updated by .github/workflows/deploy-functions.yml
-      # when that function changes on main.
+      # notify-drops does: a non-2xx response, a delivery failure, or an
+      # insert failure exits 1 after the catalogue write. Hosted functions
+      # are updated by .github/workflows/deploy-functions.yml when they
+      # change on main. A 404 here means that deploy has not shipped
+      # notify-drops yet.
       - name: refresh
         env:
           GRAHAM_TARGET: hosted
