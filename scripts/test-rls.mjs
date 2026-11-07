@@ -39,6 +39,28 @@ function check(name, passed, detail = '') {
   }
 }
 
+async function attachGallery(listingId, count = 3) {
+  const rows = [];
+  for (let position = 0; position < count; position += 1) {
+    rows.push({
+      listing_id: listingId,
+      position,
+      source_url: `https://photos.test/${listingId}/${position}.jpg`,
+    });
+  }
+  const written = await fetch(`${URL}/rest/v1/listing_photos`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(rows),
+  });
+  return written.status;
+}
+
 async function api(path, { token = ANON, method = 'GET', body, prefer } = {}) {
   const response = await fetch(`${URL}${path}`, {
     method,
@@ -325,8 +347,14 @@ console.log('\nafter approval');
     body: JSON.stringify({ permission: 'approved' }),
   });
 
-  const theirs = await api(`/rest/v1/listings?id=eq.${listingId}`, { token: buyer.token });
-  check('a buyer can see a listing from an approved dealer', theirs.body?.length === 1);
+  const bare = await api(`/rest/v1/listings?id=eq.${listingId}`, { token: buyer.token });
+  check('a buyer cannot see an approved listing with no photographs', bare.body?.length === 0);
+
+  const attached = await attachGallery(listingId);
+  check('the proof listing gets a three-photo gallery', attached >= 200 && attached < 300, `got ${attached}`);
+
+  const thin = await api(`/rest/v1/listings?id=eq.${listingId}`, { token: buyer.token });
+  check('a buyer can see a listing from an approved dealer', thin.body?.length === 1);
 
   const buyerDeck = await api('/rest/v1/rpc/get_deck', { token: buyer.token, method: 'POST', body: { p_limit: 50 } });
   check('the deck includes approved listings', buyerDeck.body?.some((row) => row.id === listingId));
@@ -533,7 +561,7 @@ console.log('\nafter approval');
   const ownedPhotos = await api(`/rest/v1/listing_photos?listing_id=eq.${listingId}`, {
     token: dealerUser.token,
   });
-  check('a claimed dealer reads photos on a listing it did not import', ownedPhotos.body?.length === 1);
+  check('a claimed dealer reads photos on a listing it did not import', ownedPhotos.body?.length >= 1);
 
   const hiddenPhotos = await api(`/rest/v1/listing_photos?listing_id=eq.${listingId}`, {
     token: buyer.token,
@@ -659,6 +687,12 @@ let itemId;
     bareQueue.status < 300 && Array.isArray(bareRows) && bareRows.some((row) => row.id === itemId),
     `got ${bareQueue.status} ${JSON.stringify(bareRows)?.slice(0, 180)}`
   );
+  const unstamped = bareRows.find((row) => row.id === itemId);
+  check(
+    'apply_source_item does not stamp applied_hash before the gallery',
+    unstamped?.applied_hash == null,
+    `applied_hash ${unstamped?.applied_hash}`
+  );
 
   const scheduledWrite = await fetch(`${URL}/rest/v1/rpc/replace_listing_photos`, {
     method: 'POST',
@@ -684,9 +718,56 @@ let itemId;
   });
   const filledRows = await filledQueue.json();
   check(
-    'a watch leaves the queue once it has a photograph',
-    filledQueue.status < 300 && Array.isArray(filledRows) && !filledRows.some((row) => row.id === itemId),
+    'one photograph does not finish the gallery',
+    filledQueue.status < 300 && Array.isArray(filledRows) && filledRows.some((row) => row.id === itemId),
     `got ${filledQueue.status} ${JSON.stringify(filledRows)?.slice(0, 180)}`
+  );
+
+  await fetch(`${URL}/rest/v1/listing_photos`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify([1, 2].map((position) => ({
+      listing_id: syncedListingId,
+      position,
+      source_url: `https://shop.test/${position}.jpg`,
+    }))),
+  });
+  const three = await fetch(`${URL}/rest/v1/rpc/pending_source_items`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_dealer_id: dealerId, p_limit: 25 }),
+  });
+  const threeRows = await three.json();
+  check(
+    'three photographs stay queued until the hashes are stamped',
+    three.status < 300 && Array.isArray(threeRows) && threeRows.some((row) => row.id === itemId),
+    `got ${three.status}`
+  );
+  await fetch(`${URL}/rest/v1/source_items?id=eq.${itemId}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ applied_hash: 'c1', photos_hash: 'gallery' }),
+  });
+  const finished = await fetch(`${URL}/rest/v1/rpc/pending_source_items`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_dealer_id: dealerId, p_limit: 25 }),
+  });
+  const finishedRows = await finished.json();
+  check(
+    'a stamped three-photo gallery leaves the queue',
+    finished.status < 300 && Array.isArray(finishedRows) && !finishedRows.some((row) => row.id === itemId),
+    `got ${finished.status} ${JSON.stringify(finishedRows)?.slice(0, 180)}`
   );
 
   // The whole point of edited_fields: a correction has to outlive the refresh
@@ -932,6 +1013,7 @@ console.log('\nswipes');
     prefer: 'return=representation',
   });
   const passedId = spare.body?.[0]?.id;
+  if (passedId) await attachGallery(passedId);
 
   await api('/rest/v1/swipes', {
     token: buyer.token,
@@ -1577,10 +1659,15 @@ console.log('\nreplacing a gallery');
   const shorter = await replace(dealerUser.token, [gallery[0]]);
   check('a shorter gallery replaces a longer one', shorter.body === 1, `got ${JSON.stringify(shorter.body)}`);
 
-  const left = await api(`/rest/v1/listing_photos?listing_id=eq.${listingId}&select=position`, {
-    token: buyer.token,
-  });
-  check('replacing a shorter gallery leaves no tail behind', left.body?.length === 1);
+  const left = await fetch(
+    `${URL}/rest/v1/listing_photos?listing_id=eq.${listingId}&select=position`,
+    { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } },
+  ).then((response) => response.json());
+  check(
+    'replacing a shorter gallery leaves no tail behind',
+    Array.isArray(left) && left.length === 1,
+    JSON.stringify(left),
+  );
 
   // The refresh runs with the service key. auth.uid() is null. This used to
   // raise "Sign in first." after the files were already in the bucket.
@@ -1595,6 +1682,16 @@ console.log('\nreplacing a gallery');
     scheduled.status < 300 && scheduledBody === 2,
     `got ${scheduled.status} ${JSON.stringify(scheduledBody)}`
   );
+
+  await fetch(`${URL}/rest/v1/listing_photos`, {
+    method: 'POST',
+    headers: { ...admin, Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      listing_id: listingId,
+      position: 2,
+      source_url: 'https://shop.test/3.jpg',
+    }),
+  });
 }
 
 console.log('\ndealer applications');
@@ -2893,6 +2990,7 @@ console.log('\nwhat anon can reach');
       }).then((response) => response.json())
     : null;
   const guestListingId = guestListing?.[0]?.id;
+  if (guestListingId) await attachGallery(guestListingId);
 
   const anonFacets = await asAnon('listing_facets', { p_exclude_own: true });
   check(
@@ -3172,6 +3270,7 @@ console.log('\ndelete account');
     prefer: 'return=representation',
   });
   const doomedWatchId = watch.body?.[0]?.id;
+  if (doomedWatchId) await attachGallery(doomedWatchId);
   check('that shop can carry a listing', Boolean(doomedWatchId), `got ${watch.status}`);
 
   const signedOut = await api('/rest/v1/rpc/delete_own_account', {
@@ -4365,7 +4464,9 @@ console.log('\ndrops');
       }),
     });
     const body = await response.json();
-    return { status: response.status, id: body?.[0]?.id, body };
+    const id = body?.[0]?.id;
+    if (id) await attachGallery(id);
+    return { status: response.status, id, body };
   }
 
   const oldListing = await insertListing({ created_at: '2019-01-01T00:00:00.000Z' });
