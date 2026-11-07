@@ -575,6 +575,19 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
         .insert(rows)
         .select('id, brand, model, reference, created_at, dealer_id');
       if (inserted.error) return bad(inserted.error.message, 403);
+      const photoUrl =
+        'https://images.squarespace-cdn.com/content/v1/64d53a504f5aee6d2b32ee14/19e5672c-8f2f-4bc3-ac40-a2c141dc78c7/B0004038.jpg?format=1500w';
+      const photos = (inserted.data ?? []).flatMap((row: { id: string }) =>
+        [0, 1, 2].map((position) => ({
+          listing_id: row.id,
+          position,
+          source_url: photoUrl,
+        }))
+      );
+      if (photos.length > 0) {
+        const photoWrite = await ctx.supabase.from('listing_photos').insert(photos);
+        if (photoWrite.error) return bad(photoWrite.error.message, 403);
+      }
       return Response.json({
         provider: 'fixture',
         published: inserted.data?.length ?? 0,

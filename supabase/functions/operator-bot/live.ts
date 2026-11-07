@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@^2'
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from '../import-listings/catalog.ts';
 import { discover } from '../import-listings/discover.ts';
 import { fixtureImportAllowed } from '../import-listings/fixture.ts';
-import { DEFAULT_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
+import { SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from '../import-listings/source.ts';
 
 import { FixtureImportOff, OperatorError, type FixtureWatch, type OperatorDeps } from './handler.ts';
@@ -20,20 +20,59 @@ function admin(): SupabaseClient {
 }
 
 const NEW_SHOPS_PER_HOUR = 200;
-const PUBLISH_PASSES = 5;
+const CATALOGUE_SNAPSHOT_MS = 6 * 60 * 60 * 1000;
 
-async function publishQueued(dealerId: string) {
-  const totals = { processed: 0, published: 0, skipped: 0, failed: 0, pending: 0 };
-  for (let pass = 0; pass < PUBLISH_PASSES; pass += 1) {
-    const batch = await publishBatch(admin(), admin(), dealerId, DEFAULT_BATCH);
-    totals.processed += batch.processed;
-    totals.published += batch.published;
-    totals.skipped += batch.skipped;
-    totals.failed += batch.failed;
-    totals.pending = batch.pending;
-    if (batch.pending === 0 || batch.processed === 0) break;
+async function catalogueIsFresh(dealerId: string, sourceUrl: string) {
+  const job = await admin()
+    .from('import_jobs')
+    .select('finished_at')
+    .eq('dealer_id', dealerId)
+    .eq('source_url', sourceUrl)
+    .eq('status', 'succeeded')
+    .order('finished_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (job.error || !job.data?.finished_at) return false;
+  const age = Date.now() - new Date(job.data.finished_at).getTime();
+  if (age < 0 || age > CATALOGUE_SNAPSHOT_MS) return false;
+  const items = await admin()
+    .from('source_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('dealer_id', dealerId);
+  return !items.error && (items.count ?? 0) > 0;
+}
+
+async function reusedCatalog(dealerId: string) {
+  const [sample, forSale] = await Promise.all([
+    admin().from('source_items').select('provider').eq('dealer_id', dealerId).limit(1).maybeSingle(),
+    admin()
+      .from('source_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('dealer_id', dealerId)
+      .eq('available', true),
+  ]);
+  if (sample.error || forSale.error) {
+    throw new OperatorError(sample.error?.message ?? forSale.error?.message ?? 'Could not read the catalogue.', 502);
   }
-  return totals;
+  const count = forSale.count ?? 0;
+  return {
+    provider: sample.data?.provider ?? 'snapshot',
+    found: count,
+    added: 0,
+    changed: 0,
+    adopted: 0,
+    retired: 0,
+    relisted: 0,
+    forSale: count,
+    skipped: 0,
+    complete: true,
+  };
+}
+
+async function pendingCount(dealerId: string) {
+  const counts = await admin().rpc('pending_source_item_count', { p_dealer_id: dealerId });
+  if (counts.error) throw new OperatorError(counts.error.message, 502);
+  return counts.data?.[0]?.pending ?? 0;
 }
 
 async function assertBudget() {
@@ -200,11 +239,34 @@ export function liveDeps(): OperatorDeps {
     async importCatalog(input) {
       const dealer = await ensureDealer(input.sourceUrl, input.dealerName, input.dealerEmail);
       try {
+        // One call does one heavy thing. Reading a large catalogue and copying
+        // galleries in the same isolate is what the worker killed. A succeeded
+        // job younger than six hours is the snapshot, so the caller loops and
+        // each later call publishes one small batch.
+        if (await catalogueIsFresh(dealer.id, input.sourceUrl)) {
+          const result = await reusedCatalog(dealer.id);
+          const publish = await publishBatch(admin(), admin(), dealer.id, SCHEDULED_PUBLISH_BATCH);
+          await meter(input.sourceUrl, dealer.id, 'succeeded', result.provider);
+          return {
+            dealerId: dealer.id,
+            permission: dealer.permission,
+            catalogue: 'reused',
+            ...result,
+            publish,
+          };
+        }
+
         const result = await syncCatalog(admin(), dealer.id, input.sourceUrl, MAX_CATALOG_ITEMS);
         await queuePublish(admin(), dealer.id);
-        const publish = await publishQueued(dealer.id);
+        const pending = await pendingCount(dealer.id);
         await meter(input.sourceUrl, dealer.id, 'succeeded', result.provider);
-        return { dealerId: dealer.id, permission: dealer.permission, ...result, publish };
+        return {
+          dealerId: dealer.id,
+          permission: dealer.permission,
+          catalogue: 'read',
+          ...result,
+          publish: { processed: 0, published: 0, skipped: 0, failed: 0, pending },
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Import failed.';
         await meter(input.sourceUrl, dealer.id, 'failed', 'catalog', message);
@@ -254,7 +316,10 @@ export function liveDeps(): OperatorDeps {
           return [{ listing_id: saved.id, position: 0, source_url: listing.photoUrl }];
         });
         if (photos.length > 0) {
-          const photoWrite = await admin().from('listing_photos').insert(photos);
+          const gallery = photos.flatMap((photo) =>
+            [0, 1, 2].map((position) => ({ ...photo, position }))
+          );
+          const photoWrite = await admin().from('listing_photos').insert(gallery);
           if (photoWrite.error) throw new OperatorError(photoWrite.error.message, 502);
         }
       }
