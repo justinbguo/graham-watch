@@ -21,7 +21,7 @@ export default function AppLayout() {
 
   // iOS has no guest deck. The header cannot spare a Log in control beside
   // the title, and the phone is not a preview of the site. Web keeps the
-  // deck, with Log in in that slot.
+  // deck, with the sign-in sheet open over it on arrival.
   if (Platform.OS === 'ios' && !isSignedIn) {
     if (isLoading) return null;
     return (
@@ -65,14 +65,19 @@ export default function AppLayout() {
             name="search"
             options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
           />
+          {/* Web hides the screen under a `modal`; only a transparent modal
+              keeps the deck drawn under the scrim. */}
           <Stack.Screen
             name="sign-in"
-            options={{
-              presentation: 'modal',
-              ...(Platform.OS === 'web'
-                ? { animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }
-                : {}),
-            }}
+            options={
+              Platform.OS === 'web'
+                ? {
+                    presentation: 'transparentModal',
+                    animation: 'fade',
+                    contentStyle: { backgroundColor: 'transparent' },
+                  }
+                : { presentation: 'modal' }
+            }
           />
         </Stack>
       </SaveFlightProvider>

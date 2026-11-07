@@ -212,9 +212,10 @@ beside the word on sign-in for a while, and that made the screen a poster
 before it was a form. No screen wears the mark in its header either: a header
 holds a title or that screen's own control, a count, and controls.
 
-On web, sign-in is a sheet over the deck. Guests land on Buy with **Log in**
-in the header's action slot. After `GUEST_SWIPE_BUDGET` judgments the sheet
-opens itself with copy that says why. The sheet is the wordmark, one
+On web, sign-in is a sheet over the deck. Guests land on Buy with the sheet
+already open, once per page load; there is no **Log in** control in the
+header. After `GUEST_SWIPE_BUDGET` judgments the sheet opens again with copy
+that says why. The sheet is the wordmark, one
 `body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
 with **Not now** to dismiss. On iOS, that same panel is the first screen, and
 it does not dismiss: the header has no room for a **Log in** control beside

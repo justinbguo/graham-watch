@@ -18,9 +18,10 @@ its own — see "Phone" below.
 ## Guest browsing
 
 Web opens on the deck without an account. Guests get the same Buy surface —
-search, filters, grid or cards — with **Log in** at the top right. Judgments
-live on the device for `GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the
-sign-in sheet. Community, messages, wishlist, and profile ask for an account up
+search, filters, grid or cards — with the sign-in sheet open over the deck on
+arrival, once per page load. Dismiss it and the deck is there. Judgments live on
+the device for `GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the sheet
+again. Community, messages, wishlist, and profile ask for an account up
 front. Anon may read the approved catalogue (and run `search_listings` /
 `listing_counts`); swipes and everything personal stay authenticated. Local
 guest judgments flush into `swipes` once a session lands.
