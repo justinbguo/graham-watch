@@ -1428,13 +1428,14 @@ separate verified flag on a dealer, so the mark is the list's, not a second
 status. A person does not wear it, and neither does a watch row.
 
 When a followed shop has listed watches in the last 14 days, after the follow,
-that this buyer has not opened, the row adds `3 new` in `caption` / `textMuted` between the name
-and the mark. It is type, not a pill: a box around a count would look like
-another control. Above Following, the same news is one row, `title`, "New from
-dealers you follow", with the total in that same caption at the end of the
-line. It opens the New feed. The Profile tab carries the total the way
-Wishlist carries a count. Opening the feed, or opening that shop, clears the
-number. The feed's rows stay; only the count leaves.
+that this buyer has not opened, Messages carries that news. The Following row
+on Profile does not. One row at the top of the inbox reads "New from dealers
+you follow", `labelStrong`, with the total in `caption` / `textMuted` at the
+end of the line. It is type, not a pill. It opens the New feed. The Messages
+tab carries the total the way Wishlist carries a count, added to the unread
+thread count because the bar has one number. Opening the feed clears every
+shop. Opening one shop clears that shop. The feed's rows stay. Only the count
+leaves.
 
 ## A contact address is never spelled out on screen
 

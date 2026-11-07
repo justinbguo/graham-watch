@@ -23,6 +23,6 @@ Preconditions:
 
 ## Gotchas
 
-- Opening the shop marks that shop's new watches seen. Do this after the Profile screenshot in the Drops proof, or the badge will already be 0.
+- Opening the shop marks that shop's new watches seen. In the Drops proof, screenshot Messages before opening the shop, or the Messages badge will already be 0.
 - A shop that is not approved is not followable. Test Bench is inserted as approved by `seed`.
 - Goldfinger's Vintage is the seeded catalogue, id `ad0d7d71-741a-4b65-9465-641ed9cc0199`. Its watches are older than the drop window.
