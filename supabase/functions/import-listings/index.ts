@@ -4,6 +4,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
+import { fixtureImportAllowed, parseFixtureListings } from './fixture.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch } from './publish.ts';
@@ -549,6 +550,46 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
 
     const action = String(body.action ?? 'sync');
     const isOperator = operatorCheck(ctx.supabase);
+
+    // A JSON watch, written as the signed-in shop owner. No fetch, no model.
+    // Off unless this process is a local stack with the flag set.
+    if (action === 'fixture') {
+      if (!fixtureImportAllowed(Deno.env)) {
+        return bad(
+          'Fixture import is off. It runs only on a local stack with GRAHAM_ALLOW_FIXTURE_IMPORT=1, and never against the hosted project.',
+          404,
+        );
+      }
+      let parsed: ReturnType<typeof parseFixtureListings>;
+      try {
+        parsed = parseFixtureListings(body);
+      } catch (error) {
+        return bad(error instanceof Error ? error.message : 'Bad fixture.');
+      }
+      const rows = parsed.listings.map((item) => ({
+        dealer_id: parsed.dealerId,
+        imported_by: userId,
+        brand: item.brand,
+        model: item.model,
+        reference: item.reference,
+        year: item.year,
+        price_cents: item.price_cents,
+        description: item.description,
+        currency: 'USD',
+        status: 'active' as const,
+        source_url: `https://test-bench.graham.test/fixture/${crypto.randomUUID()}`,
+      }));
+      const inserted = await ctx.supabase
+        .from('listings')
+        .insert(rows)
+        .select('id, brand, model, reference, created_at, dealer_id');
+      if (inserted.error) return bad(inserted.error.message, 403);
+      return Response.json({
+        provider: 'fixture',
+        published: inserted.data?.length ?? 0,
+        listings: inserted.data ?? [],
+      });
+    }
 
     /**
      * Given a domain, where the watches are.

@@ -13,7 +13,13 @@ import {
   type DropNotice,
   type DropToken,
 } from '../supabase/functions/notify-drops/select.ts';
-import { dropPushMessages, readTickets, ticketsFromExpoBody } from '../supabase/functions/notify-drops/expo.ts';
+import {
+  dropPushMessages,
+  EXPO_PUSH_URL,
+  readTickets,
+  resolveExpoPushUrl,
+  ticketsFromExpoBody,
+} from '../supabase/functions/notify-drops/expo.ts';
 import { routeFromPushData } from '../src/lib/pushRoute.ts';
 
 const NOW = new Date('2026-11-03T06:30:00.000Z');
@@ -399,6 +405,34 @@ test('a matching token and a new watch is a plan, not a skip', () => {
     nothingNew: 0,
     noApprovedFollow: 0,
   });
+});
+
+test('a local stack can capture pushes, and a hosted URL cannot', () => {
+  const capture = 'http://graham-push-capture:8799/push';
+  assert.equal(
+    resolveExpoPushUrl({
+      get: (name) =>
+        name === 'SUPABASE_URL' ? 'http://kong:8000' : name === 'EXPO_PUSH_URL' ? capture : undefined,
+    }),
+    capture,
+  );
+  assert.equal(
+    resolveExpoPushUrl({
+      get: (name) =>
+        name === 'SUPABASE_URL'
+          ? 'https://hbxgxtbtefpyutyqafoi.supabase.co'
+          : name === 'EXPO_PUSH_URL'
+            ? capture
+            : undefined,
+    }),
+    EXPO_PUSH_URL,
+  );
+  assert.equal(
+    resolveExpoPushUrl({
+      get: (name) => (name === 'SUPABASE_URL' ? 'http://127.0.0.1:54321' : undefined),
+    }),
+    EXPO_PUSH_URL,
+  );
 });
 
 test('a drop tap opens the shop or the feed, and a reply still opens the thread', () => {
