@@ -98,7 +98,7 @@ Fixture people, created by `seed`:
 
 Stable handles for the Drops proof, not coordinates:
 
-- Guest gate: button `Log in or create an account`
+- Guest gate: button `Log in or create an account`. On web, Buy also opens that sheet by itself, so `Continue with email` can already be on screen.
 - Email door: button `Continue with email`
 - Code field: `Sign-in code`
 - Unseen count: button `New from dealers you follow, N` on Messages

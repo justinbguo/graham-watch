@@ -25,6 +25,6 @@ Preconditions:
 
 ## Gotchas
 
-- `screenshot` signs in when it sees `Log in or create an account`. On `/` that button is not the guest gate. The header button is `Log in`. The current screenshot command does not press it, so `/` stays signed out.
+- `screenshot /` signs in as the named user, then waits for the line `N watches available`. Buy opens the sign-in sheet on its own for a web guest, so the email door can already be visible.
 - Demo mode (`EXPO_PUBLIC_DEMO=1`) never hits this stack. Do not export the web build with that variable set.
 - A claimed shop is hidden from the dealer's own deck. Test Bench's watches stay visible to `buyer`.
