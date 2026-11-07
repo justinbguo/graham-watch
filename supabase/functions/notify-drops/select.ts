@@ -112,6 +112,32 @@ function time(value: string): number {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+export type DropSkipCounts = {
+  /** Approved follow, and no device registered. */
+  noToken: number;
+  /** Subset of noToken that also had at least one new watch. */
+  noTokenWithListings: number;
+  /** A row already exists for this UTC day, so the unique key would refuse another. */
+  alreadyToday: number;
+  /** Token and an approved follow, but nothing new in the window. */
+  nothingNew: number;
+  /** Every follow is a shop that is not approved, or the follow time does not parse. */
+  noApprovedFollow: number;
+};
+
+export type DropReport = {
+  plans: DropPlan[];
+  skipped: DropSkipCounts;
+};
+
+const EMPTY_SKIPS = (): DropSkipCounts => ({
+  noToken: 0,
+  noTokenWithListings: 0,
+  alreadyToday: 0,
+  nothingNew: 0,
+  noApprovedFollow: 0,
+});
+
 export function selectDrops(input: {
   now: Date;
   follows: DropFollow[];
@@ -119,7 +145,23 @@ export function selectDrops(input: {
   notices: DropNotice[];
   tokens: DropToken[];
 }): DropPlan[] {
+  return reportDrops(input).plans;
+}
+
+/**
+ * The same decision as selectDrops, plus why each follower was left out.
+ * The nightly log prints the counts. A zero plan with noTokenWithListings
+ * is a follower who has new watches and no phone, which is not an error.
+ */
+export function reportDrops(input: {
+  now: Date;
+  follows: DropFollow[];
+  listings: DropListing[];
+  notices: DropNotice[];
+  tokens: DropToken[];
+}): DropReport {
   const day = utcDay(input.now);
+  const skipped = EMPTY_SKIPS();
 
   const tokensByUser = new Map<string, string[]>();
   for (const row of input.tokens) {
@@ -144,7 +186,9 @@ export function selectDrops(input: {
   // Earliest follow wins if the same pair is passed twice. A later follow
   // would hide watches listed in between.
   const followByUser = new Map<string, Map<string, { at: number; name: string }>>();
+  const seenFollowers = new Set<string>();
   for (const follow of input.follows) {
+    seenFollowers.add(follow.userId);
     if (follow.permission !== 'approved') continue;
     const at = time(follow.followedAt);
     if (Number.isNaN(at)) continue;
@@ -154,6 +198,9 @@ export function selectDrops(input: {
       shops.set(follow.dealerId, { at, name: follow.dealerName });
     }
     followByUser.set(follow.userId, shops);
+  }
+  for (const userId of seenFollowers) {
+    if (!followByUser.has(userId)) skipped.noApprovedFollow += 1;
   }
 
   const listingsByDealer = new Map<string, DropListing[]>();
@@ -172,8 +219,6 @@ export function selectDrops(input: {
   const cutoff = dropCutoff(input.now);
   const userIds = [...followByUser.keys()].sort();
   for (const userId of userIds) {
-    if (noticedToday.has(userId)) continue;
-    if (!tokensByUser.has(userId)) continue;
     const shops = followByUser.get(userId)!;
     const already = covered.get(userId) ?? new Set<string>();
     const chosen: DropListing[] = [];
@@ -186,7 +231,19 @@ export function selectDrops(input: {
         chosen.push(listing);
       }
     }
-    if (chosen.length === 0) continue;
+    if (noticedToday.has(userId)) {
+      skipped.alreadyToday += 1;
+      continue;
+    }
+    if (!tokensByUser.has(userId)) {
+      skipped.noToken += 1;
+      if (chosen.length > 0) skipped.noTokenWithListings += 1;
+      continue;
+    }
+    if (chosen.length === 0) {
+      skipped.nothingNew += 1;
+      continue;
+    }
 
     chosen.sort((a, b) => {
       const delta = time(b.createdAt) - time(a.createdAt);
@@ -216,5 +273,5 @@ export function selectDrops(input: {
     });
   }
 
-  return plans;
+  return { plans, skipped };
 }

@@ -36,6 +36,7 @@ jobs:
           scripts/refresh-run.test.mjs
           scripts/refresh-health.test.mjs
           scripts/deploy-functions.test.mjs
+          scripts/drops-refresh.test.mjs
           scripts/dealer-filter.test.mjs
           scripts/deck-paging.test.mjs
           scripts/deck-stack.test.mjs

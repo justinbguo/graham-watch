@@ -15,17 +15,20 @@
  * paused shop is not either: pause is a permission, not a second flag, so
  * the same filter skips it.
  *
- * Exits 0 when at least one shop finished its catalogue read. A shop that
- * failed is logged and left for the next night. Exits 1 when the request
- * itself failed (missing secret, rejected cron secret, OpenAI key) or every
- * shop failed. Health warnings — one shop's error, an empty catalogue,
- * missing photos, a week with nothing new — do not change that exit code.
+ * Exits 0 when at least one shop finished its catalogue read and the
+ * notify-drops call succeeded. A shop that failed is logged and left for
+ * the next night. Exits 1 when the request itself failed (missing secret,
+ * rejected cron secret, OpenAI key), every shop failed, or notify-drops
+ * errored. Nobody to notify is not an error. Health warnings — one shop's
+ * error, an empty catalogue, missing photos, a week with nothing new — do
+ * not change that exit code.
  */
 
 import { appendFileSync, readFileSync } from 'node:fs';
 
 import { OPERATOR_HOSTED, parseEnvFile } from './_env.mjs';
 import { config, describeTarget, request, serviceKey } from './_supabase.mjs';
+import { explainTokenGap, interpretDrops, tokenGapLine } from './drops-refresh.mjs';
 import {
   healthReport,
   isSchemaMiss,
@@ -173,9 +176,12 @@ if (exitCode !== 0) {
 
 await notifyDrops();
 
-// A failed drop must not fail the catalogue. The watches are already published;
-// the next successful night sends whatever was not logged.
+// The catalogue rows are already written. This still fails the job when the
+// drop call itself fails, so a 404 or a rejected secret is not a green night.
+// A successful call that selected nobody stays green and says why.
 async function notifyDrops() {
+  let status = 0;
+  let parsed = null;
   try {
     const response = await fetch(`${url}/functions/v1/notify-drops`, {
       method: 'POST',
@@ -188,20 +194,59 @@ async function notifyDrops() {
       body: '{}',
       signal: AbortSignal.timeout(60_000),
     });
+    status = response.status;
     const text = await response.text();
-    if (!response.ok) {
-      const detail = `Drops were not sent (${response.status}). The catalogue refresh still finished.`;
-      console.error(detail);
-      if (text) console.error(text.slice(0, 500));
-      annotation('warning', 'Drops', detail);
-      return;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = text;
     }
-    console.log(`Drops: ${text}`);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Drops were not sent.';
-    console.error(`Drops were not sent. The catalogue refresh still finished. ${detail}`);
+    parsed = error instanceof Error ? error.message : 'Drops were not sent.';
+  }
+
+  const outcome = interpretDrops(status, parsed);
+  for (const line of outcome.lines) {
+    if (outcome.fail) console.error(line);
+    else console.log(line);
+  }
+  if (outcome.fail) {
+    annotation('error', 'Drops', outcome.lines[0]);
+    process.exit(1);
+  }
+
+  if (outcome.warn) {
+    const notable =
+      outcome.lines.find((line) => line.startsWith('Skipped:')) ??
+      outcome.lines.find((line) => line.startsWith('Push tokens:')) ??
+      outcome.lines[0];
+    annotation('warning', 'Drops', notable);
+  }
+
+  if (!outcome.needsGap) return;
+  try {
+    await logTokenGap();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Could not explain the empty drop.';
+    console.error(detail);
     annotation('warning', 'Drops', detail);
   }
+}
+
+async function logTokenGap() {
+  const follows = await request('/rest/v1/dealer_follows?select=user_id', { token: key });
+  const tokens = await request('/rest/v1/device_push_tokens?select=user_id', { token: key });
+  if (!follows.ok || !tokens.ok) {
+    const detail = 'Could not explain the empty drop. The follow and token counts were not readable.';
+    console.error(detail);
+    annotation('warning', 'Drops', detail);
+    return;
+  }
+  const followIds = Array.isArray(follows.body) ? follows.body.map((row) => row.user_id) : [];
+  const tokenIds = Array.isArray(tokens.body) ? tokens.body.map((row) => row.user_id) : [];
+  const line = tokenGapLine(explainTokenGap(followIds, tokenIds));
+  console.log(line);
+  annotation('warning', 'Drops', line);
 }
 
 function stepSummary(markdown) {

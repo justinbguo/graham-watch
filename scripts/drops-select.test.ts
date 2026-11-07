@@ -5,6 +5,7 @@ import {
   DROP_MAX_AGE_DAYS,
   dropCopy,
   dropCutoff,
+  reportDrops,
   selectDrops,
   utcDay,
   type DropFollow,
@@ -308,6 +309,96 @@ test('a single-shop push names that shop, and a feed push does not', () => {
   });
   assert.equal('dealerId' in many[0]!.data, false);
   assert.equal(many.length, 2);
+});
+
+test('a push token on a different account does not notify the follower', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [follow(ADA, CRAFT, 'Old School Seconds')],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T02:00:00.000Z')],
+    notices: [],
+    tokens: [token(BEA)],
+  });
+  assert.deepEqual(report.plans, []);
+  assert.equal(report.skipped.noToken, 1);
+  assert.equal(report.skipped.noTokenWithListings, 1);
+  assert.equal(report.skipped.nothingNew, 0);
+  assert.equal(report.skipped.alreadyToday, 0);
+});
+
+test('a blank token is the same as no token when there are new watches', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [follow(ADA, CRAFT, 'Craft + Tailored')],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T02:00:00.000Z')],
+    notices: [],
+    tokens: [{ userId: ADA, token: '   ' }],
+  });
+  assert.deepEqual(report.plans, []);
+  assert.equal(report.skipped.noTokenWithListings, 1);
+});
+
+test('a follower with a token and nothing new is skipped for that reason', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [follow(ADA, CRAFT, 'Craft + Tailored', '2026-11-03T04:00:00.000Z')],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T02:00:00.000Z')],
+    notices: [],
+    tokens: [token(ADA)],
+  });
+  assert.deepEqual(report.plans, []);
+  assert.equal(report.skipped.nothingNew, 1);
+  assert.equal(report.skipped.noToken, 0);
+});
+
+test('today’s row is the skip reason even when more watches arrived', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [follow(ADA, CRAFT, 'Craft + Tailored')],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T05:00:00.000Z')],
+    notices: [
+      {
+        userId: ADA,
+        notifiedOn: '2026-11-03',
+        status: 'failed',
+        listingIds: [WATCH_OLD],
+      },
+    ],
+    tokens: [token(ADA)],
+  });
+  assert.deepEqual(report.plans, []);
+  assert.equal(report.skipped.alreadyToday, 1);
+});
+
+test('a follow on a shop that is not approved is its own skip', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [{ ...follow(ADA, CRAFT, 'Paused'), permission: 'paused' }],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T02:00:00.000Z')],
+    notices: [],
+    tokens: [token(ADA)],
+  });
+  assert.deepEqual(report.plans, []);
+  assert.equal(report.skipped.noApprovedFollow, 1);
+  assert.equal(report.skipped.nothingNew, 0);
+});
+
+test('a matching token and a new watch is a plan, not a skip', () => {
+  const report = reportDrops({
+    now: NOW,
+    follows: [follow(ADA, CRAFT, 'Craft + Tailored')],
+    listings: [listing(WATCH_NEW, CRAFT, '2026-11-03T02:00:00.000Z')],
+    notices: [],
+    tokens: [token(ADA)],
+  });
+  assert.equal(report.plans.length, 1);
+  assert.deepEqual(report.skipped, {
+    noToken: 0,
+    noTokenWithListings: 0,
+    alreadyToday: 0,
+    nothingNew: 0,
+    noApprovedFollow: 0,
+  });
 });
 
 test('a drop tap opens the shop or the feed, and a reply still opens the thread', () => {
