@@ -49,3 +49,7 @@ deno.lock
 .env
 .supabase-db-password
 .vercel
+
+# verification scratch (proof screenshots live outside the repo, or in artifacts/)
+.cursor/skills/verify-graham/.run/
+artifacts/

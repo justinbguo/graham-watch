@@ -42,6 +42,7 @@ jobs:
           scripts/deck-stack.test.mjs
           scripts/filter-spec.test.mjs
           scripts/drops-select.test.ts
+          scripts/fixture-import.test.ts
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing
@@ -177,3 +178,25 @@ jobs:
             git --no-pager diff src/lib/database.types.ts
             exit 1
           fi
+
+  verify-drops:
+    name: drops verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # The harness shells out to the supabase binary in node_modules. Playwright
+      # needs a browser. Both are local-only: the job never receives a hosted key.
+      - name: install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: prove drops
+        run: npm run verify:drops

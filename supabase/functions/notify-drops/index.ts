@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
-import { chunk, dropPushMessages, EXPO_CHUNK, EXPO_PUSH_URL, readTickets, ticketsFromExpoBody } from './expo.ts';
+import { chunk, dropPushMessages, EXPO_CHUNK, resolveExpoPushUrl, readTickets, ticketsFromExpoBody } from './expo.ts';
 import {
   dropCutoff,
   reportDrops,
@@ -195,7 +195,7 @@ async function postExpo(messages: ReturnType<typeof dropPushMessages>): Promise<
   const accessToken = Deno.env.get('EXPO_ACCESS_TOKEN');
   if (accessToken) headers.authorization = `Bearer ${accessToken}`;
 
-  const response = await fetch(EXPO_PUSH_URL, {
+  const response = await fetch(resolveExpoPushUrl(Deno.env), {
     method: 'POST',
     headers,
     body: JSON.stringify(messages),
