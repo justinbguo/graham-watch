@@ -463,6 +463,12 @@ export const dealerSocial = {
   minHeight: 36,
   paddingX: space.md,
   radius: radius.lg,
+  /**
+   * Community directory. Same rectangle, short enough that a shop name and
+   * Follow share the rail.
+   */
+  compactMinHeight: 28,
+  compactPaddingX: space.sm,
 } as const;
 
 export const motion = {
@@ -554,8 +560,8 @@ export const layout = {
   /** Seller Hub on web: inventory rows need room; not as wide as the home grid. */
   hub: 960,
   /**
-   * Community feed column on desktop web. The tool rail uses `deckToolRail`;
-   * the centred cap matches Buy via `deckFrameWeb`.
+   * Community feed column on desktop web. The follow list uses `communityRail`;
+   * the centred cap is `communityFrameWeb`, so the list does not take this width.
    */
   community: 960,
   /** Desktop messages: inbox width as a share of the split (thread gets the rest). */
@@ -569,6 +575,16 @@ export const layout = {
    * them, so the swipe card keeps `cardWeb` after the rail.
    */
   deckFrameWeb: 960 + 112 + space.lg + space.xs,
+  /**
+   * Community follow list on desktop web. A shop name and Follow share the row.
+   * Buy stays on `deckToolRail`.
+   */
+  communityRail: 320,
+  /**
+   * Desktop Community cap: the feed column plus the follow list and the air
+   * between them, so the feed keeps `community` after the rail.
+   */
+  communityFrameWeb: 960 + 320 + space.lg + space.xs,
   /**
    * Columns on the wide home grid. Photograph above the copy, so a desktop
    * window fills with watches rather than one tall row each.
@@ -632,6 +648,7 @@ export type LayoutWidth = Exclude<
   | 'desktopHeaderSearchMax'
   | 'desktopHeaderSearchShare'
   | 'deckToolRail'
+  | 'communityRail'
   | 'messagesPaneShare'
 >;
 

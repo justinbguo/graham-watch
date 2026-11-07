@@ -581,3 +581,42 @@ export function useDealerShop(dealerId: string) {
     },
   });
 }
+
+export type DirectoryDealer = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+};
+
+// PostgREST returns at most 1000 rows. A full page means another follows.
+const DIRECTORY_PAGE = 1000;
+
+/**
+ * Approved shops, A to Z. Pending is not on the deck yet. Paused and revoked
+ * are off it. This is who a buyer can follow.
+ */
+export function useDealerDirectory() {
+  return useQuery({
+    queryKey: keys.dealerDirectory,
+    queryFn: async (): Promise<DirectoryDealer[]> => {
+      if (isDemo) return demo.directory();
+
+      const shops: DirectoryDealer[] = [];
+      for (let page = 0; page < 20; page += 1) {
+        const from = page * DIRECTORY_PAGE;
+        const { data, error } = await supabase
+          .from('dealers')
+          .select('id, name, logo_url')
+          .eq('permission', 'approved')
+          .order('name')
+          .order('id')
+          .range(from, from + DIRECTORY_PAGE - 1);
+        if (error) throw error;
+        const rows = data ?? [];
+        shops.push(...rows);
+        if (rows.length < DIRECTORY_PAGE) break;
+      }
+      return shops;
+    },
+  });
+}
