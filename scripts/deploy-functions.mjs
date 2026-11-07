@@ -28,6 +28,14 @@ export function listFunctionDirs(root = 'supabase/functions') {
     .sort();
 }
 
+/** operator-bot must say verify_jwt = false. A secret key is not a JWT. */
+export function operatorBotSkipsJwt(configText) {
+  const blocks = configText.split(/\n(?=\[)/);
+  const block = blocks.find((part) => part.startsWith('[functions.operator-bot]'));
+  if (!block) return false;
+  return /^\s*verify_jwt\s*=\s*false\s*$/m.test(block) && !/verify_jwt\s*=\s*true/.test(block);
+}
+
 /** The import-listings block must say verify_jwt = true, and must not also say false. */
 export function importListingsKeepsJwt(configText) {
   const blocks = configText.split(/\n(?=\[)/);

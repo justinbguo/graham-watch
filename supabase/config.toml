@@ -466,6 +466,11 @@ verify_jwt = true
 [functions.notify-drops]
 verify_jwt = true
 
+# A project secret key is not a JWT. verify_jwt would reject it before this
+# function could compare GRAHAM_OPERATOR_SECRET. import-listings stays on.
+[functions.operator-bot]
+verify_jwt = false
+
 [analytics]
 # Vector bind-mounts the host container socket, which Colima's VM cannot pass
 # through. This only disables the Logs tab in Studio.
