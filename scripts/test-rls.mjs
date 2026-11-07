@@ -2020,6 +2020,91 @@ console.log('\noperators');
   const byBuyer = await publish(buyer.token, 'approved');
   check('a buyer cannot publish a shop', byBuyer.status >= 400, `got ${byBuyer.status}`);
 
+  const beforeBot = await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
+    headers: admin,
+  }).then((response) => response.json());
+
+  const botByBuyer = await api('/rest/v1/rpc/bot_set_dealer_permission', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_permission: 'approved' },
+  });
+  check('a buyer cannot approve through the operator bot', botByBuyer.status >= 400, `got ${botByBuyer.status}`);
+
+  const botByOwner = await api('/rest/v1/rpc/bot_set_dealer_permission', {
+    token: importer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_permission: 'approved' },
+  });
+  check(
+    'the importer who added the shop cannot approve it through the operator bot',
+    botByOwner.status >= 400,
+    `got ${botByOwner.status}`
+  );
+
+  const botByClaimant = await api('/rest/v1/rpc/bot_set_dealer_permission', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_permission: 'approved' },
+  });
+  check(
+    'the dealer who claimed the shop cannot approve it through the operator bot',
+    botByClaimant.status >= 400,
+    `got ${botByClaimant.status}`
+  );
+
+  const afterBot = await fetch(`${URL}/rest/v1/dealers?id=eq.${dealerId}&select=permission`, {
+    headers: admin,
+  }).then((response) => response.json());
+  check(
+    'a buyer or dealer call does not change shop permission',
+    beforeBot?.[0]?.permission === afterBot?.[0]?.permission,
+    `${beforeBot?.[0]?.permission} -> ${afterBot?.[0]?.permission}`
+  );
+
+  const originalPermission = beforeBot?.[0]?.permission;
+  if (originalPermission !== 'pending') {
+    const lowered = await fetch(`${URL}/rest/v1/rpc/bot_set_dealer_permission`, {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ p_dealer_id: dealerId, p_permission: 'pending' }),
+    });
+    const loweredBody = await lowered.json();
+    check(
+      'the service role can unapprove through the operator bot',
+      lowered.ok && loweredBody === 'pending',
+      `${lowered.status} ${JSON.stringify(loweredBody)}`,
+    );
+  }
+
+  const botApproved = await fetch(`${URL}/rest/v1/rpc/bot_set_dealer_permission`, {
+    method: 'POST',
+    headers: admin,
+    body: JSON.stringify({ p_dealer_id: dealerId, p_permission: 'approved' }),
+  });
+  const botApprovedBody = await botApproved.json();
+  check('the service role can approve a pending shop through the operator bot', botApproved.ok && botApprovedBody === 'approved', `${botApproved.status} ${JSON.stringify(botApprovedBody)}`);
+
+  const activity = await fetch(`${URL}/rest/v1/rpc/operator_activity`, {
+    method: 'POST',
+    headers: admin,
+    body: JSON.stringify({ p_limit: 20 }),
+  });
+  const activityBody = await activity.json();
+  const botRow = Array.isArray(activityBody)
+    ? activityBody.find((row) => row.action === 'approve_shop' && row.target_id === dealerId && row.operator_label === 'operator bot')
+    : null;
+  check('that approval is recorded as the operator bot', activity.ok && Boolean(botRow), JSON.stringify(activityBody)?.slice(0, 400));
+
+  if (originalPermission && originalPermission !== 'approved') {
+    const restored = await fetch(`${URL}/rest/v1/rpc/set_dealer_permission`, {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ p_dealer_id: dealerId, p_permission: originalPermission }),
+    });
+    check('the shop permission is put back', restored.ok, `wanted ${originalPermission}, got ${restored.status}`);
+  }
+
   const pauseByBuyer = await publish(buyer.token, 'paused');
   check('a buyer cannot pause a shop', pauseByBuyer.status >= 400, `got ${pauseByBuyer.status}`);
 
@@ -2712,6 +2797,8 @@ console.log('\nwhat anon can reach');
     ['operator_recent_users', {}],
     ['operator_user_detail', { p_user_id: buyer.id }],
     ['record_operator_action', { p_action: 'x', p_target_type: 'shop', p_target_id: dealerId, p_before: {}, p_after: {} }],
+    ['record_bot_action', { p_action: 'x', p_target_type: 'shop', p_target_id: dealerId, p_before: {}, p_after: {} }],
+    ['bot_set_dealer_permission', { p_dealer_id: dealerId, p_permission: 'approved' }],
     [
       'operator_edit_listing',
       {
