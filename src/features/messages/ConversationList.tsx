@@ -192,8 +192,8 @@ export function ConversationList({
                     ? 'No messages match.'
                     : inboxFilter !== 'all'
                       ? inboxFilterEmptyMessage(inboxFilter)
-                      : embedded
-                        ? 'Use the button below to message someone, or search for a username.'
+                      : embedded || desktopInbox
+                        ? 'Use the button beside search, or search for a username.'
                         : 'Tap + to message someone, ask a shop about a watch, or write from a post.'
                 }
               />

@@ -303,7 +303,9 @@ cannot. An untested policy is an unproven one.
 Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Community, Messages,
 Wishlist, Profile. Search stays inside the tabs and opens from the bar under the deck's
 count. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
-Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
+On iOS, signed-out users see sign-in before the deck. On the web, guests
+browse Buy, and the other tabs ask them to sign in. Session lives in
+`expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.
 
