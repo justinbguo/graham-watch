@@ -25,7 +25,7 @@ Details: [TRANSACTIONS.md](TRANSACTIONS.md), [PRODUCT_SPEC.md](PRODUCT_SPEC.md) 
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
-| 0 | **Seller hub** tab (claimed dealers) — Messages, Payments, Customers, Listings | Shipped (placeholders except Messages + Listings) |
+| 0 | **Deal** tab (claimed dealers). Messages, Payments, Analytics, Listings, Support | Shipped. Payments is a placeholder. Support opens an email to hello@graham.watch. |
 | 1 | Deal states: accept → pay → complete | Planned |
 | 2 | Buyer pay + seller payout onboarding (e.g. Connect) + ledger | Planned |
 | 3 | Push on message / inquiry / deal | Planned |
@@ -34,12 +34,13 @@ Details: [TRANSACTIONS.md](TRANSACTIONS.md), [PRODUCT_SPEC.md](PRODUCT_SPEC.md) 
 
 ## Seller hub
 
-Claimed dealers get the **Hub** tab (store icon) instead of Messages. Sections:
+Claimed dealers get the **Deal** tab (store icon) instead of Messages. The code calls the screen Seller Hub. Sections:
 
-- **Messages** — buyer threads (`thread_dealer_id` = your shop). Toggle **Personal messages** for collector DMs.
-- **Payments** — placeholder until deal pay + payouts ship.
-- **Customers** — placeholder.
-- **Listings** — inventory hide/sold/edit (same data as Profile).
+- **Messages**. The same inbox as the buyer Messages tab, with a **New** button. Filters are All, Unread, Favorites, and Groups. The screen does not split shop threads from personal ones.
+- **Payments**. Placeholder until deal pay and payouts ship.
+- **Analytics**. Who engages, and which watches get deck attention.
+- **Listings**. Inventory hide, sold, and edit (same data as Profile).
+- **Support**. Opens an email to hello@graham.watch. In-app tickets are not built.
 
 Buyers still see the normal **Messages** tab.
 

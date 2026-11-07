@@ -1,6 +1,8 @@
-# Next.js template
+# Studio
 
-This is a Next.js template with shadcn/ui.
+This folder is the Higgsfield generation app. It is not the operator console. The contract is [AGENTS.md](AGENTS.md). The operator console is `operator/`.
+
+UI primitives in `components/ui` still come from shadcn.
 
 ## Adding components
 

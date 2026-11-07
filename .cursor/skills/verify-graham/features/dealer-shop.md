@@ -19,7 +19,7 @@ Preconditions:
 
 - `seed` claimed Test Bench as `bench@graham.test` (`sign-in dealer`).
 
-- **Open the editor.** Run `screenshot /profile <evidence>/dealer-profile.png --as dealer`. The page is the shop editor, not the buyer gate.
+- **Open the editor.** Run `screenshot /profile <evidence>/dealer-profile.png --as dealer`. The page shows `Your shop` and Test Bench, and the tab is `Deal`, not the buyer Following row.
 - **Fixture import is not this screen.** `import` posts the local fixture action as the dealer and creates `DROP-1`. It does not open `/import-inventory` and it does not call OpenAI. A pass of `import` is not proof of the import screen.
 
 ## Gotchas

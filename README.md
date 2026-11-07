@@ -6,6 +6,7 @@ like. Dealer inventory is imported by an operator, not by users.
 Expo (SDK 57) + React Native + Expo Router, Supabase for auth, Postgres, and
 edge functions.
 
+- Agent map (routes, data, functions, CI): [AGENTS.md](AGENTS.md)
 - Operating guide, test accounts, operator UI: [docs/OPERATING.md](docs/OPERATING.md)
 - Shipping a change: [docs/DEVELOPING.md](docs/DEVELOPING.md)
 - Phone installs (EAS): [docs/PHONE.md](docs/PHONE.md)
@@ -27,7 +28,7 @@ Desktop, and do not run `docker` commands by hand.
 2. `npm run db:start` — starts the local Supabase stack.
 3. `npm run env -- local` — points the app, the scripts, and the operator UI at that stack.
 4. `npm run db:reset` — applies migrations and seeds a snapshot of real
-   inventory, so the deck has watches in it once you sign in.
+   inventory, so the deck has watches in it.
 5. `npm run web` (browser) or `npm run ios` (simulator via Expo Go)
 
 To look at the UI with no backend at all, use `npm run demo:web` or `npm run demo`.
@@ -79,8 +80,8 @@ To add a different shop to the local stack instead:
 npm run dealers:local -- add goldfingersvintage.com --limit 10 --yes
 ```
 
-Listings are invisible to anyone not signed in, so an empty deck on the sign-in
-screen is expected.
+On the web, a guest can browse the approved catalogue. iOS shows sign-in
+before the deck. Swipes, messages, and Community stay behind sign-in.
 
 Only email codes are enabled. Apple and Google are written but switched off, because
 neither has credentials yet — see "Enabling Apple and Google" below.
@@ -117,7 +118,7 @@ other and a shop that answers in the app, run `npm run mock:users`.
 ## Layout
 
 ```
-src/app/            routes; (app)/(tabs) holds Buy, Community, Messages, Wishlist, Profile, Search
+src/app/            routes; tabs are Buy, Community, Messages, Wishlist, Profile. Search is a sheet.
 src/features/       auth, onboarding, listings, dealers, exchange, messages, saved
 src/components/     SwipeCard, DeckGrid, ListingRow, shared UI primitives
 src/data/           one module per entity, TanStack Query hooks
@@ -126,7 +127,7 @@ src/providers/      session, query cache, theme
 scripts/            operator tools and RLS tests
 operator/           operator web app; own package.json, Vite not Expo
 supabase/migrations schema and RLS
-supabase/functions  import, inquiry, claim, and application edge functions
+supabase/functions  import, notify-drops, inquiry, claim, and application edge functions
 ```
 
 ## Development build

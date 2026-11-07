@@ -1,3 +1,131 @@
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+
+# App map
+
+Graham is a vintage-watch marketplace. Buyers swipe a deck. Dealers claim a shop. Operators approve which shops reach the deck. The phone and web app is Expo SDK 57 (Router, React Native). Data is Supabase (Auth, Postgres, edge functions). Vercel builds the Expo web export from `main` (`vercel.json`). The operator console is a separate Vite app in `operator/`, with its own `operator/vercel.json`.
+
+Longer guides stay where they are. Update this file when a route, table, function, or workflow changes, and delete the sentence that change makes false.
+
+| Question | Read |
+| --- | --- |
+| How to run, reset, and operate | [docs/OPERATING.md](docs/OPERATING.md) |
+| How to ship a change | [docs/DEVELOPING.md](docs/DEVELOPING.md) |
+| What the product is supposed to do | [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) |
+| Visual rules | [docs/DESIGN.md](docs/DESIGN.md) and `src/lib/design.ts` |
+| Auth | [docs/AUTH.md](docs/AUTH.md) |
+| Scraping a shop site | [docs/SCRAPING.md](docs/SCRAPING.md) |
+| Deals and fees | [docs/TRANSACTIONS.md](docs/TRANSACTIONS.md) and [docs/MARKETPLACE.md](docs/MARKETPLACE.md) |
+| Graham Pro | [docs/REVENUECAT.md](docs/REVENUECAT.md) |
+| Phone builds | [docs/PHONE.md](docs/PHONE.md) |
+| Which shops the scraper can read | [docs/dealer-site-readiness.md](docs/dealer-site-readiness.md) |
+| Cursor rules | `.cursor/rules/` (judgment, architecture, data, design, Supabase, teaching) |
+
+`studio/` is a Next.js Higgsfield template (`npm run studio`). It is not the operator console and not the Expo app.
+
+## Routes
+
+Expo Router lives in `src/app`. Tabs are in `src/app/(app)/(tabs)/_layout.tsx`.
+
+Buyer tabs, left to right on a phone:
+
+- **Buy** (`index`). Deck. Wide web shows a grid. Guests can swipe a small budget, then the sign-in sheet opens (`src/features/auth/useSignInOnArrival.ts`).
+- **Community** (`community`). Posts to sell, buy, or trade. Tables still say `exchange_*`.
+- **Messages** (`messages`). Threads, plus the Drops row when a followed shop has unseen new watches. Signed-out visitors get the guest gate.
+- **Wishlist** (`saved`).
+- **Profile** (`profile`). Following lives here. Drops does not.
+
+A claimed dealer sees **Deal** in place of Messages (`SellerHubScreen`). Sections are Messages, Payments, Analytics, Listings, and Support. Payments is a placeholder. Support opens `mailto:hello@graham.watch`.
+
+`source` is registered with `href: null`, so it is absent from the bar. Sourcing posts are in-memory in `src/data/sourcing.ts`.
+
+Stack routes under `src/app/(app)/`:
+
+- `sign-in`, `onboarding` (root `src/app/onboarding.tsx`)
+- `listing/[listingId]`, `photos/[listingId]`, `edit-listing/[listingId]`, `filters/[surface]`, `search`
+- `drops` (New watches feed; `?dealerId=` opens one shop)
+- `conversation/[conversationId]`, `new-message`, `new-group`, `seller-messages`
+- `dealer/[dealerId]`, `collector/[userId]`, `inquiry/[listingId]`
+- `apply`, `import-inventory`, `graham-pro`, `settings`
+- `sourcing/new`, `sourcing/[requestId]`
+
+Desktop web puts the tab bar on top (`useIsDesktopWeb`). A wide window that is not desktop web uses a left rail.
+
+## Who does what
+
+**Buyer.** Sign in, finish onboarding (name, username, birthday 18+, notification permission), swipe Buy, follow a shop from Community or the shop page, read Drops from Messages, message a claimed shop, email an unclaimed shop.
+
+**Dealer.** Profile, claim a shop. The claim function emails a code to a mailbox on the shop domain. After claim, the Deal tab replaces Messages. Publishing the shop onto the deck is still an operator action (`dealers.permission`).
+
+**Operator.** Not a tab. `npm run dealers` (service role) and `operator/` (anon key plus a row in `operators`). Both approve shops and answer applications. RLS stops a dealer from approving their own shop.
+
+## Data
+
+Migrations are append-only under `supabase/migrations`. Types come from `npm run db:types` into `src/lib/database.types.ts`. App code imports `Database` from `src/lib/database.ts`. Do not hand-edit the generated file.
+
+Tables:
+
+- People and access: `profiles`, `operators`, `operator_actions`
+- Shops: `dealers`, `dealer_applications`, `dealer_claim_codes`, `dealer_follows`, `import_jobs`, `source_items`, `refresh_runs`
+- Watches: `listings`, `listing_photos`, `swipes`, `watch_models`, `watch_catalog_sync`
+- Mail: `inquiries`
+- Community: `exchange_posts`, `exchange_comments`, `exchange_photos`, `exchange_votes`
+- Messages and deals: `conversations`, `conversation_members`, `messages`, `conversation_reads`, `conversation_deals`, `checkout_defaults`, `deal_reviews`
+- Drops: `drop_notifications`, `drop_views`, `device_push_tokens`
+
+Row-level security is on for these tables. The anon key ships in the app. Policies are proved by `npm run test:rls`. The three gates (`profiles.account_type`, `dealers.claimed_by`, `dealers.permission`) are explained in [docs/OPERATING.md](docs/OPERATING.md). `dealer_claim_codes` has RLS and no policies, so the app cannot read codes. Counts and dealer lists that must hide columns are SQL functions (`listing_counts`, `operator_dealers`), not extra tables.
+
+## Edge functions
+
+Code is `supabase/functions`. `verify_jwt` stays on. Deploy is the `Deploy edge functions` workflow, not a pull request check. Do not deploy from an agent session unless someone asked.
+
+| Function | Who calls it | What it writes |
+| --- | --- | --- |
+| `import-listings` | App and operator (`src/data/dealers.ts`, `operator/src/importer.ts`, `scripts/_import.mjs`). Nightly refresh sends `action: "scheduled-refresh"` with the service role and `x-graham-cron-secret`. Local proof sends `action: "fixture"`, which the hosted function refuses. | Listings, photos, `import_jobs`, `source_items`. `discover` and `preview` write nothing. |
+| `notify-drops` | `scripts/refresh.mjs` after a catalogue write. Same service role and cron header. | `drop_notifications`, then an Expo push. Local stacks may set `EXPO_PUSH_URL` only when `SUPABASE_URL` is a local host. |
+| `claim-dealer` | `src/data/dealers.ts` | A mailbox code, then the claim. |
+| `verify-application` | `src/data/applications.ts` | A code for an application mailbox. |
+| `inquiry-draft` | `src/data/inquiries.ts` | Nothing. Returns the email text. The dealer address stays on the server. |
+| `send-inquiry` | `src/data/inquiries.ts` | Sends the inquiry mail and updates the inquiry row. |
+
+`npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops, then calls `notify-drops`. A failed notify call fails the job.
+
+## CI and deploys
+
+| Workflow | When | Jobs |
+| --- | --- | --- |
+| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all six, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, generated types), `drops verification` (`npm run verify:drops`) |
+| `Catalogue refresh` | Cron `0 6 * * *`, and manual | `npm run refresh` against hosted |
+| `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships changed functions. Does not apply migrations. |
+
+Vercel deploys the Expo web app from `main`. Preview builds run on pull requests. See [docs/DEVELOPING.md](docs/DEVELOPING.md).
+
+## Env and secret names
+
+Names only. Values stay in GitHub Actions secrets, Supabase function secrets, or gitignored `.env.local` files.
+
+App (`EXPO_PUBLIC_*`, public in the binary): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_SIGN_IN`, `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_REVENUECAT_API_KEY`, `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY`, `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY`, `EXPO_PUBLIC_REVENUECAT_ENTITLEMENT`, `EXPO_PUBLIC_DEMO`.
+
+Local auth provider config for `supabase start`: `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`, `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET`, `SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID`, `SUPABASE_AUTH_EXTERNAL_APPLE_SECRET`.
+
+Operator UI: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+
+Studio server: `HF_API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+Edge functions: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GRAHAM_CRON_SECRET`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_CONCURRENCY`, `SCRAPE_PROVIDER`, `JINA_API_KEY`, `FIRECRAWL_API_KEY`, `EXPO_ACCESS_TOKEN`, `EXPO_PUSH_URL`, `APP_ORIGIN`, `SUPPORT_EMAIL`, `INQUIRY_FROM`, `RESEND_API_KEY`, `SMTP_HOST`, `SMTP_PORT`.
+
+GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GRAHAM_CRON_SECRET`.
+
+## Verification
+
+`npm run verify:drops` runs `.cursor/skills/verify-graham/control-graham.mjs`. One local stack, project id `graham-watch`, API `http://127.0.0.1:54321`, web `http://127.0.0.1:8091`. Read `.cursor/skills/verify-graham/SKILL.md` and `features/README.md` before driving a feature. The hosted project is out of bounds for that harness.
+
+`.cursor/skills/control-graham` is the demo Metro path (`EXPO_PUBLIC_DEMO=1`) for deck, search, and wishlist. Supabase proofs stay on `verify-graham`.
+
+## Rules that bite
+
+- `src/app/**` is routes only. Data lives in `src/data/`. Features live in `src/features/`.
+- No literal colors, font sizes, or raw gaps in components. Tokens are `src/lib/design.ts`.
+- Never edit a migration that has already run. Add a new file.
+- `npm run db:push` against hosted is a production schema change. Do not run it from an agent session unless someone asked.

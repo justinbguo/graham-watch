@@ -1441,7 +1441,9 @@ When a followed shop has listed watches in the last 14 days, after the follow,
 that this buyer has not opened, Messages carries that news. The Following row
 on Profile does not. One row at the top of the inbox reads "New from dealers
 you follow", `labelStrong`, with the total in `caption` / `textMuted` at the
-end of the line. It is type, not a pill. It opens the New feed. The Messages
+end of the line. It is type, not a pill. It opens the New feed. When the
+inbox has no threads, "No messages yet" sits directly under that row, at the
+top of the list. The Messages
 tab carries the total the way Wishlist carries a count, added to the unread
 thread count because the bar has one number. Opening the feed clears every
 shop. Opening one shop clears that shop. The feed's rows stay. Only the count

@@ -96,7 +96,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => <ProfileTabIcon color={color} focused={focused} />,
         }}
       />
-      {/* Landed on main after this branch replaced that tab with Community. */}
       <Tabs.Screen name="source" options={{ href: null }} />
     </Tabs>
   );

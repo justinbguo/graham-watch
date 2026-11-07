@@ -5,6 +5,8 @@ description: Drive the Graham Expo web app the way a buyer would and prove behav
 
 # Verify Graham
 
+Drops, sign-in, follows, and `npm run verify:drops` belong to `.cursor/skills/verify-graham`. That skill starts one local Supabase stack. This skill drives the demo Metro app (`EXPO_PUBLIC_DEMO=1`) for the deck, search, and wishlist.
+
 Graham is a swipe-based vintage-watch discovery app (Expo SDK 57 + Expo Router + Supabase). Agents prove behavior by launching an **owned** web instance, driving the real buyer path, and keeping evidence after cleanup.
 
 The control surface is `control-graham`. Prefer it over ad-hoc `curl`, raw Playwright, or clicking in a Metro the user already had open.

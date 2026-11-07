@@ -44,7 +44,7 @@ In:
 5. Inquiry — from a watch on the wishlist, deliberately contact the dealer.
 6. Profile — your name, an optional picture, the posts you have written,
    watches on your wishlist, and the shop you have claimed if you have one.
-7. Dealer workspace — claim a shop; **Seller hub** tab when claimed; edit listings on Profile or Hub.
+7. Dealer workspace — claim a shop; the **Deal** tab when claimed (Seller Hub in code); edit listings on Profile or the Listings section.
 8. Community — post a watch to sell, buy, or trade, or a random post (a find, a
    question, a watch to show), and comment on someone else's. A row under the
    title filters the feed to one kind, or All.
@@ -303,14 +303,17 @@ cannot. An untested policy is an unproven one.
 Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Community, Messages,
 Wishlist, Profile. Search stays inside the tabs and opens from the bar under the deck's
 count. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
-Signed-out users hit an auth gate. Session lives in `expo-secure-store` and refreshes on
+On iOS, signed-out users see sign-in before the deck. On the web, guests
+browse Buy, and the other tabs ask them to sign in. Session lives in
+`expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.
 
 ## 12. Known gaps before real users
 
-- CI runs typecheck, a web bundle, the operator UI, the edge functions, and
-  `test:rls` on every push. See [OPERATING.md](OPERATING.md#testing).
+- CI runs typecheck, a web bundle, the operator UI, the edge functions,
+  the database checks, and the Drops verification job on every push. See
+  [OPERATING.md](OPERATING.md#testing).
 - The buyer and dealer screens have no tests. The feed parsers and the operator's
   pasted-list parser do.
 - Demo mode (`src/lib/demo.ts`) reimplements the deck's filter logic in JavaScript, so
@@ -322,8 +325,8 @@ types are generated from the schema, never hand-written.
 - There is no way in the app to move a claim off an account without deleting it.
   An operator can clear `claimed_by` by hand. Deleting the account also releases
   the claim and leaves the shop listed.
-- Messages poll rather than stream, and nothing notifies anyone: no push, no email
-  when a message arrives. A person who does not open the app does not know.
+- Messages poll rather than stream. A new message sends no push and no email.
+  Drops do send a push when a followed shop lists a watch. See `notify-drops`.
 - There is no way to block or report someone, and anyone who has posted can be
   written to.
 - **Graham Pro** does not gate the deck, wishlist, or messages yet. Web and demo
@@ -333,7 +336,7 @@ types are generated from the schema, never hand-written.
 
 ## 13. Community
 
-The third tab, between Search and Wishlist. Signed-in people post a watch they want to sell,
+The second tab, between Buy and Messages. Signed-in people post a watch they want to sell,
 buy, or trade. Others comment on that post. The comment is the public record. The tab
 was named Exchange; the database tables, functions, and code keep that word.
 

@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Engineering judgment
 
+The app map is `AGENTS.md`. When a route, table, edge function, or workflow changes, update that file and delete the sentence the change makes false.
+
 Justin owns product direction. You own technical decisions — make them. Ask him
 about product tradeoffs (what the app should do for a user), never about
 implementation details he would only be guessing at.

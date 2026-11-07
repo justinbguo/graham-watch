@@ -928,23 +928,27 @@ async function shoot(page, file) {
 
 async function ensureSignedIn(page, email) {
   const gate = page.getByRole('button', { name: 'Log in or create an account' });
+  const emailDoor = page.getByRole('button', { name: 'Continue with email' });
   const buy = page.getByRole('tab', { name: 'Buy' });
   try {
     await Promise.race([
       gate.waitFor({ state: 'visible', timeout: 30_000 }),
+      emailDoor.waitFor({ state: 'visible', timeout: 30_000 }),
       buy.waitFor({ state: 'visible', timeout: 30_000 }),
     ]);
   } catch (error) {
     fail(
       'The web export did not show sign-in or the tab bar.',
-      'The page should offer Log in or create an account, or the Buy tab when a session is already stored.',
+      'The page should offer Log in or create an account, Continue with email, or the Buy tab when a session is already stored.',
       { url: page.url(), text: (await pageText(page)).slice(0, 800), cause: error instanceof Error ? error.message : String(error) },
     );
   }
-  if (!(await gate.isVisible().catch(() => false))) return;
+  const gateOpen = await gate.isVisible().catch(() => false);
+  const doorOpen = await emailDoor.isVisible().catch(() => false);
+  if (!gateOpen && !doorOpen) return;
 
-  await gate.click();
-  await page.getByRole('button', { name: 'Continue with email' }).click();
+  if (gateOpen) await gate.click();
+  await emailDoor.click();
   await page.getByPlaceholder('you@example.com').fill(email);
   const since = Date.now();
   await page.getByRole('button', { name: 'Send me a code' }).click();
@@ -978,6 +982,8 @@ async function ensureSignedIn(page, email) {
       { url: page.url(), text: (await pageText(page)).slice(0, 800) },
     );
   }
+  await gate.waitFor({ state: 'hidden', timeout: 20_000 });
+  await buy.waitFor({ state: 'visible', timeout: 20_000 });
 }
 
 async function openMessages(page) {
@@ -1014,6 +1020,24 @@ async function openMessages(page) {
     badgeLabel: (await badge.getAttribute('aria-label')) ?? (await badge.innerText()),
     tabLabel: await tab.first().getAttribute('aria-label'),
   };
+}
+
+async function openDealerProfile(page) {
+  await page.getByRole('tab', { name: 'Profile', exact: true }).click();
+  try {
+    await page.getByText('Your shop', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByText('Test Bench', { exact: true }).first().waitFor({ state: 'visible' });
+    await page.getByRole('tab', { name: 'Deal', exact: true }).waitFor({ state: 'visible' });
+  } catch (error) {
+    const failed = path.join(evidenceDir(), 'dealer-profile-missing.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      'Profile did not show the claimed shop.',
+      'The dealer sees Your shop, Test Bench, and a Deal tab in place of Messages.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+  return { shop: 'Test Bench', tab: 'Deal' };
 }
 
 async function openProfile(page) {
@@ -1075,11 +1099,30 @@ async function commandScreenshot(route, file, userName) {
     const pathOnly = route.split('?')[0];
     let detail = {};
     if (pathOnly === '/messages') detail = await openMessages(page);
-    else if (pathOnly === '/profile') detail = await openProfile(page);
+    else if (pathOnly === '/profile') {
+      detail = who.email === PEOPLE.dealer.email ? await openDealerProfile(page) : await openProfile(page);
+    }
     else if (pathOnly === '/drops') {
       await page.goto(target, { waitUntil: 'domcontentloaded' });
       await waitForWatch(page);
       detail = { url: page.url() };
+    } else if (pathOnly === '/community') {
+      try {
+        await page.getByRole('tab', { name: 'Community', exact: true }).click();
+        await page.getByRole('button', { name: 'All posts' }).waitFor({ state: 'visible', timeout: 20_000 });
+      } catch (error) {
+        const failed = path.join(evidenceDir(), 'community-missing.png');
+        await shoot(page, failed).catch(() => undefined);
+        fail(
+          'Community did not show the post filter.',
+          'The signed-in board has a button named All posts.',
+          { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+        );
+      }
+      detail = { surface: 'community' };
+    } else if (pathOnly === '/') {
+      await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+      detail = { surface: 'buy' };
     } else {
       await page.goto(target, { waitUntil: 'domcontentloaded' });
     }

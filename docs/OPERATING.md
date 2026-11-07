@@ -46,9 +46,9 @@ file, and an exported `SUPABASE_URL` wins over both.
 
 ## Hosted is behind local
 
-Hosted is not a mirror of your machine and nothing keeps it in step. The five
-functions are level as of this branch; the schema is one migration behind, and
-secrets are missing. Check before blaming the code:
+Hosted is not a mirror of your machine and nothing keeps it in step. Edge
+functions deploy from `main` when their code changes. Schema changes still
+need `npm run db:push` after a dump. Check before blaming the code:
 
 ```
 npx supabase migration list      # local vs remote, side by side
@@ -221,9 +221,11 @@ with a letter. `claim_username` reserves it there. A trigger refuses
 The final onboarding question calls `expo-notifications` for the OS permission.
 On Android it creates the `watch-updates` channel before the request; without a
 channel Android 13 does not show its prompt. The result is stored in
-`profiles.notifications_enabled`. That column is not a push token and no remote
-delivery exists yet. Push delivery requires a development build on Android;
-Expo Go cannot receive remote notifications there.
+`profiles.notifications_enabled`. That column records the permission answer.
+A granted device stores its token in `device_push_tokens`. `notify-drops`
+sends one Expo push when a followed shop lists a watch the buyer has not
+opened. A new message still has no push and no email. Remote push on Android
+needs a development build. Expo Go cannot receive it there.
 
 When `EXPO_PUBLIC_REVENUECAT_*` keys are set on iOS or Android, the Graham Pro
 paywall screen runs next. `onboarded_at` is written after subscribe, restore, or
@@ -257,9 +259,10 @@ A verified application grants nothing. It is a request with a proved return
 address, waiting for an operator. That ordering is the point: prove the mailbox,
 then a human decides.
 
-Once a shop is claimed, the **Hub** tab replaces Messages — seller sections for
-buyer threads, listings, and placeholders for payments and customers. Profile
-stays the workspace for catalogue refresh and claim flow.
+Once a shop is claimed, the **Deal** tab replaces Messages. The screen is
+Seller Hub in the code. Its sections are Messages, Payments, Analytics,
+Listings, and Support. Profile stays the workspace for catalogue refresh and
+the claim flow.
 
 ### The operator path
 
@@ -582,7 +585,7 @@ mailbox to every buyer.
 | `npx expo export --platform web` | Broken route tree, missing assets, bad imports | Logic |
 | `npm run build` in `operator/` | Type errors and a broken bundle in the operator UI | Logic |
 | `npx oxlint --deny-warnings` in `operator/` | Lint in the operator UI | The Expo app, which has no linter |
-| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the five edge functions | Logic, and whether they are deployed |
+| `deno check --config supabase/functions/deno.ci.json …` | Type errors in the six edge functions | Logic, and whether they are deployed |
 | `deno test --config supabase/functions/deno.ci.json supabase/functions/` | The Squarespace, Shopify, and sitemap parsers, against payloads a real shop returned | Extraction, photos, and the write path |
 | `npm run test:rls` | Every security policy, over HTTP, from a buyer's side of the wire | Anything above the database |
 | `npm run test:filters` | v2 search, v2 counts, v1, and `matchesListing` return the same watches, and keyset pages do not skip or repeat | Anything above the database |
@@ -594,8 +597,9 @@ seconds. CI runs all of them on every push and pull request:
 | --- | --- |
 | `app` | `npm run typecheck`, a web bundle, and the refresh and deploy planner tests |
 | `operator ui` | `npm run build`, `oxlint --deny-warnings`, and `npm test`, in `operator/` |
-| `edge functions` | `deno check` on all five, then `deno test` over the directory |
+| `edge functions` | `deno check` on all six, then `deno test` over the directory |
 | `database` | every migration from empty, `npm run test:rls`, `npm run test:filters`, generated types |
+| `drops verification` | `npm run verify:drops` against one local stack |
 
 Deploying the functions is a different workflow, `Deploy edge functions`, and
 it runs only on a push to `main` that touches function code or
@@ -620,7 +624,7 @@ on launch.
 The edge functions are not part of the Expo program, so `npm run typecheck` has
 never seen them. `deno check` is the only type check the import pipeline gets. It
 runs with `--config supabase/functions/deno.ci.json`, which exists solely to stop
-Deno walking up to the app's `package.json`; without it, checking five server
+Deno walking up to the app's `package.json`; without it, checking six server
 files resolves the whole Expo tree and any package published in the last day
 fails Deno's dependency-age policy.
 
