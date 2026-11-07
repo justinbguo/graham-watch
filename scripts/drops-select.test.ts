@@ -20,7 +20,7 @@ import {
   resolveExpoPushUrl,
   ticketsFromExpoBody,
 } from '../supabase/functions/notify-drops/expo.ts';
-import { routeFromPushData } from '../src/lib/pushRoute.ts';
+import { pathForPushRoute, routeFromPushData } from '../src/lib/pushRoute.ts';
 
 const NOW = new Date('2026-11-03T06:30:00.000Z');
 const ADA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -435,20 +435,26 @@ test('a local stack can capture pushes, and a hosted URL cannot', () => {
   );
 });
 
-test('a drop tap opens the shop or the feed, and a reply still opens the thread', () => {
-  assert.deepEqual(
-    routeFromPushData({ kind: 'drop', dropNotificationId: WATCH_NEW, dealerId: CRAFT }),
-    { type: 'drop', dropNotificationId: WATCH_NEW, dealerId: CRAFT },
-  );
-  assert.deepEqual(routeFromPushData({ kind: 'drop', dropNotificationId: WATCH_NEW }), {
+test('a drop tap opens that dealer in Messages, and several dealers open the drops list', () => {
+  const oneShop = routeFromPushData({
+    kind: 'drop',
+    dropNotificationId: WATCH_NEW,
+    dealerId: CRAFT,
+  });
+  assert.deepEqual(oneShop, { type: 'drop', dropNotificationId: WATCH_NEW, dealerId: CRAFT });
+  assert.equal(oneShop && pathForPushRoute(oneShop), `/drops?dealerId=${CRAFT}`);
+
+  const several = routeFromPushData({ kind: 'drop', dropNotificationId: WATCH_NEW });
+  assert.deepEqual(several, {
     type: 'drop',
     dropNotificationId: WATCH_NEW,
     dealerId: null,
   });
+  assert.equal(several && pathForPushRoute(several), '/drops');
+
   assert.equal(routeFromPushData({ kind: 'drop', dropNotificationId: 'nope' }), null);
-  assert.deepEqual(routeFromPushData({ conversationId: 'thread-1' }), {
-    type: 'conversation',
-    conversationId: 'thread-1',
-  });
+  const reply = routeFromPushData({ conversationId: 'thread-1' });
+  assert.deepEqual(reply, { type: 'conversation', conversationId: 'thread-1' });
+  assert.equal(reply && pathForPushRoute(reply), '/conversation/thread-1');
   assert.equal(routeFromPushData(null), null);
 });

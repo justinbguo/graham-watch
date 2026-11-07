@@ -17,6 +17,13 @@ function uuid(value: unknown): string | null {
   return typeof value === 'string' && UUID.test(value) ? value : null;
 }
 
+/** Where the tap lands. One shop opens that shop's drops. Several open the list. */
+export function pathForPushRoute(route: PushRoute): string {
+  if (route.type === 'conversation') return `/conversation/${route.conversationId}`;
+  if (route.dealerId) return `/drops?dealerId=${route.dealerId}`;
+  return '/drops';
+}
+
 export function routeFromPushData(data: unknown): PushRoute | null {
   if (!data || typeof data !== 'object') return null;
   const record = data as Record<string, unknown>;

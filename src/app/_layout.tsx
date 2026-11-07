@@ -2,12 +2,14 @@ import { useFonts } from 'expo-font';
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationLightTheme,
+  router,
   SplashScreen,
   Stack,
   ThemeProvider as NavigationThemeProvider,
 } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useOnboardingGate } from '@/data/profile';
@@ -77,6 +79,19 @@ function Chrome() {
   useEffect(() => {
     applySystemChrome(theme);
   }, [theme]);
+
+  // A signed-in full page load of /drops returns to Buy. The notification tap
+  // uses router.push while the app is already open, and the local tour does too.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const target = window as Window & { __grahamNavigate?: (href: string) => void };
+    target.__grahamNavigate = (href) => {
+      router.push(href as '/drops');
+    };
+    return () => {
+      delete target.__grahamNavigate;
+    };
+  }, []);
 
   const navigationTheme = useMemo(() => {
     const base = theme.scheme === 'dark' ? NavigationDarkTheme : NavigationLightTheme;

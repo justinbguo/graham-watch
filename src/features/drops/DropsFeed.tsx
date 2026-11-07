@@ -11,11 +11,19 @@ import { inset, space, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
 
+const DEALER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function dealerIdFromParam(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw && DEALER_ID.test(raw) ? raw : null;
+}
+
 /**
  * Watches listed by shops this buyer follows, after they followed.
- * The count on Profile clears when this screen opens. The rows stay.
+ * The count on Messages clears when this screen opens. The rows stay.
+ * A dealer id limits the list, and the seen mark, to that shop.
  */
-export function DropsFeed() {
+export function DropsFeed({ dealerId = null }: { dealerId?: string | null }) {
   const { userId } = useSession();
   const styles = useThemedStyles(feedStyles);
   const open = useOpenStack();
@@ -27,8 +35,8 @@ export function DropsFeed() {
   // list, so the rows stay put.
   useEffect(() => {
     if (!userId || !data) return;
-    markSeen(null);
-  }, [userId, data, markSeen]);
+    markSeen(dealerId);
+  }, [userId, data, markSeen, dealerId]);
 
   const close = () => router.back();
 
@@ -60,10 +68,14 @@ export function DropsFeed() {
     );
   }
 
-  const cards = data ?? [];
+  const cards = (data ?? []).filter((card) => dealerId == null || card.dealer_id === dealerId);
+  const shopName = dealerId ? (cards.find((card) => card.dealer?.name)?.dealer?.name ?? null) : null;
 
   return (
-    <Screen title="New watches" subtitle="From dealers you follow" action={<CloseButton onPress={close} />}>
+    <Screen
+      title="New watches"
+      subtitle={shopName ?? 'From dealers you follow'}
+      action={<CloseButton onPress={close} />}>
       <FlatList
         data={cards}
         keyExtractor={(card) => card.id}

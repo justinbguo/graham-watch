@@ -46,7 +46,7 @@ export const keys = {
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,
-  /** Unseen new watches per followed shop. The Profile badge is the sum. */
+  /** Unseen new watches per followed shop. The Messages badge includes the sum. */
   dropCounts: (userId: string) => ['drop-counts', userId] as const,
   dropFeed: (userId: string) => ['drop-feed', userId] as const,
   dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
