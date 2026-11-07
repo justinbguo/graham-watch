@@ -7,7 +7,7 @@
  * command is forwarded to that keeper so demo in-memory swipe state survives
  * across commands. `cleanup` stops only what this run started; artifacts stay.
  *
- *   node .cursor/skills/verify-graham/bin/control-graham.mjs <command> [args]
+ *   node .cursor/skills/control-graham/bin/control-graham.mjs <command> [args]
  */
 import { spawn, execFileSync } from 'node:child_process';
 import {

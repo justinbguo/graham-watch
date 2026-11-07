@@ -1,5 +1,5 @@
 {
-  "name": "verify-graham",
+  "name": "control-graham",
   "version": "1.0.0",
   "private": true,
   "description": "Playwright dependency for control-graham, the agent verification harness.",

@@ -4,7 +4,7 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 
 ## Baseline preconditions
 
-- Start with `node .cursor/skills/verify-graham/bin/control-graham.mjs up --mode demo` unless the feature file requires **local**.
+- Start with `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode demo` unless the feature file requires **local**.
 - Run `doctor` and require `looksLikeGraham: true` on the owned URL.
 - Never drive a Metro/browser you did not start with `up`.
 - Default viewport is 1280×900 (desktop web: grid/rail chrome may appear; arrows still pass/save on the card stage when Buy is focused).

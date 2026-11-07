@@ -1,5 +1,5 @@
 ---
-name: verify-graham
+name: control-graham
 description: Drive the Graham Expo web app the way a buyer would and prove behavior with screenshots and aria snapshots. Use when verifying UI changes, swipe/deck/wishlist/search flows, or any claim that the app "works".
 ---
 
@@ -10,10 +10,10 @@ Graham is a swipe-based vintage-watch discovery app (Expo SDK 57 + Expo Router +
 The control surface is `control-graham`. Prefer it over ad-hoc `curl`, raw Playwright, or clicking in a Metro the user already had open.
 
 ```bash
-CG="node .cursor/skills/verify-graham/bin/control-graham.mjs"
+CG="node .cursor/skills/control-graham/bin/control-graham.mjs"
 ```
 
-First-time on a machine: `(cd .cursor/skills/verify-graham && npm install)`.
+First-time on a machine: `(cd .cursor/skills/control-graham && npm install)`.
 
 ## Modes
 
@@ -88,7 +88,7 @@ Read `features/README.md`, then the matching feature file. Drive one mapped entr
 
 ## Evidence
 
-Artifacts land in `.cursor/skills/verify-graham/artifacts/<run-id>/` and **survive** `cleanup`.
+Artifacts land in `.cursor/skills/control-graham/artifacts/<run-id>/` and **survive** `cleanup`.
 
 Proof standards:
 
@@ -112,10 +112,10 @@ One active run at a time (`.runs/active.json`). `up` refuses if that run's Metro
 ## Helpers
 
 ```bash
-node .cursor/skills/verify-graham/bin/control-graham.mjs <command>
+node .cursor/skills/control-graham/bin/control-graham.mjs <command>
 ```
 
-Requires Playwright under `.cursor/skills/verify-graham/` (gitignored `node_modules`). Chrome/Chromium on the machine (`google-chrome` or Playwright channel).
+Requires Playwright under `.cursor/skills/control-graham/` (gitignored `node_modules`). Chrome/Chromium on the machine (`google-chrome` or Playwright channel).
 
 ## Feature map
 
