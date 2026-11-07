@@ -26,6 +26,9 @@
     // Node's test runner. It imports the drop selector, which lives next to
     // the edge function. `deno check` covers that function; this file is run
     // with `node --test --experimental-strip-types`.
-    "scripts/drops-select.test.ts"
+    "scripts/drops-select.test.ts",
+    // Same runner as drops-select. The fixture guard is plain TypeScript next
+    // to the edge function, and node --test strips the types itself.
+    "scripts/fixture-import.test.ts"
   ]
 }
