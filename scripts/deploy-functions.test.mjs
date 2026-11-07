@@ -5,7 +5,9 @@ import { test } from 'node:test';
 import {
   PROJECT_REF,
   deployArgs,
+  deployAuthFailure,
   importListingsKeepsJwt,
+  probeManagementApi,
   selectFunctions,
 } from './deploy-functions.mjs';
 
@@ -64,6 +66,39 @@ test('deploy args keep JWT verification on and name the project', () => {
     'hbxgxtbtefpyutyqafoi',
   ]);
   assert.equal(args.includes('--no-verify-jwt'), false);
+});
+
+test('a rejected access token names the secret to replace', () => {
+  const message = deployAuthFailure(401, '{"message":"Invalid access token"}');
+  assert.match(message, /SUPABASE_ACCESS_TOKEN/);
+  assert.match(message, /401 Invalid access token/);
+  assert.match(message, /hbxgxtbtefpyutyqafoi/);
+  assert.match(message, /Re-run Deploy edge functions/);
+  assert.equal(deployAuthFailure(500, 'boom'), null);
+});
+
+test('the CLI phrase is enough when the status is not 401', () => {
+  const message = deployAuthFailure(0, 'unexpected list functions status 401: {"message":"Invalid access token"}');
+  assert.match(message, /SUPABASE_ACCESS_TOKEN/);
+});
+
+test('a token with no access to the project is a different sentence', () => {
+  const message = deployAuthFailure(403, '{"message":"Forbidden"}');
+  assert.match(message, /403/);
+  assert.match(message, /does not have access/);
+});
+
+test('the management probe reports the status and does not send the token anywhere else', async () => {
+  let seen = null;
+  const result = await probeManagementApi('test-token', async (url, init) => {
+    seen = { url, authorization: init.headers.Authorization };
+    return { ok: false, status: 401, text: async () => '{"message":"Invalid access token"}' };
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 401);
+  assert.match(result.body, /Invalid access token/);
+  assert.equal(seen.url, 'https://api.supabase.com/v1/projects/hbxgxtbtefpyutyqafoi/functions');
+  assert.equal(seen.authorization, 'Bearer test-token');
 });
 
 test('import-listings is pinned to verify_jwt true in config.toml', () => {

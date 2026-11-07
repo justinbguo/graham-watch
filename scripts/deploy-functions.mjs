@@ -70,6 +70,46 @@ export function deployArgs(name, projectRef = PROJECT_REF) {
   return ['functions', 'deploy', name, '--project-ref', projectRef];
 }
 
+const TOKEN_PAGE = 'https://supabase.com/dashboard/account/tokens';
+
+/**
+ * A rejected management-API call, as a sentence an operator can act on.
+ * Null when the status is some other failure and the caller should print
+ * the raw body itself.
+ */
+export function deployAuthFailure(status, bodyText) {
+  const text = bodyText ?? '';
+  if (status === 401 || /invalid access token/i.test(text)) {
+    return (
+      `SUPABASE_ACCESS_TOKEN was rejected (401 Invalid access token). ` +
+      `The GitHub Actions secret is missing, expired, or revoked. ` +
+      `Create a new personal access token at ${TOKEN_PAGE} for the account that owns project ${PROJECT_REF}, ` +
+      `then replace the repository secret SUPABASE_ACCESS_TOKEN. ` +
+      `This workflow stops here. Edge functions stay on the last successful deploy until that secret works. ` +
+      `Re-run Deploy edge functions after replacing it.`
+    );
+  }
+  if (status === 403) {
+    return (
+      `SUPABASE_ACCESS_TOKEN cannot list functions on project ${PROJECT_REF} (403). ` +
+      `The token is accepted, and the account that owns it does not have access to that project. ` +
+      `Replace the repository secret with a token from an account that does, then re-run Deploy edge functions.`
+    );
+  }
+  return null;
+}
+
+export async function probeManagementApi(token, fetchImpl = fetch) {
+  const response = await fetchImpl(`https://api.supabase.com/v1/projects/${PROJECT_REF}/functions`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+  const body = await response.text();
+  return { ok: response.ok, status: response.status, body };
+}
+
 function diffFiles(before) {
   if (!before || /^0+$/.test(before)) return null;
   try {
@@ -89,7 +129,7 @@ function writeOutput(names) {
   appendFileSync(process.env.GITHUB_OUTPUT, `functions<<EOF\n${names.join('\n')}\nEOF\n`);
 }
 
-function main() {
+async function main() {
   const configText = readFileSync('supabase/config.toml', 'utf8');
   if (!importListingsKeepsJwt(configText)) {
     console.error(
@@ -115,8 +155,24 @@ function main() {
 
   if (!process.env.SUPABASE_ACCESS_TOKEN) {
     console.error(
-      'SUPABASE_ACCESS_TOKEN is not set. Add a Supabase account access token as that repository secret (Dashboard → Account → Access Tokens). The project ref is already in this script.'
+      `SUPABASE_ACCESS_TOKEN is not set. Add a Supabase account access token as that repository secret (${TOKEN_PAGE}). The project ref is already in this script. This workflow cannot deploy until the secret is set.`
     );
+    process.exit(1);
+  }
+
+  // Fail before the CLI's stack trace. A bad token used to surface as
+  // "unexpected list functions status 401" buried under a Node exception,
+  // and the nightly refresh then stayed green when notify-drops 404'd.
+  const probe = await probeManagementApi(process.env.SUPABASE_ACCESS_TOKEN);
+  if (!probe.ok) {
+    const loud =
+      deployAuthFailure(probe.status, probe.body) ??
+      `Could not list edge functions (${probe.status}). ${probe.body.slice(0, 300)}`;
+    console.error(loud);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const encoded = loud.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+      console.error(`::error title=SupabaseAccessToken::${encoded}`);
+    }
     process.exit(1);
   }
 
@@ -140,4 +196,9 @@ function isMain() {
   }
 }
 
-if (isMain()) main();
+if (isMain()) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

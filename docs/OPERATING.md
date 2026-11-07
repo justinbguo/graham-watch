@@ -84,7 +84,7 @@ One new repository secret, and nothing else:
 
 | Secret | What it is |
 | --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | A personal access token from [Account → Access Tokens](https://supabase.com/dashboard/account/tokens). The CLI reads it from the environment. The project ref `hbxgxtbtefpyutyqafoi` is in the workflow, not a secret. |
+| `SUPABASE_ACCESS_TOKEN` | A personal access token from [Account → Access Tokens](https://supabase.com/dashboard/account/tokens). The CLI reads it from the environment. The project ref `hbxgxtbtefpyutyqafoi` is in the workflow, not a secret. An expired token fails the job immediately with `401 Invalid access token` and names this secret. Functions stay on the last deploy until it is replaced, then re-run the workflow. |
 
 The nightly refresh secrets are unchanged and still required on the repo:
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
@@ -383,7 +383,14 @@ The job prints a shop health summary after the per-shop lines and writes one
 row per shop to `refresh_runs` when that table exists. A single shop's error,
 an empty catalogue, live watches with no photographs, or seven nights with
 nothing new, changed, or published is a warning on the Actions run. The job
-stays green unless every shop failed or the request itself was rejected.
+stays green unless every shop failed, the request itself was rejected, or
+`notify-drops` failed. After the shops are written it calls `notify-drops`
+and prints how many people were sent a push and why anyone was skipped
+(no token, already notified today, nothing new since the follow, token on
+an account that follows nobody). A night with nobody to notify stays green.
+A 404, a rejected cron secret, or a delivery error fails the job. The same
+`GRAHAM_CRON_SECRET` has to be a hosted edge-function secret, not only a
+GitHub secret: `notify-drops` returns 503 when that value is missing.
 Until the migration is on hosted, the summary says the history table is
 missing and still prints today's lines.
 
