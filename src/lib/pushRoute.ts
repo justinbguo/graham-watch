@@ -1,3 +1,5 @@
+import type { Href } from 'expo-router';
+
 /**
  * Where a notification tap goes. Kept off `expo-notifications` so the choice
  * can be tested without a phone.
@@ -18,7 +20,7 @@ function uuid(value: unknown): string | null {
 }
 
 /** Where the tap lands. One shop opens that shop's drops. Several open the list. */
-export function pathForPushRoute(route: PushRoute): string {
+export function pathForPushRoute(route: PushRoute): Href {
   if (route.type === 'conversation') return `/conversation/${route.conversationId}`;
   if (route.dealerId) return `/drops?dealerId=${route.dealerId}`;
   return '/drops';
