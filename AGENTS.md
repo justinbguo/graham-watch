@@ -82,7 +82,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 
 | Function | Who calls it | What it writes |
 | --- | --- | --- |
-| `import-listings` | App and operator (`src/data/dealers.ts`, `operator/src/importer.ts`, `scripts/_import.mjs`). Nightly refresh sends `action: "scheduled-refresh"` with the service role and `x-graham-cron-secret`. Local proof sends `action: "fixture"`, which the hosted function refuses. | Listings, photos, `import_jobs`, `source_items`. `discover` and `preview` write nothing. |
+| `import-listings` | App and operator (`src/data/dealers.ts`, `operator/src/importer.ts`, `scripts/_import.mjs`). Nightly refresh sends `action: "scheduled-refresh"` with the service role and `x-graham-cron-secret`. Local proof sends `action: "fixture"`, which the hosted function refuses. | Listings, photos, `import_jobs`, `source_items`. A strap, accessory, or clock is stored with `source_items.hold_reason` and is not published. Listings already on the deck stay there. `discover` and `preview` write nothing. |
 | `notify-drops` | `scripts/refresh.mjs` after a catalogue write. Same service role and cron header. | `drop_notifications`, then an Expo push. Local stacks may set `EXPO_PUSH_URL` only when `SUPABASE_URL` is a local host. |
 | `claim-dealer` | `src/data/dealers.ts` | A mailbox code, then the claim. |
 | `verify-application` | `src/data/applications.ts` | A code for an application mailbox. |

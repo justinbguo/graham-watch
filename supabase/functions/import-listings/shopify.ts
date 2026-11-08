@@ -1,3 +1,4 @@
+import { classifyCatalogueItem } from './nonwatch.ts';
 import { CatalogueRefused, parseRobots, type RobotsPolicy } from './robots.ts';
 import { htmlToText } from './scrape.ts';
 import {
@@ -91,10 +92,27 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function tagsOf(product: Json): string[] {
+  const raw = product?.tags;
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((tag: unknown): tag is string => typeof tag === 'string' && tag.trim() !== '')
+      .map((tag: string) => tag.trim());
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map((tag: string) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 function metaOf(product: Json, photoCount: number): ItemMeta {
   return {
     vendor: text(product?.vendor),
     productType: text(product?.product_type),
+    tags: tagsOf(product),
     sku: text(product?.variants?.[0]?.sku),
     photoCount,
     publishedAt: text(product?.published_at),
@@ -200,35 +218,44 @@ export function mapProduct(
   if (!title) return refuse('no title');
   if (!handle) return refuse('no product URL');
 
-  const type = meta.productType;
-  // A blank type is not a claim. Dropping untyped products would empty every
-  // shop that never filled the field in. "Watch Straps" is a strap, so the
-  // word "watch" in a type earns nothing — the operator console lists every
-  // refusal with its reason, which is what makes a wrong call here visible.
-  if (type && NOT_A_WATCH.test(type)) {
-    return refuse(`product type "${type}" is not a watch`);
-  }
-  if (!photoUrls.length) return refuse('no photograph');
+  const body = htmlToText(String(product?.body_html ?? ''), origin);
+  const decision = classifyCatalogueItem({
+    title,
+    text: body,
+    productType: meta.productType,
+    tags: meta.tags ?? [],
+    vendor: meta.vendor,
+  });
 
   // Dealers keep sold watches published with every variant marked unavailable,
   // which is the shop saying "gone" in the only place it says it.
   const variants: Json[] = Array.isArray(product?.variants) ? product.variants : [];
   const stated = variants.filter((variant: Json) => typeof variant?.available === 'boolean');
-
-  return {
-    item: {
-      // Shopify's numeric product id survives a handle rename; the handle does not.
-      externalId: product?.id == null ? productKey(sourceUrl) : `shopify:${product.id}`,
-      available: stated.length === 0 || stated.some((variant: Json) => variant.available === true),
-      title: catalogueTitle(title, meta.vendor, shopName),
-      text: htmlToText(String(product?.body_html ?? ''), origin),
-      sourceUrl,
-      photoUrls,
-      priceCents: toCents(product?.variants?.[0]),
-      currency,
-      meta,
-    },
+  const available = stated.length === 0 || stated.some((variant: Json) => variant.available === true);
+  const item: SourceItem = {
+    // Shopify's numeric product id survives a handle rename; the handle does not.
+    externalId: product?.id == null ? productKey(sourceUrl) : `shopify:${product.id}`,
+    available,
+    title: catalogueTitle(title, meta.vendor, shopName),
+    text: body,
+    sourceUrl,
+    photoUrls,
+    priceCents: toCents(product?.variants?.[0]),
+    currency,
+    meta,
   };
+
+  if (decision.decision === 'hold') {
+    return { item: { ...item, holdReason: decision.reason } };
+  }
+
+  const type = meta.productType;
+  if (type && NOT_A_WATCH.test(type)) {
+    return refuse(`product type "${type}" is not a watch`);
+  }
+  if (!photoUrls.length) return refuse('no photograph');
+
+  return { item };
 }
 
 /** products.json returns the whole shop; a collection URL should not. */
@@ -394,6 +421,10 @@ function unseen(products: Json[], seen: Set<string>): Json[] {
 function keep(read: AdapterRead, mapped: Mapped, minPhotos: number) {
   if ('skipped' in mapped) {
     read.skipped.push(mapped.skipped);
+    return;
+  }
+  if (mapped.item.holdReason) {
+    read.items.push(mapped.item);
     return;
   }
   if (mapped.item.photoUrls.length < minPhotos) {

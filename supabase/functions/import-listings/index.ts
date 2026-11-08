@@ -5,6 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
 import { fixtureImportAllowed, parseFixtureListings } from './fixture.ts';
+import { holdLabel } from './nonwatch.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from './publish.ts';
@@ -322,7 +323,7 @@ function previewFromItems(items: SourceItem[], skipped: SkippedItem[]) {
     sku: item.meta?.sku ?? null,
     published_at: item.meta?.publishedAt ?? null,
     updated_at: item.meta?.updatedAt ?? null,
-    skipped: null as string | null,
+    skipped: item.holdReason ? holdLabel(item.holdReason) : null,
   }));
 
   const dropped = skipped.map((item) => ({
@@ -346,12 +347,13 @@ function previewFromItems(items: SourceItem[], skipped: SkippedItem[]) {
 }
 
 function previewCounts(items: SourceItem[], skipped: SkippedItem[]) {
-  const forSale = items.filter((item) => item.available).length;
+  const watches = items.filter((item) => !item.holdReason);
+  const forSale = watches.filter((item) => item.available).length;
   return {
     read: items.length + skipped.length,
     for_sale: forSale,
-    sold: items.length - forSale,
-    skipped: skipped.length,
+    sold: watches.length - forSale,
+    skipped: skipped.length + (items.length - watches.length),
   };
 }
 

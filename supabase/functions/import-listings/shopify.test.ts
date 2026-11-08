@@ -28,6 +28,11 @@ function refused(fields: Record<string, unknown> = {}) {
   return 'skipped' in mapped ? mapped.skipped : null;
 }
 
+function held(fields: Record<string, unknown> = {}) {
+  const mapped = mapProduct(product(fields), ORIGIN, 'USD');
+  return 'item' in mapped ? mapped.item : null;
+}
+
 /* --------------------------------------------------------- product_type */
 
 // The regression this exists for. Collectors Corner NY type their watches
@@ -44,18 +49,18 @@ Deno.test('keeps an untyped product, because a blank field states nothing', () =
   assertEquals(kept({ product_type: null })?.title, 'Rolex Explorer 1016');
 });
 
-Deno.test('refuses what the shop itself says is not a watch', () => {
-  assertEquals(refused({ product_type: 'Straps' })?.reason, 'product type "Straps" is not a watch');
-  assertEquals(refused({ product_type: 'SIGN' }) !== null, true);
+Deno.test('holds a strap the shop typed as a strap, and still refuses a sign', () => {
+  assertEquals(held({ product_type: 'Straps' })?.holdReason, 'strap');
+  assertEquals(refused({ product_type: 'SIGN' })?.reason, 'product type "SIGN" is not a watch');
   assertEquals(refused({ product_type: 'Sunglasses' }) !== null, true);
 });
 
 // The word "watch" earns a type nothing. These are the three most common
 // non-watch types a watch dealer has, and all three contain it.
-Deno.test('refuses a watch strap, a watch box and a watch winder', () => {
-  assertEquals(refused({ product_type: 'Watch Straps' }) !== null, true);
-  assertEquals(refused({ product_type: 'Watch Boxes' }) !== null, true);
-  assertEquals(refused({ product_type: 'Watch Winder' }) !== null, true);
+Deno.test('holds a watch strap, a watch box and a watch winder', () => {
+  assertEquals(held({ product_type: 'Watch Straps' })?.holdReason, 'strap');
+  assertEquals(held({ product_type: 'Watch Boxes' })?.holdReason, 'accessory');
+  assertEquals(held({ product_type: 'Watch Winder' })?.holdReason, 'accessory');
 });
 
 // "Signature" is not "sign", and "showcase" is not "case".
@@ -67,12 +72,26 @@ Deno.test('matches a whole word, not a prefix of one', () => {
 /* ------------------------------------------------------------- discards */
 
 Deno.test('a discard carries the shop fields, so the operator sees why', () => {
-  const skipped = refused({ product_type: 'Straps', vendor: 'Hirsch' });
+  const skipped = refused({ product_type: 'SIGN', vendor: 'Hirsch' });
 
   assertEquals(skipped?.sourceUrl, 'https://shop.com/products/rolex-explorer-1016');
   assertEquals(skipped?.meta?.vendor, 'Hirsch');
-  assertEquals(skipped?.meta?.productType, 'Straps');
+  assertEquals(skipped?.meta?.productType, 'SIGN');
   assertEquals(skipped?.meta?.photoCount, 1);
+});
+
+Deno.test('a held strap keeps the shop fields and the reason', () => {
+  const strap = held({
+    product_type: 'Watches',
+    vendor: 'Hirsch',
+    title: 'Black Saffiano Watch Strap',
+    tags: 'strap, leather',
+  });
+
+  assertEquals(strap?.holdReason, 'strap');
+  assertEquals(strap?.meta?.vendor, 'Hirsch');
+  assertEquals(strap?.meta?.productType, 'Watches');
+  assertEquals(strap?.meta?.tags, ['strap', 'leather']);
 });
 
 Deno.test('a product with no photograph is refused rather than dropped', () => {
@@ -99,9 +118,9 @@ Deno.test('refuses merch and sculpture, and keeps a type that only looks similar
   assertEquals(refused({ product_type: 'Merchandise' }) !== null, true);
   assertEquals(refused({ product_type: 'Merch / Apparel' }) !== null, true);
   assertEquals(refused({ product_type: 'Sculpture' }) !== null, true);
-  assertEquals(refused({ product_type: 'Two Piece' }) !== null, true);
-  assertEquals(refused({ product_type: 'Two-Piece' }) !== null, true);
-  assertEquals(refused({ product_type: 'Nato' }) !== null, true);
+  assertEquals(held({ product_type: 'Two Piece' })?.holdReason, 'strap');
+  assertEquals(held({ product_type: 'Two-Piece' })?.holdReason, 'strap');
+  assertEquals(held({ product_type: 'Nato' })?.holdReason, 'strap');
   // "Commercial" does not contain the word "merch".
   assertEquals(kept({ product_type: 'Commercial' })?.title, 'Rolex Explorer 1016');
 });

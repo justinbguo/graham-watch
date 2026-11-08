@@ -770,6 +770,50 @@ let itemId;
     `got ${finished.status} ${JSON.stringify(finishedRows)?.slice(0, 180)}`
   );
 
+  const held = await api('/rest/v1/source_items?select=id', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: {
+      dealer_id: dealerId,
+      provider: 'shopify',
+      external_id: `shopify:held-${stamp}`,
+      source_url: `https://vault-${stamp}.test/products/strap`,
+      raw: { title: 'Black Saffiano Watch Strap' },
+      text_hash: 'th',
+      content_hash: 'ch',
+      publish: true,
+      available: true,
+      hold_reason: 'strap',
+      extracted: typed,
+      extracted_hash: 'other',
+    },
+    prefer: 'return=representation',
+  });
+  check('a shop can record a held strap', held.status === 201, `got ${held.status} ${JSON.stringify(held.body)?.slice(0, 180)}`);
+  const heldId = held.body?.[0]?.id;
+  const heldQueue = await fetch(`${URL}/rest/v1/rpc/pending_source_items`, {
+    method: 'POST',
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_dealer_id: dealerId, p_limit: 25 }),
+  });
+  const heldRows = await heldQueue.json();
+  check(
+    'a held strap stays out of the publish queue',
+    heldQueue.status < 300 && Array.isArray(heldRows) && !heldRows.some((row) => row.id === heldId),
+    `got ${heldQueue.status} ${JSON.stringify(heldRows)?.slice(0, 180)}`
+  );
+  const heldApply = await api('/rest/v1/rpc/apply_source_item', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_source_item_id: heldId },
+  });
+  check('a held strap is not published', heldApply.status >= 400, `got ${heldApply.status}`);
+  const strapListing = await api(
+    `/rest/v1/listings?source_url=eq.${encodeURIComponent(`https://vault-${stamp}.test/products/strap`)}&select=id`,
+    { token: dealerUser.token }
+  );
+  check('a held strap creates no listing', Array.isArray(strapListing.body) && strapListing.body.length === 0);
+
   // The whole point of edited_fields: a correction has to outlive the refresh
   // that would otherwise put the shop's own value back.
   const corrected = await api(

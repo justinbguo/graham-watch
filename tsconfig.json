@@ -29,6 +29,9 @@
     "scripts/drops-select.test.ts",
     // Same runner as drops-select. The fixture guard is plain TypeScript next
     // to the edge function, and node --test strips the types itself.
-    "scripts/fixture-import.test.ts"
+    "scripts/fixture-import.test.ts",
+    // node --experimental-strip-types runs it. tsc would follow the .ts import
+    // into supabase/functions, which this project excludes.
+    "scripts/nonwatch-dry-run.ts"
   ]
 }

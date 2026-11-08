@@ -1505,6 +1505,7 @@ export type Database = {
           extracted: Json | null
           extracted_hash: string | null
           first_seen_at: string
+          hold_reason: string | null
           id: string
           last_seen_at: string
           listing_id: string | null
@@ -1525,6 +1526,7 @@ export type Database = {
           extracted?: Json | null
           extracted_hash?: string | null
           first_seen_at?: string
+          hold_reason?: string | null
           id?: string
           last_seen_at?: string
           listing_id?: string | null
@@ -1545,6 +1547,7 @@ export type Database = {
           extracted?: Json | null
           extracted_hash?: string | null
           first_seen_at?: string
+          hold_reason?: string | null
           id?: string
           last_seen_at?: string
           listing_id?: string | null
@@ -2409,6 +2412,7 @@ export type Database = {
           extracted: Json | null
           extracted_hash: string | null
           first_seen_at: string
+          hold_reason: string | null
           id: string
           last_seen_at: string
           listing_id: string | null

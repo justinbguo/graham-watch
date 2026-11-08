@@ -1,3 +1,4 @@
+import { classifyCatalogueItem } from './nonwatch.ts';
 import { htmlToText } from './scrape.ts';
 import {
   fetchJson,
@@ -85,7 +86,6 @@ function mapItem(item: Json, base: URL): SourceItem | null {
   if (!title) return null;
 
   const photos = photoUrls(item);
-  if (!photos.length) return null;
 
   let sourceUrl = base.toString();
   try {
@@ -100,6 +100,16 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     ? item.structuredContent.variants
     : [];
   const price = squarespacePrice(item);
+  const meta = metaOf(item, photos.length);
+  const text = htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl);
+  const decision = classifyCatalogueItem({
+    title,
+    text,
+    productType: meta.productType,
+    tags: meta.tags ?? [],
+    vendor: meta.vendor,
+  });
+  if (!photos.length && decision.decision !== 'hold') return null;
 
   return {
     // Squarespace's own item id survives a slug rename; fullUrl does not.
@@ -110,12 +120,13 @@ function mapItem(item: Json, base: URL): SourceItem | null {
         (variant: Json) => variant?.unlimited === true || Number(variant?.qtyInStock) > 0
       ),
     title,
-    text: htmlToText(`${item?.excerpt ?? ''}\n${item?.body ?? ''}`, sourceUrl),
+    text,
     sourceUrl,
     photoUrls: photos,
     priceCents: price.priceCents,
     currency: price.currency,
-    meta: metaOf(item, photos.length),
+    meta,
+    ...(decision.decision === 'hold' ? { holdReason: decision.reason } : {}),
   };
 }
 
@@ -207,7 +218,7 @@ export async function fetchSquarespaceItems(
           reason: typeof raw?.title === 'string' && raw.title.trim() ? 'no photograph' : 'no title',
           meta: null,
         });
-      } else if (mapped.photoUrls.length < minPhotos) {
+      } else if (!mapped.holdReason && mapped.photoUrls.length < minPhotos) {
         read.skipped.push({
           sourceUrl: mapped.sourceUrl,
           title: mapped.title,

@@ -248,6 +248,7 @@ export async function importCandidates(dealerId: string): Promise<ImportCandidat
     .select('id, source_url, raw, publish, listing_id, error')
     .eq('dealer_id', dealerId)
     .eq('available', true)
+    .is('hold_reason', null)
     .order('first_seen_at', { ascending: false })
     .limit(CANDIDATE_LIMIT);
 
@@ -352,7 +353,8 @@ export async function stageImport(
         .from('source_items')
         .update({ publish: true, error: null })
         .eq('dealer_id', dealerId)
-        .eq('id', candidate.id);
+        .eq('id', candidate.id)
+        .is('hold_reason', null);
       if (error) throw error;
       continue;
     }
@@ -396,7 +398,8 @@ export async function stageImport(
         error: null,
       })
       .eq('dealer_id', dealerId)
-      .eq('id', candidate.id);
+      .eq('id', candidate.id)
+      .is('hold_reason', null);
     if (error) throw error;
   }
 

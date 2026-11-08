@@ -55,7 +55,7 @@ export async function choose({ dealerId, limit, token }) {
   if (limit === 0) return 0;
 
   const available = await request(
-    `/rest/v1/source_items?dealer_id=eq.${dealerId}&listing_id=is.null&available=is.true&publish=is.false&select=id&order=first_seen_at${
+    `/rest/v1/source_items?dealer_id=eq.${dealerId}&listing_id=is.null&available=is.true&publish=is.false&hold_reason=is.null&select=id&order=first_seen_at${
       limit !== undefined ? `&limit=${limit}` : ''
     }`,
     { token }

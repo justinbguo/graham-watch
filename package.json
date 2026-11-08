@@ -63,6 +63,7 @@
     "db:push": "supabase db push",
     "db:push:dry": "supabase db push --dry-run",
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
+    "nonwatch:dry-run": "node --experimental-strip-types scripts/nonwatch-dry-run.ts",
     "functions:serve": "supabase functions serve import-listings",
     "demo": "EXPO_PUBLIC_DEMO=1 expo start --go --clear",
     "demo:ios": "EXPO_PUBLIC_DEMO=1 expo start --ios --go --clear",
