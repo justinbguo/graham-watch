@@ -407,6 +407,7 @@ export function useDealerCatalog(dealerId: string | null) {
         .from('source_items')
         .select('*')
         .eq('dealer_id', dealerId!)
+        .is('hold_reason', null)
         .order('last_seen_at', { ascending: false });
 
       if (error) throw error;
@@ -455,12 +456,13 @@ export function useChooseCatalogItems(dealerId: string | null) {
   return useMutation({
     mutationFn: async ({ ids, publish }: { ids: string[]; publish: boolean }) => {
       if (!ids.length) return;
-      const { error } = await supabase
+      const write = supabase
         .from('source_items')
         // Clearing the error is what lets a dealer retry a watch that failed:
         // the publish queue skips any row holding one.
         .update({ publish, error: null })
         .in('id', ids);
+      const { error } = await (publish ? write.is('hold_reason', null) : write);
       if (error) throw error;
     },
     onSuccess: () => {

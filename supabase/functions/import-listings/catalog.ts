@@ -210,6 +210,7 @@ export async function syncCatalog(
           content_hash: await contentFingerprint(item),
           available: item.available,
           last_seen_at: readAt,
+          hold_reason: item.holdReason ?? null,
           error: null,
           // publish, applied_hash, photos_hash, listing_id and first_seen_at are
           // omitted on purpose: PostgREST only overwrites the keys it is sent, so
@@ -224,6 +225,7 @@ export async function syncCatalog(
     );
 
     for (const row of rows) {
+      if (row.hold_reason) continue;
       const previous = known.get(row.external_id);
       if (previous === undefined) added += 1;
       else if (previous !== row.content_hash) changed += 1;
@@ -240,6 +242,13 @@ export async function syncCatalog(
 
   // Which rows this read actually saw, by the stamp the upsert just wrote.
   // Listing the ids in the query instead puts 500 uuids in a URL.
+  const held = await supabase
+    .from('source_items')
+    .update({ publish: false })
+    .eq('dealer_id', dealerId)
+    .not('hold_reason', 'is', null);
+  if (held.error) throw new Error(held.error.message);
+
   const { data: seen } = await supabase
     .from('source_items')
     .select('id')
@@ -257,17 +266,18 @@ export async function syncCatalog(
   const counts = (availability.data ?? {}) as { retired?: number; relisted?: number };
   const retired = Number(counts.retired ?? 0);
   const relisted = Number(counts.relisted ?? 0);
+  const watches = items.filter((item) => !item.holdReason);
 
   return {
     provider,
-    found: items.length,
+    found: watches.length,
     added,
     changed,
     adopted: (adopted.data as number) ?? 0,
     retired,
     relisted,
-    forSale: items.filter((item) => item.available).length,
-    skipped: skipped.length,
+    forSale: watches.filter((item) => item.available).length,
+    skipped: skipped.length + (items.length - watches.length),
     complete,
   };
 }

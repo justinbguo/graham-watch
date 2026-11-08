@@ -10,6 +10,7 @@ import { TIMEOUT } from '../_shared/timeouts.ts';
 export type ItemMeta = {
   vendor: string | null;
   productType: string | null;
+  tags?: string[];
   sku: string | null;
   photoCount: number;
   publishedAt: string | null;
@@ -71,6 +72,7 @@ export type SourceItem = {
    * the other way round empties an import from any shop we misread.
    */
   available: boolean;
+  holdReason?: 'strap' | 'accessory' | 'clock';
   /** The operator reviewed this snapshot, so publishing must not replace it. */
   operatorEdited?: boolean;
   /** Absent on rows stored before the operator console needed to show this. */

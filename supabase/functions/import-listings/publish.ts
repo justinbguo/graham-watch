@@ -2,6 +2,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { ExtractorUnavailable, extractFields } from './extract.ts';
 import { photosFingerprint, textFingerprint } from './hash.ts';
+import { classifyCatalogueItem, fieldsFromSourceItem } from './nonwatch.ts';
 import { copyPhotos } from './photos.ts';
 import { mapPool } from './pool.ts';
 import type { SourceItem } from './source.ts';
@@ -84,6 +85,15 @@ async function publishOne(
   row: SourceItemRow
 ): Promise<'published' | 'skipped' | 'failed'> {
   const item = await hydrate(row);
+  const decision = classifyCatalogueItem(fieldsFromSourceItem(item));
+  if (decision.decision === 'hold') {
+    const noted = await supabase
+      .from('source_items')
+      .update({ hold_reason: decision.reason, publish: false })
+      .eq('id', row.id);
+    if (noted.error) console.error('hold note failed', row.id, noted.error.message);
+    return 'skipped';
+  }
 
   if (item.photoUrls.length < MIN_PHOTOS_PER_LISTING) {
     // Reported, not thrown: the row simply re-queues if the note does not land.
@@ -191,7 +201,8 @@ export async function queuePublish(supabase: SupabaseClient, dealerId: string) {
     .from('source_items')
     .update({ publish: true, error: null })
     .eq('dealer_id', dealerId)
-    .eq('available', true);
+    .eq('available', true)
+    .is('hold_reason', null);
   if (error) throw new Error(error.message);
 }
 

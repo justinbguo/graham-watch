@@ -163,12 +163,13 @@ async function ensureDealer(sourceUrl: string, name?: string, email?: string) {
 }
 
 function counts(items: SourceItem[], skipped: SkippedItem[]) {
-  const forSale = items.filter((item) => item.available).length;
+  const watches = items.filter((item) => !item.holdReason);
+  const forSale = watches.filter((item) => item.available).length;
   return {
     read: items.length + skipped.length,
     for_sale: forSale,
-    sold: items.length - forSale,
-    skipped: skipped.length,
+    sold: watches.length - forSale,
+    skipped: skipped.length + (items.length - watches.length),
   };
 }
 
