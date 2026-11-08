@@ -170,8 +170,9 @@ nobody follows.
   thread's cache in `onMutate`, marked `PENDING_ID`, and the refetch replaces
   it.
 - More than one watch on a grid row for Search, the home grid (`ListingTile`:
-  `layout.gridColumnsPhone` on a phone, `layout.gridColumns` / `gridColumnsWeb`
-  above the breakpoint), and nowhere else. Tiles are a square photograph alone
+  `layout.gridColumnsPhone` on a phone, and on a wide window
+  `layout.gridColumns` / `gridColumnsWeb` unless the row control picks up to
+  `gridColumnsMax`), and nowhere else. Tiles are a square photograph alone
   on the page (`contain`, `radius.md`), name / specs / price+dealer under it —
   no `surface` wrapping the block. The wishlist and a shop use `ListingRow`:
   photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;

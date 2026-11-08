@@ -54,7 +54,7 @@ export function desktopGridColumns(windowWidth: number, insetLeft: number, inset
   const rail = layout.deckToolRail + space.lg + space.xs + space.lg;
   const available = Math.max(0, desktopAvailableWidth(windowWidth, insetLeft, insetRight) - rail);
   const columns = Math.ceil((available + space.sm) / (layout.gridTileMax + space.sm));
-  return Math.max(layout.gridColumnsWeb, columns);
+  return Math.min(layout.gridColumnsMax, Math.max(layout.gridColumnsWeb, columns));
 }
 
 export function useDesktopColumnWidth() {

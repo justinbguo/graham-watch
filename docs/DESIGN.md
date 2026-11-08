@@ -624,6 +624,7 @@ opens before a tile passes `gridTileMax`.
 | `layout.communityFrameWeb` | 1308 | Community cap: feed column plus that list. |
 | `layout.gridColumns` | 4 | Tile columns on the wide native home grid. |
 | `layout.gridColumnsWeb` | 2 | Fewest tile columns on the desktop web home grid. |
+| `layout.gridColumnsMax` | 6 | Most listings one wide grid row holds. A phone stays at two. |
 | `layout.gridTileMax` | 640 | Widest a desktop web grid tile gets before another column opens. |
 | `layout.desktopColumnShare` | 1 | Desktop web tabs: the tab column is the window. |
 | `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |
@@ -668,7 +669,12 @@ Why each one:
   across. On a wide native window, `layout.gridColumns`, capped at
   `layout.grid`. On desktop web the wall fills the window, and another
   column opens once a tile would pass `layout.gridTileMax`, so a photo
-  does not become a banner.
+  does not become a banner. On a wide window the row can be set to
+  2, 3, 4, 5, or 6. That choice is stored the same way as appearance.
+  A phone keeps two and does not show the control. A horizontal
+  two-finger swipe on a web grid photograph turns that listing's
+  photos. A vertical swipe still scrolls the page. The bars under
+  the photograph say which photo is showing.
 
 ### Size comes from measurement, not from the window
 

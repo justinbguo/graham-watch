@@ -4,7 +4,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 # App map
 
-Graham is a vintage-watch marketplace. Buyers swipe a deck. Dealers claim a shop. Operators approve which shops reach the deck. The phone and web app is Expo SDK 57 (Router, React Native). Data is Supabase (Auth, Postgres, edge functions). Vercel builds the Expo web export from `main` (`vercel.json`). The operator console is a separate Vite app in `operator/`, with its own `operator/vercel.json`.
+Graham is a vintage-watch aggregator. Buyers browse watches that dealers already list on their own sites, and the watch opens on the dealer's page. Dealers claim a shop. Operators approve which shops reach the deck. The phone and web app is Expo SDK 57 (Router, React Native). Data is Supabase (Auth, Postgres, edge functions). Vercel builds the Expo web export from `main` (`vercel.json`). The operator console is a separate Vite app in `operator/`, with its own `operator/vercel.json`.
 
 Longer guides stay where they are. Update this file when a route, table, function, or workflow changes, and delete the sentence that change makes false.
 
@@ -54,7 +54,7 @@ Desktop web puts the tab bar on top (`useIsDesktopWeb`). A wide window that is n
 
 ## Who does what
 
-**Buyer.** Sign in, finish onboarding (name, username, birthday 18+, notification permission), swipe Buy, follow a shop from Community or the shop page, read Drops from Messages, message a claimed shop, email an unclaimed shop.
+**Buyer.** Sign in, finish onboarding (name, username, birthday 18+, notification permission), swipe Buy, follow a shop from Community or the shop page, read Drops from Messages, message a claimed shop, email an unclaimed shop. Community and Messages stay in the app under a pause banner. Buying a watch uses the listing's dealer page.
 
 **Dealer.** Profile, claim a shop. The claim function emails a code to a mailbox on the shop domain. After claim, the Deal tab replaces Messages. Publishing the shop onto the deck is still an operator action (`dealers.permission`).
 
