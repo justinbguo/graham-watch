@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-nat
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft, useSendInquiry } from '@/data/inquiries';
 import { useListing, usePrimeListing } from '@/data/listings';
+import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { useOpenStack } from '@/lib/openStack';
 import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -107,6 +108,7 @@ export default function InquiryScreen() {
         {failure ? <Message text={failure.message} tone="error" /> : null}
 
         <View style={styles.actions}>
+          <DealerSiteButton url={card.source_url} />
           <Button
             label="Open in my mail app"
             variant="solid"

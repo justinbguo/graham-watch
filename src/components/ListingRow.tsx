@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable as FramePressable, ScrollView, Text, View 
 import { Pressable } from 'react-native-gesture-handler';
 
 import { InquireMark } from '@/components/InquireMark';
+import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
+import { listingSourceUrl } from '@/lib/listingSource';
 import { ListingSummary } from '@/components/ListingSummary';
 import { useSwipeGuard } from '@/components/SwipeToRemove';
 import { formatTitle } from '@/lib/format';
@@ -173,6 +175,9 @@ export function ListingRow({
             )}
             <Text style={styles.messageLabel}>{messageLabel}</Text>
           </Pressable>
+        ) : null}
+        {onMessage && listingSourceUrl(card.source_url) ? (
+          <DealerSiteButton url={card.source_url} />
         ) : null}
       </View>
 
