@@ -5,7 +5,6 @@ import { secureStorage } from '@/lib/secureStorage';
 
 const STORAGE_KEY = 'graham.grid-columns';
 
-/** Same store as the appearance preference. Missing means the width still decides. */
 export function useGridColumnChoice() {
   const [chosen, setChosen] = useState<GridColumnOption | null>(null);
 

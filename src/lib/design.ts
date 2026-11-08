@@ -597,11 +597,10 @@ export const layout = {
   gridColumnsPhone: 2,
   /** Desktop web home grid: at least two swipe-photo columns. */
   gridColumnsWeb: 2,
-  /** Most listings a wide grid row may hold. A phone stays on `gridColumnsPhone`. */
   gridColumnsMax: 6,
   /**
-   * Widest a desktop web grid tile gets. Another column opens past this, so
-   * the wall can fill the window without a photo becoming a banner.
+   * Tile width the automatic desktop column count uses. A saved row pick can
+   * make a tile wider than this.
    * Target is half of `cardWeb` (480); this ceiling keeps a laptop at two.
    */
   gridTileMax: 640,

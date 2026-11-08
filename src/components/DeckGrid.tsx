@@ -66,13 +66,10 @@ export function DeckGrid({
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
   const { chosen, choose } = useGridColumnChoice();
-  const automatic = desktopGridColumns(windowWidth, insets.left, insets.right);
-  const columns = gridColumnsFor({
-    wide,
-    desktopWeb: isDesktopWeb,
-    automatic,
-    chosen,
-  });
+  const automatic = isDesktopWeb
+    ? desktopGridColumns(windowWidth, insets.left, insets.right)
+    : layout.gridColumns;
+  const columns = gridColumnsFor(wide, automatic, chosen);
   const columnChoice = isGridColumnOption(columns) ? columns : layout.gridColumnsWeb;
 
   const {

@@ -13,8 +13,8 @@ const DRAG_SLOP = 6;
 
 /**
  * Multi-photo grid frame on web. DOM pointer listeners with capture follow the
- * mouse after press, and `touch-action: none` keeps the grid list from taking
- * the gesture. React Native's pan responder does not reliably drive mouse drag
+ * mouse after press, and `touch-action: pan-y` leaves vertical scroll to the
+ * list. React Native's pan responder does not reliably drive mouse drag
  * on web inside a virtualized list.
  */
 export function GridPhotoStrip({

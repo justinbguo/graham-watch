@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 import { Button } from '@/components/ui';
 import { listingSourceUrl } from '@/lib/listingSource';
 
-/** Dealer page in a new browser tab on web, and the system browser on a phone. */
 export function openListingSource(url: string): void {
   if (Platform.OS === 'web') {
     window.open(url, '_blank', 'noopener,noreferrer');

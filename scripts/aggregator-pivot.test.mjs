@@ -15,16 +15,13 @@ test('a blank dealer page hides the link', () => {
 });
 
 test('a phone stays at two columns even when six was saved', () => {
-  assert.equal(
-    gridColumnsFor({ wide: false, desktopWeb: true, automatic: 4, chosen: 6 }),
-    2,
-  );
+  assert.equal(gridColumnsFor(false, 4, 6), 2);
 });
 
 test('a wide window can show six and otherwise stops at six', () => {
-  assert.equal(gridColumnsFor({ wide: true, desktopWeb: true, automatic: 3, chosen: 6 }), 6);
-  assert.equal(gridColumnsFor({ wide: true, desktopWeb: true, automatic: 9, chosen: null }), 6);
-  assert.equal(gridColumnsFor({ wide: true, desktopWeb: false, automatic: 9, chosen: null }), 4);
+  assert.equal(gridColumnsFor(true, 3, 6), 6);
+  assert.equal(gridColumnsFor(true, 9, null), 6);
+  assert.equal(gridColumnsFor(true, 4, null), 4);
 });
 
 test('a horizontal wheel step changes one photo and a vertical wheel does not', () => {

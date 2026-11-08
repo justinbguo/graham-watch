@@ -6,11 +6,10 @@ import { useThemedStyles } from '@/providers/theme';
 
 export const PAUSED_COPY = "Not in scope right now, but you're free to test.";
 
-/** Sits above a paused screen and does not take taps from the feature under it. */
 export function PausedBanner() {
   const styles = useThemedStyles(bannerStyles);
   return (
-    <View pointerEvents="none" style={styles.banner}>
+    <View style={styles.banner}>
       <Text style={styles.label}>{PAUSED_COPY}</Text>
     </View>
   );
