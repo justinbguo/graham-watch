@@ -232,6 +232,28 @@ Deno.test('a stored square icon is not replaced by og:image or header art', asyn
   );
 });
 
+Deno.test('a dealer icon fetch carries no credential headers', async () => {
+  const icon = 'https://dealer.example/favicon.png';
+  const seen: Headers[] = [];
+  const { fetcher } = respond({ [icon]: { png: [180, 180] } });
+  const recording = (url: string, init?: RequestInit) => {
+    const headers = init?.headers;
+    assertEquals(headers instanceof Headers, true, url);
+    seen.push(headers as Headers);
+    return fetcher(url);
+  };
+  await chooseDealerIcon({
+    html: `<link rel="icon" href="${icon}">`,
+    origin: 'https://dealer.example',
+    fetch: recording,
+  });
+  assertEquals(seen.length > 0, true);
+  for (const headers of seen) {
+    assertEquals(headers.has('authorization'), false);
+    assertEquals(headers.has('apikey'), false);
+  }
+});
+
 Deno.test('a site icon under 128px yields to the header logo', async () => {
   const icon = 'https://shop.example/tiny.png';
   const header = 'https://shop.example/header-logo.png';

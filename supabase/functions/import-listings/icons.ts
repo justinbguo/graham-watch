@@ -1,11 +1,13 @@
+import { headersForHost } from '../_shared/outbound.mjs';
+import { TIMEOUT } from '../_shared/timeouts.ts';
 import { isPublicHttpUrl } from './discover.ts';
 import { readBoundedBytes } from './photos.ts';
-import { TIMEOUT } from '../_shared/timeouts.ts';
 
 const USER_AGENT = 'GrahamBot/0.1 (+https://graham.watch)';
 const MAX_ICON_BYTES = 4_000_000;
 const MAX_PROBES = 8;
 const PREFERRED_SHORT_SIDE = 180;
+const SITE_ICON_MIN = 128;
 
 export type IconFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -282,7 +284,7 @@ function ogImage(html: string, origin: string): string | null {
 async function manifestIcons(url: string, fetcher: IconFetch): Promise<Candidate[]> {
   try {
     const response = await fetcher(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: headersForHost(url, null, { 'User-Agent': USER_AGENT }),
       signal: AbortSignal.timeout(TIMEOUT.source),
       redirect: 'follow',
     });
@@ -306,7 +308,7 @@ async function probe(candidate: Candidate, fetcher: IconFetch): Promise<Measured
   if (isDefaultPlatformIcon(candidate.url)) return null;
   try {
     const response = await fetcher(candidate.url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: headersForHost(candidate.url, null, { 'User-Agent': USER_AGENT }),
       signal: AbortSignal.timeout(TIMEOUT.source),
       redirect: 'follow',
     });
@@ -338,7 +340,20 @@ async function probe(candidate: Candidate, fetcher: IconFetch): Promise<Measured
   }
 }
 
+function siteIcon(image: Measured): boolean {
+  return image.tier <= 2 && square(image) && shortSide(image) >= SITE_ICON_MIN;
+}
+
+function goodSquare(image: { width: number; height: number }): boolean {
+  return square(image) && shortSide(image) >= SITE_ICON_MIN;
+}
+
 function rank(measured: Measured[]): Measured | null {
+  const site = measured.filter(siteIcon);
+  if (site.length) {
+    site.sort((a, b) => shortSide(b) - shortSide(a) || a.tier - b.tier);
+    return site[0] ?? null;
+  }
   const party = measured.filter((image) => image.tier <= 4);
   const pool = party.length ? party : measured.filter((image) => image.tier >= 5);
   if (!pool.length) return null;
@@ -351,6 +366,7 @@ function rank(measured: Measured[]): Measured | null {
 }
 
 function improves(next: Measured, current: Measured): boolean {
+  if (goodSquare(current) && next.tier > 2) return false;
   if (worse(next, current)) return false;
   if (shortSide(next) > shortSide(current)) return true;
   return !square(current) && square(next);
@@ -365,8 +381,9 @@ function worse(next: Measured, current: Measured): boolean {
  * The icon to store, or null when nothing usable was found and nothing is stored.
  *
  * A miss returns the stored https URL, decoded or not, so a refresh cannot
- * blank a dealer. A smaller find, or a wide image in place of a square one,
- * also keeps the stored URL.
+ * blank a dealer. A smaller find, a wide image in place of a square one, or
+ * an og:image or header logo in place of a stored square icon, also keeps
+ * the stored URL.
  */
 export async function chooseDealerIcon(input: {
   html: string;

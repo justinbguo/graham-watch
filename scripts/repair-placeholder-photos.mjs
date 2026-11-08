@@ -10,6 +10,7 @@
 
 import { createHash } from 'node:crypto';
 
+import { headersForHost } from '../supabase/functions/_shared/outbound.mjs';
 import { config, describeTarget } from './_supabase.mjs';
 
 const PLACEHOLDER_SHA256 = '581af6bf6f105c917c6e7085911bae110d5326a72dd728499c14566f6e8b1269';
@@ -76,7 +77,9 @@ async function bytesOf(url, key, row) {
     : null;
   for (const target of [stored, row.source_url].filter(Boolean)) {
     try {
-      const response = await fetch(target, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+      const response = await fetch(target, {
+        headers: headersForHost(target, url, { apikey: key, Authorization: `Bearer ${key}` }),
+      });
       if (!response.ok) continue;
       return new Uint8Array(await response.arrayBuffer());
     } catch {

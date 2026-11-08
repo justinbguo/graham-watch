@@ -1,3 +1,4 @@
+import { headersForHost } from '../_shared/outbound.mjs';
 import { TIMEOUT } from '../_shared/timeouts.ts';
 
 /**
@@ -119,7 +120,7 @@ export function catalogueComplete(
 export async function fetchText(url: URL, accept: string): Promise<TextResponse | null> {
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: accept },
+      headers: headersForHost(url, null, { 'User-Agent': USER_AGENT, Accept: accept }),
       signal: AbortSignal.timeout(TIMEOUT.source),
     });
     return { status: response.status, body: await response.text() };

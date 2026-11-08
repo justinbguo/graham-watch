@@ -1,5 +1,6 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
+import { headersForHost } from '../_shared/outbound.mjs';
 import { TIMEOUT } from '../_shared/timeouts.ts';
 
 const BUCKET = 'listing-photos';
@@ -126,7 +127,9 @@ async function copyOne(
   await acquirePhoto();
   try {
     const response = await fetch(sourceUrl, {
-      headers: { 'User-Agent': 'GrahamBot/0.1 (+https://graham.watch)' },
+      headers: headersForHost(sourceUrl, null, {
+        'User-Agent': 'GrahamBot/0.1 (+https://graham.watch)',
+      }),
       signal: AbortSignal.timeout(TIMEOUT.photo),
     });
     if (!response.ok) {
