@@ -42,6 +42,7 @@ jobs:
           scripts/deck-stack.test.mjs
           scripts/deck-stage.test.mjs
           scripts/filter-spec.test.mjs
+          scripts/repair-photos.test.mjs
           scripts/drops-select.test.ts
           scripts/fixture-import.test.ts
 

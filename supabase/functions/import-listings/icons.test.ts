@@ -176,6 +176,79 @@ Deno.test('a null probe keeps the stored icon', async () => {
   );
 });
 
+Deno.test('a square site icon beats a larger square og:image', async () => {
+  const icon = 'https://thetimecurator.com/cdn/shop/files/fvicon.jpg';
+  const og = 'https://cdn.shopify.com/s/files/1/0560/1768/2617/files/ttc_logo.jpg';
+  const { fetcher } = respond({
+    [icon]: { png: [800, 800] },
+    [og]: { png: [1080, 1080] },
+  });
+  assertEquals(
+    await chooseDealerIcon({
+      html: `<link rel="shortcut icon" href="${icon}"><meta property="og:image" content="${og}">`,
+      origin: 'https://thetimecurator.com',
+      fetch: fetcher,
+    }),
+    icon,
+  );
+});
+
+Deno.test('a square favicon beats a larger header logo', async () => {
+  const icon =
+    'https://images.squarespace-cdn.com/content/v1/62584b0dea70ac02dde2a696/4ec1c87f-0933-4436-8b5e-aa8282eb8794/favicon.ico';
+  const header =
+    'https://images.squarespace-cdn.com/content/v1/62584b0dea70ac02dde2a696/8081a6dd-7ad9-4ec5-9df5-7c56858aa8d5/Good+Evening+Vintage+Project.png';
+  const { fetcher } = respond({
+    [icon]: { png: [512, 512] },
+    [header]: { png: [2500, 2979] },
+  });
+  assertEquals(
+    await chooseDealerIcon({
+      html: `<link rel="icon" href="${icon}"><header><img class="Header-branding-logo" src="${header}" alt="Good Evening Vintage"></header>`,
+      origin: 'https://goodevening.co',
+      fetch: fetcher,
+    }),
+    icon,
+  );
+});
+
+Deno.test('a stored square icon is not replaced by og:image or header art', async () => {
+  const current = 'https://cdn.example/hand-set.png';
+  const og = 'https://cdn.example/brand-logo-og.png';
+  const header = 'https://cdn.example/header-logo.png';
+  const { fetcher } = respond({
+    [current]: { png: [512, 512] },
+    [og]: { png: [1080, 1080] },
+    [header]: { png: [2500, 2979] },
+  });
+  assertEquals(
+    await chooseDealerIcon({
+      html: `<header><img class="Header-branding-logo" src="${header}" alt="Shop"></header><meta property="og:image" content="${og}">`,
+      origin: 'https://cdn.example',
+      currentUrl: current,
+      fetch: fetcher,
+    }),
+    current,
+  );
+});
+
+Deno.test('a site icon under 128px yields to the header logo', async () => {
+  const icon = 'https://shop.example/tiny.png';
+  const header = 'https://shop.example/header-logo.png';
+  const { fetcher } = respond({
+    [icon]: { png: [32, 32] },
+    [header]: { png: [400, 400] },
+  });
+  assertEquals(
+    await chooseDealerIcon({
+      html: `<link rel="icon" href="${icon}"><header><img class="logo" src="${header}" alt="Shop"></header>`,
+      origin: 'https://shop.example',
+      fetch: fetcher,
+    }),
+    header,
+  );
+});
+
 Deno.test('a failed page keeps a stored icon', async () => {
   const current = 'https://cdn.example/current.png';
   const { fetcher } = respond({
