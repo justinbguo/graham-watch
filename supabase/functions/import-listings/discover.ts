@@ -11,6 +11,7 @@
  * where outbound reads of shops we do not own are already metered and guarded.
  */
 
+import { headersForHost } from '../_shared/outbound.mjs';
 import { TIMEOUT } from '../_shared/timeouts.ts';
 import { chooseDealerIcon } from './icons.ts';
 
@@ -52,7 +53,7 @@ async function get(url: string): Promise<string | null> {
 
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: headersForHost(url, null, { 'User-Agent': USER_AGENT }),
       signal: AbortSignal.timeout(TIMEOUT.source),
     });
     return response.ok ? await response.text() : null;

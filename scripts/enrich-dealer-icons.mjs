@@ -12,6 +12,7 @@
 
 import { register } from 'node:module';
 
+import { headersForHost } from '../supabase/functions/_shared/outbound.mjs';
 import { config, describeTarget } from './_supabase.mjs';
 
 register(new URL('./ts-resolve-hook.mjs', import.meta.url));
@@ -65,7 +66,10 @@ for (let from = 0; ; from += 20) {
   for (const shop of shops) {
     let html = '';
     try {
-      const page = await fetch(shop.website, { signal: AbortSignal.timeout(20_000) });
+      const page = await fetch(shop.website, {
+        headers: headersForHost(shop.website, null, {}),
+        signal: AbortSignal.timeout(20_000),
+      });
       html = page.ok ? await page.text() : '';
     } catch {
       html = '';
