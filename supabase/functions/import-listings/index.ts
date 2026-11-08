@@ -7,7 +7,7 @@ import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
 import { fixtureImportAllowed, parseFixtureListings } from './fixture.ts';
 import { holdLabel } from './nonwatch.ts';
 import { ExtractorUnavailable } from './extract.ts';
-import { discover, normalizeDomain, readProfile, type Profile } from './discover.ts';
+import { discover, NO_PROFILE, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from './source.ts';
@@ -170,6 +170,33 @@ function websiteOf(sourceUrl: string): { host: string; website: string } {
  * found is left alone rather than cleared, so a site that is briefly down does
  * not blank a dealer's page.
  */
+async function rememberIcon(
+  supabase: SupabaseClient,
+  dealerId: string,
+  website: string,
+  current: string | null,
+) {
+  try {
+    const profile = await readProfile(website, undefined, current);
+    await refreshProfile(supabase, dealerId, profile);
+  } catch (error) {
+    console.error('could not refresh dealer icon', error instanceof Error ? error.message : error);
+  }
+}
+
+async function storedLogo(
+  supabase: SupabaseClient,
+  website: string,
+  dealerId?: string,
+): Promise<string | null> {
+  const query = supabase.from('dealers').select('logo_url');
+  const row = dealerId
+    ? await query.eq('id', dealerId).maybeSingle()
+    : await query.eq('website', website).maybeSingle();
+  if (row.error) return null;
+  return row.data?.logo_url ?? null;
+}
+
 async function refreshProfile(supabase: SupabaseClient, dealerId: string, profile: Profile) {
   const patch: Record<string, string> = {};
   if (profile.description) patch.description = profile.description;
@@ -398,12 +425,12 @@ async function recordSyncFailure(supabase: SupabaseClient, dealerId: string, mes
  * Marks every for-sale catalogue row for publish so the nightly job can drain
  * new watches without a human ticking them. Already-linked rows stay published.
  */
-type ApprovedShop = { id: string; name: string; website: string };
+type ApprovedShop = { id: string; name: string; website: string; logo_url: string | null };
 
 function approvedShops(supabase: SupabaseClient) {
   return supabase
     .from('dealers')
-    .select('id, name, website')
+    .select('id, name, website, logo_url')
     .eq('permission', 'approved')
     .not('website', 'is', null)
     .order('name');
@@ -480,6 +507,7 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
       });
     }
 
+    await rememberIcon(supabase, approved.id, approved.website, approved.logo_url);
     const sync = await syncCatalog(supabase, approved.id, approved.website, MAX_CATALOG_ITEMS);
     await recordSync(supabase, approved.id, sync);
     await queuePublish(supabase, approved.id);
@@ -782,7 +810,15 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
     // Read here rather than trusted from the caller: Refresh on an existing
     // shop never runs discovery, and that is the button this has to arrive
     // through for the shops already imported.
-    const profile = await readProfile(websiteOf(sourceUrl).website);
+    const profile = await readProfile(
+      websiteOf(sourceUrl).website,
+      undefined,
+      await storedLogo(
+        ctx.supabase,
+        websiteOf(sourceUrl).website,
+        typeof body.dealerId === 'string' ? body.dealerId : undefined,
+      ),
+    ).catch(() => NO_PROFILE);
 
     let dealerId: string;
     try {

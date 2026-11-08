@@ -49,6 +49,7 @@ export type OperatorDeps = {
   importFixture(input: { sourceUrl: string; dealerName?: string; listings: FixtureWatch[] }): Promise<unknown>;
   setPermission(dealerId: string, permission: 'approved' | 'pending'): Promise<unknown>;
   report(dealerId: string): Promise<unknown>;
+  enrichIcons(input: { dealerId?: string; dryRun: boolean }): Promise<unknown>;
   audit(row: AuditRow): Promise<void>;
 };
 
@@ -222,6 +223,21 @@ export async function handleOperatorRequest(req: Request, deps: OperatorDeps): P
         const message = error instanceof Error ? error.message : 'Operator request failed.';
         return jsonError(message, 500);
       }
+    }
+
+    if (action === 'enrich-icons') {
+      const dealerId = body.dealerId === undefined ? undefined : dealerIdOf(body);
+      const dryRun = body.dryRun !== false;
+      return await run(
+        () => deps.enrichIcons({ dealerId, dryRun }),
+        () => deps.audit({
+          action: 'enrich_icons',
+          targetType: 'shop',
+          targetId: dealerId ?? null,
+          before: null,
+          after: { dealerId: dealerId ?? null, dryRun },
+        }),
+      );
     }
 
     if (action === 'report') {

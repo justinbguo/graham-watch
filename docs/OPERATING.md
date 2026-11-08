@@ -323,7 +323,22 @@ curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
   -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"action":"report","dealerId":"00000000-0000-4000-8000-000000000000"}'
+
+curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
+  -H "apikey: $GRAHAM_OPERATOR_SECRET" \
+  -H "Authorization: Bearer $GRAHAM_OPERATOR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"enrich-icons","dealerId":"00000000-0000-4000-8000-000000000000"}'
 ```
+
+`enrich-icons` reads shop homepages and plans `dealers.logo_url` changes. It does not import listings. Omitting `dryRun`, or setting it to true, writes nothing. `dryRun: false` writes. A script does the same job and also refuses a non-local write:
+
+```
+deno run --config supabase/functions/deno.ci.json --allow-net --allow-read --allow-env scripts/enrich-dealer-icons.ts
+node scripts/repair-placeholder-photos.mjs
+```
+
+The repair script lists `listing_photos` rows whose bytes are the Squarespace no-image file, and the gallery row it would move to position 0. It does not delete storage objects. `--write` on either script refuses any host other than loopback. Do not point either script at production without a separate approval.
 
 `import` creates the shop as `pending` when the website is new. It does not approve the shop. The first call reads the catalogue into `source_items` and marks the for-sale rows for publish. It does not copy photographs in that same call. A later call, while a succeeded import for that same URL is less than six hours old, skips the site and publishes one batch of two watches. Repeat `import` with the same body until `publish.pending` is `0`. The same call twice is safe. A watch is applied only after its gallery is stored, so a call that dies mid-gallery leaves that watch in `publish.pending` and the next call finishes the photographs. `publish.failed` counts watches that recorded an error. Those wait for a catalogue read, which clears the error. `approve` sets `dealers.permission` to `approved`, which is what puts watches with at least three photographs on the Buy deck. A listing with fewer than three photographs stays hidden from buyers. `unapprove` sets the shop back to `pending`. A `revoked` shop stays revoked. `report` returns the permission, active and total listing counts, and the latest `import_jobs` row.
 
