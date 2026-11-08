@@ -293,6 +293,10 @@ export type ShopifyIO = {
   pause?: (ms: number) => Promise<void>;
   /** Test hook. Shopify's own cap is 250; production does not set this. */
   pageSize?: number;
+  /** First products.json page for this call. Defaults to 1. */
+  startPage?: number;
+  /** Pages to read in this call. Defaults to the whole feed, up to MAX_PAGES. */
+  maxPages?: number;
 };
 
 type ShopMeta = { currency: string | null; name: string | null };
@@ -317,6 +321,9 @@ export async function fetchShopifyItems(
   const base = new URL(sourceUrl);
   const endpoint = productsEndpoint(base);
   const pageSize = Math.min(PAGE_SIZE, Math.max(1, io.pageSize ?? PAGE_SIZE));
+  const startPage = Math.min(MAX_PAGES, Math.max(1, Math.floor(io.startPage ?? 1)));
+  const budget = Math.min(MAX_PAGES, Math.max(1, Math.floor(io.maxPages ?? MAX_PAGES)));
+  const lastPage = Math.min(MAX_PAGES, startPage + budget - 1);
   const fetchBody = io.fetchText ?? fetchText;
   const pause = io.pause ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
 
@@ -343,7 +350,7 @@ export async function fetchShopifyItems(
     return transient(second) ? null : second;
   };
 
-  const firstUrl = pageUrl(endpoint, 1, pageSize);
+  const firstUrl = pageUrl(endpoint, startPage, pageSize);
   const first = await load(firstUrl, 'application/json');
   // A 404 is "not Shopify". A feed that never answers is not permission to
   // scrape the homepage instead and call that the whole catalogue.
@@ -358,7 +365,7 @@ export async function fetchShopifyItems(
   const seen = new Set<string>();
   let products: Json[] = firstJson.products;
 
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
+  for (let page = startPage; page <= lastPage; page += 1) {
     const fresh = unseen(products, seen);
     // A page of ids we already stored means the page parameter stopped moving.
     // That is not the end of the shop. Calling it complete would retire the
@@ -380,12 +387,13 @@ export async function fetchShopifyItems(
       }
     }
 
-    if (products.length < pageSize) {
+    if (products.length === 0 || products.length < pageSize) {
       read.complete = true;
       return read;
     }
-    if (page === MAX_PAGES) {
+    if (page === lastPage) {
       read.complete = false;
+      if (page < MAX_PAGES) read.nextPage = page + 1;
       return read;
     }
 

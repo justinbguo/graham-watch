@@ -30,7 +30,9 @@ export function lastSyncDetail(cell: LastSyncCell): string {
   if (cell.kind === 'never') {
     return 'No catalogue read yet. Sync or the nightly refresh will record one.';
   }
-  if (cell.kind === 'zero') return 'The last catalogue read added no watches.';
+  if (cell.kind === 'zero') {
+    return 'The last catalogue read did not create a listing. The shop can still have been re-read.';
+  }
   const watches = cell.count === 1 ? 'watch' : 'watches';
   return `${cell.count} ${watches} first seen on the last catalogue read.`;
 }

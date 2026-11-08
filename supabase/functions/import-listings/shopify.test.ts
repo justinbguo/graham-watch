@@ -212,16 +212,33 @@ function shop(pages: Json[][], options: { robots?: string; metaFails?: number } 
   return {
     calls,
     pauses,
-    read: (limit = 100, pageSize?: number) =>
+    read: (limit = 100, pageSize?: number, extra: { startPage?: number; maxPages?: number } = {}) =>
       fetchShopifyItems('https://shop.example', limit, 0, {
         fetchText,
         pause: async (ms) => {
           pauses.push(ms);
         },
         pageSize,
+        ...extra,
       }),
   };
 }
+
+Deno.test('a page budget stops on a full page and names the next one', async () => {
+  const fixture = shop([[watch(1), watch(2)], [watch(3)]]);
+  const read = await fixture.read(100, 2, { maxPages: 1 });
+  assertEquals(read?.complete, false);
+  assertEquals(read?.nextPage, 2);
+  assertEquals(read?.items.map((item) => item.externalId), ['shopify:1', 'shopify:2']);
+});
+
+Deno.test('the following page completes a short feed', async () => {
+  const fixture = shop([[watch(1), watch(2)], [watch(3)]]);
+  const read = await fixture.read(100, 2, { startPage: 2, maxPages: 1 });
+  assertEquals(read?.complete, true);
+  assertEquals(read?.nextPage, undefined);
+  assertEquals(read?.items.map((item) => item.externalId), ['shopify:3']);
+});
 
 Deno.test('a short read is incomplete when the adapter stopped early', () => {
   // The old check was `items.length < limit`. A page cap with room left in

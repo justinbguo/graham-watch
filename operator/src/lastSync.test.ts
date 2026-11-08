@@ -14,7 +14,7 @@ test('a catalogue read that added nothing reads as zero', () => {
   const cell = lastSyncCell('2026-11-07T12:00:00.000Z', 0);
   assert.equal(cell.kind, 'zero');
   assert.equal(lastSyncLabel(cell), '0');
-  assert.match(lastSyncDetail(cell), /added no watches/);
+  assert.match(lastSyncDetail(cell), /did not create a listing/);
 });
 
 test('a catalogue read that added watches shows that count', () => {

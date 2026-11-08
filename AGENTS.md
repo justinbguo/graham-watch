@@ -90,7 +90,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 | `send-inquiry` | `src/data/inquiries.ts` | Sends the inquiry mail and updates the inquiry row. |
 | `operator-bot` | A bot that holds `GRAHAM_OPERATOR_SECRET` and calls the function over HTTPS. No signed-in session. | Discover, inspect, and import. Import either reads the catalogue or publishes one batch of two watches, and returns `publish.pending` so the caller can loop. A succeeded read less than six hours old is reused. Fixture import on a local stack. Approve and unapprove through `bot_set_dealer_permission`. `enrich-icons` refreshes `dealers.logo_url` and does not import listings. It is a dry run unless `dryRun` is false. Reads one shop's listing counts and latest `import_jobs` row. Audit rows in `operator_actions` with `actor` `operator-bot`. |
 
-`npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops, then calls `notify-drops`. A failed notify call fails the job.
+`npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops, then calls `notify-drops`. A failed notify call fails the job. `npm run catalogue:audit` compares each approved shop's public feed with the catalogue and writes nothing.
 
 ## CI and deploys
 

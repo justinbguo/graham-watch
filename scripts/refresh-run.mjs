@@ -13,7 +13,17 @@
  * the field off, and calling publish on top of that would do the work twice.
  */
 
-export const MAX_PUBLISH_CALLS = 30;
+/**
+ * One call publishes two watches. 30 calls left Grand Caliber with 378
+ * for-sale watches and no listing after the 8 Nov 2026 read, and Danny's
+ * with 104. 400 calls is 800 watches, above either shop's for-sale count.
+ */
+export const MAX_PUBLISH_CALLS = 400;
+
+/** Shopify pages per catalogue request. Eight pages is 2,000 products. */
+export const SYNC_PAGE_BUDGET = 8;
+
+const MAX_SYNC_SLICES = 8;
 
 export function refreshExitCode(results) {
   if (results.some((shop) => shop.fatal)) return 1;
@@ -64,7 +74,47 @@ export function formatShop(shop) {
  */
 export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLISH_CALLS) {
   const website = dealer.website ?? dealer.id;
-  const sync = await invoke({ dealerId: dealer.id, phase: 'sync' });
+  const readAt = new Date().toISOString();
+  let carry;
+  let sync = null;
+  let page = 1;
+  for (let slice = 0; slice < MAX_SYNC_SLICES; slice += 1) {
+    sync = await invoke({
+      dealerId: dealer.id,
+      phase: 'sync',
+      page,
+      pageBudget: SYNC_PAGE_BUDGET,
+      readAt,
+      ...(carry ? { carry } : {}),
+    });
+    if (!sync.ok) break;
+    const row = firstResult(sync.body);
+    if (!row?.ok || typeof row.nextPage !== 'number') break;
+    carry = row.carry;
+    page = row.nextPage;
+  }
+  if (!sync) {
+    return {
+      ok: false,
+      fatal: false,
+      skipped: false,
+      dealerId: dealer.id,
+      website,
+      name: dealer.name ?? null,
+      error: 'Refresh failed.',
+      status: 0,
+      found: 0,
+      changed: 0,
+      added: 0,
+      retired: 0,
+      relisted: 0,
+      published: 0,
+      listingsSkipped: 0,
+      pending: 0,
+      complete: false,
+      publishError: null,
+    };
+  }
 
   if (!sync.ok) {
     return {

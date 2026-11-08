@@ -2,11 +2,13 @@ import { classifyCatalogueItem } from './nonwatch.ts';
 import { htmlToText } from './scrape.ts';
 import {
   fetchJson,
+  fetchText,
   productKey,
   type AdapterRead,
   type ItemMeta,
   type Json,
   type SourceItem,
+  type TextResponse,
 } from './source.ts';
 
 // Squarespace serves originals at 4000px and several megabytes. A phone deck
@@ -200,21 +202,124 @@ export async function hydrateSquarespaceItem(item: SourceItem): Promise<SourceIt
 }
 
 /**
+ * A Squarespace site often splits the shop across collections (`/rolex`,
+ * `/under350`) and points `dealers.website` at the homepage. The homepage is a
+ * page, not a feed. Reading it as the whole catalogue retired all 85 Cool
+ * Vintage Watches listings on 8 Nov 2026.
+ *
+ * These slugs are pages or not watches. `pocket-watches` stays.
+ */
+const SKIP_COLLECTION =
+  /^(?:cameras?|gift-cards?|blogs?(?:-.+)?|news|testimonials?|services?|terms|about|contacts?|search(?:page)?)$/i;
+
+/** Parent paths that hold product URLs, dropping pages and the camera shelf. */
+export function squarespaceCollectionPaths(locs: readonly string[]): string[] {
+  const counts = new Map<string, number>();
+  for (const raw of locs) {
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      continue;
+    }
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length < 2 || SKIP_COLLECTION.test(parts[0])) continue;
+    const collection = `${url.origin}/${parts[0]}`;
+    counts.set(collection, (counts.get(collection) ?? 0) + 1);
+  }
+  return [...counts.keys()];
+}
+
+export type SquarespaceIO = {
+  fetchJson?: (url: URL) => Promise<Json | null>;
+  fetchText?: (url: URL, accept: string) => Promise<TextResponse | null>;
+};
+
+function locsFromSitemap(xml: string): string[] {
+  return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+}
+
+function isProductCollection(body: Json | null): boolean {
+  if (!body) return false;
+  if (Array.isArray(body.items) || body.item) return true;
+  return body.collection?.typeName === 'products';
+}
+
+/**
  * Squarespace answers any collection or product URL with JSON when asked, which
  * hands us titles, prose, prices and full image galleries as data. Scraping the
  * rendered page instead means parsing five megabytes of markup to recover facts
  * the site was willing to state outright.
  *
- * Returns null when the URL is not a Squarespace collection, so the caller can
- * fall back to the generic scrape-and-extract path.
+ * Returns null when the URL is not a Squarespace collection and the sitemap
+ * has no product collections either, so the caller can fall back to the scrape.
+ * That fallback must not be treated as a finished catalogue.
  */
 export async function fetchSquarespaceItems(
   sourceUrl: string,
   limit: number,
-  minPhotos = 0
+  minPhotos = 0,
+  io: SquarespaceIO = {}
 ): Promise<AdapterRead | null> {
   const base = new URL(sourceUrl);
-  const read: AdapterRead = { items: [], skipped: [] };
+  const load = io.fetchJson ?? fetchJson;
+  const firstUrl = new URL(base.toString());
+  firstUrl.searchParams.set('format', 'json');
+  const first = await load(firstUrl);
+  if (!first) return null;
+
+  const targets = isProductCollection(first)
+    ? [base]
+    : await discoverCollections(base, load, io.fetchText ?? fetchText);
+  if (!targets) return null;
+
+  const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
+  const seen = new Set<string>();
+  for (const target of targets) {
+    const finished = await readCollection(target, limit, minPhotos, read, seen, load);
+    if (!finished) read.complete = false;
+    if (read.items.length >= limit) {
+      read.complete = false;
+      break;
+    }
+  }
+  return read;
+}
+
+async function discoverCollections(
+  base: URL,
+  load: (url: URL) => Promise<Json | null>,
+  fetchBody: (url: URL, accept: string) => Promise<TextResponse | null>
+): Promise<URL[] | null> {
+  const sitemapUrl = new URL('/sitemap.xml', base.origin);
+  const sitemap = await fetchBody(sitemapUrl, 'application/xml');
+  if (!sitemap || sitemap.status < 200 || sitemap.status >= 300) return null;
+  const candidates = squarespaceCollectionPaths(locsFromSitemap(sitemap.body));
+  const found: URL[] = [];
+  for (const candidate of candidates) {
+    const url = new URL(candidate);
+    url.searchParams.set('format', 'json');
+    const body = await load(url);
+    if (body?.collection?.typeName === 'products' || Array.isArray(body?.items)) {
+      url.searchParams.delete('format');
+      found.push(url);
+    }
+  }
+  return found.length ? found : null;
+}
+
+/**
+ * True when the collection ended. False when a page failed or the item cap
+ * stopped the walk, both of which must not retire what this read did not see.
+ */
+async function readCollection(
+  base: URL,
+  limit: number,
+  minPhotos: number,
+  read: AdapterRead,
+  seen: Set<string>,
+  load: (url: URL) => Promise<Json | null>
+): Promise<boolean> {
   let offset: number | null = null;
 
   while (read.items.length < limit) {
@@ -222,18 +327,14 @@ export async function fetchSquarespaceItems(
     page.searchParams.set('format', 'json');
     if (offset !== null) page.searchParams.set('offset', String(offset));
 
-    const body = await fetchJson(page);
-    if (!body) return read.items.length ? read : null;
+    const body = await load(page);
+    if (!body) return false;
 
-    // A product URL answers with `item`, a collection with `items`.
     const batch = Array.isArray(body.items) ? body.items : body.item ? [body.item] : null;
-    if (!batch) return read.items.length ? read : null;
+    if (!batch) return false;
 
     for (const raw of batch) {
       const mapped = mapItem(raw, base);
-
-      // Discard thin listings before hydration, not after: each one that
-      // survives costs a product page fetch.
       if (!mapped) {
         read.skipped.push({
           sourceUrl: typeof raw?.fullUrl === 'string' ? raw.fullUrl : base.toString(),
@@ -241,7 +342,10 @@ export async function fetchSquarespaceItems(
           reason: typeof raw?.title === 'string' && raw.title.trim() ? 'no photograph' : 'no title',
           meta: null,
         });
+      } else if (seen.has(mapped.externalId)) {
+        continue;
       } else if (!mapped.holdReason && mapped.photoUrls.length < minPhotos) {
+        seen.add(mapped.externalId);
         read.skipped.push({
           sourceUrl: mapped.sourceUrl,
           title: mapped.title,
@@ -249,18 +353,17 @@ export async function fetchSquarespaceItems(
           meta: mapped.meta ?? null,
         });
       } else {
+        seen.add(mapped.externalId);
         read.items.push(mapped);
       }
 
-      if (read.items.length >= limit) break;
+      if (read.items.length >= limit) return false;
     }
 
     const next = body.pagination?.nextPageOffset;
-    if (!body.pagination?.nextPage || typeof next !== 'number' || next === offset) break;
+    if (!body.pagination?.nextPage || typeof next !== 'number' || next === offset) return true;
     offset = next;
   }
 
-  // A collection entry is only what the shop chose to show in a grid. The rest
-  // arrives later, one watch at a time, from hydrateSquarespaceItem.
-  return read;
+  return false;
 }

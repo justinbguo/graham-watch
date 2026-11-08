@@ -47,6 +47,12 @@ export type AdapterRead = {
    * caller infers it from the item cap, which is all a one-page scrape can do.
    */
   complete?: boolean;
+  /**
+   * The next Shopify page when this call stopped on a budget, not on the end
+   * of the feed. The nightly script calls again. One request cannot hash
+   * The Watch Preserve's 8,571 products: that died HTTP 546 on 8 Nov 2026.
+   */
+  nextPage?: number;
 };
 
 /**

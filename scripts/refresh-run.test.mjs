@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { formatShop, refreshDealer, refreshFailureReason, runRefresh } from './refresh-run.mjs';
+import { formatShop, refreshDealer, refreshFailureReason, runRefresh, SYNC_PAGE_BUDGET } from './refresh-run.mjs';
 
 const GOLD = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -52,7 +52,12 @@ test('a shop with nothing to publish is one catalogue read and no model calls', 
     });
   });
 
-  assert.deepEqual(calls, [{ dealerId: GOLD.id, phase: 'sync' }]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].dealerId, GOLD.id);
+  assert.equal(calls[0].phase, 'sync');
+  assert.equal(calls[0].page, 1);
+  assert.equal(calls[0].pageBudget, SYNC_PAGE_BUDGET);
+  assert.equal(typeof calls[0].readAt, 'string');
   assert.equal(shop.ok, true);
   assert.equal(shop.published, 0);
   assert.equal(shop.pending, 0);
@@ -218,6 +223,40 @@ test('the per-night cap leaves the rest of the queue for the next run', async ()
   assert.equal(shop.published, 4);
   assert.equal(shop.pending, 96);
   assert.equal(shop.ok, true);
+});
+
+test('a catalogue that names a next page is read again before anything is published', async () => {
+  const calls = [];
+  let firstReadAt = null;
+  const shop = await refreshDealer(OLD, async (body) => {
+    calls.push(body.phase === 'sync' ? body.page : body.phase);
+    if (body.phase === 'sync' && body.page === 1) {
+      firstReadAt = body.readAt;
+      return syncResponse({
+        found: 10,
+        added: 10,
+        pending: 0,
+        complete: false,
+        nextPage: 9,
+        carry: { found: 10, added: 10, changed: 0, retired: 0, relisted: 0, skipped: 0 },
+      });
+    }
+    if (body.phase === 'sync') {
+      assert.equal(body.page, 9);
+      assert.equal(body.readAt, firstReadAt);
+      assert.equal(body.carry.found, 10);
+      return syncResponse({ found: 14, added: 11, pending: 2, complete: true });
+    }
+    return {
+      ok: true,
+      status: 200,
+      body: { bounded: true, results: [{ ok: true, published: 2, processed: 2, pending: 0 }] },
+    };
+  });
+
+  assert.deepEqual(calls, [1, 9, 'publish']);
+  assert.equal(shop.found, 14);
+  assert.equal(shop.published, 2);
 });
 
 test('a revoked shop the function refuses is not a failed refresh', async () => {

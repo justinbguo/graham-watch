@@ -446,7 +446,7 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
                 />
                 <th
                   className="new-sync"
-                  title="Watches first seen on the latest catalogue read. Never means this shop has no read recorded. 0 means the last read added no watches.">
+                  title="Listings first seen on the latest catalogue read. Never means this shop has no read recorded. 0 means that read did not create a listing.">
                   New on last sync
                 </th>
                 <SortHeader label="Status" sortKey="status" sort={sort} onSort={setSort} />
@@ -602,9 +602,9 @@ export function Dealers({ onOpenInbox }: { onOpenInbox?: (dealer: Row) => void }
             <p className="muted small">
               <strong># listings</strong> is every watch you imported. <strong>View listings</strong>{' '}
               opens Active and On site tabs. <strong>Last sync</strong> goes red after 48 hours without a
-              catalogue read or successful nightly refresh. <strong>New on last sync</strong> is the
-              watches whose catalogue row was first seen on that read. Never means no read is recorded.
-              0 means the read added no watches. <strong>Sync</strong> reads the site then lets you
+              catalogue read or successful nightly refresh. <strong>New on last sync</strong> counts listings first seen on that read.
+              Never means no read is recorded. 0 means the read did not create a listing, which is
+              normal when the shop's stock did not change. <strong>Sync</strong> reads the site then lets you
               import; you only pay when you confirm watches.
             </p>
           </details>
