@@ -81,6 +81,21 @@ export async function readBoundedBytes(
   return bytes;
 }
 
+/** Squarespace's no-image PNG. HTTP 200, 300×300, 2102 bytes. Not a photograph. */
+export const SQUARESPACE_PLACEHOLDER_SHA256 =
+  '581af6bf6f105c917c6e7085911bae110d5326a72dd728499c14566f6e8b1269';
+
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', copy);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function isPlaceholderPhoto(bytes: Uint8Array): Promise<boolean> {
+  return (await sha256Hex(bytes)) === SQUARESPACE_PLACEHOLDER_SHA256;
+}
+
 const EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -105,7 +120,7 @@ async function copyOne(
   listingId: string,
   sourceUrl: string,
   position: number
-): Promise<CopiedPhoto> {
+): Promise<CopiedPhoto | null> {
   const fallback = { source_url: sourceUrl, storage_path: null, position };
 
   await acquirePhoto();
@@ -129,6 +144,9 @@ async function copyOne(
 
     const bytes = await readBoundedBytes(response, MAX_BYTES);
     if (!bytes?.byteLength) return fallback;
+    // The placeholder is a successful response. Leaving a hotlink would still
+    // paint the grey tile, so the row is omitted and the gallery shifts up.
+    if (await isPlaceholderPhoto(bytes)) return null;
 
     const path = `${listingId}/${position}.${extension}`;
     const { error } = await admin.storage.from(BUCKET).upload(path, bytes, {
@@ -146,13 +164,18 @@ async function copyOne(
 }
 
 /**
- * The calls overlap in the sense that a failure in one does not cancel the
- * others. The download itself is one file at a time: see PHOTO_COPIES_AT_ONCE.
+ * One file at a time. A placeholder is omitted, and the next real photograph
+ * takes the position it left, so the kept set is what the minimum counts.
  */
-export function copyPhotos(
+export async function copyPhotos(
   admin: SupabaseClient,
   listingId: string,
   sourceUrls: string[]
 ): Promise<CopiedPhoto[]> {
-  return Promise.all(sourceUrls.map((url, position) => copyOne(admin, listingId, url, position)));
+  const kept: CopiedPhoto[] = [];
+  for (const url of sourceUrls) {
+    const photo = await copyOne(admin, listingId, url, kept.length);
+    if (photo) kept.push(photo);
+  }
+  return kept;
 }
