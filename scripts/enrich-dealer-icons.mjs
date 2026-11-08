@@ -11,14 +11,13 @@
  */
 
 import { register } from 'node:module';
-import { pathToFileURL } from 'node:url';
 
 import { config, describeTarget } from './_supabase.mjs';
 
 register(new URL('./ts-resolve-hook.mjs', import.meta.url));
 
 const { chooseDealerIcon } = await import(
-  pathToFileURL(new URL('../supabase/functions/import-listings/icons.ts', import.meta.url)).href,
+  new URL('../supabase/functions/import-listings/icons.ts', import.meta.url).href,
 );
 
 const HOSTED_REF = 'hbxgxtbtefpyutyqafoi';
