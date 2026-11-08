@@ -3,7 +3,6 @@ import { Text, View } from 'react-native';
 
 import { Divider } from '@/components/ui';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
-import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import type { DeckCard } from '@/lib/models';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -33,8 +32,6 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
           </Text>
         </View>
       ) : null}
-
-      <DealerSiteButton url={card.source_url} />
 
       {card.description ? (
         <View style={styles.about}>

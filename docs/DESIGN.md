@@ -669,9 +669,9 @@ Why each one:
   across. On a wide native window, `layout.gridColumns`, capped at
   `layout.grid`. On desktop web the wall fills the window, and another
   column opens once a tile would pass `layout.gridTileMax`, so a photo
-  does not become a banner. On a wide window the row can be set to
-  2, 3, 4, 5, or 6. That choice is stored the same way as appearance.
-  A phone keeps two and does not show the control. A horizontal
+  does not become a banner. On desktop web, Card View in the Buy rail
+  sets that row to 2, 3, 4, 5, or 6. That choice is stored the same way
+  as appearance. A phone keeps two and does not show the control. A horizontal
   two-finger swipe on a web grid photograph turns that listing's
   photos. A vertical swipe still scrolls the page. The bars under
   the photograph say which photo is showing.

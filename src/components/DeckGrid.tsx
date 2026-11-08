@@ -4,18 +4,13 @@ import {
   FlatList,
   Platform,
   Text,
-  useWindowDimensions,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { ListingTile } from '@/components/ListingTile';
-import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { Button, Message } from '@/components/ui';
-import { useGridColumnChoice } from '@/features/deck/useGridColumns';
 import {
   GRID_END_THRESHOLD,
   isNearListEnd,
@@ -23,10 +18,9 @@ import {
   type GridPaging,
   type ListScrollMetrics,
 } from '@/data/deckPaging';
-import { GRID_COLUMN_OPTIONS, gridColumnsFor, isGridColumnOption } from '@/lib/gridColumns';
-import { desktopGridColumns, useIsDesktopWeb, useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
-import { layout, space, type, type Theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -48,29 +42,22 @@ const GAP = space.sm;
  */
 export function DeckGrid({
   cards,
+  columns,
   onOpen,
   active = true,
   paging,
 }: {
   cards: DeckCard[];
+  columns: number;
   onOpen: (card: DeckCard) => void;
   /** False while a sheet covers the deck, so keys do not steer underneath it. */
   active?: boolean;
   paging: GridPaging;
 }) {
-  const wide = useIsWide();
   const isDesktopWeb = useIsDesktopWeb();
-  const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(gridStyles);
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
-  const { chosen, choose } = useGridColumnChoice();
-  const automatic = isDesktopWeb
-    ? desktopGridColumns(windowWidth, insets.left, insets.right)
-    : layout.gridColumns;
-  const columns = gridColumnsFor(wide, automatic, chosen);
-  const columnChoice = isGridColumnOption(columns) ? columns : layout.gridColumnsWeb;
 
   const {
     hasNextPage,
@@ -187,15 +174,6 @@ export function DeckGrid({
   }, [active, cards, columns, selectedIndex, onOpen]);
 
   return (
-    <View style={styles.frame}>
-      {wide ? (
-        <SegmentedChoice
-          label="Listings per row"
-          value={columnChoice}
-          options={GRID_COLUMN_OPTIONS.map((value) => ({ value, label: String(value) }))}
-          onChange={choose}
-        />
-      ) : null}
     <FlatList
       key={`deck-grid-${columns}`}
       style={styles.list}
@@ -231,7 +209,6 @@ export function DeckGrid({
         </View>
       )}
     />
-    </View>
   );
 }
 
@@ -268,11 +245,6 @@ function GridFooter({ paging }: { paging: GridPaging }) {
 }
 
 const gridStyles = (theme: Theme) => ({
-  frame: {
-    flex: 1,
-    minHeight: 0,
-    gap: space.sm,
-  },
   list: {
     flex: 1,
     // Web's default min-height is the content height, which turns the page

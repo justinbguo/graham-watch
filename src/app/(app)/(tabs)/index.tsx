@@ -4,12 +4,14 @@ import { usePathname } from 'expo-router';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
+import { GridColumnChoice } from '@/components/GridColumnChoice';
 import { DeckRailButton } from '@/components/DeckRailButton';
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
 import { DeckCoach } from '@/features/deck/DeckCoach';
 import { deckCardZ } from '@/features/deck/stack';
 import { useDeckStack } from '@/features/deck/useDeckStack';
+import { useDeckColumns } from '@/features/deck/useGridColumns';
 import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
 import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
 import { FilterMenu } from '@/features/filters/FilterMenu';
@@ -91,6 +93,7 @@ export default function Deck() {
   useSignInOnArrival(deckOnTop);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
+  const { columns, columnChoice, choose: chooseColumns } = useDeckColumns();
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
   // The card an undo just put back, so it can come in by the edge it left.
   const [returning, setReturning] = useState<string | null>(null);
@@ -285,7 +288,10 @@ export default function Deck() {
         accessibilityLabel="Undo, bring back the watch you passed on"
       />
       <FilterMenu surface="deck" count={count} triggerVariant="text" />
-      <ViewToggle value={view} onChange={setView} variant="text" />
+      <View style={styles.viewChoice}>
+        <ViewToggle value={view} onChange={setView} variant="text" />
+        {view === 'grid' ? <GridColumnChoice value={columnChoice} onChange={chooseColumns} /> : null}
+      </View>
     </>
   );
 
@@ -385,6 +391,7 @@ export default function Deck() {
                 a new query, and this key sends the list back to the top. */}
             <DeckGrid
               key={filterCacheToken(filters)}
+              columns={columns}
               cards={cards}
               active={deckOnTop}
               paging={{
@@ -565,6 +572,10 @@ const deckStyles = (_theme: Theme) => ({
   actions: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
+    gap: space.xs,
+  },
+  viewChoice: {
+    alignSelf: 'stretch' as const,
     gap: space.xs,
   },
   view: {
