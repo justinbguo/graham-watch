@@ -419,6 +419,24 @@ async function recordSyncFailure(supabase: SupabaseClient, dealerId: string, mes
  */
 type ApprovedShop = { id: string; name: string; website: string; logo_url: string | null };
 
+function carryCount(value: unknown): number {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  return Math.floor(count);
+}
+
+function readCarry(value: unknown) {
+  const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    found: carryCount(row.found),
+    added: carryCount(row.added),
+    changed: carryCount(row.changed),
+    retired: carryCount(row.retired),
+    relisted: carryCount(row.relisted),
+    skipped: carryCount(row.skipped),
+  };
+}
+
 function approvedShops(supabase: SupabaseClient) {
   return supabase
     .from('dealers')
@@ -500,14 +518,44 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
     }
 
     await rememberIcon(supabase, approved.id, approved.website, approved.logo_url);
-    const sync = await syncCatalog(supabase, approved.id, approved.website, MAX_CATALOG_ITEMS);
-    await recordSync(supabase, approved.id, sync);
-    await queuePublish(supabase, approved.id);
-    const counts = await supabase.rpc('pending_source_item_count', {
-      p_dealer_id: approved.id,
-    });
-    if (counts.error) throw new Error(counts.error.message);
-    const pending = counts.data?.[0]?.pending ?? 0;
+    const page = Number(body.page);
+    const budget = Number(body.pageBudget);
+    const slice = Number.isInteger(page) && page >= 1
+      ? {
+        startPage: page,
+        maxPages: Number.isInteger(budget) ? Math.min(40, Math.max(1, budget)) : 8,
+        readAt: typeof body.readAt === 'string' ? body.readAt : undefined,
+      }
+      : undefined;
+    const sync = await syncCatalog(
+      supabase,
+      approved.id,
+      approved.website,
+      MAX_CATALOG_ITEMS,
+      slice
+    );
+    const carry = readCarry(body.carry);
+    const totals = {
+      found: carry.found + sync.found,
+      added: carry.added + sync.added,
+      changed: carry.changed + sync.changed,
+      retired: carry.retired + sync.retired,
+      relisted: carry.relisted + sync.relisted,
+      skipped: carry.skipped + sync.skipped,
+    };
+    // A later page is still coming. Recording now would store this slice's
+    // size as the whole shop, and publishing would start before the read ended.
+    const resume = typeof sync.nextPage === 'number';
+    let pending = 0;
+    if (!resume) {
+      await recordSync(supabase, approved.id, { ...sync, ...totals });
+      await queuePublish(supabase, approved.id);
+      const counts = await supabase.rpc('pending_source_item_count', {
+        p_dealer_id: approved.id,
+      });
+      if (counts.error) throw new Error(counts.error.message);
+      pending = counts.data?.[0]?.pending ?? 0;
+    }
 
     return Response.json({
       bounded: true,
@@ -521,8 +569,10 @@ async function scheduledRefresh(req: Request, body: Record<string, unknown>) {
           website: approved.website,
           ok: true,
           ...sync,
+          ...totals,
           pending,
           published: 0,
+          carry: totals,
         },
       ],
     });

@@ -1,6 +1,18 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
-import { squarespacePhotoUrls, squarespacePrice } from './squarespace.ts';
+import { squarespaceCollectionPaths, squarespacePhotoUrls, squarespacePrice } from './squarespace.ts';
+
+Deno.test('a homepage sitemap yields every watch collection and skips cameras', () => {
+  const origin = 'https://www.coolvintagewatches.com';
+  const paths = squarespaceCollectionPaths([
+    `${origin}/under350/uw59`,
+    `${origin}/rolex/bubbleback`,
+    `${origin}/cameras/leica-m5`,
+    `${origin}/watches`,
+    `${origin}/blog-montauk/2012/6/11/latest`,
+  ]);
+  assertEquals(paths, [`${origin}/under350`, `${origin}/rolex`]);
+});
 
 Deno.test('falls back to the available variant when the product price is zero', () => {
   assertEquals(

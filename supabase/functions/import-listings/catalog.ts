@@ -36,16 +36,71 @@ const MIN_PHOTOS_IN_CATALOG = 1;
 const UPSERT_CHUNK = 100;
 
 /**
+ * PostgREST returns at most this many rows when the caller does not ask for
+ * the next page. Danny's catalogue is about 4,300 rows. Treating the first
+ * page as the whole shop both inflated "added" and sold listings whose rows
+ * were on a later page.
+ */
+export const PAGE_ROWS = 1000;
+
+export async function everyRow<T extends { id: string }>(
+  load: (
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const rows: T[] = [];
+  const seen = new Set<string>();
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const { data, error } = await load(from, from + PAGE_ROWS - 1);
+    if (error) throw new Error(error.message);
+    const page = data ?? [];
+    let fresh = 0;
+    for (const row of page) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+      fresh += 1;
+    }
+    if (fresh === 0 || page.length < PAGE_ROWS) return rows;
+  }
+}
+
+/** The stamp for this refresh. A caller-supplied time has to be from this run. */
+export function readStamp(input: string | undefined, now = Date.now()): string {
+  const ms = input ? new Date(input).getTime() : Number.NaN;
+  if (!Number.isFinite(ms) || Math.abs(now - ms) > 6 * 60 * 60 * 1000) {
+    return new Date(now).toISOString();
+  }
+  return new Date(ms).toISOString();
+}
+
+/**
  * Two ways in. If the site hands us its own structured data we take it, keeping
  * the shop's own stock state intact. Otherwise we scrape the page and ask the
  * model to find the watches, which is the same job with worse inputs.
  */
 const ADAPTERS: Record<
   string,
-  (url: string, limit: number, minPhotos: number) => Promise<AdapterRead | null>
+  (
+    url: string,
+    limit: number,
+    minPhotos: number,
+    slice?: CatalogSlice
+  ) => Promise<AdapterRead | null>
 > = {
-  shopify: fetchShopifyItems,
-  squarespace: fetchSquarespaceItems,
+  shopify: (url, limit, minPhotos, slice) =>
+    fetchShopifyItems(url, limit, minPhotos, {
+      startPage: slice?.startPage,
+      maxPages: slice?.maxPages,
+    }),
+  squarespace: (url, limit, minPhotos) => fetchSquarespaceItems(url, limit, minPhotos),
+};
+
+/** One slice of a Shopify feed. Absent means read the feed in this call. */
+export type CatalogSlice = {
+  startPage?: number;
+  maxPages?: number;
 };
 
 /**
@@ -58,10 +113,11 @@ const ADAPTERS: Record<
 export async function adapterItems(
   sourceUrl: string,
   limit: number,
-  minPhotos = MIN_PHOTOS_IN_CATALOG
+  minPhotos = MIN_PHOTOS_IN_CATALOG,
+  slice?: CatalogSlice
 ): Promise<{ provider: string } & AdapterRead | null> {
   for (const [name, run] of Object.entries(ADAPTERS)) {
-    const read = await run(sourceUrl, limit, minPhotos);
+    const read = await run(sourceUrl, limit, minPhotos, slice);
     // `recognized` covers a feed that answered and kept nothing. Without it an
     // empty Shopify shop fell through to the scraper.
     if (read && (read.recognized || read.items.length || read.skipped.length)) {
@@ -80,6 +136,8 @@ export type CatalogRead = {
   extracted: Map<string, Record<string, unknown>>;
   /** False when the walk stopped before the feed ended. See catalogueComplete. */
   complete?: boolean;
+  /** Set when a Shopify call stopped on its page budget. */
+  nextPage?: number;
 };
 
 /**
@@ -89,8 +147,12 @@ export type CatalogRead = {
  * model to find the watches on the page, but that is one call for the whole
  * page rather than one per watch, so a catalogue read stays cheap either way.
  */
-export async function readCatalog(sourceUrl: string, limit: number): Promise<CatalogRead> {
-  const found = await adapterItems(sourceUrl, limit);
+export async function readCatalog(
+  sourceUrl: string,
+  limit: number,
+  slice?: CatalogSlice
+): Promise<CatalogRead> {
+  const found = await adapterItems(sourceUrl, limit, MIN_PHOTOS_IN_CATALOG, slice);
   if (found) {
     return {
       provider: found.provider,
@@ -98,6 +160,7 @@ export async function readCatalog(sourceUrl: string, limit: number): Promise<Cat
       skipped: found.skipped,
       extracted: new Map(),
       complete: found.complete,
+      nextPage: found.nextPage,
     };
   }
 
@@ -131,12 +194,9 @@ export async function readCatalog(sourceUrl: string, limit: number): Promise<Cat
     extracted.set(externalId, fields);
   }
 
-  // The extractor is asked for watches and returns watches, so there is no
-  // discard pile on this path — anything it passed over left no record.
-  // One page is the whole of this path. Under the cap it still reports
-  // complete, which is the old behaviour: the scrape does not know the shop
-  // has another page.
-  return { provider, items, skipped: [], extracted, complete: items.length < limit };
+  // One scraped page is not the shop. On 8 Nov 2026 Cool Vintage's homepage
+  // scraped as zero watches and a "complete" read sold all 85 listings.
+  return { provider, items, skipped: [], extracted, complete: false };
 }
 
 export type SyncResult = {
@@ -154,6 +214,15 @@ export type SyncResult = {
   skipped: number;
   /** False when the shop has more watches than one read is allowed to walk. */
   complete: boolean;
+  /** Next Shopify page when this call stopped on a budget. */
+  nextPage?: number;
+};
+
+export type SyncOptions = {
+  startPage?: number;
+  maxPages?: number;
+  /** Shared by every slice of one nightly run, so absence is judged once at the end. */
+  readAt?: string;
 };
 
 /**
@@ -169,20 +238,27 @@ export async function syncCatalog(
   supabase: SupabaseClient,
   dealerId: string,
   sourceUrl: string,
-  limit: number
+  limit: number,
+  options: SyncOptions = {}
 ): Promise<SyncResult> {
-  const { provider, items, skipped, extracted, complete: feedComplete } = await readCatalog(
+  const { provider, items, skipped, extracted, complete: feedComplete, nextPage } = await readCatalog(
     sourceUrl,
-    limit
+    limit,
+    options
   );
-  const readAt = new Date().toISOString();
+  const readAt = readStamp(options.readAt);
 
-  const { data: before } = await supabase
-    .from('source_items')
-    .select('external_id, content_hash')
-    .eq('dealer_id', dealerId);
+  const before = await everyRow<{ id: string; external_id: string; content_hash: string }>(
+    (from, to) =>
+      supabase
+        .from('source_items')
+        .select('id, external_id, content_hash')
+        .eq('dealer_id', dealerId)
+        .order('id')
+        .range(from, to)
+  );
 
-  const known = new Map((before ?? []).map((row) => [row.external_id, row.content_hash]));
+  const known = new Map(before.map((row) => [row.external_id, row.content_hash]));
 
   // Either the whole read is pre-typed (the page path types every watch on the
   // way past) or none of it is. Mixing the two would make a ragged payload, and
@@ -241,7 +317,8 @@ export async function syncCatalog(
   if (adopted.error) throw new Error(adopted.error.message);
 
   // Which rows this read actually saw, by the stamp the upsert just wrote.
-  // Listing the ids in the query instead puts 500 uuids in a URL.
+  // PostgREST returns 1000 rows unless the caller pages. Danny's catalogue is
+  // about 4,300, and the first page is not the shop.
   const held = await supabase
     .from('source_items')
     .update({ publish: false })
@@ -249,13 +326,18 @@ export async function syncCatalog(
     .not('hold_reason', 'is', null);
   if (held.error) throw new Error(held.error.message);
 
-  const { data: seen } = await supabase
-    .from('source_items')
-    .select('id')
-    .eq('dealer_id', dealerId)
-    .gte('last_seen_at', readAt);
+  const seen = await everyRow<{ id: string }>((from, to) =>
+    supabase
+      .from('source_items')
+      .select('id')
+      .eq('dealer_id', dealerId)
+      .gte('last_seen_at', readAt)
+      .order('id')
+      .range(from, to)
+  );
 
-  const complete = catalogueComplete({ items, complete: feedComplete }, limit);
+  const feedEnded = nextPage == null && catalogueComplete({ items, complete: feedComplete }, limit);
+  const complete = feedEnded;
   const availability = await supabase.rpc('sync_source_availability', {
     p_dealer_id: dealerId,
     p_seen_ids: (seen ?? []).map((row) => row.id),
@@ -266,6 +348,18 @@ export async function syncCatalog(
   const counts = (availability.data ?? {}) as { retired?: number; relisted?: number };
   const retired = Number(counts.retired ?? 0);
   const relisted = Number(counts.relisted ?? 0);
+
+  // A product that left a finished feed stays available in source_items
+  // otherwise, and the catalogue count keeps offering it.
+  if (complete) {
+    const stale = await supabase
+      .from('source_items')
+      .update({ available: false, publish: false })
+      .eq('dealer_id', dealerId)
+      .lt('last_seen_at', readAt);
+    if (stale.error) throw new Error(stale.error.message);
+  }
+
   const watches = items.filter((item) => !item.holdReason);
 
   return {
@@ -279,5 +373,6 @@ export async function syncCatalog(
     forSale: watches.filter((item) => item.available).length,
     skipped: skipped.length + (items.length - watches.length),
     complete,
+    ...(nextPage != null ? { nextPage } : {}),
   };
 }

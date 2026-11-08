@@ -97,6 +97,9 @@ test('an error, an empty catalogue, and missing photos are separate warnings', (
     empty.map((flag) => flag.kind),
     ['empty', 'photos']
   );
+
+  const wiped = shopFlags({ ...SHOP, found: 0, retired: 85 }, [quietRun()], null);
+  assert.equal(wiped[0].detail, 'catalogue read returned 0 listings and retired 85');
 });
 
 test('a refused shop is not a health failure', () => {

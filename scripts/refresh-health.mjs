@@ -95,7 +95,14 @@ export function shopFlags(shop, runsNewestFirst, photos) {
   }
 
   if (shop.ok && !shop.publishError && !shop.fatal && Number(shop.found ?? 0) === 0) {
-    flags.push({ kind: 'empty', detail: 'catalogue read returned 0 listings' });
+    const retired = Number(shop.retired ?? 0);
+    flags.push({
+      kind: 'empty',
+      detail:
+        retired > 0
+          ? `catalogue read returned 0 listings and retired ${retired}`
+          : 'catalogue read returned 0 listings',
+    });
   }
 
   const gap = photoNumbers(photos);

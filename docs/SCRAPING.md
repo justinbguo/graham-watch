@@ -214,6 +214,17 @@ decided (`feed_unavailable`, `missing_from_catalog`, or `dealer`). A dealer
 marking sold by hand sticks across later feeds; a feed-sourced sold clears if
 the shop lists the watch again.
 
+A Squarespace homepage is not a catalogue. The reader follows the sitemap to
+each products collection, and skips shelves such as cameras. A one-page scrape
+is never complete, so a page that is not a feed cannot sell the shop's stock
+by absence. Shopify reads are sliced into eight pages per request, because one
+request cannot hash a catalogue of several thousand products.
+
+`npm run catalogue:audit` fetches those same public feeds and reports watches
+the feed is selling that the catalogue does not hold, catalogue rows still
+marked for sale that the feed does not, and listings marked sold while the
+feed still offers them. It writes nothing.
+
 ## Recommendation
 
 Start on `fetch` to test against static dealer sites at no cost. Move to `firecrawl`
