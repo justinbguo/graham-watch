@@ -1,3 +1,4 @@
+import { PausedFrame } from '@/components/PausedBanner';
 import { GuestGate } from '@/features/auth/GuestGate';
 import { CommunityScreen } from '@/features/exchange/CommunityScreen';
 import { useSession } from '@/providers/session';
@@ -9,12 +10,18 @@ export default function Community() {
 
   if (!isSignedIn) {
     return (
-      <GuestGate
-        title="Community"
-        message="Sign in to read the exchange and post watches you are hunting or selling."
-      />
+      <PausedFrame>
+        <GuestGate
+          title="Community"
+          message="Sign in to read the exchange and post watches you are hunting or selling."
+        />
+      </PausedFrame>
     );
   }
 
-  return <CommunityScreen />;
+  return (
+    <PausedFrame>
+      <CommunityScreen />
+    </PausedFrame>
+  );
 }

@@ -1,3 +1,4 @@
+import { PausedFrame } from '@/components/PausedBanner';
 import { Screen } from '@/components/ui';
 import { useIsDesktopWeb } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
@@ -25,22 +26,26 @@ export function MessagesScreen({
 
   if (isDesktopWeb) {
     return (
-      <DesktopMessagesLayout
-        userId={userId}
-        conversationId={conversationId}
-        listingId={listingId}
-        back={back}
-      />
+      <PausedFrame>
+        <DesktopMessagesLayout
+          userId={userId}
+          conversationId={conversationId}
+          listingId={listingId}
+          back={back}
+        />
+      </PausedFrame>
     );
   }
 
   return (
-    <Screen
-      title="Messages"
-      inTabs={!back}
-      back={back}
-      action={<NewMessageButton onPress={() => open('new-message', undefined, '/new-message')} />}>
-      <ConversationList userId={userId} selectedConversationId={conversationId} />
-    </Screen>
+    <PausedFrame>
+      <Screen
+        title="Messages"
+        inTabs={!back}
+        back={back}
+        action={<NewMessageButton onPress={() => open('new-message', undefined, '/new-message')} />}>
+        <ConversationList userId={userId} selectedConversationId={conversationId} />
+      </Screen>
+    </PausedFrame>
   );
 }

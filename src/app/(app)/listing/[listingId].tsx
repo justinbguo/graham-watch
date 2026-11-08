@@ -8,8 +8,10 @@ import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { AddToWishlist } from '@/features/listings/AddToWishlist';
+import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { PassWatch } from '@/features/listings/PassWatch';
+import { listingSourceUrl } from '@/lib/listingSource';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
 import {
@@ -70,23 +72,31 @@ export default function ListingScreen() {
   // about a watch you have kept, so saving is the only verdict it offers.
   const fromSearch = from === 'search';
 
+  const showPass = !isSaved && !fromSearch && !card?.sold_at;
+  const showSave = !isSaved;
+  const dealerUrl = listingSourceUrl(card?.source_url);
   const verdictActions =
-    isSaved ? null : (
-      <View style={styles.verdictRow}>
-        {fromSearch || card?.sold_at ? null : (
-          <PassWatch
-            block
-            loading={save.isPending && save.variables?.direction === 'left'}
-            onPress={() => judge('left', () => router.back())}
-          />
-        )}
-        <AddToWishlist
-          block
-          loading={save.isPending && save.variables?.direction === 'right'}
-          onPress={() => judge('right')}
-        />
+    showPass || showSave || dealerUrl ? (
+      <View style={styles.verdict}>
+        {showSave ? (
+          <View style={styles.verdictRow}>
+            {showPass ? (
+              <PassWatch
+                block
+                loading={save.isPending && save.variables?.direction === 'left'}
+                onPress={() => judge('left', () => router.back())}
+              />
+            ) : null}
+            <AddToWishlist
+              block
+              loading={save.isPending && save.variables?.direction === 'right'}
+              onPress={() => judge('right')}
+            />
+          </View>
+        ) : null}
+        <DealerSiteButton url={card?.source_url} grouped />
       </View>
-    );
+    ) : null;
 
   if (isPending) {
     return (
@@ -205,6 +215,11 @@ const detailStyles = (theme: Theme) => ({
     // The X sits at the end of a 44pt target, so 20 points of that target
     // fall between the price and the glyph. Cancel them, then leave space.sm.
     marginRight: space.sm - (HIT_TARGET - size.icon),
+  },
+  verdict: {
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
+    gap: space.sm,
   },
   verdictRow: {
     flexDirection: 'row' as const,

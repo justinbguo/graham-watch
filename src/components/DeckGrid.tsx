@@ -4,14 +4,11 @@ import {
   FlatList,
   Platform,
   Text,
-  useWindowDimensions,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { ListingTile } from '@/components/ListingTile';
 import { Button, Message } from '@/components/ui';
 import {
@@ -21,9 +18,9 @@ import {
   type GridPaging,
   type ListScrollMetrics,
 } from '@/data/deckPaging';
-import { desktopGridColumns, useIsDesktopWeb, useIsWide } from '@/lib/layout';
+import { useIsDesktopWeb } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
-import { layout, space, type, type Theme } from '@/lib/theme';
+import { space, type, type Theme } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -45,28 +42,22 @@ const GAP = space.sm;
  */
 export function DeckGrid({
   cards,
+  columns,
   onOpen,
   active = true,
   paging,
 }: {
   cards: DeckCard[];
+  columns: number;
   onOpen: (card: DeckCard) => void;
   /** False while a sheet covers the deck, so keys do not steer underneath it. */
   active?: boolean;
   paging: GridPaging;
 }) {
-  const wide = useIsWide();
   const isDesktopWeb = useIsDesktopWeb();
-  const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(gridStyles);
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
-  const columns = wide
-    ? isDesktopWeb
-      ? desktopGridColumns(windowWidth, insets.left, insets.right)
-      : layout.gridColumns
-    : layout.gridColumnsPhone;
 
   const {
     hasNextPage,

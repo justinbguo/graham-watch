@@ -4,6 +4,7 @@ import { Platform, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { photoScrollPage } from '@/lib/photoPager';
+import { photoWheelStep } from '@/lib/photoWheel';
 import type { DeckPhoto } from '@/lib/models';
 import { motion, size, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -12,8 +13,8 @@ const DRAG_SLOP = 6;
 
 /**
  * Multi-photo grid frame on web. DOM pointer listeners with capture follow the
- * mouse after press, and `touch-action: none` keeps the grid list from taking
- * the gesture. React Native's pan responder does not reliably drive mouse drag
+ * mouse after press, and `touch-action: pan-y` leaves vertical scroll to the
+ * list. React Native's pan responder does not reliably drive mouse drag
  * on web inside a virtualized list.
  */
 export function GridPhotoStrip({
@@ -44,6 +45,8 @@ export function GridPhotoStrip({
   const pageRef = useRef(page);
   const widthRef = useRef(width);
   const countRef = useRef(photos.length);
+  const wheelAccum = useRef(0);
+  const wheelLock = useRef(false);
   pageRef.current = page;
   widthRef.current = width;
   countRef.current = photos.length;
@@ -113,16 +116,33 @@ export function GridPhotoStrip({
       finish(event.clientX);
     };
 
+    const onWheel = (event: WheelEvent) => {
+      const step = photoWheelStep(event.deltaX, event.deltaY, wheelAccum.current);
+      if (!step.horizontal) return;
+      event.preventDefault();
+      wheelAccum.current = step.nextAccumulated;
+      if (wheelLock.current || step.direction === 0) return;
+      wheelLock.current = true;
+      wheelAccum.current = 0;
+      snapTo(pageRef.current + step.direction);
+      window.setTimeout(() => {
+        wheelLock.current = false;
+        wheelAccum.current = 0;
+      }, motion.base);
+    };
+
     el.addEventListener('pointerdown', onPointerDown);
     el.addEventListener('pointermove', onPointerMove);
     el.addEventListener('pointerup', onPointerEnd);
     el.addEventListener('pointercancel', onPointerEnd);
+    el.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
       el.removeEventListener('pointerdown', onPointerDown);
       el.removeEventListener('pointermove', onPointerMove);
       el.removeEventListener('pointerup', onPointerEnd);
       el.removeEventListener('pointercancel', onPointerEnd);
+      el.removeEventListener('wheel', onWheel);
     };
   }, [offsetX, onPageChange, photos.length, width]);
 
@@ -180,7 +200,7 @@ export function GridPhotoStrip({
 const stripStyles = (theme: Theme) => ({
   clip: {
     overflow: 'hidden' as const,
-    touchAction: 'none' as const,
+    touchAction: 'pan-y' as const,
   },
   fill: {
     width: '100%' as const,

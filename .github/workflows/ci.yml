@@ -45,6 +45,7 @@ jobs:
           scripts/repair-photos.test.mjs
           scripts/drops-select.test.ts
           scripts/fixture-import.test.ts
+          scripts/aggregator-pivot.test.mjs
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing

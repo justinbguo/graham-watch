@@ -47,14 +47,14 @@ export function desktopColumnWidth(windowWidth: number, insetLeft: number, inset
 }
 
 /**
- * Buy grid columns on desktop web. At least `gridColumnsWeb`. Another column
- * opens once a tile would pass `gridTileMax`, so the wall fills the window.
+ * Automatic Buy grid columns on desktop web, before a saved pick.
+ * At least `gridColumnsWeb` and at most `gridColumnsMax`.
  */
 export function desktopGridColumns(windowWidth: number, insetLeft: number, insetRight: number) {
   const rail = layout.deckToolRail + space.lg + space.xs + space.lg;
   const available = Math.max(0, desktopAvailableWidth(windowWidth, insetLeft, insetRight) - rail);
   const columns = Math.ceil((available + space.sm) / (layout.gridTileMax + space.sm));
-  return Math.max(layout.gridColumnsWeb, columns);
+  return Math.min(layout.gridColumnsMax, Math.max(layout.gridColumnsWeb, columns));
 }
 
 export function useDesktopColumnWidth() {
