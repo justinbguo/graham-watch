@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
+import { PausedFrame } from '@/components/PausedBanner';
 import { GuestGate } from '@/features/auth/GuestGate';
 import { MessagesScreen } from '@/features/messages/MessagesScreen';
 import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
@@ -23,10 +24,12 @@ export default function Messages() {
 
   if (!isSignedIn) {
     return (
-      <GuestGate
-        title="Messages"
-        message="Sign in to write dealers and keep your conversations."
-      />
+      <PausedFrame>
+        <GuestGate
+          title="Messages"
+          message="Sign in to write dealers and keep your conversations."
+        />
+      </PausedFrame>
     );
   }
 

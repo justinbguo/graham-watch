@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
+import { PausedFrame } from '@/components/PausedBanner';
 import { ConversationScreen } from '@/features/messages/ConversationScreen';
 import { useIsDesktopWeb } from '@/lib/layout';
 
@@ -35,10 +36,12 @@ export default function ConversationRoute() {
   if (isDesktopWeb) return null;
 
   return (
-    <ConversationScreen
-      key={`${conversationId}:${listingId ?? ''}`}
-      conversationId={conversationId}
-      listingId={listingId}
-    />
+    <PausedFrame>
+      <ConversationScreen
+        key={`${conversationId}:${listingId ?? ''}`}
+        conversationId={conversationId}
+        listingId={listingId}
+      />
+    </PausedFrame>
   );
 }

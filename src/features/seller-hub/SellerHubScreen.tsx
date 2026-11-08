@@ -3,6 +3,7 @@ import { Platform, View } from 'react-native';
 
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
+import { PausedFrame } from '@/components/PausedBanner';
 import { Screen } from '@/components/ui';
 import type { DealerAccount } from '@/data/dealers';
 import { DesktopMessagesLayout } from '@/features/messages/DesktopMessagesLayout';
@@ -46,6 +47,7 @@ export function SellerHubScreen({
   const hubContent = (
     <View style={styles.content}>
       {tab === 'messages' && userId ? (
+        <PausedFrame>
         <View style={styles.messages}>
           {isDesktopWeb ? (
             <DesktopMessagesLayout
@@ -63,6 +65,7 @@ export function SellerHubScreen({
             />
           )}
         </View>
+        </PausedFrame>
       ) : null}
       {tab === 'payments' ? (
         <HubPanel>
