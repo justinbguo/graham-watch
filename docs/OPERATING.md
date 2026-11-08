@@ -331,18 +331,18 @@ curl -sS "$SUPABASE_URL/functions/v1/operator-bot" \
   -d '{"action":"enrich-icons","dealerId":"00000000-0000-4000-8000-000000000000"}'
 ```
 
-`enrich-icons` reads shop homepages and plans `dealers.logo_url` changes. It does not import listings. Omitting `dryRun`, or setting it to true, writes nothing. `dryRun: false` writes. A script does the same job and also refuses a non-local write:
+`enrich-icons` reads shop homepages and plans `dealers.logo_url` changes. It does not import listings. Omitting `dryRun`, or setting it to true, writes nothing and returns `planned` rows of the old URL and the new URL. `dryRun: false` writes those rows. Without `dealerId` one call handles at most 20 shops that have a website. The script below walks every such shop. `--write` on either script refuses a host other than `127.0.0.1` or `localhost`, which includes the hosted project:
 
 ```
-deno run --config supabase/functions/deno.ci.json --allow-net --allow-read --allow-env scripts/enrich-dealer-icons.ts
+node --experimental-strip-types scripts/enrich-dealer-icons.mjs
 node scripts/repair-placeholder-photos.mjs
 ```
 
-The repair script lists `listing_photos` rows whose bytes are the Squarespace no-image file, and the gallery row it would move to position 0. It does not delete storage objects. `--write` on either script refuses any host other than loopback. Do not point either script at production without a separate approval.
+Add `--write` to either command to update a local stack. The repair script lists `listing_photos` rows whose bytes match the Squarespace no-image file, the rows it would reorder, and the row it would move to position 0. It does not delete storage objects, and it does not change listing text, status, or price.
 
 `import` creates the shop as `pending` when the website is new. It does not approve the shop. The first call reads the catalogue into `source_items` and marks the for-sale rows for publish. It does not copy photographs in that same call. A later call, while a succeeded import for that same URL is less than six hours old, skips the site and publishes one batch of two watches. Repeat `import` with the same body until `publish.pending` is `0`. The same call twice is safe. A watch is applied only after its gallery is stored, so a call that dies mid-gallery leaves that watch in `publish.pending` and the next call finishes the photographs. `publish.failed` counts watches that recorded an error. Those wait for a catalogue read, which clears the error. `approve` sets `dealers.permission` to `approved`, which is what puts watches with at least three photographs on the Buy deck. A listing with fewer than three photographs stays hidden from buyers. `unapprove` sets the shop back to `pending`. A `revoked` shop stays revoked. `report` returns the permission, active and total listing counts, and the latest `import_jobs` row.
 
-Each successful discover, inspect, import, and report writes `operator_actions` with `actor` `operator-bot`. Approve and unapprove write that actor inside `bot_set_dealer_permission`. The operator console shows the actor as "operator bot".
+Each successful discover, inspect, import, report, and enrich-icons call writes `operator_actions` with `actor` `operator-bot`. Approve and unapprove write that actor inside `bot_set_dealer_permission`. The operator console shows the actor as "operator bot".
 
 A local stack can import fixture listings without scraping. The hosted function returns 404 for that shape and writes nothing. The edge runtime needs `GRAHAM_ALLOW_FIXTURE_IMPORT=1` and a local `SUPABASE_URL`. The same call twice does not insert the same `source_url` again, and it does not move an already approved shop back to pending.
 

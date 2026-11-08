@@ -368,13 +368,13 @@ export function liveDeps(): OperatorDeps {
       return { dealerId, permission: data };
     },
     async enrichIcons({ dealerId, dryRun }) {
-      const query = admin()
+      let query = admin()
         .from('dealers')
         .select('id, website, logo_url')
         .not('website', 'is', null)
-        .order('name')
-        .limit(20);
-      const shops = dealerId ? await query.eq('id', dealerId) : await query;
+        .order('id');
+      query = dealerId ? query.eq('id', dealerId) : query.limit(20);
+      const shops = await query;
       if (shops.error) throw new OperatorError(shops.error.message, 502);
       if (dealerId && (shops.data ?? []).length === 0) throw new OperatorError('No such shop.', 404);
       const rows = [];
@@ -387,15 +387,10 @@ export function liveDeps(): OperatorDeps {
           const updated = await admin().from('dealers').update({ logo_url: to }).eq('id', shop.id);
           if (updated.error) throw new OperatorError(updated.error.message, 502);
         }
-        rows.push({
-          dealerId: shop.id,
-          website: shop.website,
-          from: shop.logo_url,
-          to,
-          write,
-        });
+        if (!write) continue;
+        rows.push({ dealerId: shop.id, website: shop.website, from: shop.logo_url, to });
       }
-      return { dryRun, shops: rows };
+      return { dryRun, planned: rows };
     },
     async report(dealerId) {
       const dealer = await admin()

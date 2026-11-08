@@ -348,14 +348,19 @@ export async function readProfile(
   currentLogoUrl?: string | null,
 ): Promise<Profile> {
   const html = page === undefined ? await get(origin) : page;
-  if (!html) return NO_PROFILE;
+  // Null only when the page has no icon and the dealer has none stored.
+  // A failed read must not clear a mark that already works.
+  const logoUrl = await chooseDealerIcon({
+    html: html ?? '',
+    origin,
+    currentUrl: currentLogoUrl,
+  });
+  if (!html) return { description: null, instagram: null, logoUrl };
 
   return {
     description: descriptionIn(html),
     instagram: instagramIn(html),
-    // Null only when the page has no icon and the dealer has none stored.
-    // A failed read must not clear a mark that already works.
-    logoUrl: await chooseDealerIcon({ html, origin, currentUrl: currentLogoUrl }),
+    logoUrl,
   };
 }
 

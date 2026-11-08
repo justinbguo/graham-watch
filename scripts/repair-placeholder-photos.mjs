@@ -1,7 +1,7 @@
 /**
  * Lists Squarespace no-image rows and the gallery photo that would become first.
  *
- * Dry run unless --write. --write refuses any host that is not this machine.
+ * Dry run unless --write. --write refuses any host other than 127.0.0.1 or localhost.
  * Storage objects stay. Listing text, status, and price stay.
  *
  *   node scripts/repair-placeholder-photos.mjs
@@ -11,21 +11,23 @@
 import { createHash } from 'node:crypto';
 
 import { config, describeTarget } from './_supabase.mjs';
-import { isLocalUrl } from './_env.mjs';
 
 const PLACEHOLDER_SHA256 = '581af6bf6f105c917c6e7085911bae110d5326a72dd728499c14566f6e8b1269';
 const HOSTED_REF = 'hbxgxtbtefpyutyqafoi';
 
-function refuseRemoteWrite(url) {
-  let host = '';
+function loopback(url) {
   try {
-    host = new URL(url).hostname;
+    const host = new URL(url).hostname;
+    return (host === '127.0.0.1' || host === 'localhost') && !url.includes(HOSTED_REF);
   } catch {
-    host = url;
+    return false;
   }
-  if (!isLocalUrl(url) || host.includes(HOSTED_REF)) {
+}
+
+function refuseRemoteWrite(url) {
+  if (!loopback(url)) {
     throw new Error(
-      `Refusing to write placeholder repairs on ${describeTarget()}. Pass a local stack, and ask Justin before any production repair.`,
+      `Refusing to write placeholder repairs on ${describeTarget()}. --write accepts only 127.0.0.1 or localhost.`,
     );
   }
 }

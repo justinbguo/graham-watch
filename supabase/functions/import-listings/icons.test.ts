@@ -62,17 +62,25 @@ function respond(files: Record<string, { status?: number; png?: [number, number]
   return { fetcher, seen };
 }
 
-Deno.test('a Shopify 32px crop is recovered and the original wins', async () => {
-  const declared = 'https://thetimecurator.com/cdn/shop/files/fvicon_32x32.jpg?v=1617507435';
-  const original = 'https://thetimecurator.com/cdn/shop/files/fvicon.jpg?v=1617507435';
-  assertEquals(recoverIconUrls(declared)[0], original);
+Deno.test('a Shopify 32px crop is recovered and the 300px original wins', async () => {
+  const declared =
+    'https://collectorscornerny.com/cdn/shop/files/CCNY_dec3b64d-4784-4775-b734-6acb28abd60d.png?crop=center&height=32&v=1784836775&width=32';
+  const recovered = recoverIconUrls(declared);
+  assertEquals(recovered[0].includes('width='), false);
+  assertEquals(recovered[0].includes('crop='), false);
+  assertEquals(recovered[0].includes('height='), false);
+  assertEquals(
+    recoverIconUrls('https://thetimecurator.com/cdn/shop/files/fvicon_32x32.jpg?v=1617507435')[0],
+    'https://thetimecurator.com/cdn/shop/files/fvicon.jpg?v=1617507435',
+  );
+  const original = recovered[0];
   const { fetcher, seen } = respond({
     [declared]: { png: [32, 32] },
-    [original]: { png: [800, 800] },
+    [original]: { png: [300, 300] },
   });
   const chosen = await chooseDealerIcon({
-    html: `<link rel="icon" href="${declared}">`,
-    origin: 'https://thetimecurator.com',
+    html: `<link rel="shortcut icon" href="${declared}">`,
+    origin: 'https://collectorscornerny.com',
     fetch: fetcher,
   });
   assertEquals(chosen, original);
@@ -146,6 +154,20 @@ Deno.test('a stored larger icon is kept when the new find is smaller', async () 
   assertEquals(
     await chooseDealerIcon({
       html: `<link rel="icon" href="${small}">`,
+      origin: 'https://cdn.example',
+      currentUrl: current,
+      fetch: fetcher,
+    }),
+    current,
+  );
+});
+
+Deno.test('a null probe keeps the stored icon', async () => {
+  const current = 'https://cdn.example/current.png';
+  const { fetcher } = respond({});
+  assertEquals(
+    await chooseDealerIcon({
+      html: '<html></html>',
       origin: 'https://cdn.example',
       currentUrl: current,
       fetch: fetcher,

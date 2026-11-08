@@ -163,12 +163,10 @@ function websiteOf(sourceUrl: string): { host: string; website: string } {
 /**
  * Writes back what the shop's homepage says about itself.
  *
- * Unlike the address just below, this overwrites. All three are read off the
- * page rather than typed by anyone, and a logo URL points into the shop's own
- * CDN, which does not survive a redesign — leaving the stale one in place
- * would mean Refresh could not repair the thing it exists to repair. Nothing
- * found is left alone rather than cleared, so a site that is briefly down does
- * not blank a dealer's page.
+ * Description and Instagram overwrite, because both are read from the page.
+ * A logo is written only when the chosen URL differs from the stored one.
+ * A miss leaves the column alone, so a site that is briefly down does not
+ * blank a dealer's page, and a smaller find does not replace a larger mark.
  */
 async function rememberIcon(
   supabase: SupabaseClient,
@@ -178,30 +176,22 @@ async function rememberIcon(
 ) {
   try {
     const profile = await readProfile(website, undefined, current);
-    await refreshProfile(supabase, dealerId, profile);
+    await refreshProfile(supabase, dealerId, profile, current);
   } catch (error) {
     console.error('could not refresh dealer icon', error instanceof Error ? error.message : error);
   }
 }
 
-async function storedLogo(
+async function refreshProfile(
   supabase: SupabaseClient,
-  website: string,
-  dealerId?: string,
-): Promise<string | null> {
-  const query = supabase.from('dealers').select('logo_url');
-  const row = dealerId
-    ? await query.eq('id', dealerId).maybeSingle()
-    : await query.eq('website', website).maybeSingle();
-  if (row.error) return null;
-  return row.data?.logo_url ?? null;
-}
-
-async function refreshProfile(supabase: SupabaseClient, dealerId: string, profile: Profile) {
+  dealerId: string,
+  profile: Profile,
+  currentLogo: string | null,
+) {
   const patch: Record<string, string> = {};
   if (profile.description) patch.description = profile.description;
   if (profile.instagram) patch.instagram = profile.instagram;
-  if (profile.logoUrl) patch.logo_url = profile.logoUrl;
+  if (profile.logoUrl && profile.logoUrl !== currentLogo) patch.logo_url = profile.logoUrl;
 
   if (!Object.keys(patch).length) return;
 
@@ -215,7 +205,6 @@ async function findDealer(
   userId: string,
   sourceUrl: string,
   isOperator: () => Promise<boolean>,
-  profile: Profile,
   dealerId?: string,
   name?: string,
   email?: string
@@ -230,14 +219,16 @@ async function findDealer(
   if (dealerId) {
     const { data: owned } = await supabase
       .from('dealers')
-      .select('id, claimed_by, created_by')
+      .select('id, claimed_by, created_by, logo_url, website')
       .eq('id', dealerId)
       .maybeSingle();
 
     if (!owned || !(await mine(owned))) {
       throw new Error('You do not manage that dealer.');
     }
-    await refreshProfile(supabase, owned.id, profile);
+    const homepage = owned.website ?? websiteOf(sourceUrl).website;
+    const profile = await readProfile(homepage, undefined, owned.logo_url);
+    await refreshProfile(supabase, owned.id, profile, owned.logo_url);
     return owned.id;
   }
 
@@ -248,7 +239,7 @@ async function findDealer(
   // a dealer that already exists.
   const { data: existing } = await supabase
     .from('dealers')
-    .select('id, name, claimed_by, created_by')
+    .select('id, name, claimed_by, created_by, logo_url')
     .eq('website', website)
     .maybeSingle();
 
@@ -267,7 +258,8 @@ async function findDealer(
   if (name && existing.name === host) {
     await supabase.from('dealers').update({ name }).eq('id', existing.id);
   }
-  await refreshProfile(supabase, existing.id, profile);
+  const profile = await readProfile(website, undefined, existing.logo_url);
+  await refreshProfile(supabase, existing.id, profile, existing.logo_url);
   // Fill an address we could not find the first time without ever reading the
   // one already there — the `is null` filter is what makes this not overwrite.
   if (email) {
@@ -809,17 +801,8 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
 
     // Read here rather than trusted from the caller: Refresh on an existing
     // shop never runs discovery, and that is the button this has to arrive
-    // through for the shops already imported.
-    const profile = await readProfile(
-      websiteOf(sourceUrl).website,
-      undefined,
-      await storedLogo(
-        ctx.supabase,
-        websiteOf(sourceUrl).website,
-        typeof body.dealerId === 'string' ? body.dealerId : undefined,
-      ),
-    ).catch(() => NO_PROFILE);
-
+    // through for the shops already imported. findDealer passes the stored
+    // logo into that read so a miss does not clear it.
     let dealerId: string;
     try {
       const found = await findDealer(
@@ -827,19 +810,19 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
         userId,
         sourceUrl,
         isOperator,
-        profile,
         typeof body.dealerId === 'string' ? body.dealerId : undefined,
         named,
         addressed
       );
 
-      // Refreshing a shop you already manage is free — that is the nightly
-      // sweep and a dealer reloading their own catalogue. Introducing one we
+      // Refreshing a shop you already manage is free. The nightly sweep and a
+      // dealer reloading their own catalogue are that case. Introducing one we
       // have never read is the priced act.
       if (found) {
         dealerId = found;
       } else {
         await assertBudget(userId, await isOperator());
+        const profile = await readProfile(websiteOf(sourceUrl).website).catch(() => NO_PROFILE);
         dealerId = await createDealer(ctx.supabase, userId, sourceUrl, profile, named, addressed);
       }
     } catch (error) {

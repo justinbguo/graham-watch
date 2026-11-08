@@ -102,11 +102,17 @@ export function imageSize(bytes: Uint8Array): { width: number; height: number } 
 }
 
 function imageSizeWebp(bytes: Uint8Array): { width: number; height: number } | null {
-  if (bytes.length < 30) return null;
+  if (bytes.length < 16) return null;
   if (ascii(bytes, 0, 4) !== 'RIFF' || ascii(bytes, 8, 4) !== 'WEBP') return null;
-  if (ascii(bytes, 12, 4) === 'VP8X') {
+  if (ascii(bytes, 12, 4) === 'VP8X' && bytes.length >= 30) {
     const width = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16);
     const height = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16);
+    return width > 0 && height > 0 ? { width, height } : null;
+  }
+  if (ascii(bytes, 12, 4) === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
+    const bits = bytes[21] + (bytes[22] << 8) + (bytes[23] << 16) + bytes[24] * 0x1000000;
+    const width = (bits & 0x3fff) + 1;
+    const height = ((bits >> 14) & 0x3fff) + 1;
     return { width, height };
   }
   if (ascii(bytes, 12, 4) !== 'VP8 ') return null;
@@ -238,8 +244,7 @@ function dedupe(list: Candidate[]): Candidate[] {
 function headerLogo(html: string, origin: string): string | null {
   const header = /<header\b[^>]*>([\s\S]*?)<\/header>/i.exec(html)?.[1] ?? html;
   const images = [...header.matchAll(/<img\s([^>]*)>/gi)].map((match) => match[1]);
-  const logoish = images.filter((tag) => /logo|wordmark|brand/i.test(tag));
-  const pool = logoish.length ? logoish : images.slice(0, 1);
+  const pool = images.filter((tag) => /logo|wordmark|brand/i.test(tag));
   for (const tag of pool) {
     const fromSet = largest(decode(attr(tag, 'srcset')), origin);
     if (fromSet) return fromSet;
@@ -274,7 +279,7 @@ function ogImage(html: string, origin: string): string | null {
   return resolveUrl(content, origin);
 }
 
-async function manifestIcons(url: string, origin: string, fetcher: IconFetch): Promise<Candidate[]> {
+async function manifestIcons(url: string, fetcher: IconFetch): Promise<Candidate[]> {
   try {
     const response = await fetcher(url, {
       headers: { 'User-Agent': USER_AGENT },
@@ -288,7 +293,7 @@ async function manifestIcons(url: string, origin: string, fetcher: IconFetch): P
     const body = (await response.json()) as { icons?: { src?: string }[] };
     const list: Candidate[] = [];
     for (const icon of body.icons ?? []) {
-      if (typeof icon?.src === 'string') pushCandidate(list, icon.src, origin, 0);
+      if (typeof icon?.src === 'string') pushCandidate(list, icon.src, url, 0);
     }
     return list;
   } catch {
@@ -337,12 +342,18 @@ function rank(measured: Measured[]): Measured | null {
   const party = measured.filter((image) => image.tier <= 4);
   const pool = party.length ? party : measured.filter((image) => image.tier >= 5);
   if (!pool.length) return null;
-  const squares = pool.filter(square);
-  const shaped = squares.length ? squares : pool;
-  const large = shaped.filter((image) => shortSide(image) >= PREFERRED_SHORT_SIDE);
-  const finalists = large.length ? large : shaped;
+  const large = pool.filter((image) => shortSide(image) >= PREFERRED_SHORT_SIDE);
+  const shaped = large.length ? large : pool;
+  const squares = shaped.filter(square);
+  const finalists = squares.length ? squares : shaped;
   finalists.sort((a, b) => shortSide(b) - shortSide(a) || a.tier - b.tier);
   return finalists[0] ?? null;
+}
+
+function improves(next: Measured, current: Measured): boolean {
+  if (worse(next, current)) return false;
+  if (shortSide(next) > shortSide(current)) return true;
+  return !square(current) && square(next);
 }
 
 function worse(next: Measured, current: Measured): boolean {
@@ -353,8 +364,9 @@ function worse(next: Measured, current: Measured): boolean {
 /**
  * The icon to store, or null when nothing usable was found and nothing is stored.
  *
- * A miss returns the current URL when that file still decodes, so a refresh
- * cannot blank a dealer. A smaller or less square find also keeps the current URL.
+ * A miss returns the stored https URL, decoded or not, so a refresh cannot
+ * blank a dealer. A smaller find, or a wide image in place of a square one,
+ * also keeps the stored URL.
  */
 export async function chooseDealerIcon(input: {
   html: string;
@@ -366,15 +378,20 @@ export async function chooseDealerIcon(input: {
   const gathered = collect(input.html, input.origin);
   const manifest = gathered.find((candidate) => candidate.tier === -1);
   const icons = gathered.filter((candidate) => candidate.tier >= 0 && candidate.tier <= 4);
-  if (manifest) icons.unshift(...(await manifestIcons(manifest.url, input.origin, fetcher)));
+  if (manifest) icons.unshift(...(await manifestIcons(manifest.url, fetcher)));
   const unique = dedupe(icons).slice(0, MAX_PROBES);
   const measured: Measured[] = [];
+  let probes = 0;
   for (const candidate of unique) {
+    if (probes >= MAX_PROBES) break;
+    probes += 1;
     const image = await probe(candidate, fetcher);
     if (image && !(image.tier === 4 && ratio(image) < 0.85)) measured.push(image);
   }
   if (!measured.length) {
     for (const candidate of gathered.filter((item) => item.tier >= 5)) {
+      if (probes >= MAX_PROBES) break;
+      probes += 1;
       const image = await probe(candidate, fetcher);
       if (image) measured.push(image);
     }
@@ -389,7 +406,7 @@ export async function chooseDealerIcon(input: {
   }
 
   const best = rank(measured);
-  if (!best) return current ? current.url : null;
-  if (current && worse(best, current)) return current.url;
+  if (!best) return current?.url ?? currentUrl ?? null;
+  if (current && !improves(best, current)) return current.url;
   return best.url;
 }
