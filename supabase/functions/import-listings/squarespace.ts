@@ -55,12 +55,35 @@ export function squarespacePrice(item: Json): {
   return { priceCents: null, currency: null };
 }
 
-function photoUrls(item: Json): string[] {
+const IMAGE_FILE = /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i;
+
+/**
+ * Gallery frames are the photographs. Squarespace's product root is sometimes
+ * a directory with no filename, and that URL answers 200 with the platform's
+ * no-image PNG. A root is kept only when it names an image and the gallery
+ * does not already include it.
+ */
+export function squarespacePhotoUrls(item: Json): string[] {
   const gallery = Array.isArray(item?.items) ? item.items : [];
-  const urls = [item?.assetUrl, ...gallery.map((entry: Json) => entry?.assetUrl)].filter(
-    (url: unknown): url is string => typeof url === 'string' && url.startsWith('http')
-  );
-  return [...new Set(urls)].map((url) => `${url}?format=${PHOTO_WIDTH}`);
+  const urls: string[] = [];
+  for (const entry of gallery) {
+    const asset = (entry as Json)?.assetUrl;
+    if (typeof asset === 'string' && asset.startsWith('http')) urls.push(asset);
+  }
+  const root = typeof item?.assetUrl === 'string' ? item.assetUrl : '';
+  const rootPath = root.split(/[?#]/)[0];
+  const seen = new Set(urls.map((url) => url.split(/[?#]/)[0]));
+  if (root.startsWith('http') && IMAGE_FILE.test(rootPath) && !seen.has(rootPath)) urls.push(root);
+
+  return [...new Set(urls)].map((url) => {
+    try {
+      const parsed = new URL(url);
+      parsed.searchParams.set('format', PHOTO_WIDTH);
+      return parsed.toString();
+    } catch {
+      return `${url}${url.includes('?') ? '&' : '?'}format=${PHOTO_WIDTH}`;
+    }
+  });
 }
 
 function metaOf(item: Json, photoCount: number): ItemMeta {
@@ -85,7 +108,7 @@ function mapItem(item: Json, base: URL): SourceItem | null {
   const title = typeof item?.title === 'string' ? item.title.trim() : '';
   if (!title) return null;
 
-  const photos = photoUrls(item);
+  const photos = squarespacePhotoUrls(item);
 
   let sourceUrl = base.toString();
   try {

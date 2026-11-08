@@ -52,6 +52,10 @@ function deps(overrides: Partial<OperatorDeps> = {}) {
         latestJob: { status: 'succeeded' },
       };
     },
+    enrichIcons: async (input) => {
+      calls.push(`enrich:${input.dryRun}:${input.dealerId ?? ''}`);
+      return { dryRun: input.dryRun, shops: [] };
+    },
     audit: async (row) => {
       audits.push(row);
     },
@@ -265,4 +269,23 @@ Deno.test('a private URL, a bad id, and an unknown action are refused', async ()
   assertEquals(unknown.status, 400);
   assertEquals(harness.calls, []);
   assertEquals(harness.audits, []);
+});
+
+Deno.test('enrich-icons is a dry run until the caller asks to write', async () => {
+  const harness = deps();
+  const dry = await handleOperatorRequest(request({ action: 'enrich-icons', dealerId: dealer }), harness.deps);
+  assertEquals(dry.status, 200);
+  assertEquals(await dry.json(), { dryRun: true, shops: [] });
+
+  const write = await handleOperatorRequest(
+    request({ action: 'enrich-icons', dealerId: dealer, dryRun: false }),
+    harness.deps,
+  );
+  assertEquals(write.status, 200);
+  assertEquals((await write.json()).dryRun, false);
+  assertEquals(harness.calls, [`enrich:true:${dealer}`, `enrich:false:${dealer}`]);
+  assertEquals(
+    harness.audits.map((row) => (row as AuditRow).action),
+    ['enrich_icons', 'enrich_icons'],
+  );
 });

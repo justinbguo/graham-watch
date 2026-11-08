@@ -159,6 +159,8 @@ async function publishOne(
     rewrite = (existing.count ?? 0) < MIN_PHOTOS_PER_LISTING;
   }
   if (rewrite) {
+    // The minimum is photographs we kept. copyPhotos drops the Squarespace
+    // no-image file, so a placeholder must not satisfy the count.
     const photos = await copyPhotos(storage, listingId, photoUrls);
     if (photos.length < MIN_PHOTOS_PER_LISTING) {
       const noted = await supabase

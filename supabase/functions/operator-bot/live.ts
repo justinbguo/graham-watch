@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from '../import-listings/catalog.ts';
-import { discover } from '../import-listings/discover.ts';
+import { discover, readProfile } from '../import-listings/discover.ts';
 import { fixtureImportAllowed } from '../import-listings/fixture.ts';
 import { SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from '../import-listings/source.ts';
@@ -125,26 +125,53 @@ function websiteOf(sourceUrl: string) {
   return { host, website: `https://${host}` };
 }
 
+export function newDealerRow(input: {
+  name: string;
+  website: string;
+  email: string | null;
+  logoUrl: string | null;
+}) {
+  return {
+    name: input.name,
+    website: input.website,
+    contact_email: input.email,
+    logo_url: input.logoUrl,
+    permission: 'pending' as const,
+    created_by: null,
+  };
+}
+
+async function storeLogo(dealerId: string, website: string, current: string | null) {
+  const profile = await readProfile(website, undefined, current);
+  if (!profile.logoUrl || profile.logoUrl === current) return profile.logoUrl;
+  const updated = await admin().from('dealers').update({ logo_url: profile.logoUrl }).eq('id', dealerId);
+  if (updated.error) console.error('could not store dealer icon', updated.error.message);
+  return profile.logoUrl;
+}
+
 async function ensureDealer(sourceUrl: string, name?: string, email?: string) {
   const { host, website } = websiteOf(sourceUrl);
   const existing = await admin()
     .from('dealers')
-    .select('id, permission')
+    .select('id, permission, logo_url')
     .eq('website', website)
     .maybeSingle();
   if (existing.error) throw new OperatorError(existing.error.message, 502);
-  if (existing.data) return existing.data;
+  if (existing.data) {
+    await storeLogo(existing.data.id, website, existing.data.logo_url);
+    return existing.data;
+  }
 
   await assertBudget();
+  const profile = await readProfile(website);
   const inserted = await admin()
     .from('dealers')
-    .insert({
+    .insert(newDealerRow({
       name: name || host,
       website,
-      contact_email: email ?? null,
-      permission: 'pending',
-      created_by: null,
-    })
+      email: email ?? null,
+      logoUrl: profile.logoUrl,
+    }))
     .select('id, permission')
     .single();
 
@@ -339,6 +366,31 @@ export function liveDeps(): OperatorDeps {
       });
       if (error) throw permissionFailure(error);
       return { dealerId, permission: data };
+    },
+    async enrichIcons({ dealerId, dryRun }) {
+      let query = admin()
+        .from('dealers')
+        .select('id, website, logo_url')
+        .not('website', 'is', null)
+        .order('id');
+      query = dealerId ? query.eq('id', dealerId) : query.limit(20);
+      const shops = await query;
+      if (shops.error) throw new OperatorError(shops.error.message, 502);
+      if (dealerId && (shops.data ?? []).length === 0) throw new OperatorError('No such shop.', 404);
+      const rows = [];
+      for (const shop of shops.data ?? []) {
+        if (!shop.website) continue;
+        const profile = await readProfile(shop.website, undefined, shop.logo_url);
+        const to = profile.logoUrl;
+        const write = Boolean(to && to !== shop.logo_url);
+        if (write && !dryRun) {
+          const updated = await admin().from('dealers').update({ logo_url: to }).eq('id', shop.id);
+          if (updated.error) throw new OperatorError(updated.error.message, 502);
+        }
+        if (!write) continue;
+        rows.push({ dealerId: shop.id, website: shop.website, from: shop.logo_url, to });
+      }
+      return { dryRun, planned: rows };
     },
     async report(dealerId) {
       const dealer = await admin()

@@ -12,6 +12,7 @@
  */
 
 import { TIMEOUT } from '../_shared/timeouts.ts';
+import { chooseDealerIcon } from './icons.ts';
 
 const USER_AGENT = 'GrahamBot/0.1 (+https://graham.watch)';
 
@@ -341,36 +342,25 @@ export function declaredIcon(html: string, origin: string): string | null {
   return null;
 }
 
-/**
- * Confirms a URL is really a picture before we store it.
- *
- * Analog Shift declares an icon whose URL 404s, and Squarespace answers that
- * 404 with an HTML page rather than an error the fetch would reject. Stored
- * unchecked, that is a permanently broken image beside a dealer's name.
- */
-async function isImage(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(TIMEOUT.source),
-    });
-    return response.ok && (response.headers.get('content-type') ?? '').startsWith('image/');
-  } catch {
-    return false;
-  }
-}
-
-export async function readProfile(origin: string, page?: string | null): Promise<Profile> {
+export async function readProfile(
+  origin: string,
+  page?: string | null,
+  currentLogoUrl?: string | null,
+): Promise<Profile> {
   const html = page === undefined ? await get(origin) : page;
-  if (!html) return NO_PROFILE;
-
-  const icon = declaredIcon(html, origin);
+  // Null only when the page has no icon and the dealer has none stored.
+  // A failed read must not clear a mark that already works.
+  const logoUrl = await chooseDealerIcon({
+    html: html ?? '',
+    origin,
+    currentUrl: currentLogoUrl,
+  });
+  if (!html) return { description: null, instagram: null, logoUrl };
 
   return {
     description: descriptionIn(html),
     instagram: instagramIn(html),
-    logoUrl: icon && (await isImage(icon)) ? icon : null,
+    logoUrl,
   };
 }
 
