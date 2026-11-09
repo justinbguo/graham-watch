@@ -15,5 +15,5 @@ export function gridColumnsFor(
 ): number {
   if (!wide) return layout.gridColumnsPhone;
   if (chosen != null) return chosen;
-  return Math.min(layout.gridColumnsMax, Math.max(layout.gridColumnsWeb, automatic));
+  return Math.max(layout.gridColumnsWeb, automatic);
 }

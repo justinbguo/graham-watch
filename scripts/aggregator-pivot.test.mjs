@@ -18,10 +18,11 @@ test('a phone stays at two columns even when six was saved', () => {
   assert.equal(gridColumnsFor(false, 4, 6), 2);
 });
 
-test('a wide window can show six and otherwise stops at six', () => {
+test('a wide window keeps a saved count and otherwise follows the automatic count', () => {
   assert.equal(gridColumnsFor(true, 3, 6), 6);
-  assert.equal(gridColumnsFor(true, 9, null), 6);
+  assert.equal(gridColumnsFor(true, 9, null), 9);
   assert.equal(gridColumnsFor(true, 4, null), 4);
+  assert.equal(gridColumnsFor(true, 1, null), 2);
 });
 
 test('a horizontal wheel step changes one photo and a vertical wheel does not', () => {

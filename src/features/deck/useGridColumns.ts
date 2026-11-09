@@ -37,6 +37,5 @@ export function useDeckColumns() {
     ? desktopGridColumns(width, insets.left, insets.right)
     : layout.gridColumns;
   const columns = gridColumnsFor(wide, automatic, chosen);
-  const columnChoice = isGridColumnOption(columns) ? columns : layout.gridColumnsWeb;
-  return { columns, columnChoice, choose };
+  return { columns, choose };
 }

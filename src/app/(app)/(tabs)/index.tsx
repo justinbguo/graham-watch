@@ -93,7 +93,7 @@ export default function Deck() {
   useSignInOnArrival(deckOnTop);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
-  const { columns, columnChoice, choose: chooseColumns } = useDeckColumns();
+  const { columns, choose: chooseColumns } = useDeckColumns();
   const [lastPass, setLastPass] = useState<DeckCard | null>(null);
   // The card an undo just put back, so it can come in by the edge it left.
   const [returning, setReturning] = useState<string | null>(null);
@@ -290,7 +290,7 @@ export default function Deck() {
       <FilterMenu surface="deck" count={count} triggerVariant="text" />
       <View style={styles.viewChoice}>
         <ViewToggle value={view} onChange={setView} variant="text" />
-        {view === 'grid' ? <GridColumnChoice value={columnChoice} onChange={chooseColumns} /> : null}
+        {view === 'grid' ? <GridColumnChoice value={columns} onChange={chooseColumns} /> : null}
       </View>
     </>
   );

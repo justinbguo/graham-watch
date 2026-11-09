@@ -624,7 +624,6 @@ opens before a tile passes `gridTileMax`.
 | `layout.communityFrameWeb` | 1308 | Community cap: feed column plus that list. |
 | `layout.gridColumns` | 4 | Tile columns on the wide native home grid. |
 | `layout.gridColumnsWeb` | 2 | Fewest tile columns on the desktop web home grid. |
-| `layout.gridColumnsMax` | 6 | Most listings one wide grid row holds. A phone stays at two. |
 | `layout.gridTileMax` | 640 | Widest a desktop web grid tile gets before another column opens. |
 | `layout.desktopColumnShare` | 1 | Desktop web tabs: the tab column is the window. |
 | `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |

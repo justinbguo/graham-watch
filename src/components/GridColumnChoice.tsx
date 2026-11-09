@@ -8,7 +8,7 @@ export function GridColumnChoice({
   value,
   onChange,
 }: {
-  value: GridColumnOption;
+  value: number;
   onChange: (next: GridColumnOption) => void;
 }) {
   const styles = useThemedStyles(choiceStyles);
