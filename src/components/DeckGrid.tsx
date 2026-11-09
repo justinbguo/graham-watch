@@ -18,9 +18,10 @@ import {
   type GridPaging,
   type ListScrollMetrics,
 } from '@/data/deckPaging';
+import { deckGridFrame } from '@/lib/gridColumns';
 import { useIsDesktopWeb } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
-import { space, type, type Theme } from '@/lib/theme';
+import { layout, space, type, type Theme } from '@/lib/theme';
 import { isTypingTarget } from '@/lib/webKeys';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -69,6 +70,7 @@ export function DeckGrid({
     endLabel,
   } = paging;
 
+  const [listWidth, setListWidth] = useState(0);
   const metrics = useRef<ListScrollMetrics>({ contentHeight: 0, viewportHeight: 0, offsetY: 0 });
   // A resize swaps `numColumns`, which remounts the list back at the top.
   // The previous offset would look like the tail and ask for the next page.
@@ -115,11 +117,18 @@ export function DeckGrid({
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
-      metrics.current = { ...metrics.current, viewportHeight: event.nativeEvent.layout.height };
+      const { width, height } = event.nativeEvent.layout;
+      setListWidth((current) => (current === width ? current : width));
+      metrics.current = { ...metrics.current, viewportHeight: height };
       askForNextPage();
     },
     [askForNextPage],
   );
+
+  const placed = isDesktopWeb
+    ? deckGridFrame({ columns, listWidth })
+    : { tileWidth: 0, rowPadLeft: 0, rowPadRight: 0 };
+  const { tileWidth, rowPadLeft, rowPadRight } = placed;
 
   const onContentSizeChange = useCallback(
     (_width: number, height: number) => {
@@ -175,50 +184,73 @@ export function DeckGrid({
 
   return (
     <FlatList
-      key={`deck-grid-${columns}`}
-      style={styles.list}
-      data={cards}
-      keyExtractor={(card) => card.id}
-      numColumns={columns}
-      columnWrapperStyle={columns > 1 ? styles.row : undefined}
-      contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}
-      // iOS calls onEndReached when the tail crosses the threshold. Web often
-      // fires that once, or not at all, and keeps firing onScroll. Both share
-      // isNearListEnd, so a mount-time onEndReached — reported before the list
-      // has a height — cannot walk the catalogue.
-      onScroll={rememberScroll}
-      onScrollEndDrag={rememberScroll}
-      onMomentumScrollEnd={rememberScroll}
-      onEndReached={() => askForNextPage()}
-      onEndReachedThreshold={GRID_END_THRESHOLD}
-      scrollEventThrottle={16}
-      onLayout={onLayout}
-      onContentSizeChange={onContentSizeChange}
-      ListFooterComponent={<GridFooter paging={paging} />}
-      renderItem={({ item, index }) => (
-        <View style={[styles.cell, columns > 1 && { maxWidth: `${100 / columns}%` as const }]}>
-          <ListingTile
-            card={item}
-            photoShape={isDesktopWeb ? 'swipe' : 'square'}
-            selected={Platform.OS === 'web' && index === selectedIndex}
-            onPress={() => {
-              setSelected(index);
-              onOpen(item);
-            }}
-          />
-        </View>
-      )}
-    />
+        key={`deck-grid-${columns}`}
+        style={styles.list}
+        data={cards}
+        keyExtractor={(card) => card.id}
+        numColumns={columns}
+        columnWrapperStyle={
+          columns > 1 ? [styles.row, { paddingLeft: rowPadLeft, paddingRight: rowPadRight }] : undefined
+        }
+        contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}
+        // iOS calls onEndReached when the tail crosses the threshold. Web often
+        // fires that once, or not at all, and keeps firing onScroll. Both share
+        // isNearListEnd, so a mount-time onEndReached — reported before the list
+        // has a height — cannot walk the catalogue.
+        onScroll={rememberScroll}
+        onScrollEndDrag={rememberScroll}
+        onMomentumScrollEnd={rememberScroll}
+        onEndReached={() => askForNextPage()}
+        onEndReachedThreshold={GRID_END_THRESHOLD}
+        scrollEventThrottle={16}
+        onLayout={onLayout}
+        onContentSizeChange={onContentSizeChange}
+        ListFooterComponent={<GridFooter paging={paging} padLeft={rowPadLeft} padRight={rowPadRight} />}
+        renderItem={({ item, index }) => (
+          <View
+            style={
+              tileWidth > 0
+                ? { width: tileWidth, flexGrow: 0, flexShrink: 0, flexBasis: tileWidth }
+                : [
+                    styles.cell,
+                    columns > 1 && {
+                      maxWidth: isDesktopWeb
+                        ? layout.deckGridTileCap
+                        : (`${100 / columns}%` as const),
+                    },
+                  ]
+            }>
+            <ListingTile
+              card={item}
+              photoShape={isDesktopWeb ? 'swipe' : 'square'}
+              selected={Platform.OS === 'web' && index === selectedIndex}
+              onPress={() => {
+                setSelected(index);
+                onOpen(item);
+              }}
+            />
+          </View>
+        )}
+      />
   );
 }
 
-function GridFooter({ paging }: { paging: GridPaging }) {
+function GridFooter({
+  paging,
+  padLeft,
+  padRight,
+}: {
+  paging: GridPaging;
+  padLeft: number;
+  padRight: number;
+}) {
   const styles = useThemedStyles(gridStyles);
   const theme = useTheme();
+  const footer = [styles.footer, { paddingLeft: padLeft, paddingRight: padRight }];
 
   if (paging.isFetchingNextPage) {
     return (
-      <View accessibilityRole="progressbar" accessibilityLabel="Loading more watches" style={styles.footer}>
+      <View accessibilityRole="progressbar" accessibilityLabel="Loading more watches" style={footer}>
         <ActivityIndicator size="small" color={theme.color.textMuted} />
       </View>
     );
@@ -226,7 +258,7 @@ function GridFooter({ paging }: { paging: GridPaging }) {
 
   if (paging.isFetchNextPageError) {
     return (
-      <View style={styles.footer}>
+      <View style={footer}>
         <Message text="Could not load more watches." tone="error" />
         <Button label="Try again" variant="ghost" onPress={paging.onLoadMore} />
       </View>
@@ -235,7 +267,7 @@ function GridFooter({ paging }: { paging: GridPaging }) {
 
   if (!paging.hasNextPage) {
     return (
-      <View style={styles.footer}>
+      <View style={footer}>
         <Text style={styles.end}>{paging.endLabel ?? "That's everything"}</Text>
       </View>
     );

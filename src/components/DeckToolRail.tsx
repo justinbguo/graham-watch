@@ -4,10 +4,13 @@ import { View } from 'react-native';
 import { layout, space, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
-/** Desktop web Buy tools: undo, filters, and the view toggle in one column. */
-export function DeckToolRail({ children }: PropsWithChildren) {
+/** Desktop web tool column. `dealers` is the Buy rail: wide enough for the shop list. */
+export function DeckToolRail({
+  children,
+  width = 'tools',
+}: PropsWithChildren<{ width?: 'tools' | 'dealers' }>) {
   const styles = useThemedStyles(railStyles);
-  return <View style={styles.rail}>{children}</View>;
+  return <View style={[styles.rail, width === 'dealers' && styles.dealers]}>{children}</View>;
 }
 
 /** Top stack inside a tool rail: filters, actions, toggles. */
@@ -26,6 +29,9 @@ const railStyles = (_theme: Theme) => ({
     justifyContent: 'flex-start' as const,
     gap: space.sm,
     paddingRight: space.lg,
+  },
+  dealers: {
+    width: layout.dealerRail,
   },
   tools: {
     alignSelf: 'stretch' as const,

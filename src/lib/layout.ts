@@ -51,7 +51,8 @@ export function desktopColumnWidth(windowWidth: number, insetLeft: number, inset
  * At least `gridColumnsWeb` and at most `gridColumnsMax`.
  */
 export function desktopGridColumns(windowWidth: number, insetLeft: number, insetRight: number) {
-  const rail = layout.deckToolRail + space.lg + space.xs + space.lg;
+  // `dealerRail` already holds the rail's right gap, so only the divider's air is added.
+  const rail = layout.dealerRail + space.xs + space.lg;
   const available = Math.max(0, desktopAvailableWidth(windowWidth, insetLeft, insetRight) - rail);
   const columns = Math.ceil((available + space.sm) / (layout.gridTileMax + space.sm));
   return Math.min(layout.gridColumnsMax, Math.max(layout.gridColumnsWeb, columns));

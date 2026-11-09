@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 
-import { NO_FILTERS, toggleRange, type Filters, type Preset } from './types';
+import { NO_FILTERS, scopeDealer, toggleRange, type Filters, type Preset } from './types';
 
 /**
  * The deck, search, and each shop filter independently. They are different
@@ -22,6 +22,9 @@ export type FilterApi = {
   togglePrice: (preset: Preset) => void;
   replace: (next: Filters) => void;
   clear: () => void;
+  /** Deck only. Other surfaces share the type and do not call these. */
+  showOnlyDealer: (dealerId: string) => void;
+  showAllDealers: () => void;
 };
 
 type CatalogSurface = 'deck' | 'search';
@@ -104,6 +107,8 @@ export function useFilters(surface: Surface, dealerId?: string): FilterApi {
         })),
       replace: (next) => apply(() => next),
       clear: () => apply(() => NO_FILTERS),
+      showOnlyDealer: (dealerId) => apply((current) => scopeDealer(current, dealerId)),
+      showAllDealers: () => apply((current) => scopeDealer(current, null)),
     };
   }, [dealerId, filters, surface, update, updateShop]);
 }

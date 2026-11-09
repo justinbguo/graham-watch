@@ -6,19 +6,23 @@ import { Message } from '@/components/ui';
 import { useDealerDirectory, type DirectoryDealer } from '@/data/dealers';
 import { FollowDealer } from '@/features/dealers/FollowDealer';
 import { dealerPicture } from '@/features/dealers/picture';
-import { useOpenStack } from '@/lib/openStack';
-import { HIT_TARGET, layout, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 /**
- * Every approved shop, under Community's "How deals work" on desktop web.
- * The name opens the shop. Follow is a sibling button: one control inside
- * the other is invalid on the web, and one tap would do both.
+ * Every approved shop, under Filters on the desktop Buy rail.
+ * The name scopes the deck to that shop. Follow is a sibling button: one
+ * control inside the other is invalid on the web, and one tap would do both.
  */
-export function DealerDirectory() {
+export function DealerDirectory({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string | null;
+  onSelect: (dealerId: string) => void;
+}) {
   const theme = useTheme();
   const styles = useThemedStyles(directoryStyles);
-  const open = useOpenStack();
   const { data: dealers = [], isPending, error } = useDealerDirectory();
 
   return (
@@ -35,21 +39,28 @@ export function DealerDirectory() {
           style={styles.list}
           contentContainerStyle={dealers.length === 0 ? styles.empty : undefined}
           ListEmptyComponent={<Message text="No shops yet." />}
-          renderItem={({ item }) => <DealerRow shop={item} onOpen={openShop(open, item)} />}
+          renderItem={({ item }) => (
+            <DealerRow
+              shop={item}
+              selected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+            />
+          )}
         />
       )}
     </View>
   );
 }
 
-function openShop(
-  open: ReturnType<typeof useOpenStack>,
-  shop: DirectoryDealer,
-) {
-  return () => open('dealer/[dealerId]', { dealerId: shop.id }, `/dealer/${shop.id}`);
-}
-
-function DealerRow({ shop, onOpen }: { shop: DirectoryDealer; onOpen: () => void }) {
+function DealerRow({
+  shop,
+  selected,
+  onSelect,
+}: {
+  shop: DirectoryDealer;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const styles = useThemedStyles(directoryStyles);
 
   return (
@@ -57,10 +68,11 @@ function DealerRow({ shop, onOpen }: { shop: DirectoryDealer; onOpen: () => void
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${shop.name}, verified`}
-        onPress={onOpen}
+        accessibilityState={{ selected }}
+        onPress={onSelect}
         style={({ pressed }) => [styles.open, pressed && styles.pressed]}>
         <Avatar url={shop.logo_url} px={size.iconSmall} fit="contain" fallback={dealerPicture} />
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={[styles.name, selected && styles.nameSelected]} numberOfLines={1}>
           {shop.name}
         </Text>
         <VerifiedMark px={size.iconSmall} />
@@ -76,7 +88,9 @@ const directoryStyles = (theme: Theme) => ({
   section: {
     flex: 1,
     minHeight: 0,
-    width: layout.communityRail,
+    alignSelf: 'stretch' as const,
+    // Same inset as the rail's buttons, so names do not sit on the window edge.
+    paddingHorizontal: space.md,
     marginTop: space.sm,
     paddingTop: space.md,
     gap: space.sm,
@@ -117,5 +131,8 @@ const directoryStyles = (theme: Theme) => ({
     ...type.labelStrong,
     color: theme.color.text,
     flexShrink: 1,
+  },
+  nameSelected: {
+    color: theme.color.brass,
   },
 });

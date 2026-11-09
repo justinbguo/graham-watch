@@ -565,31 +565,28 @@ export const layout = {
   /** Seller Hub on web: inventory rows need room; not as wide as the home grid. */
   hub: 960,
   /**
-   * Community feed column on desktop web. The follow list uses `communityRail`;
-   * the centred cap is `communityFrameWeb`, so the list does not take this width.
+   * Community feed column on desktop web. The button rail is `deckToolRail`;
+   * the centred cap is `deckFrameWeb`, so that rail does not take this width.
    */
   community: 960,
   /** Desktop messages: inbox width as a share of the split (thread gets the rest). */
   messagesPaneShare: 0.26,
   /** The glyph column on a wide window: one tab wide, plus air either side. */
   rail: 88,
-  /** Buy screen on desktop web: tools and the keyboard guide stacked at the left. */
+  /** Button-only desktop rail (Community, Deal). Buy is `dealerRail`. */
   deckToolRail: 112,
   /**
-   * Desktop Buy `Screen` cap: `cardWeb` plus the tool rail and the air between
-   * them, so the swipe card keeps `cardWeb` after the rail.
+   * Desktop cap for a `deckToolRail` beside a `cardWeb` column (Community,
+   * Seller Hub, Messages): the rail plus the air between them, so the column
+   * keeps `cardWeb`. Buy is uncapped; its rail is `dealerRail`.
    */
   deckFrameWeb: 960 + 112 + space.lg + space.xs,
   /**
-   * Community follow list on desktop web. A shop name and Follow share the row.
-   * Buy stays on `deckToolRail`.
+   * Whole desktop Buy rail with the dealer list under Filters, including its
+   * right gap. The list itself is 320 (a shop name and Follow share the row),
+   * with `space.md` either side and `space.lg` before the divider.
    */
-  communityRail: 320,
-  /**
-   * Desktop Community cap: the feed column plus the follow list and the air
-   * between them, so the feed keeps `community` after the rail.
-   */
-  communityFrameWeb: 960 + 320 + space.lg + space.xs,
+  dealerRail: 320 + space.md * 2 + space.lg,
   /**
    * Columns on the wide home grid. Photograph above the copy, so a desktop
    * window fills with watches rather than one tall row each.
@@ -601,11 +598,17 @@ export const layout = {
   gridColumnsWeb: 2,
   gridColumnsMax: 6,
   /**
-   * Tile width the automatic desktop column count uses. A saved row pick can
-   * make a tile wider than this.
-   * Target is half of `cardWeb` (480); this ceiling keeps a laptop at two.
+   * Tile width the automatic desktop column count uses. Another column opens
+   * before a tile would pass this, so a laptop stays at two.
+   * The drawn tile stops sooner, at `deckGridTileCap`.
    */
   gridTileMax: 640,
+  /**
+   * Widest a desktop grid photograph is drawn. Half of `cardWeb`. The portrait
+   * frame (`deckGridPhotoAspect`) at a wider tile is a poster, and the name
+   * sits below the fold. A per-row pick does not grow past this.
+   */
+  deckGridTileCap: 480,
   /**
    * Scan and wishlist rows: photograph width as a share of the row, capped at
    * `gridPhoto` so a list row does not become a poster.
@@ -646,6 +649,7 @@ export type LayoutWidth = Exclude<
   | 'gridColumnsWeb'
   | 'gridColumnsMax'
   | 'gridTileMax'
+  | 'deckGridTileCap'
   | 'deckGridPhotoAspect'
   | 'deckHeaderSearchShare'
   | 'desktopColumnShare'
@@ -655,7 +659,7 @@ export type LayoutWidth = Exclude<
   | 'desktopHeaderSearchMax'
   | 'desktopHeaderSearchShare'
   | 'deckToolRail'
-  | 'communityRail'
+  | 'dealerRail'
   | 'messagesPaneShare'
 >;
 
