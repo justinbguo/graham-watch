@@ -1,5 +1,7 @@
 import type { CaseMaterial, Complication, WatchStyle, Winding } from '@/lib/models';
 
+import { canonicalize } from './spec.ts';
+
 /**
  * Size and era are presets rather than sliders. Dragging two handles to "36 to
  * 39mm" is slow on a phone and precision buys nothing there — nobody wants a
@@ -127,6 +129,31 @@ function bands(ranges: Range[]) {
     mins: ranges.map((range) => range.min),
     maxs: ranges.map((range) => range.max),
   };
+}
+
+/**
+ * The shop the deck is showing, when the filter names exactly one.
+ * Zero shops and two shops are both no header. The cards are not consulted.
+ */
+export function soleDealer(filters: Filters): string | null {
+  const dealers = canonicalize(filters).spec.dealers;
+  if (!dealers || dealers.length !== 1) return null;
+  return dealers[0] ?? null;
+}
+
+/**
+ * Set the deck to one shop, or clear that cut.
+ * A repeat that would write the same dealers returns the same object, so the
+ * setter can skip the update.
+ */
+export function scopeDealer(filters: Filters, dealerId: string | null): Filters {
+  if (dealerId === null) {
+    if (filters.dealers.length === 0) return filters;
+    return { ...filters, dealers: [] };
+  }
+  const dealers = canonicalize(filters).spec.dealers;
+  if (dealers?.length === 1 && dealers[0] === dealerId) return filters;
+  return { ...filters, dealers: [dealerId] };
 }
 
 export function toRpcArgs(filters: Filters) {
