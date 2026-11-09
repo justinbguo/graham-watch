@@ -393,16 +393,17 @@ async function handle(msg) {
     await sleep(400);
     return { ok: true, role: msg.role, name: msg.name };
   }
-  if (op === 'type') {
-    const loc = page.getByLabel(new RegExp(msg.name, 'i'))
-      .or(page.getByRole('textbox', { name: new RegExp(msg.name, 'i') }));
-    await loc.first().click({ timeout: 15000 });
-    await page.keyboard.type(String(msg.text), { delay: 20 });
-    return { ok: true, name: msg.name, text: msg.text };
-  }
-  if (op === 'fill') {
-    const loc = page.getByLabel(new RegExp(msg.name, 'i'))
-      .or(page.getByRole('textbox', { name: new RegExp(msg.name, 'i') }));
+  if (op === 'type' || op === 'fill') {
+    const nameRe = new RegExp(msg.name, 'i');
+    // The Buy door is a button with the same name as the search field. getByLabel
+    // hits that hidden button first, and fill cannot type into it.
+    const textbox = page.getByRole('textbox', { name: nameRe });
+    const loc = (await textbox.count()) > 0 ? textbox : page.getByLabel(nameRe);
+    if (op === 'type') {
+      await loc.first().click({ timeout: 15000 });
+      await page.keyboard.type(String(msg.text), { delay: 20 });
+      return { ok: true, name: msg.name, text: msg.text };
+    }
     await loc.first().fill(String(msg.value), { timeout: 15000 });
     return { ok: true, name: msg.name, value: msg.value };
   }

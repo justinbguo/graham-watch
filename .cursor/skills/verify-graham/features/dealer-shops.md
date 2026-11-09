@@ -6,7 +6,7 @@ A shop page is the dealer's name, a follow control, and the watches they have fo
 
 - `shop-page`: route `/dealer/<dealerId>`.
 - `follow`: the button reads `Follow`, then `Following`.
-- `inventory`: each watch opens `/listing/<listingId>`.
+- `inventory`: each watch opens `/listing/<listingId>`. The listing shows `View on dealer site` when that watch has a source URL.
 
 ## How to get to it (user POV)
 

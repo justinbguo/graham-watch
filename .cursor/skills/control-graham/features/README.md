@@ -7,7 +7,7 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 - Start with `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode demo` unless the feature file requires **local**.
 - Run `doctor` and require `looksLikeGraham: true` on the owned URL.
 - Never drive a Metro/browser you did not start with `up`.
-- Default viewport is 1280×900 (desktop web: grid/rail chrome may appear; arrows still pass/save on the card stage when Buy is focused).
+- Default viewport is 1280×900. Demo is signed in, so Buy is usable immediately. Desktop web starts on the grid; arrows pass and save only after card view. The grid rail includes `Listings per row` (`2 listings per row` through `6 listings per row`).
 - Demo fixtures (top of deck order): Omega Speedmaster Professional 1972, Rolex Datejust 1968, Heuer Autavia 1965, Seiko 6139 Pogue 1976, Universal Genève Polerouter 1959, Cartier Tank Must 1988.
 
 ## Driving conventions
