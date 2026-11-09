@@ -6,6 +6,7 @@ import {
   Stack,
   ThemeProvider as NavigationThemeProvider,
 } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
@@ -39,6 +40,11 @@ export { RootErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Web tab title. Expo otherwise uses app.json `name`, which is also the
+          home-screen name on iOS and Android, so it stays "Graham" there. */}
+      <Head>
+        <title>Graham.Watch</title>
+      </Head>
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
