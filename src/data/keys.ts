@@ -52,6 +52,8 @@ export const keys = {
   dropCounts: (userId: string) => ['drop-counts', userId] as const,
   dropFeed: (userId: string) => ['drop-feed', userId] as const,
   dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
+  /** One shop's public identity for the Buy header. No listings. */
+  dealerIdentity: (dealerId: string) => ['dealer-identity', dealerId] as const,
   /** One live watch for emailing an unclaimed shop when the thread names none yet. */
   dealerInquiryListing: (dealerId: string) => ['dealer-inquiry-listing', dealerId] as const,
   dealerPreview: (dealerId: string) => ['dealer-preview', dealerId] as const,

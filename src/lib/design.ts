@@ -582,9 +582,13 @@ export const layout = {
   deckFrameWeb: 960 + 112 + space.lg + space.xs,
   /**
    * Community follow list on desktop web. A shop name and Follow share the row.
-   * Buy stays on `deckToolRail`.
    */
   communityRail: 320,
+  /**
+   * Desktop Buy rail once the shop list sits under the tools. The list is 320,
+   * with `space.md` either side and `space.lg` before the divider.
+   */
+  dealerRail: 320 + space.md * 2 + space.lg,
   /**
    * Desktop Community cap: the feed column plus the follow list and the air
    * between them, so the feed keeps `community` after the rail.
@@ -656,6 +660,7 @@ export type LayoutWidth = Exclude<
   | 'desktopHeaderSearchShare'
   | 'deckToolRail'
   | 'communityRail'
+  | 'dealerRail'
   | 'messagesPaneShare'
 >;
 

@@ -29,6 +29,10 @@ export { DECK_LIMIT, showDeckEmpty };
 
 const PHOTO_BUCKET = 'listing-photos';
 
+/** Shop columns a card and the Buy header both read. One string, three queries. */
+export const DEALER_IDENTITY_COLUMNS =
+  'id, name, website, description, instagram, logo_url' as const;
+
 /** Our copy when we have one, the dealer's own file when a copy failed. */
 export function listingPhotoUrl(photo: Pick<ListingPhoto, 'storage_path' | 'source_url'>): string {
   return photo.storage_path
@@ -55,7 +59,7 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
       .order('position'),
     supabase
       .from('dealers')
-      .select('id, name, website, description, instagram, logo_url')
+      .select(DEALER_IDENTITY_COLUMNS)
       .in('id', [...new Set(listings.map((l) => l.dealer_id))]),
   ]);
 

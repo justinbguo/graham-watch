@@ -201,8 +201,17 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 Buy has no title. On phone and narrow web the header is one row: the search door at
 `layout.deckHeaderSearchShare` (60%) of the width, undo, filters, and the view
 toggle grouped at the trailing edge with `space.xs` between them and
-`space.md` before the cluster. On desktop web search lives in the top nav and undo,
-filters, and the view toggle stack in `layout.deckToolRail` at the left of the deck.
+`space.md` before the cluster. On desktop web search lives in the top nav. Undo,
+filters, and the view toggle stack at the left, and under them the rail lists
+every approved shop: mark, name, the verified check, and Follow. The name is
+`labelStrong`. A selected shop's name is `brass`. The mark and the check are
+`iconSmall`. Follow is the same control as on the shop, at
+`dealerSocial.compactMinHeight` with `caption` type. The list scrolls in the
+rail. The watch column shows that shop's mark, name, description, Follow,
+website, and Instagram, with **All watches** on the name row. The header is
+absent when the deck names zero shops or more than one. The phone has no
+column under Filters, so the list is desktop web only. The rail is
+`layout.dealerRail`.
 The count is the subtitle under that row. Sign-in is the one place the letters
 are `GRAHAM`, drawn by `Wordmark`, at the left of that column. Do not invent a
 crest, heritage date, or seal to imply history the product does not have.
@@ -1748,16 +1757,7 @@ The payment line is not on the feed. An information icon sits beside the plus. I
 you pay the other person directly, and that Graham does not hold the money or the watch.
 Comment on a post before you deal with them. The comments go with a deleted post.
 
-On desktop web that same line is the rail button "How deals work". Under it, a
-list of every approved shop: mark, name, the verified check, and Follow. The
-name is `labelStrong`. The mark and the check are `iconSmall`. Follow is the
-same control as on the shop, at `dealerSocial.compactMinHeight` with `caption`
-type, so the name and the button share the rail. The list
-scrolls in the rail; the feed scrolls on its own. Pending, paused, and revoked
-shops stay off it. The phone keeps the information icon and does not show the
-list: there is no column under that icon, and the first post stays under the
-header. The block is `width="communityFrameWeb"` so the list's `communityRail`
-does not take width from the feed.
+On desktop web the explanation is the rail button "How deals work". The shop list is on Buy, under Filters.
 
 On their own post the author gets three dots at the far end of the byline, holding Edit
 and Delete in `danger`. Two full-width buttons under every post

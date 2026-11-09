@@ -34,11 +34,14 @@ export type DialColor = Enums['dial_color'];
 export type WatchStyle = Enums['watch_style'];
 export type Complication = Enums['complication'];
 
+/** The shop fields a card and the Buy header share. */
+export type DealerIdentity = Pick<
+  Dealer,
+  'id' | 'name' | 'website' | 'description' | 'instagram' | 'logo_url'
+>;
+
 /** A listing plus the photos and dealer a card needs to render. */
 export type DeckCard = Listing & {
   photos: DeckPhoto[];
-  dealer: Pick<
-    Dealer,
-    'id' | 'name' | 'website' | 'description' | 'instagram' | 'logo_url'
-  > | null;
+  dealer: DealerIdentity | null;
 };

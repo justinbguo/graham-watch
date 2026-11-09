@@ -14,6 +14,8 @@ import { useDeckStack } from '@/features/deck/useDeckStack';
 import { useDeckColumns } from '@/features/deck/useGridColumns';
 import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
 import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
+import { DeckDealerHeader } from '@/features/deck/DeckDealerHeader';
+import { DealerDirectory } from '@/features/dealers/DealerDirectory';
 import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
@@ -27,7 +29,7 @@ import { useGuest } from '@/features/auth/GuestProvider';
 import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
 import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
-import { activeCount } from '@/features/filters/types';
+import { activeCount, soleDealer } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { deckStage, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
@@ -85,8 +87,9 @@ export default function Deck() {
   const styles = useThemedStyles(deckStyles);
   const open = useOpenStack();
   const pathname = usePathname();
-  const { filters, clear } = useFilters('deck');
+  const { filters, clear, showOnlyDealer, showAllDealers } = useFilters('deck');
   const count = activeCount(filters);
+  const shownDealer = soleDealer(filters);
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
   const deckOnTop = pathname === '/' || pathname === '/index';
@@ -298,12 +301,23 @@ export default function Deck() {
   const deckTools = isDesktopWeb ? deckToolsDesktop : deckToolsMobile;
 
   const desktopRail = isDesktopWeb ? (
-    <DeckToolRail>
+    <DeckToolRail width="dealers">
       <DeckRailTools>{deckTools}</DeckRailTools>
+      <DealerDirectory selectedId={shownDealer} onSelect={showOnlyDealer} />
     </DeckToolRail>
   ) : null;
-  const frameDesktop = (content: ReactNode) =>
-    desktopRail ? <DeckDesktopFrame rail={desktopRail}>{content}</DeckDesktopFrame> : content;
+  const frameDesktop = (content: ReactNode) => {
+    const column =
+      shownDealer === null ? (
+        content
+      ) : (
+        <View style={styles.watchArea}>
+          <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
+          {content}
+        </View>
+      );
+    return desktopRail ? <DeckDesktopFrame rail={desktopRail}>{column}</DeckDesktopFrame> : column;
+  };
 
   const titleControl = isDesktopWeb ? undefined : (
     <DeckHeader>
@@ -573,6 +587,11 @@ const deckStyles = (_theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.xs,
+  },
+  watchArea: {
+    flex: 1,
+    minHeight: 0,
+    gap: space.md,
   },
   viewChoice: {
     alignSelf: 'stretch' as const,

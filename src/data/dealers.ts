@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { presentDealerIdentity } from '@/features/dealers/identity';
 import { NO_FILTERS } from '@/features/filters/types';
 import { demo, isDemo } from '@/lib/demo';
 import type { Database } from '@/lib/database';
-import type { Dealer, DeckCard, Listing } from '@/lib/models';
+import type { Dealer, DealerIdentity, DeckCard, Listing } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
 
-import { hydrate } from './listings';
+import { DEALER_IDENTITY_COLUMNS, hydrate } from './listings';
 import { keys } from './keys';
 
 export type DealerAccount =
@@ -551,6 +552,32 @@ export function useDealerPreview(dealerId: string | null) {
   });
 }
 
+/**
+ * The shop the Buy header names. Approved only, and no listings: an empty
+ * deck still has a shop to show. A miss and a thrown error are both no row.
+ */
+export function useDealerIdentity(dealerId: string) {
+  return useQuery({
+    queryKey: keys.dealerIdentity(dealerId),
+    enabled: Boolean(dealerId),
+    queryFn: async (): Promise<DealerIdentity | null> => {
+      if (isDemo) {
+        const row = demo.dealer(dealerId);
+        return row ? presentDealerIdentity(row) : null;
+      }
+
+      const { data, error } = await supabase
+        .from('dealers')
+        .select(DEALER_IDENTITY_COLUMNS)
+        .eq('id', dealerId)
+        .eq('permission', 'approved')
+        .maybeSingle();
+      if (error) throw error;
+      return data ? presentDealerIdentity(data) : null;
+    },
+  });
+}
+
 /** The shop a buyer opens: who they are, and every watch they still have for sale. */
 export function useDealerShop(dealerId: string) {
   return useQuery({
@@ -565,7 +592,7 @@ export function useDealerShop(dealerId: string) {
       const [dealer, listings] = await Promise.all([
         supabase
           .from('dealers')
-          .select('id, name, website, description, instagram, logo_url')
+          .select(DEALER_IDENTITY_COLUMNS)
           .eq('id', dealerId)
           .maybeSingle(),
         supabase
