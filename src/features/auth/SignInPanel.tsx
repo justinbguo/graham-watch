@@ -8,9 +8,7 @@ import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
-import { BackendEnvironment } from '@/features/dev/BackendEnvironment';
-import { isDemo } from '@/lib/demo';
-import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
+import { inset, layout, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const DOOR: Record<SignInMode, string> = {
@@ -24,7 +22,7 @@ const SWITCH: Record<SignInMode, string> = {
 };
 
 const TAGLINE =
-  'The best vintage watch dealers and the most passionate collectors.';
+  'The best vintage watch dealers for a very passionate collector.';
 
 /**
  * The doors themselves. Used as a sheet over the deck (guest browsing) and as
@@ -52,9 +50,8 @@ export function SignInPanel({
   const body = (
     <>
       <View style={[styles.copy, modal && styles.copyModal]}>
-        <Wordmark variant={modal ? 'header' : 'signIn'} />
+        <Wordmark variant={modal ? 'headerText' : 'signIn'} />
         <Text style={[styles.tagline, modal && styles.taglineModal]}>{tagline}</Text>
-        {!isDemo ? <BackendEnvironment compact /> : null}
       </View>
 
       <SignInDoors signIn={signIn} modal={modal} />
@@ -114,7 +111,7 @@ function SignInDoors({
               label={`${DOOR[signIn.mode]} Apple`}
               disabled={signIn.busy}
               onPress={signIn.signInWithAppleWeb}
-              mark={<DoorMark name="apple" color={theme.color.onAccent} />}
+              mark={<DoorMark name="apple" color={theme.color.text} />}
             />
           ) : null}
 
@@ -126,17 +123,11 @@ function SignInDoors({
             />
           ) : null}
 
-          <View style={styles.divider}>
-            <View style={styles.rule} />
-            <Text style={styles.dividerLabel}>or</Text>
-            <View style={styles.rule} />
-          </View>
-
           <SignInOption
             label={`${doorPrefix} email`}
             disabled={signIn.busy}
             onPress={signIn.chooseEmail}
-            mark={<DoorMark name="email-outline" color={theme.color.onAccent} />}
+            mark={<DoorMark name="email-outline" color={theme.color.text} />}
           />
         </View>
       ) : null}
@@ -218,7 +209,7 @@ const panelStyles = (theme: Theme) => ({
     paddingHorizontal: inset.screen,
   },
   modalBody: {
-    gap: stack.group,
+    gap: space.lg,
   },
   copy: {
     alignItems: 'flex-start' as const,
@@ -227,6 +218,7 @@ const panelStyles = (theme: Theme) => ({
   copyModal: {
     alignItems: 'center' as const,
     alignSelf: 'stretch' as const,
+    gap: space.sm,
   },
   tagline: {
     ...type.body,
@@ -234,7 +226,9 @@ const panelStyles = (theme: Theme) => ({
     color: theme.color.textMuted,
   },
   taglineModal: {
-    ...type.title,
+    ...type.editorial,
+    alignSelf: 'center' as const,
+    maxWidth: layout.signInLede,
     color: theme.color.text,
     textAlign: 'center' as const,
   },
@@ -243,20 +237,6 @@ const panelStyles = (theme: Theme) => ({
   },
   form: {
     gap: stack.related,
-  },
-  divider: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.md,
-  },
-  rule: {
-    flex: 1,
-    height: 1,
-    backgroundColor: theme.color.border,
-  },
-  dividerLabel: {
-    ...type.caption,
-    color: theme.color.textFaint,
   },
   apple: {
     width: '100%' as const,

@@ -1,14 +1,13 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { radius, size, space, type, type Theme } from '@/lib/theme';
+import { fieldOutline, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
- * A door on sign-in: the same capsule as `Button`. `accent` on the page,
- * `onAccent` for the label and any icon we draw, mark and label centred as
- * one group. Apple's native button stands in the same column and is picked
- * to match.
+ * A door on sign-in. Same capsule as Follow: page fill, a `text` stroke,
+ * label and icon in `text`, mark and label centred as one group. Apple's
+ * native button stands in the same column and stays Apple's own.
  */
 export function SignInOption({
   label,
@@ -42,7 +41,9 @@ const optionStyles = (theme: Theme) => ({
   door: {
     minHeight: size.controlMin,
     borderRadius: radius.full,
-    backgroundColor: theme.color.accent,
+    backgroundColor: theme.color.background,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.text,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     // A capsule clips to its curve. Padding shorter than half the height lets
@@ -60,7 +61,7 @@ const optionStyles = (theme: Theme) => ({
     ...type.labelStrong,
     flexShrink: 1,
     textAlign: 'center' as const,
-    color: theme.color.onAccent,
+    color: theme.color.text,
   },
   pressed: {
     opacity: 0.72,

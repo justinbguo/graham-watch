@@ -546,6 +546,8 @@ export const controlTextNudge = {
 export const layout = {
   /** Prose, forms, lists, detail screens. About 64 characters of `type.body`. */
   reading: 560,
+  /** Sign-in sheet tagline. Narrower than the doors so the sentence breaks into a short column. */
+  signInLede: 320,
   /** Offer-deal sheet: price field, listing quote, and expense rows need a little more than prose. */
   dealSheet: 640,
   /** Wishlist rows: narrow list centred on desktop web. */
