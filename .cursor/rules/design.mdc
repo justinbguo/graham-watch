@@ -142,6 +142,8 @@ nobody follows.
   only the fill differs.
 - A filter row that scrolls sideways. Community's All-and-intents row splits
   its width equally so every choice is on screen.
+- The dealer follow list on Community. On desktop web it sits under Filters
+  on the Buy rail, at `dealerRail`.
 - A ring, outline, or second fill a shade away to show state. Selection is
   `brass`: as a fill with a `background` label, or as the glyph colour. Two
   strokes are allowed. The swipe commit on `SwipeCard` is a gesture in flight,
@@ -151,6 +153,10 @@ nobody follows.
 - A second control in the view switch, or a glyph in it that names the view you
   are already in. `ViewToggle` is one button showing the destination, and the
   turn-and-fade between the two glyphs is what says a press did anything.
+  On the desktop rail the switch is `DeckDisplayButton` instead: the count sits
+  where the other tools' glyph does, the label is Display, and a press steps
+  it by one, wrapping after six. One per row is the card deck, more is the
+  grid. Never a toggle beside a column picker.
 - A view swap that cuts. The deck's two views enter on `FadeIn`, which also
   covers `layout.card` giving way to `layout.grid` on a wide screen. Community's
   modes do the same.
@@ -171,8 +177,10 @@ nobody follows.
   it.
 - More than one watch on a grid row for Search, the home grid (`ListingTile`:
   `layout.gridColumnsPhone` on a phone, and on a wide window
-  `layout.gridColumns` / `gridColumnsWeb` unless the row control picks up to
-  `gridColumnsMax`), and nowhere else. Tiles are a square photograph alone
+  `layout.gridColumns` / `gridColumnsWeb` unless the desktop rail's Display
+  control picks up to `gridColumnsMax`), and nowhere else. On desktop web a tile
+  stops at `layout.deckGridTileCap`, so two per row does not stretch into a poster.
+  Tiles are a square photograph alone
   on the page (`contain`, `radius.md`), name / specs / price+dealer under it —
   no `surface` wrapping the block. The wishlist and a shop use `ListingRow`:
   photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;
@@ -224,6 +232,8 @@ nobody follows.
 - A filled button that is not `accent` with `onAccent` type, centred. That
   pair is the inverse of the page: near-black on a light page, light on a
   dark one. `ghost` is the button with no fill. `solid` is the same pair.
+  **View on dealer site** is the hollow capsule in `docs/DESIGN.md`: no fill,
+  a `text` stroke, `size.follow` tall, `link-variant` at `size.iconSmall`.
 - A redrawn Instagram mark beside a shop's handle. The mark is the white
   glyph in `assets/instagram.png`, tinted to `text`, at `size.icon`. The
   handle is the label, in `body`. The site beside it uses `web` at the same
@@ -274,10 +284,12 @@ nobody follows.
   `paddingTop` on both or on neither — never an inset on only the rail or only
   the main column to "line up" with something inside the neighbor. If the feed
   or grid is flush, the rail is flush too.
-- Desktop Buy caps at `layout.deckFrameWeb`, not `cardWeb`, so the rail does not
-  steal width from the card. The block stays centred in the tab column (`column`
-  `alignSelf: 'center'`). Tab bodies with no title use `columnDesktopFlush`
-  (`space.lg` under the marketplace header).
+- Desktop Buy has the same uncapped page in both views (`width="grid"`,
+  `desktopBleed`), so the tool rail does not move when Display
+  switches views. That rail is `dealerRail`: the dealer list sits under
+  Filters. A button-only rail stays `deckToolRail`. The card stage alone caps
+  at `cardWeb`, centred beside the rail. Tab bodies with no title use
+  `columnDesktopFlush` (`space.lg` under the marketplace header).
 - Pass `inTabs` to `Screen` from a screen inside `(tabs)`, and only from there.
   A bottom tab bar owns the bottom inset; a wide left rail does not.
 - Pass `inSheet` to `Screen` from a route presented as `modal`, and only from

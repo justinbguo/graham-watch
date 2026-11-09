@@ -201,8 +201,21 @@ and a row of capitals in a UI face reads as shouting rather than as a heading.
 Buy has no title. On phone and narrow web the header is one row: the search door at
 `layout.deckHeaderSearchShare` (60%) of the width, undo, filters, and the view
 toggle grouped at the trailing edge with `space.xs` between them and
-`space.md` before the cluster. On desktop web search lives in the top nav and undo,
-filters, and the view toggle stack in `layout.deckToolRail` at the left of the deck.
+`space.md` before the cluster. On desktop web search lives in the top nav. Undo, Display, and
+Filters stack at the left of the deck. Under Filters, that rail lists every
+approved shop: mark, name, the verified check, and Follow. The name is
+`labelStrong`. A selected shop's name is `brass`. The mark and the check are
+`iconSmall`. Follow is the same
+control as on the shop, at `dealerSocial.compactMinHeight` with `caption`
+type, so the name and the button share the row. The list scrolls in the rail;
+the deck scrolls on its own. Pending, paused, and revoked shops stay off it.
+The list has `space.md` either side, the same inset as the rail's buttons, and
+the rail is `layout.dealerRail` so the row still fits. A button-only rail
+(Community, Deal) stays `layout.deckToolRail`. The phone has no column under
+Filters, so the list is desktop web only.
+The watch column shows that shop's mark, name, description, Follow, website,
+and Instagram, with **All watches** on the name row. The header is absent when
+the deck names zero shops or more than one.
 The count is the subtitle under that row. Sign-in is the one place the letters
 are `GRAHAM`, drawn by `Wordmark`, at the left of that column. Do not invent a
 crest, heritage date, or seal to imply history the product does not have.
@@ -519,6 +532,8 @@ A filled button is an `accent` capsule. The label and any icon we draw are
 `onAccent`, and both are centred. On the light page that is a near-black
 button with light type. On the dark page it flips. `ghost` drops the fill;
 its label is `text`, still centred, which is how a second action stays quiet.
+**View on dealer site** is neither: it leaves the app. The wishlist row specifies
+that hollow capsule.
 
 `solid` is the same pair. It used to be the one ink button on a screen of
 `fill` buttons, reserved for `Open in my mail app`. A button that did not
@@ -609,7 +624,8 @@ that room. The answer is almost never "stretch".
 The desktop web page paints edge to edge. Prose, the swipe card, and the
 community feed stay in a centred column with a ceiling, from `layout`. A line
 or a card does not stretch. The buy grid does use the width: another column
-opens before a tile passes `gridTileMax`.
+opens before a tile passes `gridTileMax`. A chosen count that would pass
+`deckGridTileCap` stops the tile there instead of stretching it.
 
 | Token | Width | Job |
 | --- | --- | --- |
@@ -620,23 +636,27 @@ opens before a tile passes `gridTileMax`.
 | `layout.hub` | 960 | Seller Hub on web. |
 | `layout.grid` | 1280 | The browse grid. |
 | `layout.rail` | 88 | The glyph column on a wide window. |
-| `layout.communityRail` | 320 | Community follow list beside the feed on desktop web. |
-| `layout.communityFrameWeb` | 1308 | Community cap: feed column plus that list. |
+| `layout.deckToolRail` | 112 | Button-only desktop rail (Community, Deal). |
+| `layout.dealerRail` | 376 | Desktop Buy rail with the dealer list under Filters: list 320, `space.md` either side, `space.lg` before the divider. |
+| `layout.deckFrameWeb` | 1100 | Cap for a `cardWeb` column beside `deckToolRail` (Community, Deal, Messages). |
 | `layout.gridColumns` | 4 | Tile columns on the wide native home grid. |
 | `layout.gridColumnsWeb` | 2 | Fewest tile columns on the desktop web home grid. |
 | `layout.gridColumnsMax` | 6 | Most listings one wide grid row holds. A phone stays at two. |
 | `layout.gridTileMax` | 640 | Widest a desktop web grid tile gets before another column opens. |
+| `layout.deckGridTileCap` | 480 | Widest a desktop grid tile is drawn. Half of `cardWeb`. |
 | `layout.desktopColumnShare` | 1 | Desktop web tabs: the tab column is the window. |
 | `layout.desktopHeaderSearchMax` | 320 | Marketplace header search door cap. |
-
 On desktop web inside `(tabs)`, `Screen` uses the `desktopColumnShare` column,
 which is the window. `DesktopTabHeader` uses `desktopContentWidth` — the same
 width as a padded tab body such as Seller Hub's section nav (`inset.screen`
-gutters). The swipe deck is the exception: pass `desktopBleed`
-and `width="deckFrameWeb"` so the capped block is wide enough for the tool rail
-plus a full `cardWeb` stage, centred in the window with `space.lg` under the
-header. The buy grid passes `width="grid"` with `desktopBleed` and no ceiling,
-so the wall fills the window.
+gutters). Buy is the exception: both views pass `width="grid"` with
+`desktopBleed`, so the page has no ceiling and the tool rail sits at the
+window's left edge in either view. Switching views does not move the rail.
+The grid wall fills the rest of the window. A row held at `deckGridTileCap`
+is centred in the column beside the rail. A row that reaches the right edge
+keeps `inset.screen` before that edge.
+The card stage is held to `cardWeb` and centred in the column beside the rail,
+with `space.lg` under the header.
 
 A left rail and the column beside it share one top edge. Padding belongs on both
 columns or on neither — not a one-off `paddingTop` on the rail to chase a roll,
@@ -652,7 +672,8 @@ is capped without doing anything. The type inside that column aligns left.
 Pass `width` only to leave the default. Phone-width web
 (`windowWidth` <= `layout.card`) uses `card` and the stacked photograph.
 Web wider than `layout.card` still uses the side-by-side stage, `cardWeb`,
-or `deckFrameWeb` at `WIDE_BREAKPOINT`. Native swipe view uses `card`.
+or `deckFrameWeb` at `WIDE_BREAKPOINT` (desktop web swaps that for the
+uncapped page above). Native swipe view uses `card`.
 Grid view uses `grid`.
 
 A phone is narrower than all three, so these values change nothing on a phone.
@@ -669,7 +690,10 @@ Why each one:
   across. On a wide native window, `layout.gridColumns`, capped at
   `layout.grid`. On desktop web the wall fills the window, and another
   column opens once a tile would pass `layout.gridTileMax`, so a photo
-  does not become a banner.
+  does not become a banner. A drawn tile stops at `layout.deckGridTileCap`.
+  Two across stays that wide, and the name stays on screen. That row is
+  centred in the column beside the rail. A full row keeps `inset.screen`
+  off the right edge.
 
 ### Size comes from measurement, not from the window
 
@@ -929,6 +953,17 @@ screen. On the cards, a swipe is still the decision.
 
 Wide screens open on the grid, phones on cards. Either is reachable at any width.
 
+On desktop web the rail holds one control for both. It matches Rewind and Filter: the count
+sits where their glyph does, and the label is Display. A press steps the count by one and
+wraps to one after `layout.gridColumnsMax`. One is the card deck; two through six are the
+grid at that many columns. A tile never draws wider than `layout.deckGridTileCap`, so two
+per row is not a pair of posters. That shorter row is centred in the column beside
+the rail. A row that reaches the right edge keeps `inset.screen` before it. The view and the column count were two controls, and the
+column list vanished on cards, so the rail changed shape under the pointer. The column
+count is remembered; returning to one is not. Down the rail the order is Rewind, Display,
+then Filter. The phone and wide native header keep the one-button switch, because a phone
+grid is always `layout.gridColumnsPhone` across and there is no count to step.
+
 The switch is one button beside the title, and it shows the destination, not the state: the
 grid glyph while you are on cards, the cards glyph while you are on the grid. Two glyphs
 used to sit there, one lit in brass and one faint — a segmented control drawn without its
@@ -992,7 +1027,10 @@ it. The brand used to be an `eyebrow` over the model, which made every row look 
 section heading.
 
 Wishlist and a dealer's shop still use `ListingRow`. The wide home grid uses
-`ListingTile` instead — same facts, stacked for columns. Search is photographs
+`ListingTile` instead — same facts, stacked for columns. In `ListingTile`,
+the title and specs sit on the left, while the price sits in the top-right
+corner inside an outlined `money` box with `money` font, with the seller row
+directly underneath. Search is photographs
 only. Wishlist used to set a 72px square thumbnail
 beside `bodyStrong` type, which made the same watch a different size depending
 on which tab you were standing in, and made the photograph too small to be
@@ -1031,6 +1069,14 @@ line, the price — opens the message, and so does the dot: the thread if one ex
 one if not. On the wishlist, writing is the next step, and the watch is one
 tap away on its photograph. A sold watch with no thread has nothing to write,
 so its row opens the listing.
+
+**View on dealer site** sits under the price, on the name's left edge, with
+`space.md` between them. It is a hollow capsule at `size.follow`: no fill, a
+`text` stroke, horizontal padding of half that height, and `link-variant` at
+`size.iconSmall` with `space.sm` before the label. On the wishlist it hugs the
+words. On the card and the listing the same capsule stretches with the actions
+around it. A filled accent bar was the loudest thing on the row, and opening
+the dealer is a way out.
 
 The wishlist is two sections with `title` headers in `text`: **Pending**,
 then **Saved**. Pending is a watch you have already written about. Each header sticks while its section is on
@@ -1288,10 +1334,11 @@ It all runs in Reanimated worklets on the UI thread. A magnification driven by R
 re-renders per frame, and it would drop them on the one interaction that exists to be
 looked at closely.
 
-On the deck card the swipe is the only verdict. The card carries no buttons:
-a **Add to wishlist** beside the gesture was a second way to do one thing, and a
-dealer inquiry is a step you take about a watch you have kept, not one still
-being judged.
+On the deck card the swipe is the only verdict. Pass and save stay the gesture:
+a button beside it was a second way to do one thing, and a dealer inquiry is a
+step you take about a watch you have kept. **View on dealer site** is on the
+card, above the shop, in the same place as on the listing. Opening the dealer's
+page is how you check the watch, and the card is where that check happens.
 
 On the detail screen saving is the same act as a button: **Add to wishlist**, with
 `bookmark-outline` at `size.iconSmall` beside the label. **Ask about this watch**
@@ -1590,8 +1637,8 @@ half on the glyph's top-right corner — `space.xs` out on each side, so it over
 a sticker lands rather than floating beside the glyph as a third item in the row — and
 folds it into the spoken label as "Wishlist, 3". Over 99 it reads `99+`.
 
-The pill is `badge` with `onBadge` numerals — red, white count — on New, Wishlist, and Messages
-alike, idle or active. Red is what every phone uses for "something is waiting for you".
+The pill is `badge` with `onBadge` numerals — red, white count — on New, Wishlist, and
+Messages alike, idle or active. Red is what every phone uses for "something is waiting for you".
 It used to be a white disc that inverted to dark on the current tab, because a white
 pill on a white glyph is one shape. Red stands off both glyph tones, so it no longer
 changes with the tab. It is not `danger`, which is muted for type; white on it reads
@@ -1632,8 +1679,8 @@ arrows named the deal and nothing else on the board; the people are who you are 
 Messages moved in, then back out. A conversation with a person starts from their
 profile. One with a shop starts from that shop's watch. The reply arrives later,
 and a header control on this tab and on Wishlist could not show it while you were
-swiping. Search left the bar so Messages could take
-a seat. New is the sixth glyph. The database keeps the old word: the tables are `exchange_*`
+swiping. Search left the bar so Messages could take a seat.
+New is the sixth glyph. The database keeps the old word: the tables are `exchange_*`
 and so are the hooks and the feature folder, because a rename there is a migration, and
 the name a user reads and the name a table has are two different things.
 
@@ -1751,16 +1798,10 @@ The payment line is not on the feed. An information icon sits beside the plus. I
 you pay the other person directly, and that Graham does not hold the money or the watch.
 Comment on a post before you deal with them. The comments go with a deleted post.
 
-On desktop web that same line is the rail button "How deals work". Under it, a
-list of every approved shop: mark, name, the verified check, and Follow. The
-name is `labelStrong`. The mark and the check are `iconSmall`. Follow is the
-same control as on the shop, at `dealerSocial.compactMinHeight` with `caption`
-type, so the name and the button share the rail. The list
-scrolls in the rail; the feed scrolls on its own. Pending, paused, and revoked
-shops stay off it. The phone keeps the information icon and does not show the
-list: there is no column under that icon, and the first post stays under the
-header. The block is `width="communityFrameWeb"` so the list's `communityRail`
-does not take width from the feed.
+On desktop web that same line is the rail button "How deals work". The phone
+keeps the information icon. The dealer list is not on this rail; it sits under
+Filters on Buy. The block is `width="deckFrameWeb"` so the button rail does
+not take width from the feed.
 
 On their own post the author gets three dots at the far end of the byline, holding Edit
 and Delete in `danger`. Two full-width buttons under every post
