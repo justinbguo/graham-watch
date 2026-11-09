@@ -158,7 +158,8 @@ function; the operator scripts are HTTP clients, not a second implementation.
    what it read, imports, and approves.
 2. **Claimed dealer** — the same refresh from inside the app, against their own shop.
 3. **Nightly refresh** — `npm run refresh` / GitHub Actions syncs every approved shop
-   and auto-publishes new and changed watches (`scheduled-refresh`).
+   and auto-publishes new and changed watches (`scheduled-refresh`). A full run that
+   succeeds then seals a catalogue batch for the New tab (`seal_catalogue_batch`).
 
 The pipeline:
 
@@ -275,6 +276,10 @@ conversation_deals
 dealer_claim_codes
                 id, dealer_id, requested_by, email, code_hash, salt, attempts,
                 created_at, expires_at, consumed_at
+catalogue_batches
+                id, sealed_at, listing_count
+catalogue_batch_listings
+                listing_id, batch_id
 ```
 
 `dealers.permission`: `pending | approved | revoked`. `listings.status`:
@@ -292,19 +297,22 @@ inquiries are private to their owner, and a shop reads the inquiries for its own
 listings once claimed. A conversation and its messages are readable by its sides:
 the opener, the other person, every member of a group, and — for a thread with a shop —
 whoever has claimed that shop right now. `import_jobs` is readable by its owner and writable only by the
-service role. `dealer_claim_codes` has RLS on and no policies at all. Nobody can approve
-a dealer through the app.
+service role. `dealer_claim_codes` has RLS on and no policies at all. The two catalogue batch
+tables are the same, and every grant on them is revoked: the app reads the latest
+batch only through `latest_catalogue_batch`. Nobody can approve a dealer through the app.
 
 Every policy has a test in `npm run test:rls` proving the owner can and a stranger
 cannot. An untested policy is an unproven one.
 
 ## 11. Client
 
-Expo SDK 57, React Native, TypeScript, Expo Router. Five tabs: Buy, Community, Messages,
-Wishlist, Profile. Search stays inside the tabs and opens from the bar under the deck's
-count. Above 900px wide the deck opens as a browsable grid; see [DESIGN.md](DESIGN.md).
-On iOS, signed-out users see sign-in before the deck. On the web, guests
-browse Buy, and the other tabs ask them to sign in. Session lives in
+Expo SDK 57, React Native, TypeScript, Expo Router. Six tabs: Buy, New, Community,
+Messages, Wishlist, Profile. New lists the latest sealed catalogue batch, the watches
+the last full nightly refresh put on the deck, and its red count is that batch's size.
+Drops from followed shops still arrive through Messages. Search stays inside the tabs
+and opens from the bar under the deck's count. Above 900px wide the deck opens as a
+browsable grid; see [DESIGN.md](DESIGN.md). On iOS, signed-out users see sign-in before
+the deck. On the web, guests browse Buy and New, and the other tabs ask them to sign in. Session lives in
 `expo-secure-store` and refreshes on
 foreground. Server state is TanStack Query, keyed through `src/data/keys.ts`. Supabase
 types are generated from the schema, never hand-written.

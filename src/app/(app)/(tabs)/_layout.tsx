@@ -4,6 +4,7 @@ import { Tabs } from 'expo-router';
 import { BuyTabIcon } from '@/components/BuyTabIcon';
 import { TabBar } from '@/components/TabBar';
 import { useUnseenDropCount } from '@/data/drops';
+import { useNewCount } from '@/data/newListings';
 import { useUnreadCount } from '@/features/messages/count';
 import { useClaimedDealerShop } from '@/features/seller-hub/claimedShop';
 import { ProfileTabIcon } from '@/features/profile/ProfileTabIcon';
@@ -22,6 +23,7 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
  * Buy is the commissioned watch, one outline tinted to the bar.
  */
 const ICONS: Record<string, IconName> = {
+  new: 'creation-outline',
   community: 'account-multiple-outline',
   // `message-outline` is a box with a tail. `chat-outline` is the same bubble
   // drawn round, which sits with the other round marks in this bar.
@@ -32,6 +34,7 @@ export default function TabsLayout() {
   const isDesktopWeb = useIsDesktopWeb();
   const isWide = useIsWide();
   const saved = useSavedCount();
+  const fresh = useNewCount();
   const unread = useUnreadCount();
   const drops = useUnseenDropCount();
   // The bar has one count per tab. Threads waiting and unseen drops are both
@@ -63,6 +66,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => <BuyTabIcon color={color} focused={focused} />,
         }}
       />
+      <Tabs.Screen name="new" options={{ title: 'New', tabBarBadge: fresh || undefined }} />
       <Tabs.Screen name="community" options={{ title: 'Community' }} />
       <Tabs.Screen
         name="messages"

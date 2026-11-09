@@ -1554,7 +1554,7 @@ exists while a thumb is down and is gone when the thumb lifts.
 
 ## The tab bar is a glass dock
 
-`TabBar` draws the five tabs; the navigator only says which routes exist, what each is
+`TabBar` draws the six tabs; the navigator only says which routes exist, what each is
 called, what count it carries, and which edge the bar sits on. Its own bar packs a glyph
 and a word into a fixed 49pt strip and exposes nothing else. A bar this permanent should
 not be a pile of overrides.
@@ -1590,14 +1590,17 @@ half on the glyph's top-right corner — `space.xs` out on each side, so it over
 a sticker lands rather than floating beside the glyph as a third item in the row — and
 folds it into the spoken label as "Wishlist, 3". Over 99 it reads `99+`.
 
-The pill is `badge` with `onBadge` numerals — red, white count — on Wishlist and Messages
+The pill is `badge` with `onBadge` numerals — red, white count — on New, Wishlist, and Messages
 alike, idle or active. Red is what every phone uses for "something is waiting for you".
 It used to be a white disc that inverted to dark on the current tab, because a white
 pill on a white glyph is one shape. Red stands off both glyph tones, so it no longer
 changes with the tab. It is not `danger`, which is muted for type; white on it reads
 grey. The bar never runs
 a query to find a number out: the wishlist count comes from the same cached list the wishlist
-screen renders, through `useSavedCount`, so the two cannot disagree.
+screen renders, through `useSavedCount`, so the two cannot disagree. New's count is the
+size of the latest sealed catalogue batch, read once through `useNewCount`, and the New
+screen lists that same batch. Opening New does not clear it; the next full refresh
+replaces it.
 
 **A press gives**: the glyph scales to 0.92 in 90ms and comes back. On a phone the tap
 also fires `Haptics.selectionAsync`, so the bar answers before the screen does.
@@ -1620,7 +1623,7 @@ break on the next upgrade.
 
 ## Community
 
-The second tab, between Buy and Messages. Two people (`account-multiple-outline`).
+The third tab, between New and Messages. Two people (`account-multiple-outline`).
 A public board: a person posts a watch they are selling, buying, or trading, and anyone
 signed in can comment. The comment is the public record that they are in the deal.
 
@@ -1630,7 +1633,7 @@ Messages moved in, then back out. A conversation with a person starts from their
 profile. One with a shop starts from that shop's watch. The reply arrives later,
 and a header control on this tab and on Wishlist could not show it while you were
 swiping. Search left the bar so Messages could take
-a seat without a sixth glyph. The database keeps the old word: the tables are `exchange_*`
+a seat. New is the sixth glyph. The database keeps the old word: the tables are `exchange_*`
 and so are the hooks and the feature folder, because a rename there is a migration, and
 the name a user reads and the name a table has are two different things.
 
