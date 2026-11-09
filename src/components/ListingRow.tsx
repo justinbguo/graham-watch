@@ -177,7 +177,9 @@ export function ListingRow({
           </Pressable>
         ) : null}
         {onMessage && listingSourceUrl(card.source_url) ? (
-          <DealerSiteButton url={card.source_url} />
+          <View style={styles.dealerSite}>
+            <DealerSiteButton url={card.source_url} />
+          </View>
         ) : null}
       </View>
 
@@ -289,6 +291,14 @@ const rowStyles = (theme: Theme) => ({
   messageMark: {
     width: size.dealerSocialMark,
     height: size.dealerSocialMark,
+  },
+  // On the name's left edge, clear of the price line. The button hugs its label.
+  dealerSite: {
+    alignSelf: 'flex-start' as const,
+    maxWidth: '100%' as const,
+    marginTop: space.md,
+    marginLeft: space.md,
+    marginRight: space.sm,
   },
   pressed: {
     opacity: 0.72,

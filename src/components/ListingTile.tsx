@@ -17,7 +17,7 @@ import { dealerPicture } from '@/features/dealers/picture';
 import { formatPrice, formatSpecs, formatTitle } from '@/lib/format';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
 import { photoScrollPage } from '@/lib/photoPager';
-import { layout, radius, size, space, type, type Theme } from '@/lib/theme';
+import { fieldOutline, layout, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -40,6 +40,7 @@ export function ListingTile({
   photoShape?: 'square' | 'swipe';
 }) {
   const styles = useThemedStyles(tileStyles);
+  const specs = formatSpecs(card);
 
   return (
     <View style={styles.tile}>
@@ -56,16 +57,22 @@ export function ListingTile({
         accessibilityLabel={formatTitle(card)}
         onPress={onPress}
         style={({ pressed }) => [styles.copy, pressed && styles.pressed]}>
-        <Text style={styles.title} numberOfLines={2}>
-          {formatTitle(card)}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {formatSpecs(card)}
-        </Text>
-        <View style={styles.priceRow}>
-          <Text style={card.sold_at ? styles.sold : styles.price} numberOfLines={1}>
-            {card.sold_at ? 'Sold' : formatPrice(card)}
+        <View style={styles.infoCol}>
+          <Text style={styles.title} numberOfLines={2}>
+            {formatTitle(card)}
           </Text>
+          {specs ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              {specs}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.sideCol}>
+          <View style={card.sold_at ? styles.soldBadge : styles.priceBadge}>
+            <Text style={card.sold_at ? styles.sold : styles.price} numberOfLines={1}>
+              {card.sold_at ? 'Sold' : formatPrice(card)}
+            </Text>
+          </View>
           {card.dealer ? (
             <View style={styles.dealerRow}>
               <Avatar
@@ -278,7 +285,21 @@ const tileStyles = (theme: Theme) => ({
   },
   copy: {
     paddingTop: space.sm,
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'flex-start' as const,
+    gap: space.sm,
+  },
+  infoCol: {
+    flex: 1,
+    minWidth: 0,
     gap: space.xs,
+  },
+  sideCol: {
+    alignItems: 'flex-end' as const,
+    gap: space.xs,
+    maxWidth: '50%' as const,
+    flexShrink: 0,
   },
   title: {
     ...type.labelStrong,
@@ -288,17 +309,25 @@ const tileStyles = (theme: Theme) => ({
     ...type.caption,
     color: theme.color.textMuted,
   },
-  priceRow: {
-    flexDirection: 'row' as const,
-    flexWrap: 'nowrap' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
-    paddingTop: space.xs,
-    width: '100%' as const,
+  priceBadge: {
+    borderWidth: fieldOutline,
+    borderColor: theme.color.money,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.xs,
+    paddingVertical: space.xs / 2,
+    alignSelf: 'flex-end' as const,
+  },
+  soldBadge: {
+    borderWidth: fieldOutline,
+    borderColor: theme.color.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.xs,
+    paddingVertical: space.xs / 2,
+    alignSelf: 'flex-end' as const,
   },
   price: {
     ...type.priceSmall,
-    color: theme.color.text,
+    color: theme.color.money,
     flexShrink: 0,
   },
   sold: {
@@ -307,12 +336,11 @@ const tileStyles = (theme: Theme) => ({
     flexShrink: 0,
   },
   dealerRow: {
-    flex: 1,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'flex-end' as const,
     gap: space.xs,
-    minWidth: 0,
+    maxWidth: '100%' as const,
   },
   dealer: {
     ...type.control,

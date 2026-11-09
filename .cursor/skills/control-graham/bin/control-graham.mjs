@@ -20,6 +20,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -302,7 +303,9 @@ async function cmdUp(args) {
     await sleep(500);
   }
 
-  const socketPath = join(runDir, 'keeper.sock');
+  // macOS sun_path is 104 bytes. The run directory already exceeds that, so a
+  // socket there is truncated on bind and the client cannot find it.
+  const socketPath = join(tmpdir(), `graham-keeper-${port}.sock`);
   const headed = Boolean(args.headed);
   const executablePath = chromePath();
   const keeperPath = join(runDir, 'keeper.mjs');

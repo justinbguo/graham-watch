@@ -2,10 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Platform, Pressable, Text } from 'react-native';
 
-import { Button } from '@/components/ui';
-import { dealerSocialButtonStyles, dealerSocialHitSlop } from '@/features/dealers/socialButton';
+import { dealerSocialHitSlop } from '@/features/dealers/socialButton';
 import { listingSourceUrl } from '@/lib/listingSource';
-import { size, type Theme } from '@/lib/theme';
+import { controlText, fieldOutline, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export function openListingSource(url: string): void {
@@ -21,42 +20,61 @@ export function DealerSiteButton({
   grouped = false,
 }: {
   url: string | null | undefined;
-  /** Full width under Pass and Add to wishlist, in their chrome. */
+  /** Full width under Pass and Add to wishlist. Same capsule, stretched. */
   grouped?: boolean;
 }) {
   const href = listingSourceUrl(url);
   const theme = useTheme();
-  const styles = useThemedStyles(groupedStyles);
+  const styles = useThemedStyles(buttonStyles);
   if (!href) return null;
-  if (!grouped) {
-    return (
-      <Button label="View on dealer site" variant="solid" onPress={() => openListingSource(href)} />
-    );
-  }
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole="link"
       accessibilityLabel="View on dealer site"
-      hitSlop={dealerSocialHitSlop()}
+      hitSlop={dealerSocialHitSlop(size.follow)}
       onPress={() => openListingSource(href)}
-      style={({ pressed }) => [styles.button, styles.stretch, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.link, grouped && styles.stretch, pressed && styles.pressed]}>
       <MaterialCommunityIcons
-        name="open-in-new"
-        size={size.dealerSocialMark}
+        name="link-variant"
+        size={size.iconSmall}
         color={theme.color.text}
         accessible={false}
       />
-      <Text style={styles.label} numberOfLines={1}>
+      <Text style={styles.linkLabel} numberOfLines={1}>
         View on dealer site
       </Text>
     </Pressable>
   );
 }
 
-const groupedStyles = (theme: Theme) => ({
-  ...dealerSocialButtonStyles(theme),
+const buttonStyles = (theme: Theme) => ({
   stretch: {
     alignSelf: 'stretch' as const,
     width: '100%' as const,
+  },
+  // Stroke and no fill: this leaves the app, so it stays quieter than a verdict.
+  // Horizontal padding is half the height, or the capsule curve covers the label.
+  link: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    alignSelf: 'flex-start' as const,
+    justifyContent: 'center' as const,
+    gap: space.sm,
+    height: size.follow,
+    paddingHorizontal: size.follow / 2,
+    maxWidth: '100%' as const,
+    borderRadius: radius.full,
+    borderWidth: fieldOutline,
+    borderColor: theme.color.text,
+    backgroundColor: 'transparent' as const,
+  },
+  linkLabel: {
+    ...controlText.label,
+    flexShrink: 1,
+    minWidth: 0,
+    color: theme.color.text,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

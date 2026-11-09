@@ -32,6 +32,9 @@
     "scripts/fixture-import.test.ts",
     // node --experimental-strip-types runs it. tsc would follow the .ts import
     // into supabase/functions, which this project excludes.
-    "scripts/nonwatch-dry-run.ts"
+    "scripts/nonwatch-dry-run.ts",
+    // Node's test runner. This tsconfig has no node types, so `node:test`
+    // does not resolve here. Run the file with node --experimental-strip-types.
+    "src/features/filters/deckDealerScope.test.ts"
   ]
 }

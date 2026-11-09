@@ -26,7 +26,9 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
+import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { ListingDetails } from '@/features/listings/ListingDetails';
+import { listingSourceUrl } from '@/lib/listingSource';
 import { impact, tick } from '@/lib/haptics';
 import { deckStage } from '@/lib/layout';
 import { setPhotoLaunchRect } from '@/lib/photoLaunch';
@@ -617,6 +619,9 @@ export const SwipeCard = memo(forwardRef<
   //
   // Clear at centre, so the colour swapping as the card crosses zero is never
   // seen.
+  const sourceUrl = listingSourceUrl(card.source_url);
+  const dealerSite = sourceUrl ? <DealerSiteButton url={sourceUrl} grouped /> : null;
+
   const ringStyle = useAnimatedStyle(() => {
     const commit = cardWidth.value * COMMIT_FRACTION;
     return {
@@ -683,7 +688,7 @@ export const SwipeCard = memo(forwardRef<
               }}
               contentContainerStyle={styles.webDetailContent}>
               <View style={styles.body}>
-                <ListingDetails card={card} />
+                <ListingDetails card={card} actions={dealerSite} />
               </View>
             </Animated.ScrollView>
           </View>
@@ -728,9 +733,9 @@ export const SwipeCard = memo(forwardRef<
               </View>
 
               <View style={styles.body}>
-                {/* No buttons on the card. The swipe is the verdict, and the
-                    inquiry waits on the listing route a saved watch opens. */}
-                <ListingDetails card={card} />
+                {/* Pass and save stay the swipe. Opening the dealer's page is
+                    how you check the watch, so that button is on the card. */}
+                <ListingDetails card={card} actions={dealerSite} />
               </View>
             </Animated.ScrollView>
           </>

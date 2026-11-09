@@ -14,8 +14,6 @@ import { inset, motion, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
-import { DealerDirectory } from '@/features/dealers/DealerDirectory';
-
 import { Collector } from './Collector';
 import { Composer } from './Composer';
 import { Feed } from './Feed';
@@ -166,7 +164,6 @@ export function CommunityScreen() {
           accessibilityLabel="How a deal works"
         />
       </DeckRailTools>
-      <DealerDirectory />
     </DeckToolRail>
   );
 
@@ -185,7 +182,7 @@ export function CommunityScreen() {
     <Screen
       title="Community"
       inTabs
-      width={isDesktopWeb ? 'communityFrameWeb' : 'reading'}
+      width={isDesktopWeb ? 'deckFrameWeb' : 'reading'}
       desktopBleed={isDesktopWeb}
       subhead={
         isDesktopWeb ? undefined : <IntentFilter value={filter} onChange={setFilter} />

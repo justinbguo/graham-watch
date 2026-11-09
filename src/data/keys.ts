@@ -46,7 +46,7 @@ export const keys = {
   dealerCatalog: (dealerId: string) => ['dealer-catalog', dealerId] as const,
   dealerReputation: (dealerId: string) => ['dealer-reputation', dealerId] as const,
   follows: (userId: string) => ['follows', userId] as const,
-  /** Every approved shop, for the community follow list. Not per user. */
+  /** Every approved shop, for the Buy rail under Filters. Not per user. */
   dealerDirectory: ['dealer-directory'] as const,
   /** Unseen new watches per followed shop. */
   dropCounts: (userId: string) => ['drop-counts', userId] as const,
@@ -60,7 +60,7 @@ export const keys = {
   newPage: (batchId: string, listingIds: readonly string[]) =>
     ['new-page', batchId, listingIds] as const,
   dealerShop: (dealerId: string) => ['dealer-shop', dealerId] as const,
-  /** One shop's public identity for the Buy header. No listings. */
+  /** One approved shop's name, mark, and links. No listings. */
   dealerIdentity: (dealerId: string) => ['dealer-identity', dealerId] as const,
   /** One live watch for emailing an unclaimed shop when the thread names none yet. */
   dealerInquiryListing: (dealerId: string) => ['dealer-inquiry-listing', dealerId] as const,

@@ -1,3 +1,5 @@
+import { Asset } from 'expo-asset';
+
 import type { Database } from '@/lib/database';
 
 import type { ExchangeAuthor, ExchangeComment, ExchangePost, ExchangeThread } from './exchange';
@@ -9,8 +11,14 @@ export function isExchangeShowcasePost(id: string) {
   return id.startsWith(SHOWCASE_POST_PREFIX);
 }
 
-const photo = (seed: string) =>
-  `https://picsum.photos/seed/${encodeURIComponent(seed)}/1200/800`;
+// Bundled, not remote: the showcase photos are the real watches the sample posts describe.
+// Asset.fromModule turns a require()'d image into a URI the Image component can load.
+const SPEEDMASTER_PHOTO = Asset.fromModule(
+  require('../../assets/showcase/omega-speedmaster.png')
+).uri;
+const EXPLORER_PHOTO = Asset.fromModule(
+  require('../../assets/showcase/rolex-explorer-ii-polar.jpg')
+).uri;
 
 const authors = {
   sell: {
@@ -111,9 +119,9 @@ function feedPost(row: PostRow): ExchangePost {
   const author = authorFor(row);
   const cover =
     row.intent === 'sell'
-      ? photo('showcase-speedmaster')
+      ? SPEEDMASTER_PHOTO
       : row.intent === 'trade'
-        ? photo('showcase-explorer')
+        ? EXPLORER_PHOTO
         : null;
   return {
     id: row.id,

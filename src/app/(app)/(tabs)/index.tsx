@@ -4,7 +4,7 @@ import { usePathname } from 'expo-router';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { DeckGrid } from '@/components/DeckGrid';
-import { GridColumnChoice } from '@/components/GridColumnChoice';
+import { DeckDisplayButton } from '@/components/DeckDisplayButton';
 import { DeckRailButton } from '@/components/DeckRailButton';
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
@@ -14,6 +14,8 @@ import { useDeckStack } from '@/features/deck/useDeckStack';
 import { useDeckColumns } from '@/features/deck/useGridColumns';
 import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
 import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
+import { DeckDealerHeader } from '@/features/deck/DeckDealerHeader';
+import { DealerDirectory } from '@/features/dealers/DealerDirectory';
 import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
@@ -27,8 +29,9 @@ import { useGuest } from '@/features/auth/GuestProvider';
 import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
 import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
-import { activeCount } from '@/features/filters/types';
+import { activeCount, soleDealer } from '@/features/filters/types';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
+import { isGridColumnOption } from '@/lib/gridColumns';
 import { deckStage, useIsDesktopWeb, useIsWide } from '@/lib/layout';
 import { useOpenStack } from '@/lib/openStack';
 import { setSearchLaunchRect } from '@/lib/searchLaunch';
@@ -85,7 +88,8 @@ export default function Deck() {
   const styles = useThemedStyles(deckStyles);
   const open = useOpenStack();
   const pathname = usePathname();
-  const { filters, clear } = useFilters('deck');
+  const { filters, clear, showOnlyDealer, showAllDealers } = useFilters('deck');
+  const shownDealer = soleDealer(filters);
   const count = activeCount(filters);
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
@@ -232,6 +236,18 @@ export default function Deck() {
     setView((current) => (current === 'cards' ? 'grid' : 'cards'));
   }, []);
 
+  const chooseDensity = useCallback(
+    (next: number) => {
+      if (!isGridColumnOption(next)) {
+        setView('cards');
+        return;
+      }
+      chooseColumns(next);
+      setView('grid');
+    },
+    [chooseColumns],
+  );
+
   const loadMore = useCallback(() => {
     void fetchNextPage();
   }, [fetchNextPage]);
@@ -287,23 +303,31 @@ export default function Deck() {
         disabled={!undo}
         accessibilityLabel="Undo, bring back the watch you passed on"
       />
+      <DeckDisplayButton value={view === 'cards' ? 1 : columnChoice} onChange={chooseDensity} />
       <FilterMenu surface="deck" count={count} triggerVariant="text" />
-      <View style={styles.viewChoice}>
-        <ViewToggle value={view} onChange={setView} variant="text" />
-        {view === 'grid' ? <GridColumnChoice value={columnChoice} onChange={chooseColumns} /> : null}
-      </View>
     </>
   );
 
   const deckTools = isDesktopWeb ? deckToolsDesktop : deckToolsMobile;
 
   const desktopRail = isDesktopWeb ? (
-    <DeckToolRail>
+    <DeckToolRail width="dealers">
       <DeckRailTools>{deckTools}</DeckRailTools>
+      <DealerDirectory selectedId={shownDealer} onSelect={showOnlyDealer} />
     </DeckToolRail>
   ) : null;
-  const frameDesktop = (content: ReactNode) =>
-    desktopRail ? <DeckDesktopFrame rail={desktopRail}>{content}</DeckDesktopFrame> : content;
+  const frameDesktop = (content: ReactNode) => {
+    const column =
+      shownDealer === null ? (
+        content
+      ) : (
+        <View style={styles.watchArea}>
+          <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
+          {content}
+        </View>
+      );
+    return desktopRail ? <DeckDesktopFrame rail={desktopRail}>{column}</DeckDesktopFrame> : column;
+  };
 
   const titleControl = isDesktopWeb ? undefined : (
     <DeckHeader>
@@ -431,10 +455,10 @@ export default function Deck() {
       titleControl={titleControl}
       desktopBleed
       subhead={isDesktopWeb ? undefined : roll}
-      width={deckStage(Platform.OS, windowWidth).width}
+      width={isDesktopWeb ? 'grid' : deckStage(Platform.OS, windowWidth).width}
       inTabs>
       {frameDesktop(
-        <View style={styles.desktopDeck}>
+        <View style={[styles.desktopDeck, isDesktopWeb && styles.desktopDeckCapped]}>
           {isDesktopWeb ? roll : null}
           {/* The two views trade places rather than cutting. Entering only: the
               old view is gone the frame the state changes, so there is nothing to
@@ -574,9 +598,10 @@ const deckStyles = (_theme: Theme) => ({
     alignItems: 'center' as const,
     gap: space.xs,
   },
-  viewChoice: {
-    alignSelf: 'stretch' as const,
-    gap: space.xs,
+  watchArea: {
+    flex: 1,
+    minHeight: 0,
+    gap: space.md,
   },
   view: {
     flex: 1,
@@ -588,6 +613,13 @@ const deckStyles = (_theme: Theme) => ({
   desktopDeck: {
     flex: 1,
     minHeight: 0,
+  },
+  // The page stays as wide as the grid's so the rail does not move between
+  // views; only the card stage is held to its hand-sized width.
+  desktopDeckCapped: {
+    width: '100%' as const,
+    maxWidth: layout.cardWeb,
+    alignSelf: 'center' as const,
   },
   roll: {
     paddingHorizontal: inset.screen,
@@ -611,8 +643,10 @@ const deckStyles = (_theme: Theme) => ({
     position: 'relative' as const,
     paddingBottom: layout.deckTallyBand,
   },
+  // Same band as mobile: the tally line is absolute at the bottom, and a
+  // smaller pad lets the card's lower edge sit on the text.
   deckDesktop: {
-    paddingBottom: space.md,
+    paddingBottom: layout.deckTallyBand,
   },
   stage: {
     flex: 1,

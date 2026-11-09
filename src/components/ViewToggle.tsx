@@ -1,8 +1,7 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { GlyphTurn } from '@/components/GlyphTurn';
-import { HIT_TARGET, size, space, type, type Theme } from '@/lib/theme';
+import { HIT_TARGET, size } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 export type DeckView = 'cards' | 'grid';
@@ -16,32 +15,13 @@ export type DeckView = 'cards' | 'grid';
 export function ViewToggle({
   value,
   onChange,
-  variant = 'icon',
 }: {
   value: DeckView;
   onChange: (next: DeckView) => void;
-  variant?: 'icon' | 'text';
 }) {
   const styles = useThemedStyles(toggleStyles);
   const theme = useTheme();
   const showsGrid = value === 'cards';
-  const destination = showsGrid ? 'Grid View' : 'Card View';
-
-  if (variant === 'text') {
-    const icon = showsGrid ? 'view-grid-outline' : 'cards-outline';
-    return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={showsGrid ? 'Switch to grid view' : 'Switch to card view'}
-        onPress={() => onChange(showsGrid ? 'grid' : 'cards')}
-        style={styles.textButton}>
-        <View style={styles.textRow}>
-          <MaterialCommunityIcons name={icon} size={size.icon} color={theme.color.text} />
-          <Text style={styles.textLabel}>{destination}</Text>
-        </View>
-      </Pressable>
-    );
-  }
 
   return (
     <Pressable
@@ -60,26 +40,11 @@ export function ViewToggle({
   );
 }
 
-const toggleStyles = (theme: Theme) => ({
+const toggleStyles = () => ({
   button: {
     width: HIT_TARGET,
     height: HIT_TARGET,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-  },
-  textButton: {
-    alignSelf: 'flex-start' as const,
-    minHeight: size.desktopNavPill,
-    paddingHorizontal: space.md,
-    justifyContent: 'center' as const,
-  },
-  textRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.sm,
-  },
-  textLabel: {
-    ...type.labelStrong,
-    color: theme.color.text,
   },
 });
