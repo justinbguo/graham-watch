@@ -215,9 +215,9 @@ holds a title or that screen's own control, a count, and controls.
 On web, sign-in is a sheet over the deck. Guests land on Buy with the sheet
 already open, once per page load; there is no **Log in** control in the
 header. After `GUEST_SWIPE_BUDGET` judgments the sheet opens again with copy
-that says why. The sheet is the wordmark, one
-`body`/`textMuted` sentence under it, and the doors — Apple, Google, email —
-with **Not now** to dismiss. On iOS, that same panel is the first screen, and
+that says why. The sheet is the wordmark alone (no mark beside it), one
+`editorial` sentence in `text` under it, narrowed to `layout.signInLede`, and
+the doors — Apple, Google, email — with **Not now** to dismiss. On iOS, that same panel is the first screen, and
 it does not dismiss: the header has no room for a **Log in** control beside
 undo, filters, and the view toggle. There is no second headline, no decorative
 watch beside the word, and no card around the doors.
@@ -327,13 +327,13 @@ One scheme, keyed off the system, and the status bar follows it like every
 other screen.
 
 The screen is the wordmark, the sentence under it, the watch beside that
-pair, and a column of doors: Apple, Google, a rule with `or` on it, then
-email. Apple's native button stands first on an
+pair, and a column of doors: Apple, Google, then email. No rule or `or`
+separates them. Apple's native button stands first on an
 iPhone. Everywhere else Apple is our door, because the native view does not
 exist in a browser or in Expo Go.
-A door is `SignInOption` in `src/features/auth/` — the same capsule as
-`Button`: `size.controlMin` tall, `radius.full`, `accent` on the page, mark
-and `labelStrong` label centred as one group in `onAccent`.
+A door is `SignInOption` in `src/features/auth/` — `size.controlMin` tall,
+`radius.full`, the page colour with a `text` stroke, mark and `labelStrong`
+label centred as one group in `text`.
 
 The doors name the mode. Sign-in opens on creating an account, because the
 screen exists for people who are not in yet; a ghost line under the doors —
@@ -351,8 +351,8 @@ modes mid-code would send a second, different email.
 
 ### A provider's mark is the provider's
 
-The door is ours. Google's and Apple's and the email door share `Button`'s
-capsule, so each one contrasts the page. What we do not recolor is the mark.
+The door is ours. Google's and the email door share that outline. What we do
+not recolor is the mark.
 
 Apple draws its own button, so we pick the style that matches `accent`: black
 on a light page, white on a dark one. Its label is Apple's, not ours: `SIGN_UP`
@@ -369,7 +369,7 @@ colors and do not swap in a glyph. `size.providerMark` (18) is the mark
 against a 14pt label, which is `type.labelStrong`.
 
 The email door is the same component with `email-outline` in that same box,
-in `onAccent`, so the envelope flips with the label.
+in `text`, so the envelope matches the label.
 
 ## Space and shape
 
@@ -669,12 +669,7 @@ Why each one:
   across. On a wide native window, `layout.gridColumns`, capped at
   `layout.grid`. On desktop web the wall fills the window, and another
   column opens once a tile would pass `layout.gridTileMax`, so a photo
-  does not become a banner. On desktop web, Card View in the Buy rail
-  sets that row to 2, 3, 4, 5, or 6. That choice is stored the same way
-  as appearance. A phone keeps two and does not show the control. A horizontal
-  two-finger swipe on a web grid photograph turns that listing's
-  photos. A vertical swipe still scrolls the page. The bars under
-  the photograph say which photo is showing.
+  does not become a banner.
 
 ### Size comes from measurement, not from the window
 

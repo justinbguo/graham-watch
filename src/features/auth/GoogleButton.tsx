@@ -7,9 +7,9 @@ import { size } from '@/lib/theme';
 const MARK = require('../../../assets/google-g.png');
 
 /**
- * Google's door. The capsule is ours — `SignInOption`, so it contrasts the
- * page like every other button. The mark is Google's four-color G, and it
- * is the one thing on the door we do not recolor.
+ * Google's door. The capsule is ours — `SignInOption`, the same outline as
+ * the email door. The mark is Google's four-color G, and it is the one thing
+ * on the door we do not recolor.
  *
  * The mark is silent. The label already names Google, and a screen reader
  * naming both says Google twice.

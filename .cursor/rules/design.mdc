@@ -101,7 +101,7 @@ nobody follows.
   on sign-in. On web, guests land on the deck with the sign-in sheet already
   open over it, once per page load, and no **Log in** in the header; after
   `GUEST_SWIPE_BUDGET` judgments it opens again. On iOS, sign-in is the first screen and that header control does not
-  exist. The panel is the wordmark, one `body`/`textMuted` sentence, and the
+  exist. The panel is the wordmark, one `editorial` sentence in `text`, and the
   doors — never a second headline or a card around the doors. The doors name
   the mode: `Create account with` or `Log in with`. No heading does. A header
   holds a title or that screen's own control, a count, and controls. `Screen`
@@ -228,11 +228,11 @@ nobody follows.
   glyph in `assets/instagram.png`, tinted to `text`, at `size.icon`. The
   handle is the label, in `body`. The site beside it uses `web` at the same
   size, and the domain is the label. Both rows are at least `HIT_TARGET` tall.
-- A recolored Google G, or a glyph in its place. The door is ours and follows
-  `accent`. The mark is `assets/google-g.png`, the four-color G, at
-  `size.providerMark`. Apple's native button is black on a light page and
-  white on a dark one, so it contrasts the same way. The email door uses
-  `email-outline` in `onAccent`.
+- A recolored Google G, or a glyph in its place. The door is an outline: page
+  fill, a `text` stroke, label in `text`. The mark is `assets/google-g.png`,
+  the four-color G, at `size.providerMark`. Apple's native button is black on
+  a light page and white on a dark one. The email door uses `email-outline`
+  in `text`.
 - An elliptical arc in a bundled SVG. expo-image's iOS decoder distorts packed
   arc flags, and the failure shows up on one platform only.
 - `Dimensions.get('window')` at module scope. It never updates on a browser
