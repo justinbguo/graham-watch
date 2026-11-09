@@ -4782,6 +4782,33 @@ console.log('\ndrops');
   );
 }
 
+console.log('\ncatalogue batches');
+{
+  for (const [who, token] of [
+    ['a guest', ANON],
+    ['a signed-in stranger', buyer.token],
+  ]) {
+    const latest = await api('/rest/v1/rpc/latest_catalogue_batch', { token, method: 'POST', body: {} });
+    check(
+      `${who} can read the latest batch`,
+      latest.status === 200 && Array.isArray(latest.body),
+      `got ${latest.status} ${JSON.stringify(latest.body)}`,
+    );
+
+    for (const table of ['catalogue_batches', 'catalogue_batch_listings']) {
+      const read = await api(`/rest/v1/${table}?select=*`, { token });
+      check(`${who} cannot select ${table}`, read.status >= 400, `got ${read.status}`);
+    }
+
+    const seal = await api('/rest/v1/rpc/seal_catalogue_batch', {
+      token,
+      method: 'POST',
+      body: { p_batch_id: crypto.randomUUID() },
+    });
+    check(`${who} cannot seal a batch`, seal.status >= 400, `got ${seal.status}`);
+  }
+}
+
 await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);

@@ -4,6 +4,7 @@ import type { Filters } from '@/features/filters/types';
 import type {
   CaseMaterial,
   Complication,
+  DealerIdentity,
   DeckCard,
   Profile,
   SwipeDirection,
@@ -22,6 +23,8 @@ import type {
 export const isDemo = process.env.EXPO_PUBLIC_DEMO === '1';
 
 export const DEMO_USER_ID = 'demo-user';
+
+const DEMO_SEALED_AT = new Date().toISOString();
 
 const DEMO_PROFILE: Profile = {
   id: DEMO_USER_ID,
@@ -62,6 +65,16 @@ const HARBOUR = {
   website: 'https://harbourwatch.test',
   description: 'A small shop of sports watches, serviced in house.',
   instagram: 'harbourwatch',
+  logo_url: null,
+};
+
+// No card points here. The header asks by id, and the first listing would miss it.
+const UNLISTED: DealerIdentity = {
+  id: 'demo-dealer-unlisted',
+  name: 'Quiet Bench',
+  website: 'https://quietbench.test',
+  description: 'A bench with no watches in the catalogue yet.',
+  instagram: 'quietbench',
   logo_url: null,
 };
 
@@ -315,12 +328,28 @@ export const demo = {
 
   listing: (listingId: string) => CARDS.find((card) => card.id === listingId) ?? null,
 
+  dealer: (dealerId: string): DealerIdentity | null =>
+    CARDS.find((card) => card.dealer?.id === dealerId)?.dealer ??
+    (dealerId === UNLISTED.id ? UNLISTED : null),
+
+  /** The three newest fixtures, as if last night's refresh published them. */
+  newBatch: () => ({
+    id: 'demo-batch',
+    sealedAt: DEMO_SEALED_AT,
+    listingIds: CARDS.slice(0, 3).map((card) => card.id),
+  }),
+
+  listings: (ids: readonly string[]) =>
+    ids.flatMap((id) => CARDS.filter((card) => card.id === id)),
+
   follows: (): { id: string; name: string; logo_url: string | null }[] =>
     followed.has(DEALER.id)
       ? [{ id: DEALER.id, name: DEALER.name, logo_url: DEALER.logo_url }]
       : [],
 
   directory: (): { id: string; name: string; logo_url: string | null }[] => [
+    { id: HARBOUR.id, name: HARBOUR.name, logo_url: HARBOUR.logo_url },
+    { id: UNLISTED.id, name: UNLISTED.name, logo_url: UNLISTED.logo_url },
     { id: DEALER.id, name: DEALER.name, logo_url: DEALER.logo_url },
   ],
 

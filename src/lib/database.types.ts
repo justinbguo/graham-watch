@@ -34,6 +34,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      catalogue_batch_listings: {
+        Row: {
+          batch_id: string
+          listing_id: string
+        }
+        Insert: {
+          batch_id: string
+          listing_id: string
+        }
+        Update: {
+          batch_id?: string
+          listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogue_batch_listings_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalogue_batch_listings_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalogue_batches: {
+        Row: {
+          id: string
+          listing_count: number
+          sealed_at: string
+        }
+        Insert: {
+          id: string
+          listing_count: number
+          sealed_at?: string
+        }
+        Update: {
+          id?: string
+          listing_count?: number
+          sealed_at?: string
+        }
+        Relationships: []
+      }
       checkout_defaults: {
         Row: {
           payment_label: string | null
@@ -2044,6 +2092,14 @@ export type Database = {
           listing_id: string
         }[]
       }
+      latest_catalogue_batch: {
+        Args: never
+        Returns: {
+          batch_id: string
+          listing_ids: string[]
+          sealed_at: string
+        }[]
+      }
       listing_counts: {
         Args: {
           p_brands?: string[]
@@ -2109,6 +2165,10 @@ export type Database = {
           p_listing: Database["public"]["Tables"]["listings"]["Row"]
           p_spec: Json
         }
+        Returns: boolean
+      }
+      listing_on_deck: {
+        Args: { p_listing: Database["public"]["Tables"]["listings"]["Row"] }
         Returns: boolean
       }
       listing_photo_counts: {
@@ -2499,6 +2559,14 @@ export type Database = {
           p_title?: string
         }
         Returns: string
+      }
+      seal_catalogue_batch: {
+        Args: { p_batch_id: string }
+        Returns: {
+          batch_id: string
+          created: boolean
+          listing_count: number
+        }[]
       }
       search_listings: {
         Args: {

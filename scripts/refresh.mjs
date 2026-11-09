@@ -15,15 +15,20 @@
  * paused shop is not either: pause is a permission, not a second flag, so
  * the same filter skips it.
  *
- * Exits 0 when at least one shop finished its catalogue read and the
- * notify-drops call succeeded. A shop that failed is logged and left for
- * the next night. Exits 1 when the request itself failed (missing secret,
- * rejected cron secret, OpenAI key), every shop failed, or notify-drops
- * errored. Nobody to notify is not an error. Health warnings — one shop's
+ * After a full run that exits 0, the watches it put on the deck are sealed
+ * into one catalogue batch for the New tab, then drops go out. A one-shop
+ * run does not seal.
+ *
+ * Exits 0 when at least one shop finished its catalogue read, the seal
+ * succeeded, and the notify-drops call succeeded. A shop that failed is
+ * logged and left for the next night. Exits 1 when the request itself
+ * failed (missing secret, rejected cron secret, OpenAI key), every shop
+ * failed, the seal failed, or notify-drops errored. Nobody to notify is not an error. Health warnings — one shop's
  * error, an empty catalogue, missing photos, a week with nothing new — do
  * not change that exit code.
  */
 
+import { randomUUID } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 
 import { OPERATOR_HOSTED, parseEnvFile } from './_env.mjs';
@@ -64,6 +69,7 @@ if (!secret) {
 
 const key = serviceKey();
 const { url, anonKey } = config();
+const batchId = randomUUID();
 const dealerId = process.argv.slice(2).find((arg) => !arg.startsWith('-')) ?? null;
 
 if (dealerId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dealerId)) {
@@ -174,7 +180,39 @@ if (exitCode !== 0) {
   process.exit(exitCode);
 }
 
+// A one-shop run is not a catalogue sync, so it leaves the New tab alone.
+const sealed = dealerId ? true : await sealBatch();
 await notifyDrops();
+if (!sealed) process.exit(1);
+
+async function sealBatch() {
+  let response;
+  try {
+    response = await request('/rest/v1/rpc/seal_catalogue_batch', {
+      token: key,
+      method: 'POST',
+      body: { p_batch_id: batchId },
+    });
+  } catch (error) {
+    response = { ok: false, status: 0, body: { message: error instanceof Error ? error.message : String(error) } };
+  }
+
+  const row = Array.isArray(response.body) ? response.body[0] : null;
+  if (!response.ok || !row) {
+    const detail = response.body?.message ?? response.body?.error ?? JSON.stringify(response.body);
+    const line = `New tab: could not seal batch ${batchId} (${response.status}): ${detail}`;
+    console.error(line);
+    annotation('error', 'CatalogueBatch', line);
+    return false;
+  }
+
+  console.log(
+    row.created
+      ? `New tab: ${row.listing_count} watch(es) sealed (batch ${batchId}).`
+      : `New tab: batch ${batchId} was already sealed with ${row.listing_count} watch(es).`
+  );
+  return true;
+}
 
 // The catalogue rows are already written. This still fails the job when the
 // drop call itself fails, so a 404 or a rejected secret is not a green night.
