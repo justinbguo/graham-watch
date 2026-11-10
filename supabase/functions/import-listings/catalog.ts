@@ -100,20 +100,12 @@ const ADAPTERS: Record<
   squarespace: (url, limit, minPhotos) => fetchSquarespaceItems(url, limit, minPhotos),
 };
 
-/**
- * Shopify pages one operator call may read.
- *
- * A page is 250 products. The whole feed in one isolate is what returns
- * HTTP 546 on a large shop. The nightly script asks for more than one page
- * because that job already loops. A single operator call does not.
- */
 export const PAGES_PER_CALL = 1;
 
 /** One slice of a Shopify feed. Absent means read the feed in this call. */
 export type CatalogSlice = {
   startPage?: number;
   maxPages?: number;
-  /** Test hook. Production leaves this unset and Shopify's cap of 250 applies. */
   pageSize?: number;
   fetchText?: ShopifyIO['fetchText'];
   pause?: ShopifyIO['pause'];

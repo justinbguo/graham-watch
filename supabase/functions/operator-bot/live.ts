@@ -69,13 +69,12 @@ async function reusedCatalog(dealerId: string) {
   };
 }
 
-type ResumeRow = { id: string; resume_page: number | null; created_at: string };
+type ResumeRow = { id: string; resume_page: number; catalog_read_at: string };
 
-/** The page a crashed call should read again. A finished job does not resume. */
 async function runningResume(sourceUrl: string, dealerId: string | null): Promise<ResumeRow | null> {
   const job = await admin()
     .from('import_jobs')
-    .select('id, dealer_id, resume_page, created_at')
+    .select('id, dealer_id, resume_page, catalog_read_at')
     .eq('source_url', sourceUrl)
     .eq('status', 'running')
     .order('created_at', { ascending: false })
@@ -84,9 +83,8 @@ async function runningResume(sourceUrl: string, dealerId: string | null): Promis
   const row = (job.data ?? []).find((item) =>
     dealerId ? item.dealer_id === dealerId : item.dealer_id == null
   );
-  return row
-    ? { id: row.id, resume_page: row.resume_page, created_at: row.created_at }
-    : null;
+  if (!row || row.resume_page == null || row.catalog_read_at == null) return null;
+  return { id: row.id, resume_page: row.resume_page, catalog_read_at: row.catalog_read_at };
 }
 
 async function rememberResume(
@@ -98,7 +96,7 @@ async function rememberResume(
     status: 'running' | 'succeeded';
     resumePage: number | null;
     error: string | null;
-    createdAt?: string;
+    readAt: string;
   },
 ) {
   const fields = {
@@ -108,11 +106,9 @@ async function rememberResume(
     provider: row.provider,
     status: row.status,
     resume_page: row.resumePage,
+    catalog_read_at: row.readAt,
     error: row.error,
     finished_at: row.status === 'running' ? null : new Date().toISOString(),
-    // The first page's stamp is the whole read. A later page must not look
-    // newer, or the finishing page would mark the earlier watches unavailable.
-    ...(row.createdAt ? { created_at: row.createdAt } : {}),
   };
   const write = existing
     ? await admin().from('import_jobs').update(fields).eq('id', existing.id)
@@ -310,7 +306,7 @@ export function liveDeps(): OperatorDeps {
           status: nextPage == null ? 'succeeded' : 'running',
           resumePage: nextPage,
           error: null,
-          createdAt: resume?.created_at ?? new Date().toISOString(),
+          readAt: resume?.catalog_read_at ?? new Date().toISOString(),
         });
         return {
           provider: found.provider,
@@ -353,7 +349,7 @@ export function liveDeps(): OperatorDeps {
         }
 
         const startPage = resume?.resume_page ?? 1;
-        const readAt = resume?.created_at ?? new Date().toISOString();
+        const readAt = resume?.catalog_read_at ?? new Date().toISOString();
         const result = await syncCatalog(admin(), dealer.id, input.sourceUrl, MAX_CATALOG_ITEMS, {
           startPage,
           maxPages: PAGES_PER_CALL,
@@ -371,19 +367,17 @@ export function liveDeps(): OperatorDeps {
             : nextPage == null
               ? 'Stopped before the end of the catalogue. Watches that were not read were left alone.'
               : null,
-          createdAt: readAt,
+          readAt,
         });
         if (nextPage != null) {
-          // pending stays above zero so a caller that loops until the queue
-          // is empty keeps walking the feed. The watches themselves wait
-          // until the read has seen the whole shop.
+          const pending = await pendingCount(dealer.id);
           return {
             dealerId: dealer.id,
             permission: dealer.permission,
             catalogue: 'partial',
             page: startPage,
             ...result,
-            publish: { processed: 0, published: 0, skipped: 0, failed: 0, pending: 1 },
+            publish: { processed: 0, published: 0, skipped: 0, failed: 0, pending },
           };
         }
 

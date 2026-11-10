@@ -1051,6 +1051,7 @@ export type Database = {
       }
       import_jobs: {
         Row: {
+          catalog_read_at: string | null
           created_at: string
           dealer_id: string | null
           error: string | null
@@ -1064,6 +1065,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          catalog_read_at?: string | null
           created_at?: string
           dealer_id?: string | null
           error?: string | null
@@ -1077,6 +1079,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          catalog_read_at?: string | null
           created_at?: string
           dealer_id?: string | null
           error?: string | null
