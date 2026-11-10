@@ -1811,6 +1811,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["dealer_permission"]
       }
       brand_key: { Args: { p_brand: string }; Returns: string }
+      buyer_taste: { Args: never; Returns: Json }
       can_claim_with_email: {
         Args: { p_dealer_id: string; p_email: string }
         Returns: boolean
@@ -2542,6 +2543,47 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      rank_bump: {
+        Args: {
+          p_amount: number
+          p_group: string
+          p_key: string
+          p_weights: Json
+        }
+        Returns: Json
+      }
+      rank_buy_feed: {
+        Args: {
+          p_cursor?: string
+          p_limit?: number
+          p_seed?: Json
+          p_spec?: Json
+        }
+        Returns: {
+          cursor: string
+          listing: Database["public"]["Tables"]["listings"]["Row"]
+        }[]
+      }
+      rank_followed: { Args: { p_dealer: string }; Returns: boolean }
+      rank_pack_cursor: {
+        Args: {
+          p_created_at: string
+          p_id: string
+          p_score: number
+          p_slot: number
+        }
+        Returns: string
+      }
+      rank_unpack_cursor: {
+        Args: { p_cursor: string }
+        Returns: {
+          created_at: string
+          id: string
+          score: number
+          slot: number
+        }[]
+      }
+      rank_weights: { Args: { p_seed: Json }; Returns: Json }
       record_bot_action: {
         Args: {
           p_action: string
