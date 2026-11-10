@@ -8,6 +8,7 @@ import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
+import { logEvent } from '@/data/listingEvents';
 import { useDealerInquiryListing, useListing, usePrimeListing } from '@/data/listings';
 import {
   isPending as isSending,
@@ -223,6 +224,7 @@ export function ConversationScreen({
         }
         return;
       }
+      logEvent({ kind: 'inquiry_open', surface: 'messages', listing: inquiryCard });
       mail.mutate(
         { card: inquiryCard, message: body },
         {

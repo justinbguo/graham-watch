@@ -2,8 +2,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Platform, Pressable, Text } from 'react-native';
 
+import { logEvent } from '@/data/listingEvents';
 import { dealerSocialHitSlop } from '@/features/dealers/socialButton';
 import { listingSourceUrl } from '@/lib/listingSource';
+import type { BuyerEventSurface, DeckCard } from '@/lib/models';
 import { controlText, fieldOutline, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -16,23 +18,29 @@ export function openListingSource(url: string): void {
 }
 
 export function DealerSiteButton({
-  url,
+  card,
+  surface,
   grouped = false,
 }: {
-  url: string | null | undefined;
+  card: Pick<DeckCard, 'id' | 'dealer_id' | 'source_url'> | null | undefined;
+  /** Where the button is, for the buyer event log. */
+  surface: BuyerEventSurface;
   /** Full width under Pass and Add to wishlist. Same capsule, stretched. */
   grouped?: boolean;
 }) {
-  const href = listingSourceUrl(url);
+  const href = listingSourceUrl(card?.source_url);
   const theme = useTheme();
   const styles = useThemedStyles(buttonStyles);
-  if (!href) return null;
+  if (!card || !href) return null;
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel="View on dealer site"
       hitSlop={dealerSocialHitSlop(size.follow)}
-      onPress={() => openListingSource(href)}
+      onPress={() => {
+        logEvent({ kind: 'dealer_click', surface, listing: card });
+        openListingSource(href);
+      }}
       style={({ pressed }) => [styles.link, grouped && styles.stretch, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name="link-variant"

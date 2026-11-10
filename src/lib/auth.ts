@@ -4,6 +4,7 @@ import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
+import { flushEvents } from '@/data/listingEvents';
 import { resetIdentity } from './analytics';
 import { backendInfo } from './backend';
 import { releasePushToken } from './push';
@@ -196,6 +197,7 @@ export async function signInWithProvider(provider: keyof typeof PROVIDER_LABEL) 
   // session back to this tab. Web leaves and returns; the client reads the
   // session from the URL. Native keeps the system sheet.
   if (Platform.OS === 'web') {
+    flushEvents();
     window.location.assign(data.url);
     return;
   }
@@ -223,8 +225,10 @@ async function assertProviderReady(url: string, provider: keyof typeof PROVIDER_
 }
 
 export async function signOut(options?: { scope?: 'global' | 'local' | 'others' }) {
-  // The token has to leave while the session can still authorise the delete.
-  // A failed unregister must not trap the person in the account.
+  // The token has to leave while the session can still authorise the delete,
+  // and so do the account's unsent events. A failed unregister must not trap
+  // the person in the account.
+  flushEvents();
   await releasePushToken().catch(() => undefined);
   resetIdentity();
   const { error } = await supabase.auth.signOut(options);

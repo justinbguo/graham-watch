@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FlatList } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useDropFeed, useMarkDropsSeen } from '@/data/drops';
+import { useListExposures } from '@/data/listingEvents';
 import { usePrimeListing } from '@/data/listings';
 import { useOpenStack } from '@/lib/openStack';
 import { inset, space, type Theme } from '@/lib/theme';
@@ -38,6 +39,12 @@ export function DropsFeed({ dealerId = null }: { dealerId?: string | null }) {
     markSeen(dealerId);
   }, [userId, data, markSeen, dealerId]);
 
+  const cards = useMemo(
+    () => (data ?? []).filter((card) => dealerId == null || card.dealer_id === dealerId),
+    [data, dealerId],
+  );
+  const exposures = useListExposures('drops', cards);
+
   const close = () => router.back();
 
   if (!userId) {
@@ -68,7 +75,6 @@ export function DropsFeed({ dealerId = null }: { dealerId?: string | null }) {
     );
   }
 
-  const cards = (data ?? []).filter((card) => dealerId == null || card.dealer_id === dealerId);
   const shopName = dealerId ? (cards.find((card) => card.dealer?.name)?.dealer?.name ?? null) : null;
 
   return (
@@ -79,12 +85,14 @@ export function DropsFeed({ dealerId = null }: { dealerId?: string | null }) {
       <FlatList
         data={cards}
         keyExtractor={(card) => card.id}
+        {...exposures}
         style={styles.list}
         contentContainerStyle={styles.content}
         ListEmptyComponent={<Message text="Nothing new from dealers you follow." />}
         renderItem={({ item }) => (
           <ListingRow
             card={item}
+            surface="drops"
             onPress={() => {
               primeListing(item);
               open('listing/[listingId]', { listingId: item.id }, `/listing/${item.id}`);

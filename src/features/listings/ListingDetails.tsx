@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { Divider } from '@/components/ui';
 import { DealerPanel } from '@/features/dealers/DealerPanel';
-import type { DeckCard } from '@/lib/models';
+import type { BuyerEventSurface, DeckCard } from '@/lib/models';
 import { inset, radius, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
@@ -17,7 +17,16 @@ import { useThemedStyles } from '@/providers/theme';
  * right swipe is the save, and a Save button next to it would be a second way
  * to do one thing.
  */
-export function ListingDetails({ card, actions }: { card: DeckCard; actions?: ReactNode }) {
+export function ListingDetails({
+  card,
+  actions,
+  surface,
+}: {
+  card: DeckCard;
+  actions?: ReactNode;
+  /** The frame it is in, for the buyer event log. */
+  surface: BuyerEventSurface;
+}) {
   const styles = useThemedStyles(detailsStyles);
 
   return (
@@ -46,7 +55,7 @@ export function ListingDetails({ card, actions }: { card: DeckCard; actions?: Re
       {card.dealer ? (
         <>
           {card.sold_at || card.description || actions ? <Divider /> : null}
-          <DealerPanel dealer={card.dealer} browse except={card.id} />
+          <DealerPanel dealer={card.dealer} browse except={card.id} surface={surface} />
         </>
       ) : null}
     </View>

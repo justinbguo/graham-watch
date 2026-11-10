@@ -51,7 +51,7 @@ export function FollowingList() {
                 {/* The capsule aligns itself to the start of its own box. The row
                     centres this box, so the button sits on the name's line. */}
                 <View>
-                  <FollowDealer dealer={shop} />
+                  <FollowDealer dealer={shop} surface="profile" />
                 </View>
               </View>
             );

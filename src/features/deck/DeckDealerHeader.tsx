@@ -35,7 +35,7 @@ export function DeckDealerHeader({
       </View>
       {missing ? <Text style={styles.missing}>Shop details did not load.</Text> : null}
       {data?.description ? <Text style={styles.description}>{data.description}</Text> : null}
-      {data ? <FollowDealer dealer={data} /> : null}
+      {data ? <FollowDealer dealer={data} surface="buy" /> : null}
       {data?.website ? <Website url={data.website} /> : null}
       {data?.instagram ? <Instagram handle={data.instagram} /> : null}
     </View>

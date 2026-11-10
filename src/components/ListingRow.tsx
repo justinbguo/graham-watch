@@ -10,7 +10,7 @@ import { ListingSummary } from '@/components/ListingSummary';
 import { useSwipeGuard } from '@/components/SwipeToRemove';
 import { formatTitle } from '@/lib/format';
 import { photoScrollPage } from '@/lib/photoPager';
-import type { DeckCard, DeckPhoto } from '@/lib/models';
+import type { BuyerEventSurface, DeckCard, DeckPhoto } from '@/lib/models';
 import { layout, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -22,6 +22,7 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
  */
 export function ListingRow({
   card,
+  surface,
   onMessage,
   messagePending = false,
   inConversation = false,
@@ -36,6 +37,8 @@ export function ListingRow({
   attention = false,
 }: {
   card: DeckCard;
+  /** Which list the row is in, for the buyer event log. */
+  surface: BuyerEventSurface;
   /**
    * Under the price, on the wishlist. Opens the thread with this shop about this
    * watch. Absent on a sold watch, and wherever a row is only for looking.
@@ -178,7 +181,7 @@ export function ListingRow({
         ) : null}
         {onMessage && listingSourceUrl(card.source_url) ? (
           <View style={styles.dealerSite}>
-            <DealerSiteButton url={card.source_url} />
+            <DealerSiteButton card={card} surface={surface} />
           </View>
         ) : null}
       </View>

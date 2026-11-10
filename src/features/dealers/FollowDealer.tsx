@@ -2,9 +2,11 @@ import { Pressable, Text } from 'react-native';
 
 import { GlyphTurn } from '@/components/GlyphTurn';
 import { useFollows, useToggleFollow } from '@/data/follows';
+import { logEvent } from '@/data/listingEvents';
 import { requestNotificationPermission } from '@/features/onboarding/notifications';
 import { isDemo } from '@/lib/demo';
 import { tick } from '@/lib/haptics';
+import type { BuyerEventSurface } from '@/lib/models';
 import { dealerSocial, size, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -25,10 +27,13 @@ import { dealerSocialButtonStyles, dealerSocialHitSlop } from './socialButton';
  */
 export function FollowDealer({
   dealer,
+  surface,
   block = false,
   compact = false,
 }: {
   dealer: { id: string; name: string; logo_url?: string | null };
+  /** Where the button is, for the buyer event log. */
+  surface: BuyerEventSurface;
   /** On a row of its own: the row's width, at the same height. */
   block?: boolean;
   /** Community directory. Same shape, shorter, so the shop name keeps the row. */
@@ -55,6 +60,7 @@ export function FollowDealer({
       onPress={() => {
         tick();
         const firstFollow = isSuccess && follows.length === 0 && !following;
+        logEvent({ kind: following ? 'unfollow' : 'follow', surface, dealer });
         toggle.mutate(
           {
             id: dealer.id,

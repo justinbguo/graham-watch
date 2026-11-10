@@ -2,14 +2,17 @@ import { ActivityIndicator, FlatList } from 'react-native';
 
 import { ListingRow } from '@/components/ListingRow';
 import { Centered, Divider, Message, Screen, Spinner } from '@/components/ui';
+import { useListExposures } from '@/data/listingEvents';
 import { usePrimeListing } from '@/data/listings';
 import { useNewListings } from '@/data/newListings';
 import { formatShortDate } from '@/lib/format';
+import type { DeckCard } from '@/lib/models';
 import { useOpenStack } from '@/lib/openStack';
 import { inset, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
 const LAST_NIGHT_MS = 36 * 60 * 60 * 1000;
+const NO_CARDS: DeckCard[] = [];
 
 /** A batch older than a night says its date, so a failed refresh does not read as last night. */
 function updateName(sealedAt: string): string {
@@ -30,6 +33,7 @@ export function NewScreen() {
   const styles = useThemedStyles(newStyles);
   const open = useOpenStack();
   const primeListing = usePrimeListing();
+  const exposures = useListExposures('new', view.state === 'ready' ? view.cards : NO_CARDS);
 
   switch (view.state) {
     case 'loading':
@@ -60,6 +64,7 @@ export function NewScreen() {
           <FlatList
             data={view.cards}
             keyExtractor={(card) => card.id}
+            {...exposures}
             contentContainerStyle={styles.list}
             ItemSeparatorComponent={Divider}
             onEndReached={view.loadMore}
@@ -71,6 +76,7 @@ export function NewScreen() {
             renderItem={({ item }) => (
               <ListingRow
                 card={item}
+                surface="new"
                 compact
                 onPress={() => {
                   primeListing(item);

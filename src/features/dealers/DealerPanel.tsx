@@ -2,7 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Pressable, Text, View } from 'react-native';
 
 import { useDealerReputation } from '@/data/dealers';
-import type { Dealer } from '@/lib/models';
+import type { BuyerEventSurface, Dealer } from '@/lib/models';
 import { useOpenStack } from '@/lib/openStack';
 import { HIT_TARGET, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -54,6 +54,7 @@ export function DealerPanel({
   follow = false,
   named = true,
   except,
+  surface,
 }: {
   // The three scraped fields are optional because one caller genuinely lacks
   // them: a dealer's own shop card is built from `dealer_accounts`, which
@@ -68,6 +69,8 @@ export function DealerPanel({
   named?: boolean;
   /** The listing this panel sits under, so the strip does not repeat it. */
   except?: string;
+  /** Where the panel is, for the buyer event log. */
+  surface: BuyerEventSurface;
 }) {
   const styles = useThemedStyles(panelStyles);
   const theme = useTheme();
@@ -106,7 +109,7 @@ export function DealerPanel({
 
       {showFollow ? (
         <View style={styles.actions}>
-          <FollowDealer dealer={dealer} block />
+          <FollowDealer dealer={dealer} surface={surface} block />
           <MessageDealer dealer={dealer} listingId={except} block />
         </View>
       ) : null}

@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-nat
 
 import { Button, Centered, Eyebrow, Field, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft, useSendInquiry } from '@/data/inquiries';
+import { logEvent } from '@/data/listingEvents';
 import { useListing, usePrimeListing } from '@/data/listings';
 import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { useOpenStack } from '@/lib/openStack';
@@ -108,13 +109,16 @@ export default function InquiryScreen() {
         {failure ? <Message text={failure.message} tone="error" /> : null}
 
         <View style={styles.actions}>
-          <DealerSiteButton url={card.source_url} />
+          <DealerSiteButton card={card} surface="messages" />
           <Button
             label="Open in my mail app"
             variant="solid"
             loading={openMailDraft.isPending}
             disabled={busy}
-            onPress={() => openMailDraft.mutate({ card, message })}
+            onPress={() => {
+              logEvent({ kind: 'inquiry_open', surface: 'messages', listing: card });
+              openMailDraft.mutate({ card, message });
+            }}
           />
           <Button
             label="Send via Graham"
