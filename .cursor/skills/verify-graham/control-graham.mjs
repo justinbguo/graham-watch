@@ -2300,7 +2300,7 @@ const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, cleanup. Add --dry-run on up, seed, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume.',
   );
 }
 

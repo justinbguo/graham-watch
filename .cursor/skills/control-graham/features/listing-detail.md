@@ -1,27 +1,27 @@
 # Listing detail
 
-Opening a watch shows its photograph, title, price, and dealer context. Pass/save also exist on the listing for guests and signed-in buyers.
+Opening a watch from the grid shows its photograph, title, price, and dealer context. Pass, Add to wishlist, and `View on dealer site` sit on that screen. Demo listings have a source URL, so the dealer-site button is present. The card deck shows the same details inside the card and does not open this screen.
 
 ## Sub-features
 
 - `listing-open-from-deck` opens the top watch's detail.
 - `listing-identity` shows brand/model/year consistent with the deck card.
-- `listing-back` returns to Buy without crashing.
+- `listing-back` returns to Buy with the control named `Close`.
 
 ## How to get to it (user POV)
 
-- On the card or grid, open the listing (tap the photograph / `Open listing` where labeled).
-- From Wishlist, open a saved row.
+- On the grid, open the listing with `Open listing` (one photograph) or the watch's title. On web, a tile with several photographs uses `Listing photos`.
+- The card deck does not open this screen. Wishlist's photograph does, and that photograph is omitted from the accessibility tree. The row's button is `Message the dealer about <title>`.
 
 ## Driving it with control-graham
 
 Preconditions:
 
-- Demo `doctor` green. Prefer card view (`press s` until cards, or click the control that offers card view).
+- Demo `doctor` green. Dismiss the arrival sheet. Use the grid (`press s` until the control offers card view, which means the grid is showing).
 
-- **Open.** From Buy, `aria-click --role button --name "Open listing"` or click the title control for the visible watch. `wait-settle`.
-- **Identity.** `snapshot`: title matches `formatTitle` (e.g. `Omega Speedmaster Professional, 1972`) and a price appears.
-- **Back.** Use the screen back control (`aria-click --role button --name "Back"` if present) or `home`. Buy is usable again.
+- **Open.** From the grid, `aria-click --role button --name "Open listing"`, or click the button named with the watch's title. `wait-settle`.
+- **Identity.** `snapshot`: title matches `formatTitle` (e.g. `Omega Speedmaster Professional, 1972`), a price appears, and `View on dealer site` is present.
+- **Back.** `aria-click --role button --name "Close"` or `home`. Buy is usable again. There is no control named `Back`.
 - **Proof.** `artifacts/<id>/listing.*` showing the title on the detail screen.
 
 ## Gotchas

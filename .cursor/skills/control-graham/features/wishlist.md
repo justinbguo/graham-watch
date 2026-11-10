@@ -6,7 +6,7 @@ Wishlist lists watches the buyer saved (right-swipe / ArrowRight). The tab badge
 
 - `wishlist-empty` shows an empty state when nothing is saved.
 - `wishlist-after-save` lists a watch saved from the deck.
-- `wishlist-open-listing` opens a saved watch's listing from the row.
+- `wishlist-open-listing` is the photograph. That control is omitted from the accessibility tree. The named buttons are `Message the dealer about <title>`, `Inquire about <title>`, and `View on dealer site` when the listing has a source URL.
 
 ## How to get to it (user POV)
 
@@ -22,11 +22,11 @@ Preconditions:
 
 - **Empty state (optional).** On a fresh run before any save, `click --name Wishlist`, then `snapshot`. Empty-state copy is visible; no Omega/Rolex row required.
 - **Save then open.** From Buy, `press ArrowRight` on a known fixture (note its title from snapshot). `click --name Wishlist` (badge may read `Wishlist, 1`). Snapshot includes that title.
-- **Open listing.** `aria-click --role button --name "<formatTitle>"` or click the row's accessible name matching the watch. Listing route shows the same title.
+- **Row name.** The button is `Message the dealer about <title>`, not the title alone. That press opens a thread. `View on dealer site` is a separate button when the watch has a source URL. Proof that the watch was saved is the message button's name in the snapshot, and the tab `Wishlist, N`.
 - **Proof.** `screenshot` / `snapshot` under `artifacts/<id>/wishlist.*` with the saved title visible.
 
 ## Gotchas
 
-- Tab label is `Wishlist` (spoken badge: `Wishlist, N`). Match that name.
+- Tab label is `Wishlist` (spoken badge: `Wishlist, N`). The count is saves that still need a first message to the dealer, not every saved watch.
 - Demo wishlist is session memory only.
 - Removing from wishlist uses a swipe-to-reveal control; the destructive tap is a second step — do not treat a swipe alone as delete.
