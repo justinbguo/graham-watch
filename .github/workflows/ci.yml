@@ -44,6 +44,7 @@ jobs:
           scripts/filter-spec.test.mjs
           scripts/repair-photos.test.mjs
           scripts/drops-select.test.ts
+          scripts/feedback-contact.test.ts
           scripts/fixture-import.test.ts
           scripts/aggregator-pivot.test.mjs
 

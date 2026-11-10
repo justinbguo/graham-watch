@@ -16,6 +16,7 @@ import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
 import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
 import { DeckDealerHeader } from '@/features/deck/DeckDealerHeader';
 import { DealerDirectory } from '@/features/dealers/DealerDirectory';
+import { GiveFeedback } from '@/features/feedback/GiveFeedback';
 import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
@@ -305,6 +306,7 @@ export default function Deck() {
       />
       <DeckDisplayButton value={view === 'cards' ? 1 : columnChoice} onChange={chooseDensity} />
       <FilterMenu surface="deck" count={count} triggerVariant="text" />
+      <GiveFeedback placement="rail" />
     </>
   );
 
@@ -328,6 +330,18 @@ export default function Deck() {
       );
     return desktopRail ? <DeckDesktopFrame rail={desktopRail}>{column}</DeckDesktopFrame> : column;
   };
+  const phoneFeedback = isDesktopWeb ? null : (
+    <View style={styles.feedback}>
+      <GiveFeedback placement="rail" />
+    </View>
+  );
+  const deckColumn = (content: ReactNode) =>
+    frameDesktop(
+      <>
+        {phoneFeedback}
+        {content}
+      </>,
+    );
 
   const titleControl = isDesktopWeb ? undefined : (
     <DeckHeader>
@@ -343,7 +357,7 @@ export default function Deck() {
   if (isPending || (cards.length === 0 && !error && !showEmpty)) {
     return (
       <Screen titleControl={titleControl} inTabs>
-        {frameDesktop(<Spinner />)}
+        {deckColumn(<Spinner />)}
       </Screen>
     );
   }
@@ -351,7 +365,7 @@ export default function Deck() {
   if (error) {
     return (
       <Screen titleControl={titleControl} inTabs>
-        {frameDesktop(
+        {deckColumn(
         <Centered>
           <Message text={error.message} tone="error" />
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
@@ -364,7 +378,7 @@ export default function Deck() {
   if (showEmpty) {
     return (
       <Screen titleControl={titleControl} inTabs>
-        {frameDesktop(
+        {deckColumn(
         <Centered>
           <Heading>
             {count ? 'Nothing matches' : passes ? "That's everything" : 'Nothing left to swipe'}
@@ -405,7 +419,7 @@ export default function Deck() {
         width="grid"
         desktopBleed={isDesktopWeb}
         inTabs>
-        {frameDesktop(
+        {deckColumn(
           <Animated.View
             key="grid"
             entering={FadeIn.duration(motion.base)}
@@ -454,7 +468,14 @@ export default function Deck() {
     <Screen
       titleControl={titleControl}
       desktopBleed
-      subhead={isDesktopWeb ? undefined : roll}
+      subhead={
+        isDesktopWeb ? undefined : (
+          <>
+            {phoneFeedback}
+            {roll}
+          </>
+        )
+      }
       width={isDesktopWeb ? 'grid' : deckStage(Platform.OS, windowWidth).width}
       inTabs>
       {frameDesktop(
@@ -597,6 +618,10 @@ const deckStyles = (_theme: Theme) => ({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: space.xs,
+  },
+  feedback: {
+    alignItems: 'flex-start' as const,
+    paddingHorizontal: inset.screen,
   },
   watchArea: {
     flex: 1,

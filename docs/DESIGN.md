@@ -230,7 +230,7 @@ already open, once per page load; there is no **Log in** control in the
 header. After `GUEST_SWIPE_BUDGET` judgments the sheet opens again with copy
 that says why. The sheet is the wordmark alone (no mark beside it), one
 `editorial` sentence in `text` under it, narrowed to `layout.signInLede`, and
-the doors — Apple, Google, email — with **Not now** to dismiss. On iOS, that same panel is the first screen, and
+the doors — Apple, Google, email — with **Not now** to dismiss. On iOS, that same panel is the first screen, **Give feedback** sits under the doors, and
 it does not dismiss: the header has no room for a **Log in** control beside
 undo, filters, and the view toggle. There is no second headline, no decorative
 watch beside the word, and no card around the doors.
@@ -341,7 +341,8 @@ other screen.
 
 The screen is the wordmark, the sentence under it, the watch beside that
 pair, and a column of doors: Apple, Google, then email. No rule or `or`
-separates them. Apple's native button stands first on an
+separates them. Under the doors, the panel has one link, **Give feedback**.
+Apple's native button stands first on an
 iPhone. Everywhere else Apple is our door, because the native view does not
 exist in a browser or in Expo Go.
 A door is `SignInOption` in `src/features/auth/` — `size.controlMin` tall,
@@ -961,7 +962,7 @@ per row is not a pair of posters. That shorter row is centred in the column besi
 the rail. A row that reaches the right edge keeps `inset.screen` before it. The view and the column count were two controls, and the
 column list vanished on cards, so the rail changed shape under the pointer. The column
 count is remembered; returning to one is not. Down the rail the order is Rewind, Display,
-then Filter. The phone and wide native header keep the one-button switch, because a phone
+Filter, then Give feedback. On a phone and on wide native that column does not exist, so the same row sits above the deck. The phone and wide native header keep the one-button switch, because a phone
 grid is always `layout.gridColumnsPhone` across and there is no count to step.
 
 The switch is one button beside the title, and it shows the destination, not the state: the
