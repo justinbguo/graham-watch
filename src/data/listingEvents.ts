@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import {
   afterTransientFailure,
   batches,
+  bufferAfterSend,
   claimGuest,
   dwellRow,
   enqueue,
@@ -87,8 +88,8 @@ export function logEvent(event: EventInput): void {
 /**
  * Who the next rows belong to. Telemetry calls it once the session has loaded
  * and on every change of the signed-in id, sign-out included. Sign-in claims
- * the guest buffer: its rows go to this account with their guest key, and the
- * file is removed before any later account could read it.
+ * the guest buffer: its rows go to this account with their guest key. The
+ * file stays until the server confirms the insert.
  */
 export function setEventUser(userId: string | null): void {
   if (isDemo) return;
@@ -357,7 +358,10 @@ async function flush(): Promise<void> {
   const groups = batches(routed.send, BATCH_SIZE);
   for (const [index, batch] of groups.entries()) {
     const code = await send(batch);
-    if (code === null) continue;
+    if (code === null) {
+      await forgetConfirmed(batch.map((entry) => entry.row.id));
+      continue;
+    }
     if (isPermanentFailure(code)) {
       warn(`the database refused ${batch.length} events (${code})`);
       continue;
@@ -396,8 +400,24 @@ async function keepForGuest(rows: WireEvent[]): Promise<void> {
 async function claim(user: UserId): Promise<void> {
   const raw = await secureStorage.getItem(GUEST_STORAGE);
   if (owner !== user) return;
-  queue = claimGuest(queue, parseGuestBuffer(raw), newId(), user);
-  if (raw !== null) await secureStorage.removeItem(GUEST_STORAGE);
+  const stored = parseGuestBuffer(raw);
+  // A failed flush stays on disk under the account that already claimed it.
+  if (stored?.claimedBy && stored.claimedBy !== user) return;
+  queue = claimGuest(queue, stored, newId(), user);
+  if (!stored || stored.rows.length === 0 || stored.claimedBy === user) return;
+  await secureStorage.setItem(GUEST_STORAGE, JSON.stringify({ ...stored, claimedBy: user }));
+}
+
+/** Drop stored guest rows only after `log_buyer_events` accepted their ids. */
+async function forgetConfirmed(ids: readonly string[]): Promise<void> {
+  const stored = parseGuestBuffer(await secureStorage.getItem(GUEST_STORAGE));
+  const next = bufferAfterSend(stored, ids, true);
+  if (next === stored) return;
+  if (!next) {
+    await secureStorage.removeItem(GUEST_STORAGE);
+    return;
+  }
+  await secureStorage.setItem(GUEST_STORAGE, JSON.stringify(next));
 }
 
 function exposureKey(surface: BuyerEventSurface, listingId: string): string {

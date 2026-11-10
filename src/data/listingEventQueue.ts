@@ -37,8 +37,13 @@ export type Owner = 'unknown' | 'guest' | UserId;
 
 export type Queued = { owner: Owner; row: WireEvent; retried: boolean };
 
-/** One signed-out session's rows on the device, under the key minted for it. */
-export type GuestBuffer = { guestKey: string; rows: WireEvent[] };
+/**
+ * One signed-out session's rows on the device, under the key minted for it.
+ * `claimedBy` is the account that first took those rows. The file stays until
+ * the server stores them, so a later account on the phone does not adopt a
+ * flush that has not landed.
+ */
+export type GuestBuffer = { guestKey: string; rows: WireEvent[]; claimedBy?: string };
 
 export type Exposure = {
   id: string;
@@ -217,7 +222,25 @@ export function toGuestBuffer(
     [...(stored?.rows ?? []), ...added.map((row) => ({ ...row, guest_key: guestKey }))],
     cap,
   );
-  return { buffer: { guestKey, rows: kept }, dropped };
+  return { buffer: { guestKey, rows: kept, ...(stored?.claimedBy ? { claimedBy: stored.claimedBy } : {}) }, dropped };
+}
+
+/**
+ * The device buffer after one send. A failure leaves every row. A success
+ * drops the ids the server stored. An empty buffer is null, which is the
+ * signal to delete the file. Replaying a stored id inserts nothing, so a
+ * crash between the insert and this drop is safe.
+ */
+export function bufferAfterSend(
+  stored: GuestBuffer | null,
+  sentIds: readonly string[],
+  confirmed: boolean,
+): GuestBuffer | null {
+  if (!stored || !confirmed) return stored;
+  const drop = new Set(sentIds);
+  const rows = stored.rows.filter((row) => !drop.has(row.id));
+  if (rows.length === 0) return null;
+  return { ...stored, rows };
 }
 
 /** The buffer as storage returned it. Anything that is not one reads as none. */
@@ -226,7 +249,8 @@ export function parseGuestBuffer(raw: string | null): GuestBuffer | null {
   try {
     const parsed = JSON.parse(raw) as Partial<GuestBuffer> | null;
     if (typeof parsed?.guestKey !== 'string' || !Array.isArray(parsed.rows)) return null;
-    return { guestKey: parsed.guestKey, rows: parsed.rows };
+    const claimedBy = typeof parsed.claimedBy === 'string' ? parsed.claimedBy : undefined;
+    return { guestKey: parsed.guestKey, rows: parsed.rows, ...(claimedBy ? { claimedBy } : {}) };
   } catch {
     return null;
   }

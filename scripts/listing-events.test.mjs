@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  bufferAfterSend,
   claimGuest,
   dwellRow,
   enqueue,
@@ -122,4 +123,23 @@ test('a dwell keeps the furthest photo paged on its own listing', () => {
     null,
     'a surface that shows one photo reports none',
   );
+});
+
+test('a failed flush keeps the guest buffer and a confirmed one drops the stored ids', () => {
+  const pass = toRow({ kind: 'pass', surface: 'buy', listing: listing('l1') }, at('guest-pass', 1000));
+  const save = toRow({ kind: 'save', surface: 'buy', listing: listing('l2') }, at('guest-save', 1001));
+  const { buffer } = toGuestBuffer(null, [pass, save], 'guest-key', 100);
+  const onDisk = { ...parseGuestBuffer(JSON.stringify(buffer)), claimedBy: 'user-a' };
+
+  assert.equal(bufferAfterSend(onDisk, ['guest-pass', 'guest-save'], false), onDisk);
+
+  const partial = bufferAfterSend(onDisk, ['guest-pass'], true);
+  assert.deepEqual(
+    partial.rows.map((row) => row.id),
+    ['guest-save'],
+  );
+  assert.equal(partial.claimedBy, 'user-a');
+  assert.equal(partial.guestKey, 'guest-key');
+
+  assert.equal(bufferAfterSend(partial, ['guest-save'], true), null);
 });
