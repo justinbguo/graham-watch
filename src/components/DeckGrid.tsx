@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +48,7 @@ export function DeckGrid({
   onOpen,
   active = true,
   paging,
+  header = null,
 }: {
   cards: DeckCard[];
   columns: number;
@@ -55,6 +56,7 @@ export function DeckGrid({
   /** False while a sheet covers the deck, so keys do not steer underneath it. */
   active?: boolean;
   paging: GridPaging;
+  header?: ReactElement | null;
 }) {
   const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(gridStyles);
@@ -208,6 +210,7 @@ export function DeckGrid({
         onLayout={onLayout}
         onContentSizeChange={onContentSizeChange}
         {...exposures}
+        ListHeaderComponent={header ? <View style={styles.listHeader}>{header}</View> : null}
         ListFooterComponent={<GridFooter paging={paging} padLeft={rowPadLeft} padRight={rowPadRight} />}
         renderItem={({ item, index }) => (
           <View
@@ -294,6 +297,9 @@ const gridStyles = (theme: Theme) => ({
   contentDesktop: {
     paddingHorizontal: 0,
     paddingBottom: 0,
+  },
+  listHeader: {
+    paddingBottom: space.md - GAP,
   },
   row: {
     gap: GAP,

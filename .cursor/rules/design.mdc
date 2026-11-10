@@ -181,8 +181,9 @@ nobody follows.
   control picks up to `gridColumnsMax`), and nowhere else. On desktop web a tile
   stops at `layout.deckGridTileCap`, so two per row does not stretch into a poster.
   Tiles are a square photograph alone
-  on the page (`contain`, `radius.md`), name / specs / price+dealer under it —
-  no `surface` wrapping the block. The wishlist and a shop use `ListingRow`:
+  on the page (`contain`, `radius.md`). The shop name is a one-line `glassFill`
+  label in the bottom-left of that photograph. Under it, the title and the price
+  share a two-line band and the specs are one line. No `surface` wraps the block. The wishlist and a shop use `ListingRow`:
   photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;
   wishlist and any scan row), `gridPhoto` in a shop, details on the right. The
   row or tile does not pass or save — that happens on the listing it opens.
@@ -192,7 +193,8 @@ nobody follows.
   the page in the dark scheme and disappears there; it only works inside a
   container.
 - A badge around data. A box around a name makes it look like a control, so a
-  dealer's name on a card is type and colour, not a box.
+  dealer's name on a card is type and colour, not a box. The grid photograph is
+  the exception: the shop name is the `glassFill` label described above.
 - `brass` on a photograph. It is mixed for a warm page and muddies over a
   scrim; the roll's current bar is `onOverlayAccent`. The deck plate is white
   type on `scrim` only.

@@ -334,16 +334,20 @@ export default function Deck() {
       <DealerDirectory selectedId={shownDealer} onSelect={showOnlyDealer} />
     </DeckToolRail>
   ) : null;
+  const dealerHeader =
+    shownDealer === null ? null : (
+      <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
+    );
+  const pinnedHeader = view === 'grid' ? null : dealerHeader;
   const frameDesktop = (content: ReactNode) => {
-    const column =
-      shownDealer === null ? (
-        content
-      ) : (
-        <View style={styles.watchArea}>
-          <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
-          {content}
-        </View>
-      );
+    const column = pinnedHeader ? (
+      <View style={styles.watchArea}>
+        {pinnedHeader}
+        {content}
+      </View>
+    ) : (
+      content
+    );
     return desktopRail ? <DeckDesktopFrame rail={desktopRail}>{column}</DeckDesktopFrame> : column;
   };
   const titleControl = isDesktopWeb ? undefined : (
@@ -439,6 +443,7 @@ export default function Deck() {
                 a new query, and this key sends the list back to the top. */}
             <DeckGrid
               key={filterCacheToken(filters)}
+              header={dealerHeader}
               columns={columns}
               cards={cards}
               active={deckOnTop}

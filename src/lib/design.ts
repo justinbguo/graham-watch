@@ -397,6 +397,16 @@ export const type = {
   },
 } satisfies Record<string, TextStyle>;
 
+const listingTileTitle = type.labelStrong;
+const listingTileTitleLines = 2;
+
+export const listingTile = {
+  title: listingTileTitle,
+  titleLines: listingTileTitleLines,
+  titleBand: listingTileTitle.lineHeight * listingTileTitleLines,
+  priceMaxShare: 0.5,
+} as const;
+
 /**
  * 8-point scale. Screen gutters and section gaps sit on the large end so a
  * watch photo has air around it. Controls stay on `sm`/`md` so a field does
