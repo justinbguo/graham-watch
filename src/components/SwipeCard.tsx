@@ -620,7 +620,7 @@ export const SwipeCard = memo(forwardRef<
   // Clear at centre, so the colour swapping as the card crosses zero is never
   // seen.
   const sourceUrl = listingSourceUrl(card.source_url);
-  const dealerSite = sourceUrl ? <DealerSiteButton url={sourceUrl} grouped /> : null;
+  const dealerSite = sourceUrl ? <DealerSiteButton card={card} surface="buy" grouped /> : null;
 
   const ringStyle = useAnimatedStyle(() => {
     const commit = cardWidth.value * COMMIT_FRACTION;
@@ -688,7 +688,7 @@ export const SwipeCard = memo(forwardRef<
               }}
               contentContainerStyle={styles.webDetailContent}>
               <View style={styles.body}>
-                <ListingDetails card={card} actions={dealerSite} />
+                <ListingDetails card={card} actions={dealerSite} surface="buy" />
               </View>
             </Animated.ScrollView>
           </View>
@@ -735,7 +735,7 @@ export const SwipeCard = memo(forwardRef<
               <View style={styles.body}>
                 {/* Pass and save stay the swipe. Opening the dealer's page is
                     how you check the watch, so that button is on the card. */}
-                <ListingDetails card={card} actions={dealerSite} />
+                <ListingDetails card={card} actions={dealerSite} surface="buy" />
               </View>
             </Animated.ScrollView>
           </>

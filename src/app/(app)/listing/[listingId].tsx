@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
+import { logEvent, useExposure } from '@/data/listingEvents';
 import { useListing, useSaved } from '@/data/listings';
 import { useRecordSwipe } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
@@ -47,6 +48,8 @@ export default function ListingScreen() {
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
   const photoRef = useRef<View>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  useExposure(card, { surface: 'detail', photo: { listingId: card?.id, index: photoIndex } });
 
   const isSaved =
     saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
@@ -57,6 +60,7 @@ export default function ListingScreen() {
       return;
     }
     const used = guest.swipes.length + 1;
+    logEvent({ kind: direction === 'right' ? 'save' : 'pass', surface: 'detail', listing: card! });
     save.mutate(
       { listingId: card!.id, direction },
       {
@@ -94,7 +98,7 @@ export default function ListingScreen() {
             />
           </View>
         ) : null}
-        <DealerSiteButton url={card?.source_url} grouped />
+        <DealerSiteButton card={card} surface="detail" grouped />
       </View>
     ) : null;
 
@@ -136,6 +140,7 @@ export default function ListingScreen() {
               active
               showBars
               measureRef={photoRef}
+              onIndexChange={setPhotoIndex}
               onExpand={(index) =>
                 open(
                   'photos/[listingId]',
@@ -146,7 +151,7 @@ export default function ListingScreen() {
             />
           </View>
           <ScrollView style={styles.webDetailScroll} contentContainerStyle={styles.webDetailBody}>
-            <ListingDetails card={card} actions={verdictActions} />
+            <ListingDetails card={card} actions={verdictActions} surface="detail" />
           </ScrollView>
         </View>
       ) : (
@@ -157,6 +162,7 @@ export default function ListingScreen() {
               active
               showBars
               measureRef={photoRef}
+              onIndexChange={setPhotoIndex}
               onExpand={(index) =>
                 open(
                   'photos/[listingId]',
@@ -167,7 +173,7 @@ export default function ListingScreen() {
             />
           </View>
 
-          <ListingDetails card={card} actions={verdictActions} />
+          <ListingDetails card={card} actions={verdictActions} surface="detail" />
         </ScrollView>
       )}
     </Screen>

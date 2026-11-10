@@ -24,6 +24,7 @@ import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/S
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
+import { logEvent, useExposure } from '@/data/listingEvents';
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
@@ -103,6 +104,9 @@ export default function Deck() {
   // The card an undo just put back, so it can come in by the edge it left.
   const [returning, setReturning] = useState<string | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  // The card the buyer last paged. The reset below moves the index without
+  // paging, so it does not count toward how far into a card they looked.
+  const [photoOf, setPhotoOf] = useState<string | null>(null);
   const topListing = cards[0];
   const footerReveal = useSharedValue(0);
 
@@ -179,6 +183,7 @@ export default function Deck() {
       if (direction === 'left') retainCard(card.id);
 
       const used = current.swipes.length + 1;
+      logEvent({ kind: direction === 'right' ? 'save' : 'pass', surface: 'buy', listing: card });
       swipe.mutate(
         { listingId: card.id, direction },
         {
@@ -223,6 +228,7 @@ export default function Deck() {
     (by: number) => {
       const count = topListing?.photos.length ?? 0;
       if (count <= 1) return;
+      setPhotoOf(topListing?.id ?? null);
       setPhotoIndex((current) => {
         const next = current + by;
         if (next < 0) return count - 1;
@@ -230,7 +236,15 @@ export default function Deck() {
         return next;
       });
     },
-    [topListing?.photos.length],
+    [topListing?.id, topListing?.photos.length],
+  );
+
+  const pagePhoto = useCallback(
+    (index: number) => {
+      setPhotoOf(topListing?.id ?? null);
+      setPhotoIndex(index);
+    },
+    [topListing?.id],
   );
 
   const toggleView = useCallback(() => {
@@ -278,6 +292,7 @@ export default function Deck() {
   const undo = lastPass
     ? () => {
         releaseCard(lastPass.id);
+        logEvent({ kind: 'undo', surface: 'buy', listing: lastPass });
         undoPass.mutate(lastPass);
         setReturning(lastPass.id);
         setLastPass(null);
@@ -341,6 +356,13 @@ export default function Deck() {
   // `matched` is still above zero the next page is on its way, and the empty
   // copy here would tell the buyer the catalogue was finished.
   const showEmpty = showDeckEmpty(cards.length, counts?.matched);
+
+  useExposure(view === 'cards' && !error ? topListing : null, {
+    surface: 'buy',
+    active: deckOnTop,
+    photo: { listingId: photoOf, index: photoIndex },
+    pile: filterCacheToken(filters),
+  });
 
   if (isPending || (cards.length === 0 && !error && !showEmpty)) {
     return (
@@ -496,7 +518,7 @@ export default function Deck() {
                 )}
                 isTop={onTop}
                 photoIndex={onTop ? photoIndex : undefined}
-                onPhotoIndexChange={onTop ? setPhotoIndex : undefined}
+                onPhotoIndexChange={onTop ? pagePhoto : undefined}
                 returning={card.id === returning}
                 nextPhoto={onTop ? neighbor?.photos[0]?.url : undefined}
                 onSwipe={judgeCard}

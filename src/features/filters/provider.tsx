@@ -1,5 +1,17 @@
-import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 
+import { logEvent, type EventInput } from '@/data/listingEvents';
+
+import { canonicalize, type FilterSpec } from './spec';
 import { NO_FILTERS, scopeDealer, toggleRange, type Filters, type Preset } from './types';
 
 /**
@@ -40,10 +52,13 @@ type Store = {
 
 const Context = createContext<Store | null>(null);
 
+const UNFILTERED = canonicalize(NO_FILTERS).key;
+
 export function FilterProvider({ children }: PropsWithChildren) {
   const [deck, setDeck] = useState<Filters>(NO_FILTERS);
   const [search, setSearch] = useState<Filters>(NO_FILTERS);
   const [shops, setShops] = useState<Record<string, Filters>>({});
+  useFilterEvents(deck, search, shops);
 
   const update = useCallback<Store['update']>((surface, next) => {
     const set = surface === 'deck' ? setDeck : setSearch;
@@ -63,6 +78,34 @@ export function FilterProvider({ children }: PropsWithChildren) {
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+/**
+ * A `filter` event whenever a scope's canonical filter changes. Every scope
+ * starts empty, which is not a choice, so mounting logs nothing. A change
+ * that canonicalizes to the same spec, like a stray space in the search box,
+ * logs nothing either.
+ */
+function useFilterEvents(deck: Filters, search: Filters, shops: Record<string, Filters>) {
+  const logged = useRef(new Map<string, string>());
+  useEffect(() => {
+    const report = (scope: string, filters: Filters, event: (filter: FilterSpec) => EventInput) => {
+      const { spec, key } = canonicalize(filters);
+      if ((logged.current.get(scope) ?? UNFILTERED) === key) return;
+      logged.current.set(scope, key);
+      logEvent(event(spec));
+    };
+    report('deck', deck, (filter) => ({ kind: 'filter', surface: 'buy', filter }));
+    report('search', search, (filter) => ({ kind: 'filter', surface: 'search', filter }));
+    for (const [dealerId, filters] of Object.entries(shops)) {
+      report(`shop:${dealerId}`, filters, (filter) => ({
+        kind: 'filter',
+        surface: 'shop',
+        dealer: { id: dealerId },
+        filter,
+      }));
+    }
+  }, [deck, search, shops]);
 }
 
 export function useFilters(surface: Surface, dealerId?: string): FilterApi {

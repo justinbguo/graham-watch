@@ -5,6 +5,7 @@ import { Alert, SectionList, Text, View } from 'react-native';
 import { ListingRow } from '@/components/ListingRow';
 import { SwipeToRemove } from '@/components/SwipeToRemove';
 import { Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
+import { logEvent } from '@/data/listingEvents';
 import { usePrimeListing, useSaved } from '@/data/listings';
 import { useListingThreads, useMessageAboutListing } from '@/data/messages';
 import { useUnsave } from '@/data/swipes';
@@ -126,9 +127,13 @@ export default function Saved() {
         renderItem={({ item }) => (
           <SwipeToRemove
             accessibilityLabel={`Remove ${formatTitle(item)} from wishlist`}
-            onRemove={() => unsave.mutate(item.id)}>
+            onRemove={() => {
+              logEvent({ kind: 'unsave', surface: 'wishlist', listing: item });
+              unsave.mutate(item.id);
+            }}>
             <ListingRow
               card={item}
+              surface="wishlist"
               compact
               note={
                 spoken[item.id]?.body ??

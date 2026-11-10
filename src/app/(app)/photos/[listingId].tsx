@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { PhotoZoomEnter } from '@/components/PhotoZoomEnter';
 import { Spinner } from '@/components/ui';
+import { useExposure } from '@/data/listingEvents';
 import { useListing } from '@/data/listings';
 import { takePhotoLaunchRect } from '@/lib/photoLaunch';
 import { HIT_TARGET, radius, size, space } from '@/lib/theme';
@@ -25,6 +26,8 @@ export default function PhotoViewer() {
   const at = Number(index ?? 0) || 0;
   const [entered, setEntered] = useState(!launch);
   const photo = card?.photos[Math.min(at, (card?.photos.length ?? 1) - 1)];
+  const [photoIndex, setPhotoIndex] = useState(at);
+  useExposure(card, { surface: 'viewer', photo: { listingId: card?.id, index: photoIndex } });
 
   return (
     <View style={styles.screen}>
@@ -34,6 +37,7 @@ export default function PhotoViewer() {
           active
           variant="viewer"
           initialIndex={at}
+          onIndexChange={setPhotoIndex}
         />
       ) : card ? (
         <View style={styles.hold} />

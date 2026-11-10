@@ -78,7 +78,7 @@ function DealerRow({
         <VerifiedMark px={size.iconSmall} />
       </Pressable>
       <View>
-        <FollowDealer dealer={shop} compact />
+        <FollowDealer dealer={shop} surface="buy" compact />
       </View>
     </View>
   );

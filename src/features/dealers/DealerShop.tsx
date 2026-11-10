@@ -83,7 +83,7 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.header}>
-            <DealerPanel dealer={dealer} follow named={false} />
+            <DealerPanel dealer={dealer} follow named={false} surface="shop" />
             <View style={styles.inventoryHead}>
               <Text style={styles.inventoryTitle}>Inventory</Text>
               {listings.length > 0 ? (
@@ -109,6 +109,7 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
         renderItem={({ item }) => (
           <ListingRow
             card={item}
+            surface="shop"
             onPress={() => {
               primeListing(item);
               open('listing/[listingId]', { listingId: item.id }, `/listing/${item.id}`);

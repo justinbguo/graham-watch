@@ -18,6 +18,7 @@ import {
   type GridPaging,
   type ListScrollMetrics,
 } from '@/data/deckPaging';
+import { useListExposures } from '@/data/listingEvents';
 import { deckGridFrame } from '@/lib/gridColumns';
 import { useIsDesktopWeb } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
@@ -57,6 +58,7 @@ export function DeckGrid({
 }) {
   const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(gridStyles);
+  const exposures = useListExposures('buy_grid', cards, { active });
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
 
@@ -205,6 +207,7 @@ export function DeckGrid({
         scrollEventThrottle={16}
         onLayout={onLayout}
         onContentSizeChange={onContentSizeChange}
+        {...exposures}
         ListFooterComponent={<GridFooter paging={paging} padLeft={rowPadLeft} padRight={rowPadRight} />}
         renderItem={({ item, index }) => (
           <View

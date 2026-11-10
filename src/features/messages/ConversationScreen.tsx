@@ -8,6 +8,7 @@ import { SendBar } from '@/components/SendBar';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { useOpenMailDraft } from '@/data/inquiries';
 import { keys } from '@/data/keys';
+import { logEvent } from '@/data/listingEvents';
 import { useDealerInquiryListing, useListing, usePrimeListing } from '@/data/listings';
 import {
   isPending as isSending,
@@ -79,7 +80,10 @@ export function ConversationScreen({
   const emailDealerId =
     data?.header && !data.header.writable ? data.header.threadDealerId : null;
   const needsEmailListing = Boolean(emailDealerId && !namedListingId);
-  const { data: dealerInquiryListing, isPending: dealerListingPending } = useDealerInquiryListing(
+  // `isPending` stays true for a query that is not allowed to run. This lookup
+  // only runs when the thread names no watch, so that reading would leave Email
+  // disabled on every thread that already has one.
+  const { data: dealerInquiryListing, isLoading: dealerListingPending } = useDealerInquiryListing(
     needsEmailListing ? emailDealerId : null,
   );
   const inquiryCard = listing ?? dealerInquiryListing ?? null;
@@ -223,6 +227,7 @@ export function ConversationScreen({
         }
         return;
       }
+      logEvent({ kind: 'inquiry_open', surface: 'messages', listing: inquiryCard });
       mail.mutate(
         { card: inquiryCard, message: body },
         {

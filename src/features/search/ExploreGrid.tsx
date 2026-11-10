@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
+import { useListExposures } from '@/data/listingEvents';
 import { formatTitle } from '@/lib/format';
 import type { DeckCard } from '@/lib/models';
 import { space, type Theme } from '@/lib/theme';
@@ -46,6 +47,8 @@ export function ExploreGrid({
   const styles = useThemedStyles(gridStyles);
   const [width, setWidth] = useState(0);
   const cell = width > 0 ? (width - GAP * (COLUMNS - 1)) / COLUMNS : 0;
+  const wall = useMemo(() => blocks(cards), [cards]);
+  const exposures = useListExposures('search', wall, { cardsOf: blockCards });
 
   return (
     <View
@@ -57,8 +60,9 @@ export function ExploreGrid({
       {cell > 0 ? (
         <FlatList
           style={styles.frame}
-          data={blocks(cards)}
+          data={wall}
           keyExtractor={(block) => block.id}
+          {...exposures}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -167,6 +171,10 @@ function blocks(cards: DeckCard[]): Block[] {
   }
 
   return out;
+}
+
+function blockCards(block: Block): DeckCard[] {
+  return block.kind === 'mosaic' ? [block.big, ...block.side, ...block.foot] : block.cards;
 }
 
 const gridStyles = (theme: Theme) => ({
