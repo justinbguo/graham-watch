@@ -56,7 +56,6 @@ export function DeckGrid({
   /** False while a sheet covers the deck, so keys do not steer underneath it. */
   active?: boolean;
   paging: GridPaging;
-  /** Top of the list. It scrolls away with the tiles. Buy passes the shop header here. */
   header?: ReactElement | null;
 }) {
   const isDesktopWeb = useIsDesktopWeb();
@@ -299,8 +298,6 @@ const gridStyles = (theme: Theme) => ({
     paddingHorizontal: 0,
     paddingBottom: 0,
   },
-  // The list's gap already sits under this header. The remainder is the
-  // space the shop header used to take above the grid.
   listHeader: {
     paddingBottom: space.md - GAP,
   },

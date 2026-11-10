@@ -400,12 +400,6 @@ export const type = {
 const listingTileTitle = type.labelStrong;
 const listingTileTitleLines = 2;
 
-/**
- * Buy grid copy under the photograph. The title slot and the price outline
- * are both this band tall, so a one-line title and a two-line title share one
- * height. The shop name is not in the band. The price share is only a ceiling
- * for a price wider than half the tile.
- */
 export const listingTile = {
   title: listingTileTitle,
   titleLines: listingTileTitleLines,

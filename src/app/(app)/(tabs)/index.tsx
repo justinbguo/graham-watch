@@ -338,8 +338,6 @@ export default function Deck() {
     shownDealer === null ? null : (
       <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
     );
-  // The grid list owns its header, so that header scrolls with the tiles.
-  // The card view has no page scroller. Each card scrolls inside itself.
   const pinnedHeader = view === 'grid' ? null : dealerHeader;
   const frameDesktop = (content: ReactNode) => {
     const column = pinnedHeader ? (
