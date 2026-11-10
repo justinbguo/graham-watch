@@ -4809,6 +4809,165 @@ console.log('\ncatalogue batches');
   }
 }
 
+console.log('\nbuyer events');
+{
+  const reader = await createUser(`events-${stamp}@example.com`);
+  const other = await createUser(`events-other-${stamp}@example.com`);
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const stored = (id) =>
+    fetch(`${URL}/rest/v1/buyer_events?id=eq.${id}&select=user_id,guest_key,received_at`, {
+      headers: admin,
+    }).then((r) => r.json());
+  const log = (token, events) =>
+    api('/rest/v1/rpc/log_buyer_events', { token, method: 'POST', body: { p_events: events } });
+  // Listing and shop ids that exist nowhere: the log keeps no foreign key to
+  // either, so a deleted listing leaves its history.
+  const save = (extra = {}) => ({
+    id: crypto.randomUUID(),
+    kind: 'save',
+    surface: 'buy',
+    occurred_at: new Date().toISOString(),
+    listing_id: crypto.randomUUID(),
+    dealer_id: crypto.randomUUID(),
+    ...extra,
+  });
+
+  const first = save();
+  const logged = await log(reader.token, [first]);
+  const [row] = await stored(first.id);
+  check(
+    'a signed-in buyer logs an event the service role can read',
+    logged.status === 200 && logged.body === 1 && row?.user_id === reader.id,
+    `got ${logged.status} ${JSON.stringify(logged.body)} ${JSON.stringify(row)}`,
+  );
+
+  const forged = save({ user_id: other.id, received_at: '2000-01-01T00:00:00Z' });
+  await log(reader.token, [forged]);
+  const [forgedRow] = await stored(forged.id);
+  check(
+    'a forged user id and receipt time are stored as the caller and now',
+    forgedRow?.user_id === reader.id && !forgedRow.received_at.startsWith('2000'),
+    JSON.stringify(forgedRow),
+  );
+
+  const replay = await log(reader.token, [first]);
+  const copies = await stored(first.id);
+  check(
+    'a replayed batch stores nothing new',
+    replay.status === 200 && replay.body === 0 && copies.length === 1,
+    `got ${replay.status} ${JSON.stringify(replay.body)}, ${copies.length} rows`,
+  );
+
+  const anon = await log(ANON, [save()]);
+  check('a signed-out caller cannot log events', anon.status >= 400, `got ${anon.status}`);
+
+  for (const [who, token] of [
+    ['a guest', ANON],
+    ['a signed-in buyer', reader.token],
+  ]) {
+    const read = await api('/rest/v1/buyer_events?select=*', { token });
+    check(`${who} cannot read buyer_events`, read.status >= 400, `got ${read.status}`);
+    const insert = await api('/rest/v1/buyer_events', { token, method: 'POST', body: save() });
+    check(`${who} cannot insert into buyer_events`, insert.status >= 400, `got ${insert.status}`);
+  }
+
+  const serviceInsert = await fetch(`${URL}/rest/v1/buyer_events`, {
+    method: 'POST',
+    headers: { ...admin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...save(), user_id: reader.id }),
+  });
+  check(
+    'the service role reads the log and cannot write it',
+    serviceInsert.status >= 400,
+    `got ${serviceInsert.status}`,
+  );
+
+  const impostor = save({ user_id: reader.id });
+  await log(other.token, [impostor]);
+  const [impostorRow] = await stored(impostor.id);
+  const overwrite = await log(other.token, [{ ...first, user_id: other.id }]);
+  const [firstAfter] = await stored(first.id);
+  check(
+    "a second buyer cannot write the first buyer's id or take over their row",
+    impostorRow?.user_id === other.id && overwrite.body === 0 && firstAfter?.user_id === reader.id,
+    JSON.stringify({ impostorRow, overwrite: overwrite.body, firstAfter }),
+  );
+
+  const guestKey = crypto.randomUUID();
+  const claimed = save({ guest_key: guestKey });
+  await log(reader.token, [claimed]);
+  const [claimedRow] = await stored(claimed.id);
+  check('a claimed guest row keeps its guest key', claimedRow?.guest_key === guestKey, JSON.stringify(claimedRow));
+
+  const noDirection = await log(reader.token, [save({ kind: null })]);
+  check('a swipe with no direction is refused', noDirection.status >= 400, `got ${noDirection.status}`);
+
+  const filterOnListing = await log(reader.token, [
+    {
+      id: crypto.randomUUID(),
+      kind: 'filter',
+      surface: 'buy',
+      occurred_at: new Date().toISOString(),
+      filter: { query: 'speedmaster' },
+      listing_id: crypto.randomUUID(),
+    },
+  ]);
+  check('a filter row naming a listing is refused', filterOnListing.status >= 400, `got ${filterOnListing.status}`);
+
+  const good = save();
+  const mixed = await log(reader.token, [good, save({ listing_id: null })]);
+  const goodRows = await stored(good.id);
+  check(
+    'one bad row refuses the whole batch',
+    mixed.status >= 400 && goodRows.length === 0,
+    `got ${mixed.status}, ${goodRows.length} rows`,
+  );
+
+  const tooMany = await log(
+    reader.token,
+    Array.from({ length: 101 }, () => save()),
+  );
+  check('a batch over 100 rows is refused', tooMany.status >= 400, `got ${tooMany.status}`);
+
+  const shopReport = async () => {
+    const body = { p_dealer_id: dealerId };
+    const stats = await api('/rest/v1/rpc/dealer_stats', { token: importer.token, method: 'POST', body });
+    const top = await api('/rest/v1/rpc/dealer_top_customers', { token: importer.token, method: 'POST', body });
+    return { stats: stats.body, top: top.body };
+  };
+  const before = await shopReport();
+  const exposure = crypto.randomUUID();
+  const onTheShop = { listing_id: listingId, dealer_id: dealerId, occurred_at: new Date().toISOString() };
+  const shopLogged = await log(reader.token, [
+    { ...onTheShop, id: crypto.randomUUID(), kind: 'impression', surface: 'buy', exposure_id: exposure, position: 0 },
+    { ...onTheShop, id: crypto.randomUUID(), kind: 'dwell', surface: 'buy', exposure_id: exposure, dwell_ms: 4000, photo_index: 2 },
+    { ...onTheShop, id: crypto.randomUUID(), kind: 'dealer_click', surface: 'buy', exposure_id: exposure },
+    { ...onTheShop, id: crypto.randomUUID(), kind: 'save', surface: 'buy', exposure_id: exposure },
+  ]);
+  const after = await shopReport();
+  const statFields = Object.keys(after.stats?.[0] ?? {});
+  check(
+    "a shop's stats and top customers do not move when buyers log events on its watch",
+    shopLogged.body === 4 &&
+      statFields.length > 0 &&
+      JSON.stringify(after) === JSON.stringify(before) &&
+      !statFields.some((field) => /impression|dwell|exposure|event/.test(field)),
+    JSON.stringify({ logged: shopLogged.body, before, after }),
+  );
+
+  for (const user of [reader, other]) {
+    await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
+  }
+  const left = await fetch(`${URL}/rest/v1/buyer_events?user_id=in.(${reader.id},${other.id})&select=id`, {
+    headers: admin,
+  }).then((r) => r.json());
+  check(
+    "deleting an account deletes that account's events",
+    Array.isArray(left) && left.length === 0,
+    JSON.stringify(left),
+  );
+}
+
 await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);

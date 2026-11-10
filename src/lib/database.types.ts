@@ -34,6 +34,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      buyer_events: {
+        Row: {
+          dealer_id: string | null
+          dwell_ms: number | null
+          exposure_id: string | null
+          filter: Json | null
+          guest_key: string | null
+          id: string
+          kind: Database["public"]["Enums"]["buyer_event_kind"]
+          listing_id: string | null
+          occurred_at: string
+          photo_index: number | null
+          position: number | null
+          received_at: string
+          surface: Database["public"]["Enums"]["buyer_event_surface"]
+          user_id: string
+        }
+        Insert: {
+          dealer_id?: string | null
+          dwell_ms?: number | null
+          exposure_id?: string | null
+          filter?: Json | null
+          guest_key?: string | null
+          id: string
+          kind: Database["public"]["Enums"]["buyer_event_kind"]
+          listing_id?: string | null
+          occurred_at: string
+          photo_index?: number | null
+          position?: number | null
+          received_at?: string
+          surface: Database["public"]["Enums"]["buyer_event_surface"]
+          user_id: string
+        }
+        Update: {
+          dealer_id?: string | null
+          dwell_ms?: number | null
+          exposure_id?: string | null
+          filter?: Json | null
+          guest_key?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["buyer_event_kind"]
+          listing_id?: string | null
+          occurred_at?: string
+          photo_index?: number | null
+          position?: number | null
+          received_at?: string
+          surface?: Database["public"]["Enums"]["buyer_event_surface"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       catalogue_batch_listings: {
         Row: {
           batch_id: string
@@ -2180,6 +2231,7 @@ export type Database = {
           published_listings: number
         }[]
       }
+      log_buyer_events: { Args: { p_events: Json }; Returns: number }
       lookup_claimable_dealer: {
         Args: { p_website: string }
         Returns: {
@@ -2731,6 +2783,30 @@ export type Database = {
     Enums: {
       account_type: "buyer" | "dealer"
       application_status: "pending" | "approved" | "declined"
+      buyer_event_kind:
+        | "impression"
+        | "dwell"
+        | "save"
+        | "pass"
+        | "unsave"
+        | "undo"
+        | "dealer_click"
+        | "inquiry_open"
+        | "follow"
+        | "unfollow"
+        | "filter"
+      buyer_event_surface:
+        | "buy"
+        | "buy_grid"
+        | "search"
+        | "new"
+        | "drops"
+        | "detail"
+        | "viewer"
+        | "wishlist"
+        | "shop"
+        | "profile"
+        | "messages"
       case_material:
         | "steel"
         | "yellow_gold"
@@ -2958,6 +3034,32 @@ export const Constants = {
     Enums: {
       account_type: ["buyer", "dealer"],
       application_status: ["pending", "approved", "declined"],
+      buyer_event_kind: [
+        "impression",
+        "dwell",
+        "save",
+        "pass",
+        "unsave",
+        "undo",
+        "dealer_click",
+        "inquiry_open",
+        "follow",
+        "unfollow",
+        "filter",
+      ],
+      buyer_event_surface: [
+        "buy",
+        "buy_grid",
+        "search",
+        "new",
+        "drops",
+        "detail",
+        "viewer",
+        "wishlist",
+        "shop",
+        "profile",
+        "messages",
+      ],
       case_material: [
         "steel",
         "yellow_gold",
