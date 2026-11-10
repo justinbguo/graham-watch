@@ -38,6 +38,12 @@ function held(fields: Record<string, unknown> = {}) {
 // The regression this exists for. Collectors Corner NY type their watches
 // DRESS, SPORT, DIVER and MILITARY/FIELD. A filter demanding the word "watch"
 // kept 3 of their 87 available watches and dropped the other 84 in silence.
+Deno.test('keeps a wristwatch filed under a parts and accessories breadcrumb', () => {
+  const type = 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Wristwatches';
+  assertEquals(kept({ product_type: type })?.title, 'Rolex Explorer 1016');
+  assertEquals(kept({ product_type: type })?.holdReason, undefined);
+});
+
 Deno.test('keeps a watch typed with the shop own taxonomy', () => {
   for (const type of ['DRESS', 'SPORT', 'DIVER', 'MILITARY/FIELD', 'PILOTS', 'FUNKY/RETRO']) {
     assertEquals(kept({ product_type: type })?.title, 'Rolex Explorer 1016', type);
