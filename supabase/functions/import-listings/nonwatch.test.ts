@@ -287,6 +287,14 @@ const WATCHES: CatalogueFields[] = [
     title: 'Vintage Elgin B.W. Raymond Railroad Pocket Watch',
     productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Pocket Watches',
   }),
+  item({
+    title: "Vintage Ni-Lite 17 Jewel Men's Automatic Wristwatch ETA 2472 w Original Band NOS",
+    productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Wristwatches',
+  }),
+  item({
+    title: "Vintage 35mm Movado Tempo-Matic Men's Automatic Wristwatch 2562PC w NSA Band",
+    productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Wristwatches',
+  }),
 ];
 
 Deno.test('holds the junk the shops actually listed', () => {

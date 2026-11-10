@@ -59,7 +59,9 @@ shop's own taxonomy, not a description: Collectors Corner NY type their watches
 `DRESS`, `SPORT`, `DIVER` and `MILITARY/FIELD`, and requiring the word "watch" kept
 3 of their 87 available watches. An untyped product is kept, because plenty of shops
 leave the field blank. The word "watch" earns a type nothing either — `Watch Straps`
-is a strap. Every refusal is returned with its reason and listed in the operator
+is a strap. A path such as `Jewelry & Watches > … > Wristwatches` is read from its
+last segment, so `Accessories` or `Jewelry` earlier in the path does not hold the
+watch. Every refusal is returned with its reason and listed in the operator
 console, so a wrong call here is visible rather than silent.
 
 Currency lives in `/meta.json`, never in `products.json`. Images take `?width=1500`,
