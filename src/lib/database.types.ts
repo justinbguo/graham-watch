@@ -1058,6 +1058,7 @@ export type Database = {
           id: string
           listings_created: number
           provider: string
+          resume_page: number | null
           source_url: string
           status: Database["public"]["Enums"]["import_status"]
           user_id: string | null
@@ -1070,6 +1071,7 @@ export type Database = {
           id?: string
           listings_created?: number
           provider: string
+          resume_page?: number | null
           source_url: string
           status?: Database["public"]["Enums"]["import_status"]
           user_id?: string | null
@@ -1082,6 +1084,7 @@ export type Database = {
           id?: string
           listings_created?: number
           provider?: string
+          resume_page?: number | null
           source_url?: string
           status?: Database["public"]["Enums"]["import_status"]
           user_id?: string | null
