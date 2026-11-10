@@ -285,8 +285,8 @@ test('changing filter or sort is a new query and does not reuse the cursor', () 
   assert.match(listings, /useInfiniteQuery<[^;]{0,500}string \| null/);
   assert.match(listings, /initialPageParam: null,/);
   assert.match(listings, /getNextPageParam: \(lastPage\) => nextDeckCursor\(lastPage\)/);
-  assert.match(listings, /queryFn: \(\{ pageParam \}\) => fetchDeckPage\(limit, filters, pageParam, sort, favoritesFirst\)/);
-  assert.match(listings, /rpc\('search_listings_v2'/);
+  assert.match(listings, /queryFn: \(\{ pageParam \}\) => fetchDeckPage\(limit, filters, pageParam, sort, favoritesFirst, seed\)/);
+  assert.match(listings, /rpc\('rank_buy_feed'/);
   assert.match(listings, /rpc\('listing_counts_v2'/);
   assert.match(listings, /p_cursor: cursor/);
   assert.match(listings, /p_spec: canonicalize\(filters\)\.spec as Json/);
@@ -336,7 +336,7 @@ test('deck and counts keys ignore filter order and defaults', () => {
   // load that module (its import has no extension; the app bundler resolves it),
   // so this checks the delegation instead of importing it.
   const keysSource = readFileSync(new URL('../src/data/keys.ts', import.meta.url), 'utf8');
-  assert.match(keysSource, /deckCacheKey\(filters, sort, favoritesFirst\)/);
+  assert.match(keysSource, /deckCacheKey\(filters, sort, favoritesFirst, taste\)/);
   assert.match(keysSource, /counts: \(filters: unknown\) => countsCacheKey\(filters\)/);
 });
 

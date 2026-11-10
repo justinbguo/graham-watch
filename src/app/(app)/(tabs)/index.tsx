@@ -9,6 +9,7 @@ import { DeckRailButton } from '@/components/DeckRailButton';
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
 import { DeckCoach } from '@/features/deck/DeckCoach';
+import { GuestTasteSheet } from '@/features/deck/GuestTasteSheet';
 import { deckCardZ } from '@/features/deck/stack';
 import { useDeckStack } from '@/features/deck/useDeckStack';
 import { useDeckColumns } from '@/features/deck/useGridColumns';
@@ -24,6 +25,7 @@ import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/S
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
+import { useGuestTaste } from '@/data/guestTaste';
 import { logEvent, useExposure } from '@/data/listingEvents';
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
@@ -50,6 +52,8 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Deck() {
   const { userId, isSignedIn } = useSession();
   const guest = useGuest();
+  const taste = useGuestTaste();
+  const holdTaste = !isSignedIn && (!taste.ready || !taste.taste.settled);
   const {
     data: cards = [],
     isPending,
@@ -96,7 +100,7 @@ export default function Deck() {
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
   const deckOnTop = pathname === '/' || pathname === '/index';
-  useSignInOnArrival(deckOnTop);
+  useSignInOnArrival(deckOnTop && !holdTaste);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const { columns, columnChoice, choose: chooseColumns } = useDeckColumns();
@@ -267,7 +271,7 @@ export default function Deck() {
     void fetchNextPage();
   }, [fetchNextPage]);
 
-  const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0;
+  const deckKeysOn = deckOnTop && !holdTaste && Platform.OS === 'web' && cards.length > 0;
   const cardSwipeKeysOn = deckKeysOn && view === 'cards';
 
   useWebArrowSwipe(
@@ -356,6 +360,14 @@ export default function Deck() {
   // `matched` is still above zero the next page is on its way, and the empty
   // copy here would tell the buyer the catalogue was finished.
   const showEmpty = showDeckEmpty(cards.length, counts?.matched);
+  const tasteSheet =
+    !isSignedIn && !taste.taste.settled ? (
+      taste.ready ? (
+        <GuestTasteSheet onSettle={(next) => void taste.settle(next)} />
+      ) : (
+        <View style={styles.tasteHold} />
+      )
+    ) : null;
 
   useExposure(view === 'cards' && !error ? topListing : null, {
     surface: 'buy',
@@ -368,7 +380,7 @@ export default function Deck() {
     return (
       <Screen titleControl={titleControl} inTabs>
         {frameDesktop(<Spinner />)}
-      </Screen>
+      {tasteSheet}</Screen>
     );
   }
 
@@ -381,7 +393,7 @@ export default function Deck() {
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
         </Centered>
         )}
-      </Screen>
+      {tasteSheet}</Screen>
     );
   }
 
@@ -416,7 +428,7 @@ export default function Deck() {
           )}
         </Centered>
         )}
-      </Screen>
+      {tasteSheet}</Screen>
     );
   }
 
@@ -458,7 +470,7 @@ export default function Deck() {
             />
           </Animated.View>
         )}
-      </Screen>
+      {tasteSheet}</Screen>
     );
   }
 
@@ -540,7 +552,7 @@ export default function Deck() {
           </Animated.View>
         </View>
       )}
-    </Screen>
+    {tasteSheet}</Screen>
   );
 }
 
@@ -598,6 +610,15 @@ function tally(counts: ListingCounts | undefined, filtered: boolean) {
 }
 
 const deckStyles = (_theme: Theme) => ({
+  tasteHold: {
+    position: 'absolute' as const,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 30,
+    backgroundColor: _theme.color.background,
+  },
   headerBar: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,

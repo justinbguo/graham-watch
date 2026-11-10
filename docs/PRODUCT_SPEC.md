@@ -210,8 +210,16 @@ button gone.
 ## 9. Deck behavior
 
 The deck serves listings from approved dealers that the user has not swiped and did not
-import, newest first, ranked by the brands chosen at sign-up. Swipes are append-only,
-unique on `(actor_id, listing_id)`. The wishlist is the set of right-swipes — no second table.
+import. The order is a personal score, not newest-first. A dealer-site click outweighs a
+save, and that full weight lands on the brand. The style and the price band take a
+smaller share of the same gesture. A pass is a mild negative. An undo removes the
+action it takes back and does not count on its own. A followed shop is boosted by more
+than one click. Brands, styles, and price bands the buyer engages with rise, and the
+feed still mixes in other brands so one favourite cannot fill the top. With no history,
+newer watches that have a price and photos come first, and a followed shop still rises.
+Brands chosen at sign-up are a prior on that score. A guest answers a short, skippable
+set of picks (brands, styles, price) that seeds the same score. Swipes are append-only, unique on `(actor_id, listing_id)`. The wishlist is the
+set of right-swipes. There is no second table.
 
 A pass is reversible two ways: the undo arrow takes back the last one, and "start over"
 puts back every pass at once. Wishlist watches are never replayed; they are already on the wishlist.
