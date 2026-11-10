@@ -80,7 +80,10 @@ export function ConversationScreen({
   const emailDealerId =
     data?.header && !data.header.writable ? data.header.threadDealerId : null;
   const needsEmailListing = Boolean(emailDealerId && !namedListingId);
-  const { data: dealerInquiryListing, isPending: dealerListingPending } = useDealerInquiryListing(
+  // `isPending` stays true for a query that is not allowed to run. This lookup
+  // only runs when the thread names no watch, so that reading would leave Email
+  // disabled on every thread that already has one.
+  const { data: dealerInquiryListing, isLoading: dealerListingPending } = useDealerInquiryListing(
     needsEmailListing ? emailDealerId : null,
   );
   const inquiryCard = listing ?? dealerInquiryListing ?? null;
