@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
-import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from '../import-listings/catalog.ts';
+import { MAX_CATALOG_ITEMS, PAGES_PER_CALL, readCatalog, syncCatalog } from '../import-listings/catalog.ts';
 import { discover, readProfile } from '../import-listings/discover.ts';
 import { fixtureImportAllowed } from '../import-listings/fixture.ts';
 import { SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
@@ -67,6 +67,53 @@ async function reusedCatalog(dealerId: string) {
     skipped: 0,
     complete: true,
   };
+}
+
+type ResumeRow = { id: string; resume_page: number; catalog_read_at: string };
+
+async function runningResume(sourceUrl: string, dealerId: string | null): Promise<ResumeRow | null> {
+  const job = await admin()
+    .from('import_jobs')
+    .select('id, dealer_id, resume_page, catalog_read_at')
+    .eq('source_url', sourceUrl)
+    .eq('status', 'running')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (job.error) throw new OperatorError(job.error.message, 502);
+  const row = (job.data ?? []).find((item) =>
+    dealerId ? item.dealer_id === dealerId : item.dealer_id == null
+  );
+  if (!row || row.resume_page == null || row.catalog_read_at == null) return null;
+  return { id: row.id, resume_page: row.resume_page, catalog_read_at: row.catalog_read_at };
+}
+
+async function rememberResume(
+  existing: ResumeRow | null,
+  row: {
+    dealerId: string | null;
+    sourceUrl: string;
+    provider: string;
+    status: 'running' | 'succeeded';
+    resumePage: number | null;
+    error: string | null;
+    readAt: string;
+  },
+) {
+  const fields = {
+    user_id: null,
+    dealer_id: row.dealerId,
+    source_url: row.sourceUrl,
+    provider: row.provider,
+    status: row.status,
+    resume_page: row.resumePage,
+    catalog_read_at: row.readAt,
+    error: row.error,
+    finished_at: row.status === 'running' ? null : new Date().toISOString(),
+  };
+  const write = existing
+    ? await admin().from('import_jobs').update(fields).eq('id', existing.id)
+    : await admin().from('import_jobs').insert(fields);
+  if (write.error) throw new OperatorError(write.error.message, 502);
 }
 
 async function pendingCount(dealerId: string) {
@@ -244,12 +291,28 @@ export function liveDeps(): OperatorDeps {
     },
     async inspect(sourceUrl) {
       await assertBudget();
+      const resume = await runningResume(sourceUrl, null);
+      const startPage = resume?.resume_page ?? 1;
       try {
-        const found = await readCatalog(sourceUrl, MAX_CATALOG_ITEMS);
-        await meter(sourceUrl, null, 'succeeded', found.provider);
+        const found = await readCatalog(sourceUrl, MAX_CATALOG_ITEMS, {
+          startPage,
+          maxPages: PAGES_PER_CALL,
+        });
+        const nextPage = found.nextPage ?? null;
+        await rememberResume(resume, {
+          dealerId: null,
+          sourceUrl,
+          provider: found.provider,
+          status: nextPage == null ? 'succeeded' : 'running',
+          resumePage: nextPage,
+          error: null,
+          readAt: resume?.catalog_read_at ?? new Date().toISOString(),
+        });
         return {
           provider: found.provider,
-          complete: catalogueComplete(found, MAX_CATALOG_ITEMS),
+          page: startPage,
+          complete: nextPage == null && catalogueComplete(found, MAX_CATALOG_ITEMS),
+          ...(nextPage != null ? { nextPage } : {}),
           counts: counts(found.items, found.skipped),
           listings: found.items.slice(0, 20).map((item) => ({
             source_url: item.sourceUrl,
@@ -271,7 +334,8 @@ export function liveDeps(): OperatorDeps {
         // galleries in the same isolate is what the worker killed. A succeeded
         // job younger than six hours is the snapshot, so the caller loops and
         // each later call publishes one small batch.
-        if (await catalogueIsFresh(dealer.id, input.sourceUrl)) {
+        const resume = await runningResume(input.sourceUrl, dealer.id);
+        if (!resume && (await catalogueIsFresh(dealer.id, input.sourceUrl))) {
           const result = await reusedCatalog(dealer.id);
           const publish = await publishBatch(admin(), admin(), dealer.id, SCHEDULED_PUBLISH_BATCH);
           await meter(input.sourceUrl, dealer.id, 'succeeded', result.provider);
@@ -284,14 +348,46 @@ export function liveDeps(): OperatorDeps {
           };
         }
 
-        const result = await syncCatalog(admin(), dealer.id, input.sourceUrl, MAX_CATALOG_ITEMS);
+        const startPage = resume?.resume_page ?? 1;
+        const readAt = resume?.catalog_read_at ?? new Date().toISOString();
+        const result = await syncCatalog(admin(), dealer.id, input.sourceUrl, MAX_CATALOG_ITEMS, {
+          startPage,
+          maxPages: PAGES_PER_CALL,
+          readAt,
+        });
+        const nextPage = result.nextPage ?? null;
+        await rememberResume(resume, {
+          dealerId: dealer.id,
+          sourceUrl: input.sourceUrl,
+          provider: result.provider,
+          status: nextPage == null ? 'succeeded' : 'running',
+          resumePage: nextPage,
+          error: result.complete
+            ? null
+            : nextPage == null
+              ? 'Stopped before the end of the catalogue. Watches that were not read were left alone.'
+              : null,
+          readAt,
+        });
+        if (nextPage != null) {
+          const pending = await pendingCount(dealer.id);
+          return {
+            dealerId: dealer.id,
+            permission: dealer.permission,
+            catalogue: 'partial',
+            page: startPage,
+            ...result,
+            publish: { processed: 0, published: 0, skipped: 0, failed: 0, pending },
+          };
+        }
+
         await queuePublish(admin(), dealer.id);
         const pending = await pendingCount(dealer.id);
-        await meter(input.sourceUrl, dealer.id, 'succeeded', result.provider);
         return {
           dealerId: dealer.id,
           permission: dealer.permission,
           catalogue: 'read',
+          page: startPage,
           ...result,
           publish: { processed: 0, published: 0, skipped: 0, failed: 0, pending },
         };

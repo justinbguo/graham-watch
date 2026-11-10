@@ -3,7 +3,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { extractListings } from './extract.ts';
 import { contentFingerprint, textFingerprint } from './hash.ts';
 import { scrape } from './scrape.ts';
-import { fetchShopifyItems } from './shopify.ts';
+import { fetchShopifyItems, type ShopifyIO } from './shopify.ts';
 import {
   catalogueComplete,
   productKey,
@@ -93,14 +93,22 @@ const ADAPTERS: Record<
     fetchShopifyItems(url, limit, minPhotos, {
       startPage: slice?.startPage,
       maxPages: slice?.maxPages,
+      pageSize: slice?.pageSize,
+      fetchText: slice?.fetchText,
+      pause: slice?.pause,
     }),
   squarespace: (url, limit, minPhotos) => fetchSquarespaceItems(url, limit, minPhotos),
 };
+
+export const PAGES_PER_CALL = 1;
 
 /** One slice of a Shopify feed. Absent means read the feed in this call. */
 export type CatalogSlice = {
   startPage?: number;
   maxPages?: number;
+  pageSize?: number;
+  fetchText?: ShopifyIO['fetchText'];
+  pause?: ShopifyIO['pause'];
 };
 
 /**
@@ -218,9 +226,7 @@ export type SyncResult = {
   nextPage?: number;
 };
 
-export type SyncOptions = {
-  startPage?: number;
-  maxPages?: number;
+export type SyncOptions = CatalogSlice & {
   /** Shared by every slice of one nightly run, so absence is judged once at the end. */
   readAt?: string;
 };
