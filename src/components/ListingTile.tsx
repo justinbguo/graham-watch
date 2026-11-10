@@ -12,8 +12,6 @@ import {
 import { GridPhotoStrip } from '@/components/GridPhotoStrip';
 import { Pressable } from 'react-native-gesture-handler';
 
-import { Avatar } from '@/components/Avatar';
-import { dealerPicture } from '@/features/dealers/picture';
 import { formatPrice, formatSpecs, formatTitle } from '@/lib/format';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
 import { photoScrollPage } from '@/lib/photoPager';
@@ -22,9 +20,8 @@ import { useThemedStyles } from '@/providers/theme';
 
 /**
  * One watch in the wide home grid. The photograph is the object — rounded,
- * square, on the page. The name, specs, price, and dealer sit under it on the
- * page colour, not inside a second surface. A marketplace scan, not a card
- * of cards. Tap opens the listing.
+ * square, on the page. The shop name sits on the photograph. The title, specs,
+ * and price sit under it on the page colour. Tap opens the listing.
  */
 export function ListingTile({
   card,
@@ -46,6 +43,7 @@ export function ListingTile({
     <View style={styles.tile}>
       <TilePhotos
         photos={card.photos}
+        dealerName={card.dealer?.name}
         selected={selected}
         photoShape={photoShape}
         onPress={onPress}
@@ -72,19 +70,6 @@ export function ListingTile({
         <Text style={styles.meta} numberOfLines={1}>
           {specs}
         </Text>
-        {card.dealer ? (
-          <View style={styles.dealerRow}>
-            <View style={styles.dealerMark}>
-              <Avatar
-                url={card.dealer.logo_url}
-                px={size.iconSmall}
-                fit="contain"
-                fallback={dealerPicture}
-              />
-            </View>
-            <Text style={styles.dealer}>{card.dealer.name}</Text>
-          </View>
-        ) : null}
       </Pressable>
     </View>
   );
@@ -97,11 +82,13 @@ export function ListingTile({
  */
 function TilePhotos({
   photos,
+  dealerName,
   selected,
   photoShape,
   onPress,
 }: {
   photos: DeckPhoto[];
+  dealerName?: string;
   selected: boolean;
   photoShape: 'square' | 'swipe';
   onPress?: () => void;
@@ -134,12 +121,25 @@ function TilePhotos({
     setWidth((current) => (Math.abs(current - next) < 1 ? current : next));
   };
 
+  const shop = dealerName ? (
+    <View
+      pointerEvents="none"
+      style={[styles.shopLabel, photos.length > 1 && styles.shopLabelAboveBars]}>
+      <View style={styles.shopPill}>
+        <Text style={styles.shopLabelText} numberOfLines={1}>
+          {dealerName}
+        </Text>
+      </View>
+    </View>
+  ) : null;
+
   if (photos.length === 0) {
     return (
       <View style={frameStyle} onLayout={onLayout}>
         <View style={styles.photoEmpty}>
           <Text style={styles.photoEmptyLabel}>No photograph</Text>
         </View>
+        {shop}
       </View>
     );
   }
@@ -158,6 +158,7 @@ function TilePhotos({
           style={styles.fill}
           accessible={false}
         />
+        {shop}
       </FramePressable>
     );
   }
@@ -176,6 +177,7 @@ function TilePhotos({
           onPageChange={setPage}
           onPress={onPress}
         />
+        {shop}
       </View>
     );
   }
@@ -227,6 +229,7 @@ function TilePhotos({
           <View key={photo.id} style={[styles.bar, index === page && styles.barOn]} />
         ))}
       </View>
+      {shop}
     </View>
   );
 }
@@ -333,20 +336,26 @@ const tileStyles = (theme: Theme) => {
       color: theme.color.textFaint,
       flexShrink: 0,
     },
-    dealerRow: {
-      flexDirection: 'row' as const,
+    shopLabel: {
+      position: 'absolute' as const,
+      left: space.sm,
+      right: space.sm,
+      bottom: space.sm,
       alignItems: 'flex-start' as const,
-      gap: space.xs,
     },
-    dealerMark: {
-      height: type.control.lineHeight,
-      justifyContent: 'center' as const,
+    shopLabelAboveBars: {
+      bottom: space.md,
     },
-    dealer: {
-      ...type.control,
-      color: theme.color.text,
-      flex: 1,
-      minWidth: 0,
+    shopPill: {
+      maxWidth: '100%' as const,
+      backgroundColor: theme.color.glassFill,
+      borderRadius: radius.lg,
+      paddingHorizontal: space.sm,
+      paddingVertical: space.xs,
+    },
+    shopLabelText: {
+      ...type.caption,
+      color: theme.color.onOverlay,
     },
     pressed: {
       opacity: 0.72,

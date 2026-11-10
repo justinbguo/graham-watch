@@ -985,9 +985,11 @@ On a wide window the home grid is tiles, not rows: `layout.gridColumns`
 across. The photograph is a square (`aspectRatio: 1`) with `radius.md` and
 `contain`, sitting alone on the page — not wrapped in a `surface` card. Bars
 along its bottom page extra photos. Under it, on the page colour, the copy is the `ListingTile` block described
-below. Tiles sit `space.sm` apart. A tap opens the listing; pass and save happen there. No
-badges, hearts, or shipping lines on the photograph — those are another
-product's furniture.
+below. Tiles sit `space.sm` apart. A tap opens the listing; pass and save happen there. The
+shop name is a `caption` label in `onOverlay` on `glassFill`, `radius.lg`, in the
+bottom-left of the photograph, above the paging bars when the watch has more
+than one photo. It takes one line and ellipsizes only when the name is wider
+than the photograph. No hearts or shipping lines on the photograph.
 
 Below the breakpoint the home grid is the same tiles as a wide window, but
 `layout.gridColumnsPhone` across — photograph above the copy, `space.sm`
@@ -1030,8 +1032,7 @@ Wishlist and a dealer's shop still use `ListingRow`. The wide home grid uses
 `listingTile.titleBand`, which is two lines of `labelStrong`. A one-line title
 leaves the second line empty so the price box stays that tall. Specs stay one
 `caption` line in `textMuted` under the band, reserved even when the watch has
-none. The shop name is `control` in `text` on its own line across the tile, and
-it wraps instead of ellipsizing. Search is photographs
+none. The shop name is on the photograph, not a line under the specs. Search is photographs
 only. Wishlist used to set a 72px square thumbnail
 beside `bodyStrong` type, which made the same watch a different size depending
 on which tab you were standing in, and made the photograph too small to be
