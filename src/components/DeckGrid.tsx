@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +48,7 @@ export function DeckGrid({
   onOpen,
   active = true,
   paging,
+  header = null,
 }: {
   cards: DeckCard[];
   columns: number;
@@ -55,6 +56,8 @@ export function DeckGrid({
   /** False while a sheet covers the deck, so keys do not steer underneath it. */
   active?: boolean;
   paging: GridPaging;
+  /** Top of the list. It scrolls away with the tiles. Buy passes the shop header here. */
+  header?: ReactElement | null;
 }) {
   const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(gridStyles);
@@ -208,6 +211,7 @@ export function DeckGrid({
         onLayout={onLayout}
         onContentSizeChange={onContentSizeChange}
         {...exposures}
+        ListHeaderComponent={header ? <View style={styles.listHeader}>{header}</View> : null}
         ListFooterComponent={<GridFooter paging={paging} padLeft={rowPadLeft} padRight={rowPadRight} />}
         renderItem={({ item, index }) => (
           <View
@@ -294,6 +298,11 @@ const gridStyles = (theme: Theme) => ({
   contentDesktop: {
     paddingHorizontal: 0,
     paddingBottom: 0,
+  },
+  // The list's gap already sits under this header. The remainder is the
+  // space the shop header used to take above the grid.
+  listHeader: {
+    paddingBottom: space.md - GAP,
   },
   row: {
     gap: GAP,

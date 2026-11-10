@@ -984,10 +984,8 @@ on a desktop — which is a snap nobody would read as intentional.
 On a wide window the home grid is tiles, not rows: `layout.gridColumns`
 across. The photograph is a square (`aspectRatio: 1`) with `radius.md` and
 `contain`, sitting alone on the page — not wrapped in a `surface` card. Bars
-along its bottom page extra photos. Under it, on the page colour: the name
-(`labelStrong`), the specs (`caption` / `textMuted`), then a row with the
-price on the left and the dealer in `brass` on the right. Tiles sit
-`space.md` apart. A tap opens the listing; pass and save happen there. No
+along its bottom page extra photos. Under it, on the page colour, the copy is the `ListingTile` block described
+below. Tiles sit `space.sm` apart. A tap opens the listing; pass and save happen there. No
 badges, hearts, or shipping lines on the photograph — those are another
 product's furniture.
 
@@ -1023,15 +1021,17 @@ Stacked they were a third and a fourth line
 of type in a block that is only as tall as its photograph.
 
 Maker and model are one line in one size — `formatTitle`, "Omega Speedmaster Professional,
-1972" — and that line stops at two. A short name does not reserve a blank line under
+1972" — and that line stops at two. On a list row, a short name does not reserve a blank line under
 it. The brand used to be an `eyebrow` over the model, which made every row look like a
 section heading.
 
 Wishlist and a dealer's shop still use `ListingRow`. The wide home grid uses
-`ListingTile` instead — same facts, stacked for columns. In `ListingTile`,
-the title and specs sit on the left, while the price sits in the top-right
-corner inside an outlined `money` box with `money` font, with the seller row
-directly underneath. Search is photographs
+`ListingTile` instead. The title and the outlined `money` price share one band,
+`listingTile.titleBand`, which is two lines of `labelStrong`. A one-line title
+leaves the second line empty so the price box stays that tall. Specs stay one
+`caption` line in `textMuted` under the band, reserved even when the watch has
+none. The shop name is `control` in `text` on its own line across the tile, and
+it wraps instead of ellipsizing. Search is photographs
 only. Wishlist used to set a 72px square thumbnail
 beside `bodyStrong` type, which made the same watch a different size depending
 on which tab you were standing in, and made the photograph too small to be

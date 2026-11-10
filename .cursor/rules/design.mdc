@@ -181,8 +181,9 @@ nobody follows.
   control picks up to `gridColumnsMax`), and nowhere else. On desktop web a tile
   stops at `layout.deckGridTileCap`, so two per row does not stretch into a poster.
   Tiles are a square photograph alone
-  on the page (`contain`, `radius.md`), name / specs / price+dealer under it —
-  no `surface` wrapping the block. The wishlist and a shop use `ListingRow`:
+  on the page (`contain`, `radius.md`). Under it, the title and the price share
+  a two-line band, the specs are one line, and the shop name wraps across the
+  tile. No `surface` wraps the block. The wishlist and a shop use `ListingRow`:
   photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;
   wishlist and any scan row), `gridPhoto` in a shop, details on the right. The
   row or tile does not pass or save — that happens on the listing it opens.

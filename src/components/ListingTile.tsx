@@ -17,7 +17,7 @@ import { dealerPicture } from '@/features/dealers/picture';
 import { formatPrice, formatSpecs, formatTitle } from '@/lib/format';
 import type { DeckCard, DeckPhoto } from '@/lib/models';
 import { photoScrollPage } from '@/lib/photoPager';
-import { fieldOutline, layout, radius, size, space, type, type Theme } from '@/lib/theme';
+import { fieldOutline, layout, listingTile, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 /**
@@ -57,36 +57,34 @@ export function ListingTile({
         accessibilityLabel={formatTitle(card)}
         onPress={onPress}
         style={({ pressed }) => [styles.copy, pressed && styles.pressed]}>
-        <View style={styles.infoCol}>
-          <Text style={styles.title} numberOfLines={2}>
-            {formatTitle(card)}
-          </Text>
-          {specs ? (
-            <Text style={styles.meta} numberOfLines={1}>
-              {specs}
+        <View style={styles.band}>
+          <View style={styles.titleSlot}>
+            <Text style={styles.title} numberOfLines={listingTile.titleLines}>
+              {formatTitle(card)}
             </Text>
-          ) : null}
-        </View>
-        <View style={styles.sideCol}>
+          </View>
           <View style={card.sold_at ? styles.soldBadge : styles.priceBadge}>
             <Text style={card.sold_at ? styles.sold : styles.price} numberOfLines={1}>
               {card.sold_at ? 'Sold' : formatPrice(card)}
             </Text>
           </View>
-          {card.dealer ? (
-            <View style={styles.dealerRow}>
+        </View>
+        <Text style={styles.meta} numberOfLines={1}>
+          {specs}
+        </Text>
+        {card.dealer ? (
+          <View style={styles.dealerRow}>
+            <View style={styles.dealerMark}>
               <Avatar
                 url={card.dealer.logo_url}
                 px={size.iconSmall}
                 fit="contain"
                 fallback={dealerPicture}
               />
-              <Text style={styles.dealer} numberOfLines={1}>
-                {card.dealer.name}
-              </Text>
             </View>
-          ) : null}
-        </View>
+            <Text style={styles.dealer}>{card.dealer.name}</Text>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -233,122 +231,125 @@ function TilePhotos({
   );
 }
 
-const tileStyles = (theme: Theme) => ({
-  tile: {
-    flex: 1,
-  },
-  // The photograph is the only block. Type sits on the page under it.
-  frame: {
-    width: '100%' as const,
-    aspectRatio: 1,
-    borderRadius: radius.md,
-    overflow: 'hidden' as const,
-    backgroundColor: theme.color.photoMat,
-    borderWidth: 0,
-  },
-  frameSwipe: {
-    width: '100%' as const,
-    aspectRatio: layout.deckGridPhotoAspect,
-    borderRadius: radius.lg,
-    overflow: 'hidden' as const,
-    backgroundColor: theme.color.background,
-    borderWidth: 0,
-  },
-  fill: {
-    width: '100%' as const,
-    height: '100%' as const,
-  },
-  photoEmpty: {
-    flex: 1,
-    alignItems: 'center' as const,
+const tileStyles = (theme: Theme) => {
+  const priceFrame = {
+    borderWidth: fieldOutline,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.xs,
     justifyContent: 'center' as const,
-  },
-  photoEmptyLabel: {
-    ...type.caption,
-    color: theme.color.textFaint,
-  },
-  bars: {
-    position: 'absolute' as const,
-    left: space.sm,
-    right: space.sm,
-    bottom: space.sm,
+    flexShrink: 0,
+    height: listingTile.titleBand,
+    maxWidth: `${listingTile.priceMaxShare * 100}%` as const,
+  };
+  return {
+    tile: {
+      flex: 1,
+    },
+    // The photograph is the only block. Type sits on the page under it.
+    frame: {
+      width: '100%' as const,
+      aspectRatio: 1,
+      borderRadius: radius.md,
+      overflow: 'hidden' as const,
+      backgroundColor: theme.color.photoMat,
+      borderWidth: 0,
+    },
+    frameSwipe: {
+      width: '100%' as const,
+      aspectRatio: layout.deckGridPhotoAspect,
+      borderRadius: radius.lg,
+      overflow: 'hidden' as const,
+      backgroundColor: theme.color.background,
+      borderWidth: 0,
+    },
+    fill: {
+      width: '100%' as const,
+      height: '100%' as const,
+    },
+    photoEmpty: {
+      flex: 1,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    photoEmptyLabel: {
+      ...type.caption,
+      color: theme.color.textFaint,
+    },
+    bars: {
+      position: 'absolute' as const,
+      left: space.sm,
+      right: space.sm,
+      bottom: space.sm,
+      flexDirection: 'row' as const,
+      gap: space.xs,
+    },
+    bar: {
+      flex: 1,
+      height: size.segment,
+      backgroundColor: theme.color.textFaint,
+    },
+    barOn: {
+      backgroundColor: theme.color.text,
+    },
+    copy: {
+      paddingTop: space.sm,
+      gap: space.xs,
+    },
+  band: {
     flexDirection: 'row' as const,
-    gap: space.xs,
-  },
-  bar: {
-    flex: 1,
-    height: size.segment,
-    backgroundColor: theme.color.textFaint,
-  },
-  barOn: {
-    backgroundColor: theme.color.text,
-  },
-  copy: {
-    paddingTop: space.sm,
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
     alignItems: 'flex-start' as const,
     gap: space.sm,
   },
-  infoCol: {
+  titleSlot: {
     flex: 1,
     minWidth: 0,
-    gap: space.xs,
-  },
-  sideCol: {
-    alignItems: 'flex-end' as const,
-    gap: space.xs,
-    maxWidth: '50%' as const,
-    flexShrink: 0,
+    height: listingTile.titleBand,
+    overflow: 'hidden' as const,
   },
   title: {
-    ...type.labelStrong,
+    ...listingTile.title,
     color: theme.color.text,
   },
-  meta: {
-    ...type.caption,
-    color: theme.color.textMuted,
-  },
-  priceBadge: {
-    borderWidth: fieldOutline,
-    borderColor: theme.color.money,
-    borderRadius: radius.sm,
-    paddingHorizontal: space.xs,
-    paddingVertical: space.xs / 2,
-    alignSelf: 'flex-end' as const,
-  },
-  soldBadge: {
-    borderWidth: fieldOutline,
-    borderColor: theme.color.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: space.xs,
-    paddingVertical: space.xs / 2,
-    alignSelf: 'flex-end' as const,
-  },
-  price: {
-    ...type.priceSmall,
-    color: theme.color.money,
-    flexShrink: 0,
-  },
-  sold: {
-    ...type.priceSmall,
-    color: theme.color.textFaint,
-    flexShrink: 0,
-  },
-  dealerRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'flex-end' as const,
-    gap: space.xs,
-    maxWidth: '100%' as const,
-  },
-  dealer: {
-    ...type.control,
-    color: theme.color.text,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-});
+    meta: {
+      ...type.caption,
+      color: theme.color.textMuted,
+      minHeight: type.caption.lineHeight,
+    },
+    priceBadge: {
+      ...priceFrame,
+      borderColor: theme.color.money,
+    },
+    soldBadge: {
+      ...priceFrame,
+      borderColor: theme.color.border,
+    },
+    price: {
+      ...type.priceSmall,
+      color: theme.color.money,
+      flexShrink: 0,
+    },
+    sold: {
+      ...type.priceSmall,
+      color: theme.color.textFaint,
+      flexShrink: 0,
+    },
+    dealerRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'flex-start' as const,
+      gap: space.xs,
+    },
+    dealerMark: {
+      height: type.control.lineHeight,
+      justifyContent: 'center' as const,
+    },
+    dealer: {
+      ...type.control,
+      color: theme.color.text,
+      flex: 1,
+      minWidth: 0,
+    },
+    pressed: {
+      opacity: 0.72,
+    },
+  };
+};

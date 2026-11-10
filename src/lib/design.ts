@@ -397,6 +397,22 @@ export const type = {
   },
 } satisfies Record<string, TextStyle>;
 
+const listingTileTitle = type.labelStrong;
+const listingTileTitleLines = 2;
+
+/**
+ * Buy grid copy under the photograph. The title slot and the price outline
+ * are both this band tall, so a one-line title and a two-line title share one
+ * height. The shop name is not in the band. The price share is only a ceiling
+ * for a price wider than half the tile.
+ */
+export const listingTile = {
+  title: listingTileTitle,
+  titleLines: listingTileTitleLines,
+  titleBand: listingTileTitle.lineHeight * listingTileTitleLines,
+  priceMaxShare: 0.5,
+} as const;
+
 /**
  * 8-point scale. Screen gutters and section gaps sit on the large end so a
  * watch photo has air around it. Controls stay on `sm`/`md` so a field does
