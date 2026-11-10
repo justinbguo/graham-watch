@@ -15,6 +15,7 @@ export function DeckRailButton({
   active = false,
   variant = 'default',
   accessibilityLabel,
+  accessibilityRole = 'button',
 }: {
   label: string;
   icon: RailIcon;
@@ -24,6 +25,7 @@ export function DeckRailButton({
   /** Filled accent pill for a primary rail action (e.g. New post). */
   variant?: 'default' | 'primary';
   accessibilityLabel?: string;
+  accessibilityRole?: 'button' | 'link';
 }) {
   const styles = useThemedStyles(railButtonStyles);
   const theme = useTheme();
@@ -38,7 +40,7 @@ export function DeckRailButton({
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
       disabled={disabled}

@@ -8,6 +8,7 @@ import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
+import { GiveFeedback } from '@/features/feedback/GiveFeedback';
 import { inset, layout, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
@@ -55,6 +56,7 @@ export function SignInPanel({
       </View>
 
       <SignInDoors signIn={signIn} modal={modal} />
+      {modal ? null : <GiveFeedback placement="plain" />}
       {footer}
     </>
   );

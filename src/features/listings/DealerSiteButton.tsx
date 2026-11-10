@@ -1,19 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
-import { Platform, Pressable, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { dealerSocialHitSlop } from '@/features/dealers/socialButton';
 import { listingSourceUrl } from '@/lib/listingSource';
+import { openExternal } from '@/lib/openExternal';
 import { controlText, fieldOutline, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
-
-export function openListingSource(url: string): void {
-  if (Platform.OS === 'web') {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  void Linking.openURL(url);
-}
 
 export function DealerSiteButton({
   url,
@@ -32,7 +24,7 @@ export function DealerSiteButton({
       accessibilityRole="link"
       accessibilityLabel="View on dealer site"
       hitSlop={dealerSocialHitSlop(size.follow)}
-      onPress={() => openListingSource(href)}
+      onPress={() => openExternal(href)}
       style={({ pressed }) => [styles.link, grouped && styles.stretch, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name="link-variant"
