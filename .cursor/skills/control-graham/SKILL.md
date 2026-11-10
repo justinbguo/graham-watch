@@ -58,7 +58,7 @@ $CG signin ada              # prints a one-time code; local also auto-fills from
 
 Local codes land in Mailpit (`http://127.0.0.1:54324`) and the app auto-reads them when the Supabase URL is local. Never sign in as `seed-shop@graham.test` — the deck hides that shop's watches from whoever added them.
 
-Guest web (demo and local unsigned): Buy is open; after `GUEST_SWIPE_BUDGET` (10) judgments the sign-in sheet opens. Header **Log in** is the deliberate entry.
+Demo is signed in, so the arrival sheet and the ten-swipe gate do not run there. Unsigned web (local mode before `signin`) opens the sign-in sheet over Buy once per page load. Dismiss it with `Close` or `Not now`. After `GUEST_SWIPE_BUDGET` (10) judgments the sheet opens again. Web has no header Log in. Android shows `Log in`.
 
 ## Doctor
 

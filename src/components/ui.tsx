@@ -244,6 +244,7 @@ export function Button({
   loading = false,
   disabled = false,
   compact = false,
+  accessibilityRole = 'button',
 }: {
   label: string;
   /** A glyph that names the same act as the label. Silent: the label is spoken. */
@@ -254,6 +255,7 @@ export function Button({
   disabled?: boolean;
   /** Header actions: `HIT_TARGET` tall, not `controlMin`. */
   compact?: boolean;
+  accessibilityRole?: 'button' | 'link';
 }) {
   const styles = useThemedStyles(buttonStyles);
   const theme = useTheme();
@@ -261,7 +263,7 @@ export function Button({
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       onPress={onPress}
       disabled={isDisabled}

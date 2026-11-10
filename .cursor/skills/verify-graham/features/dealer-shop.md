@@ -1,6 +1,6 @@
 # Dealer shop management
 
-A dealer who has claimed a shop edits it from Profile: the shop's details, its live listings, and an import of their own catalogue. Claiming does not approve the shop. Approval stays with an operator.
+A dealer who has claimed a shop edits the shop's details on Profile. The live listing list and the catalogue import are on the Deal tab, under Listings. Claiming does not approve the shop. Approval stays with an operator.
 
 ## Sub-features
 
@@ -11,7 +11,7 @@ A dealer who has claimed a shop edits it from Profile: the shop's details, its l
 
 ## How to get to it (user POV)
 
-Sign in as the dealer and open Profile. The editor is on that page, with counts `Live listings`, `Wishlists`, and `Inquiries`. A listing opens into the editor. Import starts from the shop tools, not from the buyer deck.
+Sign in as the dealer and open Profile. The editor is on that page, with counts `Live listings`, `Wishlists`, and `Inquiries`. Open the Deal tab, then Listings, to edit a watch or import. Import starts from the button `Import from your website`, not from the buyer deck.
 
 ## Driving it with control-graham
 
@@ -27,3 +27,4 @@ Preconditions:
 - `screenshot --as dealer` signs in as the dealer. Do not use that shot as the buyer badge proof.
 - The dealer's own deck hides their claimed shop. Look at Profile, not Buy, for Test Bench's editor.
 - Approving the shop is the operator console, not a control on this page.
+- The Messages section of Deal shows `Not in scope right now, but you're free to test.` The banner is not a control. Listings, Analytics, Payments, and Support do not show it.

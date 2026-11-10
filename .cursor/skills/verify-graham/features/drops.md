@@ -45,3 +45,4 @@ The captured push title is `New watches`. The body is `1 new watch from Test Ben
 - Opening `/drops` or `/drops?dealerId=<id>` calls `mark_drops_seen` and the badge goes to 0. The tour screenshots Messages and Profile before it opens the feed. Opening a shop still clears that shop.
 - The capture server must be the only push target. If `captured` is empty, the run failed even when the function returns `sent: 1`.
 - The Messages tab count is unread threads plus unseen drops. The proof buyer has no threads, so the tab number is the drop count.
+- Messages shows a banner, `Not in scope right now, but you're free to test.` The same banner is on Community, a conversation, and the Messages section of a claimed shop's Deal tab. It is not a control. The drops row is still `New from dealers you follow, N`.

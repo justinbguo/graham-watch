@@ -1,21 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
-import { Platform, Pressable, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { logEvent } from '@/data/listingEvents';
 import { dealerSocialHitSlop } from '@/features/dealers/socialButton';
 import { listingSourceUrl } from '@/lib/listingSource';
 import type { BuyerEventSurface, DeckCard } from '@/lib/models';
+import { openExternal } from '@/lib/openExternal';
 import { controlText, fieldOutline, radius, size, space, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
-
-export function openListingSource(url: string): void {
-  if (Platform.OS === 'web') {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  void Linking.openURL(url);
-}
 
 export function DealerSiteButton({
   card,
@@ -39,7 +31,7 @@ export function DealerSiteButton({
       hitSlop={dealerSocialHitSlop(size.follow)}
       onPress={() => {
         logEvent({ kind: 'dealer_click', surface, listing: card });
-        openListingSource(href);
+        openExternal(href);
       }}
       style={({ pressed }) => [styles.link, grouped && styles.stretch, pressed && styles.pressed]}>
       <MaterialCommunityIcons

@@ -16,6 +16,7 @@ import { useDeckTutorial } from '@/features/deck/useDeckTutorial';
 import { usePrefetchDeckPhotos } from '@/features/deck/usePrefetchDeckPhotos';
 import { DeckDealerHeader } from '@/features/deck/DeckDealerHeader';
 import { DealerDirectory } from '@/features/dealers/DealerDirectory';
+import { GiveFeedback } from '@/features/feedback/GiveFeedback';
 import { FilterMenu } from '@/features/filters/FilterMenu';
 import { SearchDoor } from '@/components/SearchBar';
 import { PhotoRollBars } from '@/components/PhotoRollBars';
@@ -306,6 +307,7 @@ export default function Deck() {
       <UndoButton onPress={undo} />
       <FilterMenu surface="deck" count={count} />
       <ViewToggle value={view} onChange={setView} />
+      <GiveFeedback placement="header" />
     </>
   );
 
@@ -320,6 +322,7 @@ export default function Deck() {
       />
       <DeckDisplayButton value={view === 'cards' ? 1 : columnChoice} onChange={chooseDensity} />
       <FilterMenu surface="deck" count={count} triggerVariant="text" />
+      <GiveFeedback placement="rail" />
     </>
   );
 
@@ -343,7 +346,6 @@ export default function Deck() {
       );
     return desktopRail ? <DeckDesktopFrame rail={desktopRail}>{column}</DeckDesktopFrame> : column;
   };
-
   const titleControl = isDesktopWeb ? undefined : (
     <DeckHeader>
       <View style={styles.actions}>{deckToolsMobile}</View>
