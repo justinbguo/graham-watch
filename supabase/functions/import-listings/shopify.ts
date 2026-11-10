@@ -1,4 +1,4 @@
-import { classifyCatalogueItem } from './nonwatch.ts';
+import { catalogueTypeLeaf, classifyCatalogueItem } from './nonwatch.ts';
 import { CatalogueRefused, parseRobots, type RobotsPolicy } from './robots.ts';
 import { htmlToText } from './scrape.ts';
 import {
@@ -250,7 +250,8 @@ export function mapProduct(
   }
 
   const type = meta.productType;
-  if (type && NOT_A_WATCH.test(type)) {
+  const leaf = catalogueTypeLeaf(type);
+  if (leaf && NOT_A_WATCH.test(leaf)) {
     return refuse(`product type "${type}" is not a watch`);
   }
   if (!photoUrls.length) return refuse('no photograph');

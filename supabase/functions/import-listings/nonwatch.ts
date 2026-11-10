@@ -21,6 +21,12 @@ const ACCESSORY_TYPE =
   /\b(tools?|winders?|boxes|cases?|trays?|accessor\w*|pouches?|rolls?|cuff\s*links?)\b/i;
 const STRAP_TYPE = /\b(straps?|bands?|bracelets?|buckles?|clasps?|natos?|two[\s-]?piece)\b/i;
 
+export function catalogueTypeLeaf(productType: string | null): string {
+  if (!productType) return '';
+  const parts = productType.split(/\s*(?:>|\/)\s*/).filter((part) => part.trim());
+  return (parts[parts.length - 1] ?? '').trim();
+}
+
 const STRAP_TAG = new Set(['strap', 'straps', 'watch strap', 'bracelet', 'bracelets']);
 const ACCESSORY_TAG = new Set([
   'tool',
@@ -59,7 +65,8 @@ function watchShaped(title: string, text: string): boolean {
 }
 
 function clockSignal(title: string, productType: string | null, tags: string[]): boolean {
-  if (CLOCK_TYPE.test(title) || (productType != null && CLOCK_TYPE.test(productType))) return true;
+  const leaf = catalogueTypeLeaf(productType);
+  if (CLOCK_TYPE.test(title) || (leaf && CLOCK_TYPE.test(leaf))) return true;
   return tags.some((tag) => fold(tag) === 'clock' || fold(tag) === 'clocks');
 }
 
@@ -71,10 +78,27 @@ function accessoryTitle(title: string): boolean {
   return false;
 }
 
+function watchNamedInTitle(title: string): boolean {
+  return /\bwatch(?:es)?\b/i.test(title) && !/\bwatch\s+straps?\b/i.test(title);
+}
+
+function dialNamedInTitle(title: string): boolean {
+  return /\bdial\b/i.test(title);
+}
+
+function subNamedInTitle(title: string): boolean {
+  return /\bsub\b/i.test(title);
+}
+
 function strapTitle(title: string): boolean {
+  if (/\bbuckles?\b/i.test(title) && title.length <= 40 && !hasYearOrReference(title)) return true;
+  if (watchNamedInTitle(title) || dialNamedInTitle(title) || subNamedInTitle(title)) return false;
   if (/\bstraps?\b/i.test(title)) return true;
-  if (/\b(?:oyster|jubilee|president(?:ial)?)\s+bracelets?\b/i.test(title)) return true;
+  if (/\b(?:oyster|jubilee|president(?:ial)?)\b.{0,24}\bbracelets?\b/i.test(title)) return true;
   if (/\bbracelets?\b/i.test(title) && /\b\d+\s*mm\b/i.test(title)) return true;
+  if (/\bheavy\s+bracelets?\b/i.test(title)) return true;
+  if (/\bbark\s+finish\s+bracelets?\b/i.test(title)) return true;
+  if (/\b(?:rose|white|yellow)\s+gold\s+bracelets?\s*$/i.test(title)) return true;
   return false;
 }
 
@@ -100,6 +124,19 @@ function hold(reason: HoldReason, rule: string): CatalogueDecision {
   return { decision: 'hold', reason, rule };
 }
 
+function holdFromTitle(title: string): CatalogueDecision | null {
+  if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
+  if (strapTitle(title)) return hold('strap', 'strap-title');
+  return null;
+}
+
+function holdFromTypeLeaf(productType: string | null): CatalogueDecision | null {
+  const leaf = catalogueTypeLeaf(productType);
+  if (leaf && ACCESSORY_TYPE.test(leaf)) return hold('accessory', 'accessory-type');
+  if (leaf && STRAP_TYPE.test(leaf)) return hold('strap', 'strap-type');
+  return null;
+}
+
 export function classifyCatalogueItem(fields: CatalogueFields): CatalogueDecision {
   const title = fields.title ?? '';
   const text = fields.text ?? '';
@@ -108,12 +145,12 @@ export function classifyCatalogueItem(fields: CatalogueFields): CatalogueDecisio
   const vendor = fields.vendor;
 
   if (clockSignal(title, productType, tags)) return hold('clock', 'clock');
-  if (watchShaped(title, text)) return { decision: 'watch' };
 
-  if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
-  if (strapTitle(title)) return hold('strap', 'strap-title');
-  if (productType && ACCESSORY_TYPE.test(productType)) return hold('accessory', 'accessory-type');
-  if (productType && STRAP_TYPE.test(productType)) return hold('strap', 'strap-type');
+  const titled = holdFromTitle(title);
+  if (titled) return titled;
+  if (watchShaped(title, text)) return { decision: 'watch' };
+  const typed = holdFromTypeLeaf(productType);
+  if (typed) return typed;
 
   const vendorName = vendor ? fold(vendor) : '';
   if (
