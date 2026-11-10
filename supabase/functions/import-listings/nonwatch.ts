@@ -21,11 +21,6 @@ const ACCESSORY_TYPE =
   /\b(tools?|winders?|boxes|cases?|trays?|accessor\w*|pouches?|rolls?|cuff\s*links?)\b/i;
 const STRAP_TYPE = /\b(straps?|bands?|bracelets?|buckles?|clasps?|natos?|two[\s-]?piece)\b/i;
 
-/**
- * Shops file a product under a path. Google's is
- * "Jewelry & Watches > … > Wristwatches". The leaf is the shop's own type.
- * An ancestor that says Accessories or Jewelry does not describe the product.
- */
 export function catalogueTypeLeaf(productType: string | null): string {
   if (!productType) return '';
   const parts = productType.split(/\s*(?:>|\/)\s*/).filter((part) => part.trim());
@@ -83,16 +78,21 @@ function accessoryTitle(title: string): boolean {
   return false;
 }
 
-/** A title that names the watch, not the strap it is sold on. */
 function watchNamedInTitle(title: string): boolean {
-  if (/\bdial\b/i.test(title)) return true;
-  if (/\bsub\b/i.test(title)) return true;
   return /\bwatch(?:es)?\b/i.test(title) && !/\bwatch\s+straps?\b/i.test(title);
+}
+
+function dialNamedInTitle(title: string): boolean {
+  return /\bdial\b/i.test(title);
+}
+
+function subNamedInTitle(title: string): boolean {
+  return /\bsub\b/i.test(title);
 }
 
 function strapTitle(title: string): boolean {
   if (/\bbuckles?\b/i.test(title) && title.length <= 40 && !hasYearOrReference(title)) return true;
-  if (watchNamedInTitle(title)) return false;
+  if (watchNamedInTitle(title) || dialNamedInTitle(title) || subNamedInTitle(title)) return false;
   if (/\bstraps?\b/i.test(title)) return true;
   if (/\b(?:oyster|jubilee|president(?:ial)?)\b.{0,24}\bbracelets?\b/i.test(title)) return true;
   if (/\bbracelets?\b/i.test(title) && /\b\d+\s*mm\b/i.test(title)) return true;
@@ -124,6 +124,19 @@ function hold(reason: HoldReason, rule: string): CatalogueDecision {
   return { decision: 'hold', reason, rule };
 }
 
+function holdFromTitle(title: string): CatalogueDecision | null {
+  if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
+  if (strapTitle(title)) return hold('strap', 'strap-title');
+  return null;
+}
+
+function holdFromTypeLeaf(productType: string | null): CatalogueDecision | null {
+  const leaf = catalogueTypeLeaf(productType);
+  if (leaf && ACCESSORY_TYPE.test(leaf)) return hold('accessory', 'accessory-type');
+  if (leaf && STRAP_TYPE.test(leaf)) return hold('strap', 'strap-type');
+  return null;
+}
+
 export function classifyCatalogueItem(fields: CatalogueFields): CatalogueDecision {
   const title = fields.title ?? '';
   const text = fields.text ?? '';
@@ -133,16 +146,11 @@ export function classifyCatalogueItem(fields: CatalogueFields): CatalogueDecisio
 
   if (clockSignal(title, productType, tags)) return hold('clock', 'clock');
 
-  if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
-  if (strapTitle(title)) return hold('strap', 'strap-title');
-
-  // A watch that mentions a bracelet, box and papers, or an integrated case
-  // is still a watch, even when the shop filed it under Straps.
+  const titled = holdFromTitle(title);
+  if (titled) return titled;
   if (watchShaped(title, text)) return { decision: 'watch' };
-
-  const leaf = catalogueTypeLeaf(productType);
-  if (leaf && ACCESSORY_TYPE.test(leaf)) return hold('accessory', 'accessory-type');
-  if (leaf && STRAP_TYPE.test(leaf)) return hold('strap', 'strap-type');
+  const typed = holdFromTypeLeaf(productType);
+  if (typed) return typed;
 
   const vendorName = vendor ? fold(vendor) : '';
   if (
