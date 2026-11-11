@@ -205,8 +205,12 @@ jobs:
 
       # The harness shells out to the supabase binary in node_modules. Playwright
       # needs a browser. Both are local-only: the job never receives a hosted key.
+      # ubuntu-latest already has Chromium's shared libraries. --with-deps only
+      # asks apt for extra fonts, and that dies when the runner cannot resolve
+      # azure.archive.ubuntu.com. Apt then spends about ten minutes in DNS
+      # timeouts, so retrying the same command does not help.
       - name: install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: prove drops
         run: npm run verify:drops
