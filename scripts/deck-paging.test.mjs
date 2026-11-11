@@ -505,7 +505,7 @@ test('a new filter starts the grid at the first page and drops the old cursor', 
   assert.throws(() => narrowed.page({ cursor: full.sent[1], judged: new Set(), guest: false }));
 
   const grid = readFileSync(new URL('../src/components/DeckGrid.tsx', import.meta.url), 'utf8');
-  const screen = readFileSync(new URL('../src/app/(app)/(tabs)/index.tsx', import.meta.url), 'utf8');
+  const screen = readFileSync(new URL('../src/features/deck/CatalogueDeck.tsx', import.meta.url), 'utf8');
   assert.match(grid, /onEndReached=/);
   assert.match(grid, /onScroll=\{rememberScroll\}/);
   assert.match(grid, /shouldLoadMoreGrid/);
