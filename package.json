@@ -76,6 +76,7 @@
     "test:rls": "GRAHAM_TARGET=local node scripts/test-rls.mjs",
     "verify:drops": "node .cursor/skills/verify-graham/control-graham.mjs verify-drops",
     "test:filters": "GRAHAM_TARGET=local node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-ts.mjs scripts/filter-contract.test.mjs",
+    "test:rank": "GRAHAM_TARGET=local node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-ts.mjs scripts/rank-feed.test.mjs",
     "mock:users": "node scripts/mock-users.mjs",
     "mock:signin": "node scripts/mock-signin.mjs",
     "mock:sign-in": "npm run mock:signin",
