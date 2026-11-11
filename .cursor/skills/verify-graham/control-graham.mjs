@@ -2340,6 +2340,44 @@ async function clearBuyerTaste(status) {
   return payload.length;
 }
 
+async function scrollGridToNextPage(page) {
+  const next = page.waitForResponse((response) => {
+    if (!response.url().includes('/rest/v1/rpc/rank_buy_feed')) return false;
+    if (response.request().method() !== 'POST') return false;
+    let payload = null;
+    try {
+      payload = response.request().postDataJSON();
+    } catch {
+      return false;
+    }
+    return typeof payload?.p_cursor === 'string' && payload.p_cursor.length > 0 && response.ok();
+  }, { timeout: 25_000 });
+  await page.getByRole('button', { name: 'Grid', exact: true }).click();
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    await page.mouse.wheel(0, 1600);
+    await page.evaluate(() => {
+      for (const node of document.querySelectorAll('div')) {
+        if (node.scrollHeight > node.clientHeight + 40) node.scrollTop = node.scrollHeight;
+      }
+    });
+    const hit = await Promise.race([
+      next.then((response) => response),
+      page.waitForTimeout(500).then(() => null),
+    ]);
+    if (hit) {
+      const rows = await hit.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        fail('The next Buy page was empty.', 'Scrolling the grid asks rank_buy_feed for the cursor of the first page.');
+      }
+      return { rows: rows.length, cursor: true };
+    }
+  }
+  const response = await next;
+  const rows = await response.json();
+  return { rows: Array.isArray(rows) ? rows.length : 0, cursor: true };
+}
+
 async function topDeckCard(page) {
   const card = page.locator('[data-testid^="deck-card-"][aria-label]').first();
   await card.waitFor({ state: 'visible', timeout: 20_000 });
@@ -2390,7 +2428,7 @@ async function commandVerifyRank(dryRun) {
     ok({
       command: 'verify-rank',
       dryRun: true,
-      writes: ['guest-taste.png', 'guest-feed.png', 'ranked-feed.png', 'followed-feed.png', 'rank-buy.webm'],
+      writes: ['guest-taste.png', 'guest-feed.png', 'guest-page.png', 'ranked-feed.png', 'followed-feed.png', 'buyer-page.png', 'rank-buy.webm'],
     });
     return;
   }
@@ -2405,6 +2443,8 @@ async function commandVerifyRank(dryRun) {
     guest: path.join(evidence, 'guest-feed.png'),
     ranked: path.join(evidence, 'ranked-feed.png'),
     followed: path.join(evidence, 'followed-feed.png'),
+    guestPage: path.join(evidence, 'guest-page.png'),
+    buyerPage: path.join(evidence, 'buyer-page.png'),
     video: path.join(evidence, 'rank-buy.webm'),
     report: path.join(evidence, 'rank-report.json'),
   };
@@ -2440,6 +2480,13 @@ async function commandVerifyRank(dryRun) {
     const guestTop = await topDeckCard(page);
     const guestBrand = await listingBrand(status, guestTop.id);
     await shoot(page, files.guest);
+    await page.waitForTimeout(1000);
+    const guestPage = await scrollGridToNextPage(page);
+    await shoot(page, files.guestPage);
+    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: 'One at a time', exact: true }).click();
+    await topDeckCard(page);
+    await page.waitForTimeout(600);
     if (guestBrand?.brand_key !== 'rolex') {
       fail(
         'The guest deck did not lead with the Rolex pick.',
@@ -2538,6 +2585,10 @@ async function commandVerifyRank(dryRun) {
     const followedTop = await topDeckCard(page);
     const followedBrand = await listingBrand(status, followedTop.id);
     await shoot(page, files.followed);
+    await page.waitForTimeout(1000);
+    const buyerPage = await scrollGridToNextPage(page);
+    await shoot(page, files.buyerPage);
+    await page.waitForTimeout(1000);
     if (followedBrand?.brand_key !== 'fixture' || !String(followedTop.label).startsWith('Fixture')) {
       fail(
         'The followed shop did not lead the deck.',
@@ -2552,6 +2603,8 @@ async function commandVerifyRank(dryRun) {
       clicked: { label: clickedCard.label, brand: clickedBrand.brand },
       ranked: { label: rankedTop.label, brand: rankedBrand.brand },
       followed: { label: followedTop.label, brand: followedBrand.brand, dealerId },
+      guestPage,
+      buyerPage,
       cleared,
     };
     writeFileSync(files.report, JSON.stringify(report, null, 2));

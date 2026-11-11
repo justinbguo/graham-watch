@@ -22,7 +22,7 @@ Preconditions:
 - `up` and `web` are ready. The seeded catalogue from `supabase/seed.sql` is on the deck. Test Bench's shelf listing is there too once `seed` has run.
 
 - **Open Buy.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot / <evidence>/buy.png`. The shot is the deck or the guest gate, not a proof of a swipe.
-- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. It picks Rolex, dismisses sign-in, signs in as `buyer`, clicks another brand's dealer link, reloads, then follows Test Bench and imports the fixture. Evidence is `guest-taste.png`, `guest-feed.png`, `ranked-feed.png`, `followed-feed.png`, and `rank-buy.webm`.
+- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. It picks Rolex, dismisses sign-in, signs in as `buyer`, clicks another brand's dealer link, reloads, then follows Test Bench and imports the fixture. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png`, `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.
 - **Pass and save are not harness commands yet.** A swipe has to happen in the browser. Do not treat a Drops screenshot as proof that pass and save work.
 
 ## Gotchas

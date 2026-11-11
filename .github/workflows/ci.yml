@@ -177,6 +177,9 @@ jobs:
       - name: filter contract
         run: npm run test:filters
 
+      - name: rank feed
+        run: npm run test:rank
+
       - name: generated types match the schema
         run: |
           npm run db:types
