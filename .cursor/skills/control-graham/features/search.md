@@ -26,7 +26,7 @@ Preconditions:
 
 ## Gotchas
 
-- Unsigned web covers Buy with the arrival sheet until `Close` or `Not now`. Demo does not.
+- Unsigned web shows the taste sheet, then the arrival sheet, until `Skip` or `See watches` and then `Close` or `Not now`. Demo does not.
 - The Buy door and the search field share the name `Search brand, model or reference`. `fill` types into the textbox. The door is a button and is not the field.
 - Search and the deck share catalogue rules in local mode; demo search reads the same six fixtures.
 - Wait for results after typing; do not assert on a single frame mid-debounce.

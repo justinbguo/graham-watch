@@ -49,7 +49,7 @@ Drive only when all of these hold:
 
 - `docker` and `supabaseCli` are true
 - `stack.url` is `http://127.0.0.1:54321` and `stack.apiOk` is true
-- `stack.refused` is absent
+- `stack.refused` is false
 - before `notify-drops`: `functions.runtimeExpoPushUrl` is `http://graham-push-capture:8799/push` and `capture` is true
 - before `screenshot`: `web.url` is `http://127.0.0.1:8091`
 

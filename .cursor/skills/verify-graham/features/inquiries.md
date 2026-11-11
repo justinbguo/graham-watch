@@ -19,7 +19,7 @@ Preconditions:
 
 - Signed in as `buyer`. A listing id from Test Bench (`drops-status` or `import`).
 
-- **Open the sheet.** Run `screenshot /inquiry/<listingId> <evidence>/inquiry.png --as buyer`. Expect `Send via Graham` and `Open in my mail app`. Expect `View on dealer site` only when that listing has a source URL. The Drops fixture `DROP-1` has none, so that button is absent there.
+- **Open the sheet.** Run `screenshot /inquiry/<listingId> <evidence>/inquiry.png --as buyer`. The command loads that URL directly. The sheet is a modal with no Buy tab, and the catalogue is public, so the buttons are on screen without a session. A cold load that already has a session is sent back to Buy, so this shot stays unsigned. Expect `Send via Graham` and `Open in my mail app`. Expect `View on dealer site` when that listing has a source URL. Fixture import stores one on `test-bench.graham.test` for every row, including `DROP-1`, so the button is present on that sheet. The JSON fixture file does not carry the field. `SHELF-1` has no photos, so the client cannot read it and the sheet says `That watch is no longer available.`
 - **Do not send from the Drops proof.** This harness has no `inquire` command. A screenshot of the sheet is not proof that a message was stored. Do not report inquiries verified because Drops passed.
 
 ## Gotchas
