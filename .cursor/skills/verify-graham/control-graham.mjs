@@ -2480,9 +2480,13 @@ async function commandVerifyRank(dryRun) {
     const guestTop = await topDeckCard(page);
     const guestBrand = await listingBrand(status, guestTop.id);
     await shoot(page, files.guest);
+    await page.waitForTimeout(1000);
     const guestPage = await scrollGridToNextPage(page);
     await shoot(page, files.guestPage);
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'One at a time', exact: true }).click();
+    await topDeckCard(page);
+    await page.waitForTimeout(600);
     if (guestBrand?.brand_key !== 'rolex') {
       fail(
         'The guest deck did not lead with the Rolex pick.',
@@ -2581,8 +2585,10 @@ async function commandVerifyRank(dryRun) {
     const followedTop = await topDeckCard(page);
     const followedBrand = await listingBrand(status, followedTop.id);
     await shoot(page, files.followed);
+    await page.waitForTimeout(1000);
     const buyerPage = await scrollGridToNextPage(page);
     await shoot(page, files.buyerPage);
+    await page.waitForTimeout(1000);
     if (followedBrand?.brand_key !== 'fixture' || !String(followedTop.label).startsWith('Fixture')) {
       fail(
         'The followed shop did not lead the deck.',
