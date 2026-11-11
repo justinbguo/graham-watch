@@ -1,6 +1,6 @@
 # Wishlist
 
-Wishlist lists watches the buyer saved (right-swipe / ArrowRight). The tab badge count updates with saves.
+Wishlist lists watches the buyer saved (right-swipe / ArrowRight on the card deck). The tab badge is the count of those saves that still need a first message.
 
 ## Sub-features
 
@@ -21,8 +21,8 @@ Preconditions:
 - At least one save this session (`press ArrowRight` on Buy), or accept empty-state proof only.
 
 - **Empty state (optional).** On a fresh run before any save, `click --name Wishlist`, then `snapshot`. Empty-state copy is visible; no Omega/Rolex row required.
-- **Save then open.** From Buy, `press ArrowRight` on a known fixture (note its title from snapshot). `click --name Wishlist` (badge may read `Wishlist, 1`). Snapshot includes that title.
-- **Row name.** The button is `Message the dealer about <title>`, not the title alone. That press opens a thread. `View on dealer site` is a separate button when the watch has a source URL. Proof that the watch was saved is the message button's name in the snapshot, and the tab `Wishlist, N`.
+- **Save then open.** On the 1280 grid, `press s` first so the view is cards (`Display, one at a time`). From that card, `press ArrowRight` on a known fixture (note its title from snapshot). `click --name Wishlist` (badge may read `Wishlist, 1`). Snapshot includes that title.
+- **Row name.** The button is `Message the dealer about <title>`, not the title alone. In demo that press does not open a thread. `View on dealer site` is a separate button when the watch has a source URL. Proof that the watch was saved is the message button's name in the snapshot, and the tab `Wishlist, N`.
 - **Proof.** `screenshot` / `snapshot` under `artifacts/<id>/wishlist.*` with the saved title visible.
 
 ## Gotchas

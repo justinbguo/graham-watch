@@ -1123,38 +1123,75 @@ async function commandScreenshot(route, file, userName) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.setDefaultTimeout(90_000);
   const target = `http://127.0.0.1:${WEB_PORT}${route}`;
+  const pathOnly = route.split('?')[0];
   try {
     await page.goto(target, { waitUntil: 'domcontentloaded' });
-    await ensureSignedIn(page, who.email);
-    const pathOnly = route.split('?')[0];
     let detail = {};
-    if (pathOnly === '/messages') detail = await openMessages(page);
-    else if (pathOnly === '/profile') {
-      detail = who.email === PEOPLE.dealer.email ? await openDealerProfile(page) : await openProfile(page);
-    }
-    else if (pathOnly === '/drops') {
-      await page.goto(target, { waitUntil: 'domcontentloaded' });
-      await waitForWatch(page);
-      detail = { url: page.url() };
-    } else if (pathOnly === '/community') {
+    // Shop and inquiry are modals with no tab bar. A signed-in cold load of
+    // those URLs is sent back to Buy, so capture the sheet on the direct load.
+    if (pathOnly.startsWith('/inquiry/')) {
+      const composer = page.getByRole('button', { name: 'Send via Graham' });
+      const missing = page.getByText('That watch is no longer available.', { exact: true });
       try {
-        await page.getByRole('tab', { name: 'Community', exact: true }).click();
-        await page.getByRole('button', { name: 'All posts' }).waitFor({ state: 'visible', timeout: 20_000 });
+        await Promise.any([
+          composer.waitFor({ state: 'visible', timeout: 30_000 }),
+          missing.waitFor({ state: 'visible', timeout: 30_000 }),
+        ]);
       } catch (error) {
-        const failed = path.join(evidenceDir(), 'community-missing.png');
-        await shoot(page, failed).catch(() => undefined);
         fail(
-          'Community did not show the post filter.',
-          'The signed-in board has a button named All posts.',
-          { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+          'The inquiry sheet did not settle.',
+          'A readable listing shows Send via Graham. A listing the client cannot read says the watch is no longer available.',
+          { url: page.url(), text: (await pageText(page)).slice(0, 800), cause: error instanceof Error ? error.message : String(error) },
         );
       }
-      detail = { surface: 'community' };
-    } else if (pathOnly === '/') {
-      await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
-      detail = { surface: 'buy' };
+      detail = { surface: 'inquiry' };
+    } else if (pathOnly.startsWith('/dealer/')) {
+      try {
+        await page.getByText('Inventory', { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+      } catch (error) {
+        fail(
+          'The shop page did not show its inventory.',
+          'The dealer route is a modal. The section title is Inventory.',
+          { url: page.url(), text: (await pageText(page)).slice(0, 800), cause: error instanceof Error ? error.message : String(error) },
+        );
+      }
+      detail = { surface: 'dealer' };
     } else {
-      await page.goto(target, { waitUntil: 'domcontentloaded' });
+      await ensureSignedIn(page, who.email);
+      if (pathOnly === '/messages') detail = await openMessages(page);
+      else if (pathOnly === '/profile') {
+        detail = who.email === PEOPLE.dealer.email ? await openDealerProfile(page) : await openProfile(page);
+      } else if (pathOnly === '/drops') {
+        await page.goto(target, { waitUntil: 'domcontentloaded' });
+        await waitForWatch(page);
+        detail = { url: page.url() };
+      } else if (pathOnly === '/community') {
+        try {
+          await page.getByRole('tab', { name: 'Community', exact: true }).click();
+          await page.getByRole('button', { name: 'All posts' }).waitFor({ state: 'visible', timeout: 20_000 });
+        } catch (error) {
+          const failed = path.join(evidenceDir(), 'community-missing.png');
+          await shoot(page, failed).catch(() => undefined);
+          fail(
+            'Community did not show the post filter.',
+            'The signed-in board has a button named All posts.',
+            { url: page.url(), text: (await pageText(page)).slice(0, 800), failed, cause: error instanceof Error ? error.message : String(error) },
+          );
+        }
+        detail = { surface: 'community' };
+      } else if (pathOnly === '/') {
+        await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+        detail = { surface: 'buy' };
+      } else if (pathOnly === '/new') {
+        await page.goto(target, { waitUntil: 'domcontentloaded' });
+        await page
+          .getByText(/New watches appear here after the nightly update\.|watches from |New watches could not be loaded\./)
+          .first()
+          .waitFor({ state: 'visible', timeout: 20_000 });
+        detail = { surface: 'new' };
+      } else {
+        await page.goto(target, { waitUntil: 'domcontentloaded' });
+      }
     }
     await shoot(page, file);
     const badgeLabel = detail.badgeLabel ?? null;

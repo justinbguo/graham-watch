@@ -7,7 +7,7 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 - Start with `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode demo` unless the feature file requires **local**.
 - Run `doctor` and require `looksLikeGraham: true` on the owned URL.
 - Never drive a Metro/browser you did not start with `up`.
-- Default viewport is 1280×900. Demo is signed in, so Buy is usable immediately. Desktop web starts on the grid; arrows pass and save only after card view. The grid rail includes `Listings per row` (`2 listings per row` through `6 listings per row`).
+- Default viewport is 1280×900. Demo is signed in, so Buy is usable immediately. Desktop web starts on the grid. The rail button is `Display, N per row` (N is 2 through 6). A press steps N and wraps to `Display, one at a time`, which is the card deck. `press s` toggles the two. Arrows pass and save only in card view. There is no control named `Listings per row`.
 - Demo fixtures (top of deck order): Omega Speedmaster Professional 1972, Rolex Datejust 1968, Heuer Autavia 1965, Seiko 6139 Pogue 1976, Universal Genève Polerouter 1959, Cartier Tank Must 1988.
 
 ## Driving conventions
@@ -28,5 +28,7 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 - [Deck pass and save](./deck-swipe.md) — keyboard pass/save on Buy.
 - [Wishlist](./wishlist.md) — saved watches appear under Wishlist.
 - [Search](./search.md) — catalogue search door and query.
-- [Listing detail](./listing-detail.md) — open a watch from the deck/grid.
-- [Guest sign-in gate](./guest-signin.md) — Log in control and budget sheet (demo/web).
+- [Listing detail](./listing-detail.md) — open a watch from the grid.
+- [New](./new.md) — the latest catalogue batch. Not the Drops feed.
+- [Feedback](./feedback.md) — the Feedback link on Buy. Do not send the message.
+- [Guest sign-in gate](./guest-signin.md) — taste sheet, then the sign-in sheet, on unsigned local web. Demo does not show it.

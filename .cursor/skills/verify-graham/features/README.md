@@ -32,7 +32,8 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 ## Features
 
 - [Onboarding](./onboarding.md) — name, username, birthday, and the questions before the deck.
-- [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save.
+- [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`.
+- [New](./new.md) — the latest sealed catalogue batch. Not the Drops feed.
 - [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
 - [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count on Messages. This is the proven flow.
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.

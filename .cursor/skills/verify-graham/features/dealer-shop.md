@@ -11,7 +11,7 @@ A dealer who has claimed a shop edits the shop's details on Profile. The live li
 
 ## How to get to it (user POV)
 
-Sign in as the dealer and open Profile. The editor is on that page, with counts `Live listings`, `Wishlists`, and `Inquiries`. Open the Deal tab, then Listings, to edit a watch or import. Import starts from the button `Import from your website`, not from the buyer deck.
+Sign in as the dealer and open Profile. The editor is on that page, with counts `Live listings`, `Wishlists`, and `Inquiries`. Open the Deal tab, then Listings, to edit a watch or import. Import starts from the control named `Import from your website`. That opens `Refresh from your site`. `Refresh from site` reads the shop, then `Choose watches` publishes in batches until nothing is pending. The buyer deck has no import control.
 
 ## Driving it with control-graham
 

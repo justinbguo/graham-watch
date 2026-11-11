@@ -8,8 +8,9 @@ Buy is the deck. A buyer passes or saves a watch. On a wide window the same watc
 - `pass`: swipe left, or the control named `Pass`.
 - `save`: swipe right. The watch lands on the Wishlist.
 - `grid`: at 900px and wider the deck is a grid of tiles.
-- `grid-columns`: on desktop web, while that grid is showing, the rail offers `Listings per row`. The radios are `2 listings per row` through `6 listings per row`. A phone stays at two and has no picker.
+- `grid-columns`: on desktop web the rail has one button, `Display, N per row` (N is 2 through 6) or `Display, one at a time` for the card deck. A press steps the count and wraps. A phone has no column picker. At phone width the view button is `Grid` while cards are showing and `One at a time` while the grid is showing. `verify-rank` clicks those phone-width names.
 - `guest-budget`: ten guest judgments, then the sign-in sheet.
+- `feedback`: a link named `Feedback` on the phone header and the desktop rail. It opens an X message compose. Do not send it. It is not an inquiry.
 
 ## How to get to it (user POV)
 
@@ -22,7 +23,7 @@ Preconditions:
 - `up` and `web` are ready. The seeded catalogue from `supabase/seed.sql` is on the deck. Test Bench's shelf listing is there too once `seed` has run.
 
 - **Open Buy.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot / <evidence>/buy.png`. The shot is the deck or the guest gate, not a proof of a swipe.
-- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. It picks Rolex, dismisses sign-in, signs in as `buyer`, clicks another brand's dealer link, reloads, then follows Test Bench and imports the fixture. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png`, `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.
+- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. The order is `rank_buy_feed`: a dealer click outweighs a save, a pass is a mild negative, an undo does not count, and a followed shop is boosted. The command picks Rolex, dismisses sign-in, signs in as `buyer`, clicks another brand's dealer link, reloads, then follows Test Bench and imports the fixture. The click is a `log_buyer_events` post, and the command fails if that post did not succeed. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png`, `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.
 - **Pass and save are not harness commands yet.** A swipe has to happen in the browser. Do not treat a Drops screenshot as proof that pass and save work.
 
 ## Gotchas
