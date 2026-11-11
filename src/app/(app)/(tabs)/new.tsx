@@ -1,7 +1,7 @@
-import { NewScreen } from '@/features/new/NewScreen';
+import { CatalogueDeck } from '@/features/deck/CatalogueDeck';
 
 export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function New() {
-  return <NewScreen />;
+  return <CatalogueDeck source="new" />;
 }

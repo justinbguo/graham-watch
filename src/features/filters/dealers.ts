@@ -11,7 +11,7 @@ export type FacetKind = { kind: string };
  */
 export function dealerChoices<T extends FacetKind>(
   facets: T[],
-  surface: 'deck' | 'search' | 'shop',
+  surface: 'deck' | 'search' | 'shop' | 'new',
 ): T[] {
   if (surface === 'shop') return [];
   return facets.filter((facet) => facet.kind === 'dealer');

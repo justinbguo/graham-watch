@@ -19,6 +19,7 @@ import {
   type ListScrollMetrics,
 } from '@/data/deckPaging';
 import { useListExposures } from '@/data/listingEvents';
+import type { BuyerEventSurface } from '@/lib/models';
 import { deckGridFrame } from '@/lib/gridColumns';
 import { useIsDesktopWeb } from '@/lib/layout';
 import type { DeckCard } from '@/lib/models';
@@ -49,6 +50,7 @@ export function DeckGrid({
   active = true,
   paging,
   header = null,
+  exposureSurface = 'buy_grid',
 }: {
   cards: DeckCard[];
   columns: number;
@@ -57,10 +59,11 @@ export function DeckGrid({
   active?: boolean;
   paging: GridPaging;
   header?: ReactElement | null;
+  exposureSurface?: Extract<BuyerEventSurface, 'buy_grid' | 'new'>;
 }) {
   const isDesktopWeb = useIsDesktopWeb();
   const styles = useThemedStyles(gridStyles);
-  const exposures = useListExposures('buy_grid', cards, { active });
+  const exposures = useListExposures(exposureSurface, cards, { active });
   const [selected, setSelected] = useState(0);
   const selectedIndex = Math.min(selected, Math.max(cards.length - 1, 0));
 

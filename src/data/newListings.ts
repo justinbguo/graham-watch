@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { demo, isDemo } from '@/lib/demo';
 import type { DeckCard } from '@/lib/models';
@@ -17,11 +18,11 @@ type NewBatch = {
   listingIds: readonly string[];
 };
 
+/** `none` means no refresh has sealed a batch on this database yet. */
 export type NewListings =
   | { state: 'loading' }
-  | { state: 'error' }
-  /** No refresh has sealed a batch on this database yet. */
-  | { state: 'none' }
+  | { state: 'error'; refetch: () => void }
+  | { state: 'none'; refetch: () => void }
   | {
       state: 'ready';
       sealedAt: string;
@@ -29,7 +30,12 @@ export type NewListings =
       total: number;
       cards: DeckCard[];
       loadingMore: boolean;
+      hasNextPage: boolean;
+      isFetching: boolean;
+      isFetchNextPageError: boolean;
+      latestPageAdded: number | undefined;
       loadMore: () => void;
+      refetch: () => void;
     };
 
 async function fetchBatch(): Promise<NewBatch | null> {
@@ -50,10 +56,11 @@ async function fetchPage(ids: readonly string[]): Promise<DeckCard[]> {
   return cards.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }
 
-function useNewBatch() {
+function useNewBatch(enabled = true) {
   return useQuery({
     queryKey: keys.newBatch,
     queryFn: fetchBatch,
+    enabled,
     // A batch is sealed once a night.
     staleTime: 10 * 60_000,
   });
@@ -64,15 +71,16 @@ export function useNewCount(): number {
   return useNewBatch().data?.listingIds.length ?? 0;
 }
 
-/** The New screen. Reads the same cached batch as `useNewCount`. */
-export function useNewListings(): NewListings {
-  const batch = useNewBatch();
+export function useNewListings(options?: { enabled?: boolean; pageAll?: boolean }): NewListings {
+  const enabled = options?.enabled !== false;
+  const pageAll = options?.pageAll === true && enabled;
+  const batch = useNewBatch(enabled);
   const current = batch.data ?? null;
   const ids = current?.listingIds ?? [];
 
   const pages = useInfiniteQuery({
     queryKey: keys.newPage(current?.id ?? 'none', current?.listingIds ?? EMPTY_IDS),
-    enabled: ids.length > 0,
+    enabled: enabled && ids.length > 0,
     initialPageParam: 0,
     queryFn: ({ pageParam }) => fetchPage(ids.slice(pageParam, pageParam + PAGE_SIZE)),
     getNextPageParam: (_last, _all, offset) =>
@@ -80,20 +88,40 @@ export function useNewListings(): NewListings {
     staleTime: Infinity,
   });
 
-  if (batch.isPending) return { state: 'loading' };
-  if (batch.isError) return { state: 'error' };
-  if (!current) return { state: 'none' };
-  if (ids.length > 0 && pages.isPending) return { state: 'loading' };
-  if (pages.isError) return { state: 'error' };
+  const loadMore = useCallback(() => {
+    if (pages.hasNextPage && !pages.isFetchingNextPage) void pages.fetchNextPage();
+  }, [pages.hasNextPage, pages.isFetchingNextPage, pages.fetchNextPage]);
 
+  useEffect(() => {
+    if (!pageAll || !pages.hasNextPage || pages.isFetchingNextPage || pages.isFetchNextPageError) return;
+    loadMore();
+  }, [pageAll, pages.hasNextPage, pages.isFetchingNextPage, pages.isFetchNextPageError, loadMore]);
+
+  const refetch = useCallback(() => {
+    void batch.refetch();
+    void pages.refetch();
+  }, [batch, pages]);
+
+  const cards = useMemo(() => (pages.data?.pages ?? []).flat(), [pages.data]);
+
+  if (!enabled || batch.isPending) return { state: 'loading' };
+  if (batch.isError) return { state: 'error', refetch };
+  if (!current) return { state: 'none', refetch };
+  if (ids.length > 0 && pages.isPending) return { state: 'loading' };
+  if (pages.isError) return { state: 'error', refetch };
+
+  const loaded = pages.data?.pages ?? [];
   return {
     state: 'ready',
     sealedAt: current.sealedAt,
     total: ids.length,
-    cards: pages.data?.pages.flat() ?? [],
+    cards,
     loadingMore: pages.isFetchingNextPage,
-    loadMore: () => {
-      if (pages.hasNextPage && !pages.isFetchingNextPage) void pages.fetchNextPage();
-    },
+    hasNextPage: pages.hasNextPage,
+    isFetching: pages.isFetching,
+    isFetchNextPageError: pages.isFetchNextPageError,
+    latestPageAdded: loaded.length ? loaded[loaded.length - 1].length : undefined,
+    loadMore,
+    refetch,
   };
 }

@@ -4,9 +4,10 @@ import { useOpenStack } from '@/lib/openStack';
 
 import type { Surface } from './provider';
 
-const HREF: Record<'deck' | 'search', Href> = {
+const HREF: Record<'deck' | 'search' | 'new', Href> = {
   deck: '/filters/deck',
   search: '/filters/search',
+  new: '/filters/new',
 };
 
 /** The filter sheet is a screen on the stack above the tabs. */
@@ -22,7 +23,7 @@ export function useOpenFilters() {
       );
       return;
     }
-    const target = surface === 'search' ? 'search' : 'deck';
+    const target = surface === 'search' ? 'search' : surface === 'new' ? 'new' : 'deck';
     open('filters/[surface]', { surface: target }, HREF[target]);
   };
 }
