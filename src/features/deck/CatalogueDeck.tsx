@@ -49,9 +49,8 @@ import { GUEST_SWIPE_BUDGET, inset, layout, motion, size, space, type, type Them
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
-const LAST_NIGHT_MS = 36 * 60 * 60 * 1000;
+const STILL_LAST_NIGHT_MS = 36 * 60 * 60 * 1000;
 
-/** Buy and New share this screen. Buy reads the ranked feed. New reads the sealed batch. */
 export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const isNew = source === 'new';
   const { userId, isSignedIn } = useSession();
@@ -688,7 +687,7 @@ function DeckHeader({ children }: { children: ReactNode }) {
 }
 
 function updateName(sealedAt: string): string {
-  return Date.now() - new Date(sealedAt).getTime() < LAST_NIGHT_MS
+  return Date.now() - new Date(sealedAt).getTime() < STILL_LAST_NIGHT_MS
     ? "last night's update"
     : `the update on ${formatShortDate(sealedAt)}`;
 }

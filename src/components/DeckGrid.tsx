@@ -59,7 +59,6 @@ export function DeckGrid({
   active?: boolean;
   paging: GridPaging;
   header?: ReactElement | null;
-  /** Buy logs `buy_grid`. New logs `new` for the same tiles. */
   exposureSurface?: Extract<BuyerEventSurface, 'buy_grid' | 'new'>;
 }) {
   const isDesktopWeb = useIsDesktopWeb();

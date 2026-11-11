@@ -71,12 +71,6 @@ export function useNewCount(): number {
   return useNewBatch().data?.listingIds.length ?? 0;
 }
 
-/**
- * The New screen. Reads the same cached batch as `useNewCount`.
- * `enabled` is false on Buy so that tab does not hydrate this batch.
- * `pageAll` keeps asking for the next page until the id list is in hand,
- * which a filter needs. The grid and the card pile page themselves.
- */
 export function useNewListings(options?: { enabled?: boolean; pageAll?: boolean }): NewListings {
   const enabled = options?.enabled !== false;
   const pageAll = options?.pageAll === true && enabled;

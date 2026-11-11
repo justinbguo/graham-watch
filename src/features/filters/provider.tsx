@@ -44,7 +44,6 @@ type CatalogSurface = 'deck' | 'search' | 'new';
 type Store = {
   deck: Filters;
   search: Filters;
-  /** The newest-batch pile. Separate from the ranked deck. */
   new: Filters;
   /** One set per shop, so Goldfinger's choices do not empty the next shop. */
   shops: Record<string, Filters>;
