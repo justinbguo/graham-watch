@@ -5,7 +5,7 @@ New is the tab of watches the last full nightly refresh sealed onto the deck. Th
 ## Sub-features
 
 - `new-tab`: tab `New`. With a batch the spoken name is `New, N`.
-- `new-list`: title `New`, subtitle `N watches from last night's update.` or a dated update when the seal is older than a night.
+- `new-list`: the same header, cards, and grid as Buy. The line under the pile is `N watches from last night's update.` or a dated update when the seal is older than a night.
 - `new-empty`: `New watches appear here after the nightly update.` when nothing has been sealed. `seed` does not seal a batch, so this is what the local proof shows.
 
 ## How to get to it (user POV)

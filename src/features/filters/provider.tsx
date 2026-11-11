@@ -21,7 +21,7 @@ import { NO_FILTERS, scopeDealer, toggleRange, type Filters, type Preset } from 
  * under $15k" should not throw away the pile you were halfway through, and
  * narrowing one shop should not follow you into the next.
  */
-export type Surface = 'deck' | 'search' | 'shop';
+export type Surface = 'deck' | 'search' | 'shop' | 'new';
 
 type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'complications' | 'sizes' | 'eras';
 
@@ -39,11 +39,13 @@ export type FilterApi = {
   showAllDealers: () => void;
 };
 
-type CatalogSurface = 'deck' | 'search';
+type CatalogSurface = 'deck' | 'search' | 'new';
 
 type Store = {
   deck: Filters;
   search: Filters;
+  /** The newest-batch pile. Separate from the ranked deck. */
+  new: Filters;
   /** One set per shop, so Goldfinger's choices do not empty the next shop. */
   shops: Record<string, Filters>;
   update: (surface: CatalogSurface, next: (current: Filters) => Filters) => void;
@@ -57,11 +59,12 @@ const UNFILTERED = canonicalize(NO_FILTERS).key;
 export function FilterProvider({ children }: PropsWithChildren) {
   const [deck, setDeck] = useState<Filters>(NO_FILTERS);
   const [search, setSearch] = useState<Filters>(NO_FILTERS);
+  const [latest, setLatest] = useState<Filters>(NO_FILTERS);
   const [shops, setShops] = useState<Record<string, Filters>>({});
   useFilterEvents(deck, search, shops);
 
   const update = useCallback<Store['update']>((surface, next) => {
-    const set = surface === 'deck' ? setDeck : setSearch;
+    const set = surface === 'deck' ? setDeck : surface === 'search' ? setSearch : setLatest;
     set((current) => next(current));
   }, []);
 
@@ -73,8 +76,8 @@ export function FilterProvider({ children }: PropsWithChildren) {
   }, []);
 
   const value = useMemo<Store>(
-    () => ({ deck, search, shops, update, updateShop }),
-    [deck, search, shops, update, updateShop],
+    () => ({ deck, search, new: latest, shops, update, updateShop }),
+    [deck, search, latest, shops, update, updateShop],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
@@ -95,6 +98,8 @@ function useFilterEvents(deck: Filters, search: Filters, shops: Record<string, F
       logged.current.set(scope, key);
       logEvent(event(spec));
     };
+    // New is not reported. `buyer_events_filter` accepts only buy, search, and
+    // shop, and one bad row drops the whole batch. The pile still filters.
     report('deck', deck, (filter) => ({ kind: 'filter', surface: 'buy', filter }));
     report('search', search, (filter) => ({ kind: 'filter', surface: 'search', filter }));
     for (const [dealerId, filters] of Object.entries(shops)) {

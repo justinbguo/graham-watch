@@ -242,7 +242,7 @@ export function usePrimeListing() {
  * query starts at `initialPageParam: null` — the first page, not the previous
  * sort's bookmark.
  */
-export function useDeck(limit = DECK_LIMIT) {
+export function useDeck(limit = DECK_LIMIT, enabled = true) {
   const { filters } = useFilters('deck');
   const guest = useGuest();
   const { userId } = useSession();
@@ -268,6 +268,7 @@ export function useDeck(limit = DECK_LIMIT) {
     // is unchanged.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+    enabled,
   });
 
   const visible = useMemo(
@@ -278,6 +279,7 @@ export function useDeck(limit = DECK_LIMIT) {
   const latestPageAdded = newCardsOnLastPage(query.data);
 
   const wantMore =
+    enabled &&
     query.data != null &&
     shouldRefillDeck({
       remaining: visible.length,
@@ -337,12 +339,13 @@ export async function fetchCounts(filters: Filters): Promise<ListingCounts> {
  * the moment a dealer is approved. Sort is not part of this key: order does
  * not change how many watches match.
  */
-export function useListingCounts() {
+export function useListingCounts(enabled = true) {
   const { filters } = useFilters('deck');
 
   return useQuery({
     queryKey: keys.counts(filters),
     queryFn: () => fetchCounts(filters),
+    enabled,
     // `matched` moves in the cache the moment a swipe lands (`useRecordSwipe`).
     // This fetch is the correction, not the animation: a minute is long enough
     // that a swipe does not wait on it.

@@ -13,12 +13,14 @@ export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 const TITLES: Record<Exclude<Surface, 'search'>, string> = {
   deck: 'Filter the deck',
   shop: 'Filter this shop',
+  new: 'Filter new watches',
 };
 
 export default function FilterSheet() {
   const { surface, dealerId } = useLocalSearchParams<{ surface: Surface; dealerId?: string }>();
   const styles = useThemedStyles(sheetStyles);
-  const target: Surface = surface === 'search' ? 'search' : surface === 'shop' ? 'shop' : 'deck';
+  const target: Surface =
+    surface === 'search' ? 'search' : surface === 'shop' ? 'shop' : surface === 'new' ? 'new' : 'deck';
   const shopId = Array.isArray(dealerId) ? dealerId[0] : dealerId;
   const matched = useFilterMatchCount(target, shopId);
   const done =

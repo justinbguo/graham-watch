@@ -24,6 +24,6 @@ Preconditions:
 
 ## Gotchas
 
-- The screen title is `New`. The Drops screen title is `New watches`.
+- New uses Buy's header, so the screen has no title `New`. The tab is still `New`. The Drops screen title is `New watches`.
 - Demo seals three fixtures when the bundle loads, so the subtitle says last night while the timestamp is this session.
 - A local database with no `seal_catalogue_batch` row shows the empty line and a tab named `New` with no count. `seed` does not seal a batch.

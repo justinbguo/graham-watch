@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { CheckRow } from '@/components/CheckRow';
 import { Field } from '@/components/ui';
 import { useDealerShop } from '@/data/dealers';
+import { useNewListings } from '@/data/newListings';
 import { useFilterFacets } from '@/data/search';
 import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
@@ -48,11 +49,16 @@ export function FilterPanel({
   const { data: catalogue = [] } = useFilterFacets(filters, {
     excludeOwn: surface === 'deck',
     excludeSwiped: surface === 'deck',
-    enabled: surface !== 'shop',
+    enabled: surface !== 'shop' && surface !== 'new',
   });
   const shop = useDealerShop(surface === 'shop' ? (dealerId ?? '') : '');
+  const newest = useNewListings({ enabled: surface === 'new', pageAll: surface === 'new' });
   const facets = (
-    surface === 'shop' ? facetsOf(shop.data?.listings ?? [], filters) : catalogue
+    surface === 'shop'
+      ? facetsOf(shop.data?.listings ?? [], filters)
+      : surface === 'new'
+        ? facetsOf(newest.state === 'ready' ? newest.cards : [], filters)
+        : catalogue
   ).filter((facet) => facet.value !== UNKNOWN_FACET_VALUE);
   const matched = useFilterMatchCount(surface, dealerId);
 
