@@ -1,10 +1,3 @@
-/**
- * The Buy page the database returns is the page `orderFeed` would build.
- *
- * Guests and signed-in buyers walk the same cursor. A thin gallery, a sold
- * watch, an unapproved shop, a judged watch, and the caller's own claimed
- * shop stay off the page the way they do today. Needs the local stack.
- */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

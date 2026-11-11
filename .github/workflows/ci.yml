@@ -177,8 +177,6 @@ jobs:
       - name: filter contract
         run: npm run test:filters
 
-      # The Buy page matches orderFeed, including the cursor and the rows a
-      # guest is not allowed to see.
       - name: rank feed
         run: npm run test:rank
 

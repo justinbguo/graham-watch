@@ -1,16 +1,10 @@
--- Anon used to spend seconds on the first Buy page. The score expression was
--- inlined into every sort key, so each listing recounted its photographs
--- under the photo policy, and that policy read the listing again. Prod guests
--- sat around 3 to 5 seconds and tripped the 3 second anon cap.
+-- Counting photographs as the caller re-enters the listing policy once per
+-- photo. The function runs as its owner so that count happens once. The
+-- where clause is the visibility rule: active, unsold, approved shop, and
+-- three photos unless the caller owns the listing.
 --
--- This function runs as its owner and applies the same visibility the policies
--- already require, so a guest still cannot read a thin gallery, a sold watch,
--- or an unapproved shop. Weights are computed once. Photographs are counted
--- once. The follow boost is one lookup for the signed-in caller.
---
--- Supabase seeds anon with statement_timeout = 3s. Prod was raised to 8s by
--- hand so a slow page could finish. Local and CI use that same cap. The page
--- itself should finish well under it.
+-- Prod already sets anon statement_timeout to 8s. This keeps local and CI
+-- on that same cap.
 
 alter role anon set statement_timeout = '8s';
 
