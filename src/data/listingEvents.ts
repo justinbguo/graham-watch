@@ -71,6 +71,10 @@ AppState.addEventListener('change', (state) => {
   if (state !== 'active') flushEvents();
 });
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => flushEvents());
+}
+
 export function logEvent(event: EventInput): void {
   try {
     if (event.kind === 'filter' && !filterFits(event.filter)) {
@@ -80,6 +84,17 @@ export function logEvent(event: EventInput): void {
     const exposureId =
       'listing' in event ? (openExposures.get(exposureKey(event.surface, event.listing.id)) ?? null) : null;
     push(toRow(event, { id: newId(), now: Date.now(), exposureId }));
+    // A reload is how the deck picks up a new score. The ten-second batch
+    // would still be in memory when the page goes away.
+    if (
+      event.kind === 'save' ||
+      event.kind === 'pass' ||
+      event.kind === 'undo' ||
+      event.kind === 'unsave' ||
+      event.kind === 'dealer_click'
+    ) {
+      flushEvents();
+    }
   } catch (error) {
     warn('an event was not logged', error);
   }

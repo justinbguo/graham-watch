@@ -941,7 +941,22 @@ async function shoot(page, file) {
   await page.screenshot({ path: path.resolve(file), fullPage: true });
 }
 
+async function dismissTaste(page) {
+  const skip = page.getByRole('button', { name: 'Skip', exact: true });
+  const visible = await skip.isVisible().catch(() => false);
+  if (!visible) {
+    const appeared = await skip
+      .waitFor({ state: 'visible', timeout: 4_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) return;
+  }
+  await skip.click();
+  await skip.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => undefined);
+}
+
 async function ensureSignedIn(page, email) {
+  await dismissTaste(page);
   const gate = page.getByRole('button', { name: 'Log in or create an account' });
   const emailDoor = page.getByRole('button', { name: 'Continue with email' });
   const buy = page.getByRole('tab', { name: 'Buy' });
@@ -2276,6 +2291,294 @@ async function commandVerifyPublishResume(dryRun) {
   ok(report);
 }
 
+async function clearBuyerTaste(status) {
+  const session = await signIn(status, PEOPLE.buyer);
+  const events = await api(
+    status.url,
+    `/rest/v1/buyer_events?user_id=eq.${session.userId}&kind=in.(save,pass,dealer_click,undo,unsave)&select=listing_id,dealer_id,kind&order=occurred_at.asc,id.asc`,
+    { key: status.serviceKey },
+  );
+  const rows = Array.isArray(events.body) ? events.body : [];
+  const stacks = new Map();
+  const dealers = new Map();
+  for (const row of rows) {
+    if (row.dealer_id) dealers.set(row.listing_id, row.dealer_id);
+    const stack = stacks.get(row.listing_id) ?? [];
+    if (row.kind === 'undo') stack.pop();
+    else if (row.kind === 'unsave') {
+      const index = stack.lastIndexOf('save');
+      if (index >= 0) stack.splice(index, 1);
+    } else stack.push(row.kind);
+    stacks.set(row.listing_id, stack);
+  }
+  const payload = [];
+  for (const [listingId, stack] of stacks) {
+    for (let count = 0; count < stack.length; count += 1) {
+      payload.push({
+        id: crypto.randomUUID(),
+        kind: 'undo',
+        surface: 'buy',
+        occurred_at: new Date().toISOString(),
+        listing_id: listingId,
+        dealer_id: dealers.get(listingId),
+      });
+    }
+  }
+  if (payload.length === 0) return 0;
+  const logged = await api(status.url, '/rest/v1/rpc/log_buyer_events', {
+    key: status.anonKey,
+    token: session.accessToken,
+    method: 'POST',
+    body: { p_events: payload },
+  });
+  if (!logged.ok) {
+    fail('The buyer could not clear an earlier taste.', 'Undo events pop the actions the ranker still counts.', {
+      status: logged.status,
+      detail: logged.body,
+    });
+  }
+  return payload.length;
+}
+
+async function topDeckCard(page) {
+  const card = page.locator('[data-testid^="deck-card-"][aria-label]').first();
+  await card.waitFor({ state: 'visible', timeout: 20_000 });
+  const testId = await card.getAttribute('data-testid');
+  const label = await card.getAttribute('aria-label');
+  return { id: testId?.replace(/^deck-card-/, '') ?? null, label };
+}
+
+async function listingBrand(status, id) {
+  const row = await api(
+    status.url,
+    `/rest/v1/listings?id=eq.${id}&select=brand,brand_key`,
+    { key: status.anonKey },
+  );
+  return row.body?.[0] ?? null;
+}
+
+async function signInBuyerOnPage(page, email) {
+  const emailDoor = page.getByRole('button', { name: 'Continue with email' });
+  if (!(await emailDoor.isVisible().catch(() => false))) {
+    await page.goto(`http://127.0.0.1:${WEB_PORT}/sign-in`, { waitUntil: 'domcontentloaded' });
+  }
+  await emailDoor.waitFor({ state: 'visible', timeout: 20_000 });
+  await emailDoor.click();
+  await page.getByPlaceholder('you@example.com').fill(email);
+  const since = Date.now();
+  await page.getByRole('button', { name: 'Send me a code' }).click();
+  const code = await mailpitCode(email, since);
+  if (!code) {
+    fail('Mailpit did not receive a sign-in code.', 'Run up, then seed, then verify-rank again.');
+  }
+  await page.getByLabel('Sign-in code').fill(code);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.waitForFunction(
+    () =>
+      Object.keys(localStorage).some((key) => {
+        const value = localStorage.getItem(key) ?? '';
+        return key.includes('auth-token') && value.includes('access_token');
+      }),
+    { timeout: 20_000 },
+  );
+  await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+  await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+}
+
+async function commandVerifyRank(dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'verify-rank',
+      dryRun: true,
+      writes: ['guest-taste.png', 'guest-feed.png', 'ranked-feed.png', 'followed-feed.png', 'rank-buy.webm'],
+    });
+    return;
+  }
+  if (!webUp()) {
+    fail('The web build is not being served.', 'Run the web command first. verify-rank does not start a second server.');
+  }
+  const status = requireStack();
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  const files = {
+    taste: path.join(evidence, 'guest-taste.png'),
+    guest: path.join(evidence, 'guest-feed.png'),
+    ranked: path.join(evidence, 'ranked-feed.png'),
+    followed: path.join(evidence, 'followed-feed.png'),
+    video: path.join(evidence, 'rank-buy.webm'),
+    report: path.join(evidence, 'rank-report.json'),
+  };
+  const videoDir = path.join(evidence, 'rank-video-tmp');
+  rmSync(videoDir, { recursive: true, force: true });
+  mkdirSync(videoDir, { recursive: true });
+  const chromium = await loadChromium();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    recordVideo: { dir: videoDir, size: { width: 390, height: 844 } },
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(90_000);
+  page.on('popup', (popup) => {
+    void popup.close().catch(() => undefined);
+  });
+
+  let report = null;
+  try {
+    const cleared = await clearBuyerTaste(status);
+    await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    const heading = page.getByText('What should we show you first?', { exact: true });
+    await heading.waitFor({ state: 'visible', timeout: 20_000 });
+    await shoot(page, files.taste);
+
+    await page.getByRole('checkbox', { name: 'Rolex' }).click();
+    await page.getByRole('button', { name: 'See watches', exact: true }).click();
+    const close = page.getByRole('button', { name: 'Close', exact: true });
+    await close.waitFor({ state: 'visible', timeout: 20_000 });
+    await close.click();
+    await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const guestTop = await topDeckCard(page);
+    const guestBrand = await listingBrand(status, guestTop.id);
+    await shoot(page, files.guest);
+    if (guestBrand?.brand_key !== 'rolex') {
+      fail(
+        'The guest deck did not lead with the Rolex pick.',
+        'See watches stores the pick and the deck refetches. The top card should be a Rolex.',
+        { label: guestTop.label, brand: guestBrand },
+      );
+    }
+
+    await signInBuyerOnPage(page, PEOPLE.buyer.email);
+    let clickedCard = await topDeckCard(page);
+    let clickedBrand = await listingBrand(status, clickedCard.id);
+    for (let pass = 0; pass < 4 && clickedBrand?.brand_key === 'rolex'; pass += 1) {
+      const before = clickedCard.id;
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForFunction(
+        (previous) => {
+          const card = document.querySelector('[data-testid^="deck-card-"][aria-label]');
+          return card && card.getAttribute('data-testid') !== previous;
+        },
+        `deck-card-${before}`,
+        { timeout: 20_000 },
+      );
+      clickedCard = await topDeckCard(page);
+      clickedBrand = await listingBrand(status, clickedCard.id);
+    }
+    if (!clickedBrand || clickedBrand.brand_key === 'rolex') {
+      fail(
+        'The deck stayed on Rolex after the passes.',
+        'Passing the Rolex pick should reveal the next brand. That card is the one the proof clicks.',
+        { label: clickedCard.label, brand: clickedBrand },
+      );
+    }
+    const logged = page.waitForResponse(
+      (response) => response.url().includes('log_buyer_events') && response.request().method() === 'POST',
+      { timeout: 20_000 },
+    );
+    const [loggedResponse] = await Promise.all([
+      logged,
+      page
+        .locator(`[data-testid="deck-card-${clickedCard.id}"]`)
+        .getByRole('link', { name: 'View on dealer site' })
+        .click(),
+    ]);
+    if (!loggedResponse.ok()) {
+      fail('The dealer click was not logged.', 'Save, pass, and dealer click flush immediately so a reload sees them.', {
+        status: loggedResponse.status(),
+      });
+    }
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const rankedTop = await topDeckCard(page);
+    const rankedBrand = await listingBrand(status, rankedTop.id);
+    await shoot(page, files.ranked);
+    if (rankedBrand?.brand_key !== clickedBrand.brand_key) {
+      fail(
+        'The clicked brand did not lead the deck after reload.',
+        'A dealer click outweighs the Rolex pick. Reload refetches the ranked page.',
+        { clicked: clickedBrand, top: rankedBrand, label: rankedTop.label },
+      );
+    }
+
+    const session = await signIn(status, PEOPLE.buyer);
+    const dealerId = await dealerIdOf(status, 'dealer');
+    const followed = await api(status.url, '/rest/v1/dealer_follows', {
+      key: status.anonKey,
+      token: session.accessToken,
+      method: 'POST',
+      prefer: 'resolution=ignore-duplicates,return=minimal',
+      body: { user_id: session.userId, dealer_id: dealerId },
+    });
+    if (!followed.ok && followed.status !== 409) {
+      fail('The buyer could not follow Test Bench.', 'Run seed so the shop and the buyer exist.', {
+        status: followed.status,
+        detail: followed.body,
+      });
+    }
+    const dealerSession = await signIn(status, PEOPLE.dealer);
+    const imported = await api(status.url, '/functions/v1/import-listings', {
+      key: status.anonKey,
+      token: dealerSession.accessToken,
+      method: 'POST',
+      body: {
+        action: 'fixture',
+        dealerId,
+        listings: [JSON.parse(readFileSync(FIXTURE, 'utf8'))],
+      },
+    });
+    if (!imported.ok) {
+      fail('Fixture import failed.', 'The local import-listings function must allow action fixture.', {
+        status: imported.status,
+        detail: imported.body,
+      });
+    }
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    const followedTop = await topDeckCard(page);
+    const followedBrand = await listingBrand(status, followedTop.id);
+    await shoot(page, files.followed);
+    if (followedBrand?.brand_key !== 'fixture' || !String(followedTop.label).startsWith('Fixture')) {
+      fail(
+        'The followed shop did not lead the deck.',
+        'The fixture watch has three photos. A follow outweighs one click, so Fixture Drop is first after reload.',
+        { label: followedTop.label, brand: followedBrand, import: imported.body },
+      );
+    }
+
+    report = {
+      command: 'verify-rank',
+      guest: { label: guestTop.label, brand: guestBrand.brand },
+      clicked: { label: clickedCard.label, brand: clickedBrand.brand },
+      ranked: { label: rankedTop.label, brand: rankedBrand.brand },
+      followed: { label: followedTop.label, brand: followedBrand.brand, dealerId },
+      cleared,
+    };
+    writeFileSync(files.report, JSON.stringify(report, null, 2));
+  } catch (error) {
+    const failed = path.join(evidence, 'rank-failed.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      error instanceof Error ? error.message : String(error),
+      'The rank proof drives the guest sheet, a dealer click, and a followed shop. The failed screenshot is rank-failed.png.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed },
+    );
+  } finally {
+    const video = page.video();
+    await context.close();
+    await browser.close();
+    if (video) {
+      const recorded = await video.path();
+      if (recorded && existsSync(recorded)) renameSync(recorded, files.video);
+    }
+    rmSync(videoDir, { recursive: true, force: true });
+  }
+  if (!report || !existsSync(files.video)) {
+    fail('The rank video was not saved.', 'Playwright writes it when the context closes. The png files stay in the evidence directory.');
+  }
+  ok({ ...report, files });
+}
+
 const commands = {
   doctor: () => commandDoctor(),
   up: () => commandUp(dryRun),
@@ -2294,13 +2597,14 @@ const commands = {
   'verify-operator': () => commandVerifyOperator(dryRun),
   'verify-operator-catalog': () => commandVerifyOperatorCatalog(dryRun),
   'verify-publish-resume': () => commandVerifyPublishResume(dryRun),
+  'verify-rank': () => commandVerifyRank(dryRun),
 };
 
 const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank.',
   );
 }
 

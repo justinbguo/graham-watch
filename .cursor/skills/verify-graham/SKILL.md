@@ -57,7 +57,7 @@ Drive only when all of these hold:
 
 ## Drive
 
-The harness is `control-graham`. Stdout is one JSON object. Progress is on stderr. `--dry-run` prints the plan and changes nothing. It is honored on `up`, `seed`, `sign-in`, `follow`, `import`, `notify-drops`, `web`, `reset-proof`, `cleanup`, `verify-drops`, `verify-operator`, `verify-operator-catalog`, and `verify-publish-resume`.
+The harness is `control-graham`. Stdout is one JSON object. Progress is on stderr. `--dry-run` prints the plan and changes nothing. It is honored on `up`, `seed`, `sign-in`, `follow`, `import`, `notify-drops`, `web`, `reset-proof`, `cleanup`, `verify-drops`, `verify-operator`, `verify-operator-catalog`, `verify-publish-resume`, and `verify-rank`.
 
 ```bash
 node .cursor/skills/verify-graham/control-graham.mjs doctor
@@ -76,6 +76,7 @@ node .cursor/skills/verify-graham/control-graham.mjs verify-drops
 node .cursor/skills/verify-graham/control-graham.mjs verify-operator
 node .cursor/skills/verify-graham/control-graham.mjs verify-operator-catalog
 node .cursor/skills/verify-graham/control-graham.mjs verify-publish-resume
+node .cursor/skills/verify-graham/control-graham.mjs verify-rank
 node .cursor/skills/verify-graham/control-graham.mjs cleanup
 ```
 

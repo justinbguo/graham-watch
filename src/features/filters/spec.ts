@@ -186,13 +186,17 @@ export function filterCacheToken(filters: unknown): string {
  * The deck cache, one pile per filter, sort, and favorites-first setting.
  *
  * The filter token stays the second entry: a swipe reads `key[1]` and updates
- * that filter's counts, which do not depend on sort. Sort and favorites-first
- * follow it because `search_listings_v2` rejects a cursor built for a
- * different order. A new key starts with no cursor, so the bookmark from
- * "newest" is never sent to "price, low to high".
+ * that filter's counts, which do not depend on sort. Sort, favorites-first,
+ * and the taste token follow it. A new key starts with no cursor, so a
+ * bookmark from another order is never sent back.
  */
-export function deckCacheKey(filters: unknown = null, sort = 'newest', favoritesFirst = true) {
-  return ['deck', filterCacheToken(filters), sort, favoritesFirst] as const;
+export function deckCacheKey(
+  filters: unknown = null,
+  sort = 'newest',
+  favoritesFirst = true,
+  taste = '',
+) {
+  return ['deck', filterCacheToken(filters), sort, favoritesFirst, taste] as const;
 }
 
 export function countsCacheKey(filters: unknown = null) {

@@ -28,6 +28,7 @@ import { PhotoCaption } from '@/components/PhotoCaption';
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { ListingDetails } from '@/features/listings/ListingDetails';
+import { formatTitle } from '@/lib/format';
 import { listingSourceUrl } from '@/lib/listingSource';
 import { impact, tick } from '@/lib/haptics';
 import { deckStage } from '@/lib/layout';
@@ -634,6 +635,7 @@ export const SwipeCard = memo(forwardRef<
     <GestureDetector gesture={pan}>
       <Animated.View
         testID={`deck-card-${card.id}`}
+        accessibilityLabel={isTop ? formatTitle(card) : undefined}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           cardWidth.value = width;

@@ -3,12 +3,11 @@ import type { InfiniteData } from '@tanstack/react-query';
 /**
  * How the Buy deck asks for the next page.
  *
- * `search_listings_v2` returns one page and an opaque cursor. The cursor is a
- * bookmark the database made for this filter, this sort, and this
- * favorites-first setting. The next request sends that string back and does
- * not read it. A cursor from a different sort is rejected, so the query key
- * includes the sort: a new sort is a new query, and a new query starts with
- * no cursor.
+ * `rank_buy_feed` returns one page and an opaque cursor. The cursor is a
+ * bookmark the database made for this filter and this taste. The next request
+ * sends that string back and does not read it. A cursor from a different
+ * order is rejected, so the query key includes the taste: a new taste is a
+ * new query, and a new query starts with no cursor.
  *
  * The pile used to be one page and nothing else. After about twenty swipes
  * the screen was empty even though more watches fit the filters. A refill

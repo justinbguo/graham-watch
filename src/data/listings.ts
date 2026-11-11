@@ -9,6 +9,7 @@ import type { Json } from '@/lib/database';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session';
 
 import {
   DECK_FAVORITES_FIRST,
@@ -23,7 +24,9 @@ import {
   type DeckPage,
   type DeckSort,
 } from './deckPaging';
+import { useGuestTaste } from './guestTaste';
 import { keys } from './keys';
+import { brandKey, emptyTaste, orderFeed, type RankSeed, type RankWatch } from './rank';
 
 export { DECK_LIMIT, showDeckEmpty };
 
@@ -91,27 +94,50 @@ export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
  * database, so it mints its own bookmark; the hook still treats that string
  * as opaque.
  */
+function asRank(card: DeckCard): RankWatch {
+  return {
+    id: card.id,
+    brandKey: card.brand_key ?? brandKey(card.brand),
+    style: card.style,
+    priceCents: card.price_cents,
+    createdAtMs: Date.parse(card.created_at),
+    dealerId: card.dealer_id,
+    photoCount: card.photos.length,
+  };
+}
+
+function orderDemo(cards: DeckCard[], seed: RankSeed): DeckCard[] {
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  return orderFeed(cards.map(asRank), emptyTaste(seed), Date.now())
+    .map((watch) => byId.get(watch.id))
+    .filter((card): card is DeckCard => card != null);
+}
+
 async function fetchDeckPage(
   limit: number,
   filters: Filters,
   cursor: string | null,
-  sort: DeckSort,
-  favoritesFirst: boolean,
+  _sort: DeckSort,
+  _favoritesFirst: boolean,
+  seed: RankSeed,
 ): Promise<DeckPage<DeckCard>> {
-  if (isDemo) return demoDeckPage(filters, cursor, limit);
+  if (isDemo) return demoDeckPage(filters, cursor, limit, seed);
 
   // The deck hides watches already judged, and a shop this account has claimed.
   // Importing a listing does not hide it. A guest has no account, so nothing
-  // is theirs to hide and `swipes` has no rows for them — the cursor is what
-  // moves a guest forward, the same way it moves a signed-in buyer.
-  const { data, error } = await supabase.rpc('search_listings_v2', {
+  // is theirs to hide and `swipes` has no rows for them. The cursor is what
+  // moves a guest forward, the same way it moves a signed-in buyer. Sort and
+  // favorites-first stay on the query key so a different order is still a
+  // different pile.
+  const { data, error } = await supabase.rpc('rank_buy_feed', {
     p_spec: canonicalize(filters).spec as Json,
     p_limit: limit,
     p_cursor: cursor,
-    p_exclude_swiped: true,
-    p_exclude_own: true,
-    p_sort: sort,
-    p_favorites_first: favoritesFirst,
+    p_seed: {
+      brands: [...seed.brands],
+      styles: [...seed.styles],
+      priceBand: seed.priceBand,
+    },
   });
   if (error) throw error;
 
@@ -123,9 +149,14 @@ async function fetchDeckPage(
   };
 }
 
-/** Stand-in for `search_listings_v2` when the app is running on fixtures. */
-function demoDeckPage(filters: Filters, cursor: string | null, limit: number): DeckPage<DeckCard> {
-  const all = demo.deck(filters);
+/** Stand-in for `rank_buy_feed` when the app is running on fixtures. */
+function demoDeckPage(
+  filters: Filters,
+  cursor: string | null,
+  limit: number,
+  seed: RankSeed,
+): DeckPage<DeckCard> {
+  const all = orderDemo(demo.deck(filters), seed);
   let start = 0;
   if (cursor != null) {
     const id = cursor.startsWith('demo:') ? cursor.slice('demo:'.length) : '';
@@ -214,8 +245,11 @@ export function usePrimeListing() {
 export function useDeck(limit = DECK_LIMIT) {
   const { filters } = useFilters('deck');
   const guest = useGuest();
+  const { userId } = useSession();
+  const { seed, cacheKey, ready } = useGuestTaste();
   const sort = DECK_SORT;
   const favoritesFirst = DECK_FAVORITES_FIRST;
+  const tasteKey = `${userId ?? 'guest'}:${ready ? cacheKey : 'pending'}`;
 
   const query = useInfiniteQuery<
     DeckPage<DeckCard>,
@@ -224,9 +258,9 @@ export function useDeck(limit = DECK_LIMIT) {
     ReturnType<typeof keys.deck>,
     string | null
   >({
-    queryKey: keys.deck(filters, sort, favoritesFirst),
+    queryKey: keys.deck(filters, sort, favoritesFirst, tasteKey),
     initialPageParam: null,
-    queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, sort, favoritesFirst),
+    queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, sort, favoritesFirst, seed),
     getNextPageParam: (lastPage) => nextDeckCursor(lastPage),
     // The deck is consumed by swiping, not by refetching. Re-running the first
     // page mid-pile would shuffle cards out from under the user's thumb. The

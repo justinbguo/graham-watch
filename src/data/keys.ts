@@ -17,7 +17,8 @@ export const keys = {
     filters: unknown = null,
     sort: DeckSort = DECK_SORT,
     favoritesFirst: boolean = DECK_FAVORITES_FIRST,
-  ) => deckCacheKey(filters, sort, favoritesFirst),
+    taste = '',
+  ) => deckCacheKey(filters, sort, favoritesFirst, taste),
   search: (filters: unknown) => ['search', filterCacheToken(filters)] as const,
   // Two numbers about the same filter set the deck is keyed on, but a separate
   // key: the deck is frozen while it is being swiped and these are not.

@@ -43,6 +43,7 @@ jobs:
           scripts/deck-stage.test.mjs
           scripts/filter-spec.test.mjs
           scripts/listing-events.test.mjs
+          scripts/rank.test.mjs
           scripts/repair-photos.test.mjs
           scripts/drops-select.test.ts
           scripts/feedback-contact.test.ts
