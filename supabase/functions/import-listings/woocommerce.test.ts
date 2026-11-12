@@ -8,6 +8,7 @@ import soldTitle from './fixtures/woocommerce/uncat-sold-title.json' with {
   type: 'json',
 };
 import zero from './fixtures/woocommerce/zero.json' with { type: 'json' };
+import { listingsFromWooProducts } from './fixture.ts';
 import { CatalogueRefused } from './robots.ts';
 import type { Json, SkippedItem, SourceItem, TextResponse } from './source.ts';
 import { fetchWooCommerceItems, mapWooProduct } from './woocommerce.ts';
@@ -444,6 +445,21 @@ Deno.test('a later page that fails does not resume on that page', async () => {
   assertEquals(read?.nextPage, undefined);
   assertEquals(read?.items.length, 1);
   assertEquals(failed, 4);
+});
+
+Deno.test('a local fixture publishes the priced watch and names every exclusion', () => {
+  const built = listingsFromWooProducts(
+    [live, zero, sold, book, sign, soldTitle],
+    ORIGIN,
+  );
+  assertEquals(built.listings.length, 1);
+  assertEquals(built.listings[0]?.brand, 'Franck Muller');
+  assertEquals(built.listings[0]?.price_cents, 1_550_000);
+  assertEquals((built.listings[0]?.photoUrls.length ?? 0) >= 3, true);
+  assertEquals(
+    built.skipped.map((item) => item.reason),
+    ['no price', 'not for sale', 'title is a book', 'title is a display sign', 'not for sale'],
+  );
 });
 
 Deno.test('robots.txt can refuse the products path', async () => {

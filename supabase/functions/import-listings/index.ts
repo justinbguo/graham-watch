@@ -4,7 +4,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 import { MAX_CATALOG_ITEMS, readCatalog, syncCatalog } from './catalog.ts';
-import { fixtureImportAllowed, parseFixtureListings } from './fixture.ts';
+import { fixtureImportAllowed, listingsFromWooProducts, parseFixtureListings } from './fixture.ts';
 import { holdLabel } from './nonwatch.ts';
 import { ExtractorUnavailable } from './extract.ts';
 import { discover, NO_PROFILE, normalizeDomain, readProfile, type Profile } from './discover.ts';
@@ -623,13 +623,43 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
           404,
         );
       }
+      const wooProducts = Array.isArray(body.products) ? body.products : null;
+      let wooSkipped: Array<{ title: string; reason: string }> = [];
+      let wooPhotos: string[][] | null = null;
+      let wooSources: string[] | null = null;
+      if (wooProducts) {
+        const dealerId = typeof body.dealerId === 'string' ? body.dealerId.trim() : '';
+        const origin = typeof body.origin === 'string' && body.origin.trim()
+          ? body.origin.trim()
+          : 'https://classicwatchny.com';
+        try {
+          const built = listingsFromWooProducts(wooProducts, origin);
+          wooSkipped = built.skipped;
+          wooPhotos = built.listings.map((item) => item.photoUrls);
+          wooSources = built.listings.map((item) => item.sourceUrl);
+          body = {
+            ...body,
+            dealerId,
+            listings: built.listings.map((item) => ({
+              brand: item.brand,
+              model: item.model,
+              reference: item.reference,
+              year: item.year,
+              price_cents: item.price_cents,
+              description: item.description,
+            })),
+          };
+        } catch (error) {
+          return bad(error instanceof Error ? error.message : 'Bad fixture.');
+        }
+      }
       let parsed: ReturnType<typeof parseFixtureListings>;
       try {
         parsed = parseFixtureListings(body);
       } catch (error) {
         return bad(error instanceof Error ? error.message : 'Bad fixture.');
       }
-      const rows = parsed.listings.map((item) => ({
+      const rows = parsed.listings.map((item, index) => ({
         dealer_id: parsed.dealerId,
         imported_by: userId,
         brand: item.brand,
@@ -640,29 +670,32 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
         description: item.description,
         currency: 'USD',
         status: 'active' as const,
-        source_url: `https://test-bench.graham.test/fixture/${crypto.randomUUID()}`,
+        source_url: wooSources?.[index] ??
+          `https://test-bench.graham.test/fixture/${crypto.randomUUID()}`,
       }));
       const inserted = await ctx.supabase
         .from('listings')
         .insert(rows)
-        .select('id, brand, model, reference, created_at, dealer_id');
+        .select('id, brand, model, price_cents, reference, created_at, dealer_id');
       if (inserted.error) return bad(inserted.error.message, 403);
-      const photoUrl =
+      const placeholder =
         'https://images.squarespace-cdn.com/content/v1/64d53a504f5aee6d2b32ee14/19e5672c-8f2f-4bc3-ac40-a2c141dc78c7/B0004038.jpg?format=1500w';
-      const photos = (inserted.data ?? []).flatMap((row: { id: string }) =>
-        [0, 1, 2].map((position) => ({
+      const photos = (inserted.data ?? []).flatMap((row: { id: string }, index: number) => {
+        const urls = wooPhotos?.[index] ?? [placeholder, placeholder, placeholder];
+        return urls.map((source_url, position) => ({
           listing_id: row.id,
           position,
-          source_url: photoUrl,
-        }))
-      );
+          source_url,
+        }));
+      });
       if (photos.length > 0) {
         const photoWrite = await ctx.supabase.from('listing_photos').insert(photos);
         if (photoWrite.error) return bad(photoWrite.error.message, 403);
       }
       return Response.json({
-        provider: 'fixture',
+        provider: wooProducts ? 'woocommerce-fixture' : 'fixture',
         published: inserted.data?.length ?? 0,
+        skipped: wooSkipped,
         listings: inserted.data ?? [],
       });
     }
