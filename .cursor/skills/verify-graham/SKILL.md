@@ -80,6 +80,7 @@ node .cursor/skills/verify-graham/control-graham.mjs verify-operator-catalog
 node .cursor/skills/verify-graham/control-graham.mjs verify-publish-resume
 node .cursor/skills/verify-graham/control-graham.mjs verify-rank
 node .cursor/skills/verify-graham/control-graham.mjs verify-new-badge
+node .cursor/skills/verify-graham/control-graham.mjs verify-guest-save
 node .cursor/skills/verify-graham/control-graham.mjs cleanup
 ```
 

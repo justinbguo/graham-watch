@@ -365,10 +365,11 @@ export function useListingCounts(enabled = true) {
 }
 
 export function useSaved(userId: string | null) {
+  const guest = useGuest();
   return useQuery({
     queryKey: keys.saved(userId ?? 'anonymous'),
     queryFn: () => fetchSaved(userId!),
-    enabled: Boolean(userId),
+    enabled: Boolean(userId) && !guest.settling,
   });
 }
 

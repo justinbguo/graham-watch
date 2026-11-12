@@ -2888,6 +2888,195 @@ async function commandVerifyNewBadge(dryRun) {
   ok({ ...report, files });
 }
 
+async function mailpitLink(email, since) {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const list = await fetch('http://127.0.0.1:54324/api/v1/messages');
+    if (list.ok) {
+      const payload = await list.json();
+      const matches = (payload.messages ?? []).filter((message) => {
+        const addressed = (message.To ?? []).some(
+          (entry) => (entry.Address ?? '').toLowerCase() === email.toLowerCase(),
+        );
+        const created = Date.parse(message.Created);
+        return addressed && (Number.isNaN(created) || created >= since - 2000);
+      });
+      matches.sort((a, b) => Date.parse(b.Created) - Date.parse(a.Created));
+      const match = matches[0];
+      if (match) {
+        const detail = await fetch(`http://127.0.0.1:54324/api/v1/message/${match.ID}`);
+        const body = await detail.json();
+        const text = `${body.Text ?? ''}\n${body.HTML ?? ''}`;
+        const href = text.match(/href="([^"]*token_hash[^"]*)"/i)?.[1];
+        if (href) return href.replaceAll('&amp;', '&');
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return null;
+}
+
+async function commandVerifyGuestSave(dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'verify-guest-save',
+      dryRun: true,
+      writes: ['guest-deck.png', 'save-prompt.png', 'dismissed.png', 'after-pass.png', 'first-run.png', 'wishlist.png', 'guest-save.webm'],
+    });
+    return;
+  }
+  if (!webUp()) {
+    fail('The web build is not being served.', 'Run the web command first. verify-guest-save does not start a second server.');
+  }
+  const status = requireStack();
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  const files = {
+    deck: path.join(evidence, 'guest-deck.png'),
+    prompt: path.join(evidence, 'save-prompt.png'),
+    dismissed: path.join(evidence, 'dismissed.png'),
+    passed: path.join(evidence, 'after-pass.png'),
+    firstRun: path.join(evidence, 'first-run.png'),
+    wishlist: path.join(evidence, 'wishlist.png'),
+    video: path.join(evidence, 'guest-save.webm'),
+    report: path.join(evidence, 'guest-save-report.json'),
+  };
+  const videoDir = path.join(evidence, 'guest-save-video-tmp');
+  rmSync(videoDir, { recursive: true, force: true });
+  mkdirSync(videoDir, { recursive: true });
+  const chromium = await loadChromium();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } },
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(90_000);
+  const saveCopy = 'Sign in to keep this watch on your wishlist.';
+  let report = null;
+  try {
+    await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    const close = page.getByRole('button', { name: 'Close', exact: true });
+    await close.waitFor({ state: 'visible', timeout: 20_000 });
+    await close.click();
+    await page.getByText(/\$[\d,]+/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await page.keyboard.press('s');
+    const first = await topDeckCard(page);
+    await shoot(page, files.deck);
+    await page.keyboard.press('ArrowRight');
+    await page.getByText(saveCopy, { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('button', { name: 'Continue with email' }).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.waitForTimeout(400);
+    const held = await page.evaluate(() => localStorage.getItem('graham.guest.pending-save'));
+    if (!held || !held.includes(first.id)) {
+      fail('The save was not held on this browser.', 'A guest save writes graham.guest.pending-save before the sheet opens.', {
+        held,
+        card: first,
+      });
+    }
+    await shoot(page, files.prompt);
+    await page.keyboard.press('Escape');
+    await page.getByText(saveCopy, { exact: true }).waitFor({ state: 'hidden', timeout: 20_000 });
+    const still = await topDeckCard(page);
+    if (still.id !== first.id) {
+      fail('Dismissing the sheet took the watch off the deck.', 'A refused save springs the card back.', { first, still });
+    }
+    const dropped = await page.evaluate(() => localStorage.getItem('graham.guest.pending-save'));
+    if (dropped) {
+      fail('Dismissing the sheet kept the save.', 'Close with no session removes graham.guest.pending-save.', { dropped });
+    }
+    await shoot(page, files.dismissed);
+    await page.keyboard.press('ArrowLeft');
+    await page.waitForFunction(
+      (previous) => {
+        const card = document.querySelector('[data-testid^="deck-card-"][aria-label]');
+        return card && card.getAttribute('data-testid') !== previous;
+      },
+      `deck-card-${first.id}`,
+      { timeout: 20_000 },
+    );
+    if (await page.getByText(saveCopy, { exact: true }).isVisible().catch(() => false)) {
+      fail('A pass opened the sign-in sheet.', 'A left swipe never asks a guest to sign in.');
+    }
+    const passed = await topDeckCard(page);
+    await shoot(page, files.passed);
+    await page.keyboard.press('ArrowRight');
+    await page.getByText(saveCopy, { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    const email = `guest-save-${Date.now()}@graham.test`;
+    await page.getByRole('button', { name: 'Continue with email' }).click();
+    await page.getByPlaceholder('you@example.com').fill(email);
+    const since = Date.now();
+    await page.getByRole('button', { name: 'Send me a code' }).click();
+    const link = await mailpitLink(email, since);
+    if (!link || !link.includes('token_hash=')) {
+      fail('Mailpit did not receive an email link.', 'Run up so the local mailer can deliver the code and the link.', { email });
+    }
+    const other = await context.newPage();
+    await other.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    const shared = await other.evaluate(() => localStorage.getItem('graham.guest.pending-save'));
+    await other.close();
+    if (!shared || !shared.includes(passed.id)) {
+      fail('A new tab could not see the held save.', 'The pending save lives in localStorage, which a new tab on this origin shares.', {
+        shared,
+        card: passed,
+      });
+    }
+    await page.goto(link, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Skip', exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+    await shoot(page, files.firstRun);
+    await page.getByRole('button', { name: 'Skip', exact: true }).click();
+    await page.getByText(/\$[\d,]+/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('tab', { name: /Wishlist/ }).click();
+    await page.getByText(passed.label, { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await shoot(page, files.wishlist);
+    const saved = await page.evaluate(async (anon) => {
+      const key = Object.keys(localStorage).find((name) => name.includes('auth-token'));
+      const session = JSON.parse(localStorage.getItem(key) ?? '{}');
+      const token = session.access_token;
+      const userId = session.user?.id;
+      const response = await fetch(`${window.location.origin.includes('8091') ? 'http://127.0.0.1:54321' : ''}/rest/v1/swipes?select=listing_id,direction&actor_id=eq.${userId}`, {
+        headers: { apikey: anon, Authorization: `Bearer ${token}` },
+      });
+      return response.json();
+    }, status.anonKey);
+    const row = Array.isArray(saved) ? saved.find((entry) => entry.listing_id === passed.id && entry.direction === 'right') : null;
+    if (!row) {
+      fail('The watch is not a wishlist row.', 'Sign-in upserts the held save as a right swipe.', { saved, card: passed });
+    }
+    report = {
+      command: 'verify-guest-save',
+      dismissed: first.label,
+      passed: passed.label,
+      savedListingId: passed.id,
+      email,
+      linkHost: new URL(link).host,
+      newTab: true,
+    };
+    writeFileSync(files.report, JSON.stringify(report, null, 2));
+  } catch (error) {
+    const failed = path.join(evidence, 'guest-save-failed.png');
+    await shoot(page, failed).catch(() => undefined);
+    fail(
+      error instanceof Error ? error.message : String(error),
+      'The guest-save proof dismisses arrival, saves, dismisses, passes, then opens the email link in a new tab. The failed screenshot is guest-save-failed.png.',
+      { url: page.url(), text: (await pageText(page)).slice(0, 800), failed },
+    );
+  } finally {
+    const video = page.video();
+    await context.close();
+    await browser.close();
+    if (video) {
+      const recorded = await video.path();
+      if (recorded && existsSync(recorded)) renameSync(recorded, files.video);
+    }
+    rmSync(videoDir, { recursive: true, force: true });
+  }
+  if (!report || !existsSync(files.video)) {
+    fail('The guest-save video was not saved.', 'Playwright writes it when the context closes.');
+  }
+  ok({ ...report, files });
+}
+
 async function pageBatch(page) {
   await page.getByText(/watch(es)? from /).first().waitFor({ state: 'visible', timeout: 20_000 });
 }
@@ -2912,13 +3101,14 @@ const commands = {
   'verify-publish-resume': () => commandVerifyPublishResume(dryRun),
   'verify-rank': () => commandVerifyRank(dryRun),
   'verify-new-badge': () => commandVerifyNewBadge(dryRun),
+  'verify-guest-save': () => commandVerifyGuestSave(dryRun),
 };
 
 const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge, verify-guest-save, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge, verify-guest-save.',
   );
 }
 

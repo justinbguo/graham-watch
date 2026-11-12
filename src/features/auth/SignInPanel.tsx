@@ -1,11 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
 import { Button, Field, Message } from '@/components/ui';
 import { Wordmark } from '@/components/Wordmark';
 import { useSignIn, type SignInMode } from '@/features/auth/email';
+import type { SignInReason } from '@/features/auth/guest';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { SignInOption } from '@/features/auth/SignInOption';
 import { GiveFeedback } from '@/features/feedback/GiveFeedback';
@@ -22,31 +22,27 @@ const SWITCH: Record<SignInMode, string> = {
   login: 'New to Graham? Create an account',
 };
 
-const TAGLINE =
-  'The best vintage watch dealers for a very passionate collector.';
+const TAGLINE: Record<SignInReason, string> = {
+  action: 'The best vintage watch dealers for a very passionate collector.',
+  save: 'Sign in to keep this watch on your wishlist.',
+};
 
 /**
  * The doors themselves. Used as a sheet over the deck (guest browsing) and as
  * the full sign-in surface when the stack still needs one.
  */
 export function SignInPanel({
-  reason,
-  footer,
+  reason = 'action',
   presentation = 'default',
 }: {
-  /** Why the sheet opened — budget is the ten-swipe gate. */
-  reason?: 'budget' | 'action';
-  footer?: ReactNode;
+  reason?: SignInReason;
   /** Web modal: centered lockup and larger tagline; shell owns the close control. */
   presentation?: 'default' | 'modal';
 }) {
   const signIn = useSignIn();
   const styles = useThemedStyles(panelStyles);
   const modal = presentation === 'modal';
-  const tagline =
-    reason === 'budget'
-      ? 'Sign in to keep swiping, save watches, and message dealers.'
-      : TAGLINE;
+  const tagline = TAGLINE[reason];
 
   const body = (
     <>
@@ -57,7 +53,6 @@ export function SignInPanel({
 
       <SignInDoors signIn={signIn} modal={modal} />
       {modal ? null : <GiveFeedback placement="plain" />}
-      {footer}
     </>
   );
 

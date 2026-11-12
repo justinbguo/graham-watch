@@ -5,7 +5,6 @@
 export {
   cardDismissDuration,
   cardSettleDuration,
-  GUEST_SWIPE_BUDGET,
   HIT_TARGET,
   saveFlightDuration,
   WIDE_BREAKPOINT,

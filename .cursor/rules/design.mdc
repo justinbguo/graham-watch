@@ -99,8 +99,8 @@ nobody follows.
   `accessibilityValue`.
 - The launcher mark in the app, or a tagline anywhere but under the wordmark
   on sign-in. On web, guests land on the deck with the sign-in sheet already
-  open over it, once per page load, and no **Log in** in the header; after
-  `GUEST_SWIPE_BUDGET` judgments it opens again. On iOS, sign-in is the first screen and that header control does not
+  open over it, once per page load, and no **Log in** in the header; a
+  guest's save opens it again, and a pass never does. On iOS, sign-in is the first screen and that header control does not
   exist. The panel is the wordmark, one `editorial` sentence in `text`, and the
   doors — never a second headline or a card around the doors. The doors name
   the mode: `Create account with` or `Log in with`. No heading does. A header
