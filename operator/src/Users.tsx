@@ -7,57 +7,31 @@ import {
   formatPercent,
   labelAnswer,
   parseDashboard,
-  parseUserDetail,
   type CountPoint,
   type Dashboard,
-  type RecentUser,
   type Rollup,
-  type UserDetail,
 } from './dashboard';
 import { supabase } from './supabase';
 
 /** Counts from the tables the app already writes. No chart library: a bar is a div. */
 export function Users() {
   const [dash, setDash] = useState<Dashboard | null>(null);
-  const [people, setPeople] = useState<RecentUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<UserDetail | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    void (async () => {
-      const [overview, recent] = await Promise.all([
-        supabase.rpc('operator_dashboard'),
-        supabase.rpc('operator_recent_users', { p_limit: 40 }),
-      ]);
+    void supabase.rpc('operator_dashboard').then(({ data, error: failed }) => {
       if (!live) return;
-      setError(overview.error?.message ?? recent.error?.message ?? null);
-      setDash(overview.data ? parseDashboard(overview.data) : null);
-      setPeople(recent.data ?? []);
-    })();
+      setError(failed?.message ?? null);
+      setDash(data ? parseDashboard(data) : null);
+    });
     return () => {
       live = false;
     };
   }, []);
 
-  useEffect(() => {
-    if (!openId) return;
-    const requested = openId;
-    let live = true;
-    void supabase.rpc('operator_user_detail', { p_user_id: requested }).then(({ data, error: failed }) => {
-      if (!live) return;
-      setDetailError(failed?.message ?? null);
-      setDetail(data ? parseUserDetail(data) : null);
-    });
-    return () => {
-      live = false;
-    };
-  }, [openId]);
-
   if (error) return <p className="error">{error}</p>;
-  if (!dash || people === null) return <p className="muted">Loading…</p>;
+  if (!dash) return <p className="muted">Loading…</p>;
 
   return (
     <section>
@@ -203,66 +177,6 @@ export function Users() {
           </div>
         )}
       </div>
-
-      <div className="block">
-        <h2>Recent users</h2>
-        {people.length === 0 ? (
-          <p className="muted">No accounts yet.</p>
-        ) : (
-          <div className="scroller">
-            <table>
-              <thead>
-                <tr>
-                  <th>Signed up</th>
-                  <th>Who</th>
-                  <th>Type</th>
-                  <th>Onboarded</th>
-                  <th className="num">Swipes</th>
-                  <th>Last active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {people.map((person) => {
-                  const expanded = openId === person.id;
-                  return [
-                    <tr key={person.id} className={expanded ? 'open' : undefined}>
-                      <td className="small">{new Date(person.created_at).toLocaleDateString()}</td>
-                      <td>
-                        <button
-                          className="sort"
-                          onClick={() => {
-                            setDetailError(null);
-                            setOpenId(expanded ? null : person.id);
-                          }}>
-                          <strong>{person.handle ? `@${person.handle}` : person.first_name || 'Unnamed'}</strong>
-                        </button>
-                      </td>
-                      <td className="small">{labelAnswer(person.account_type)}</td>
-                      <td className="small">{person.onboarded ? 'Yes' : 'No'}</td>
-                      <td className="num">{person.swipe_count}</td>
-                      <td className="small">
-                        {person.last_active ? new Date(person.last_active).toLocaleString() : '—'}
-                      </td>
-                    </tr>,
-                    expanded ? (
-                      <tr key={`${person.id}-detail`} className="detail-row">
-                        <td colSpan={6}>
-                          {detailError ? <p className="error">{detailError}</p> : null}
-                          {detail?.id === person.id ? (
-                            <UserDrill detail={detail} />
-                          ) : detailError ? null : (
-                            <p className="muted">Loading…</p>
-                          )}
-                        </td>
-                      </tr>
-                    ) : null,
-                  ];
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </section>
   );
 }
@@ -324,61 +238,5 @@ function RollupList({ title, rows }: { title: string; rows: Rollup[] }) {
         </div>
       )}
     </div>
-  );
-}
-
-function UserDrill({ detail }: { detail: UserDetail }) {
-  return (
-    <div className="detail">
-      <p className="small">
-        {detail.firstName || 'No first name'} · {labelAnswer(detail.accountType)} ·{' '}
-        {detail.onboarded ? 'Onboarded' : 'Not onboarded'}
-      </p>
-      <div className="cols">
-        <Answer label="Favourite brands" values={detail.favoriteBrands} />
-        <Answer label="Hunting for" values={detail.huntingFor.map(labelAnswer)} />
-        <p className="small">
-          <span className="muted">Collection</span>
-          <br />
-          {labelAnswer(detail.collectionSize)}
-        </p>
-        <p className="small">
-          <span className="muted">Years collecting</span>
-          <br />
-          {labelAnswer(detail.collectingYears)}
-        </p>
-        <Answer label="Search is hard because" values={detail.searchPainPoints.map(labelAnswer)} />
-      </div>
-      <h3 className="small">Saves</h3>
-      {detail.saves.length === 0 ? (
-        <p className="muted small">No saves.</p>
-      ) : (
-        <ul className="rows tight">
-          {detail.saves.map((save) => (
-            <li key={save.listingId}>
-              {[save.brand, save.model].filter(Boolean).join(' ')}
-              <span className="muted small">
-                {' '}
-                {save.reference ? `ref. ${save.reference} · ` : ''}
-                {save.dealerName}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {detail.follows.length > 0 ? (
-        <p className="small">Follows {detail.follows.map((shop) => shop.name).join(', ')}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function Answer({ label, values }: { label: string; values: string[] }) {
-  return (
-    <p className="small">
-      <span className="muted">{label}</span>
-      <br />
-      {values.length ? values.join(', ') : '—'}
-    </p>
   );
 }

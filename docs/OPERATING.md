@@ -759,7 +759,10 @@ walked by hand.
 in order, and re-seeds the inventory snapshot so the deck works again. Nothing
 local is precious, which is the point — a reset costs half a minute and no
 network. Migrations are append-only once they have run: never edit one, add a
-new file.
+new file. A wipe that deletes users and keeps the schema does not return
+`collector_number_seq` to 1, so Paul is collector 1 only if the database is
+rebuilt or that same wipe runs
+`select setval('public.collector_number_seq', 1, false);`.
 
 The snapshot in `supabase/seed.sql` is generated. Regenerate it with
 `npm run snapshot` when the shape of the data changes, and never edit it by

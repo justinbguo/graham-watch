@@ -2713,26 +2713,6 @@ console.log('\noperators');
     !JSON.stringify(dash.body).includes('example.com'),
     JSON.stringify(dash.body)?.slice(0, 200)
   );
-  const recent = await api('/rest/v1/rpc/operator_recent_users', {
-    token: buyer.token,
-    method: 'POST',
-    body: { p_limit: 20 },
-  });
-  check(
-    'recent users are a table without an email column',
-    Array.isArray(recent.body) && recent.body.every((row) => !('email' in row) && row.id),
-    JSON.stringify(recent.body?.[0])
-  );
-  const detail = await api('/rest/v1/rpc/operator_user_detail', {
-    token: buyer.token,
-    method: 'POST',
-    body: { p_user_id: buyer.id },
-  });
-  check(
-    'a user drill-in returns onboarding answers and no email',
-    detail.status < 300 && detail.body?.id === buyer.id && !JSON.stringify(detail.body).includes('example.com'),
-    `${detail.status} ${JSON.stringify(detail.body)?.slice(0, 240)}`
-  );
 
   // ---------------------------------------------------------------------
   // Who may run the importer
@@ -2980,8 +2960,8 @@ console.log('\nwhat anon can reach');
     ['require_operator', {}],
     ['operator_activity', {}],
     ['operator_dashboard', {}],
-    ['operator_recent_users', {}],
-    ['operator_user_detail', { p_user_id: buyer.id }],
+    ['operator_accounts', {}],
+    ['operator_account', { p_user_id: buyer.id }],
     ['record_operator_action', { p_action: 'x', p_target_type: 'shop', p_target_id: dealerId, p_before: {}, p_after: {} }],
     ['record_bot_action', { p_action: 'x', p_target_type: 'shop', p_target_id: dealerId, p_before: {}, p_after: {} }],
     ['bot_set_dealer_permission', { p_dealer_id: dealerId, p_permission: 'approved' }],
@@ -5011,6 +4991,100 @@ console.log('\nbuyer events');
     Array.isArray(left) && left.length === 0,
     JSON.stringify(left),
   );
+}
+
+console.log('\noperator accounts');
+{
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
+  const watcher = await createUser(`accounts-watcher-${stamp}@example.com`);
+  const collector = await createUser(`accounts-collector-${stamp}@example.com`);
+  const stranger = await createUser(`accounts-stranger-${stamp}@example.com`);
+  await fetch(`${URL}/rest/v1/operators`, { method: 'POST', headers: admin, body: JSON.stringify({ user_id: watcher.id }) });
+
+  const granted = await api('/rest/v1/rpc/is_operator', { token: watcher.token, method: 'POST' });
+  const sealed = await api('/rest/v1/buyer_events?select=*', { token: watcher.token });
+  check(
+    'an operator still cannot select buyer_events',
+    granted.body === true && sealed.status >= 400,
+    `operator ${granted.body}, got ${sealed.status}`,
+  );
+
+  const start = Date.now() - 10 * 60_000;
+  const at = (seconds) => new Date(start + seconds * 1000).toISOString();
+  const onTheWatch = { listing_id: listingId, dealer_id: dealerId };
+  const opened = crypto.randomUUID();
+  const logged = await api('/rest/v1/rpc/log_buyer_events', {
+    token: collector.token,
+    method: 'POST',
+    body: {
+      p_events: [
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'impression', surface: 'buy', occurred_at: at(0), exposure_id: crypto.randomUUID(), position: 0 },
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'impression', surface: 'detail', occurred_at: at(60), exposure_id: opened },
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'dwell', surface: 'detail', occurred_at: at(102), exposure_id: opened, dwell_ms: 42_000 },
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'save', surface: 'buy', occurred_at: at(120) },
+        { id: crypto.randomUUID(), kind: 'pass', surface: 'buy', occurred_at: at(180), listing_id: crypto.randomUUID(), dealer_id: dealerId },
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'dealer_click', surface: 'detail', occurred_at: at(240) },
+        { ...onTheWatch, id: crypto.randomUUID(), kind: 'inquiry_open', surface: 'detail', occurred_at: at(300) },
+        { id: crypto.randomUUID(), kind: 'filter', surface: 'buy', occurred_at: at(360), filter: { query: 'speedmaster' } },
+        { id: crypto.randomUUID(), kind: 'follow', surface: 'shop', occurred_at: at(420), dealer_id: dropDealerId },
+      ],
+    },
+  });
+  const followed = await api('/rest/v1/dealer_follows', {
+    token: collector.token,
+    method: 'POST',
+    body: { user_id: collector.id, dealer_id: dropDealerId },
+    prefer: 'return=minimal',
+  });
+  const asked = await fetch(`${URL}/rest/v1/inquiries`, {
+    method: 'POST',
+    headers: { ...admin, Prefer: 'return=minimal' },
+    body: JSON.stringify({ listing_id: listingId, dealer_id: dealerId, buyer_id: collector.id, message: 'Is the bracelet original?' }),
+  });
+  check(
+    'the collector logs nine events, follows a shop, and has an inquiry',
+    logged.body === 9 && followed.status < 300 && asked.status < 300,
+    `logged ${logged.status} ${JSON.stringify(logged.body)}, follow ${followed.status}, inquiry ${asked.status}`,
+  );
+
+  const list = await api('/rest/v1/rpc/operator_accounts', { token: watcher.token, method: 'POST' });
+  const row = list.body?.find?.((account) => account.id === collector.id);
+  check(
+    'an operator lists every account with its email and act counts',
+    row?.email === `accounts-collector-${stamp}@example.com` &&
+      row.swipes_right === 1 && row.swipes_left === 1 && row.dealer_clicks === 1 && row.follows === 1,
+    JSON.stringify(row),
+  );
+
+  for (const [fn, body] of [
+    ['operator_accounts', {}],
+    ['operator_account', { p_user_id: collector.id }],
+  ]) {
+    const refused = await api(`/rest/v1/rpc/${fn}`, { token: stranger.token, method: 'POST', body });
+    check(
+      `a buyer gets 42501 from ${fn} and no address`,
+      refused.status === 403 && refused.body?.code === '42501' && !JSON.stringify(refused.body).includes('example.com'),
+      `${refused.status} ${JSON.stringify(refused.body)}`,
+    );
+  }
+
+  const story = await api('/rest/v1/rpc/operator_account', {
+    token: watcher.token,
+    method: 'POST',
+    body: { p_user_id: collector.id },
+  });
+  check(
+    'the timeline shows opens and inquiries, newest first, and hides deck impressions, dwells, and drafts',
+    JSON.stringify(story.body?.timeline?.map((event) => event.kind)) ===
+      JSON.stringify(['inquiry', 'follow', 'filter', 'dealer_click', 'pass', 'save', 'open']) &&
+      story.body.timeline.at(-1).seconds === 42 &&
+      !JSON.stringify(story.body).includes('example.com'),
+    JSON.stringify(story.body)?.slice(0, 400),
+  );
+
+  for (const user of [watcher, collector, stranger]) {
+    await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
+  }
 }
 
 await cleanUp();
