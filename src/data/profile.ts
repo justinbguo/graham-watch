@@ -26,7 +26,7 @@ export type Onboarding = {
   lastName: string;
   /** Already claimed on slide 2. Written again here so finishing cannot drop it. */
   username: string;
-  dateOfBirth: string;
+  dateOfBirth: string | null;
   favoriteBrands: string[];
   /**
    * Which door they came through. Routing only — a dealer's actual powers come
@@ -54,12 +54,14 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 async function saveOnboarding(userId: string, answers: Onboarding) {
   if (isDemo) return demo.completeOnboarding();
 
+  const handle = answers.username.trim() ? normalizeUsername(answers.username) : null;
+
   const { data, error } = await supabase
     .from('profiles')
     .update({
-      first_name: answers.firstName.trim(),
-      last_name: answers.lastName.trim(),
-      handle: normalizeUsername(answers.username),
+      first_name: answers.firstName.trim() || null,
+      last_name: answers.lastName.trim() || null,
+      ...(handle ? { handle } : {}),
       date_of_birth: answers.dateOfBirth,
       favorite_brands: answers.favoriteBrands,
       account_type: answers.accountType,

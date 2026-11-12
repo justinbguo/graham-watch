@@ -9,7 +9,7 @@ import { DeckRailButton } from '@/components/DeckRailButton';
 import { DeckDesktopFrame } from '@/components/DeckDesktopFrame';
 import { DeckRailTools, DeckToolRail } from '@/components/DeckToolRail';
 import { DeckCoach } from '@/features/deck/DeckCoach';
-import { GuestTasteSheet } from '@/features/deck/GuestTasteSheet';
+import { FirstRunSheet } from '@/features/deck/FirstRunSheet';
 import { deckCardZ } from '@/features/deck/stack';
 import { useDeckStack } from '@/features/deck/useDeckStack';
 import { useDeckColumns } from '@/features/deck/useGridColumns';
@@ -26,10 +26,10 @@ import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
 import { DECK_LIMIT, shouldRefillDeck } from '@/data/deckPaging';
-import { useGuestTaste } from '@/data/guestTaste';
 import { logEvent, useExposure } from '@/data/listingEvents';
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { useNewListings, type NewListings } from '@/data/newListings';
+import { useOnboardingGate } from '@/data/profile';
 import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
@@ -55,8 +55,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const isNew = source === 'new';
   const { userId, isSignedIn } = useSession();
   const guest = useGuest();
-  const taste = useGuestTaste();
-  const holdTaste = !isNew && !isSignedIn && (!taste.ready || !taste.taste.settled);
+  const { needsOnboarding, ready: profileReady } = useOnboardingGate();
   const deckFilters = useFilters('deck');
   const newFilters = useFilters('new');
   const filterApi = isNew ? newFilters : deckFilters;
@@ -135,7 +134,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
   // them, so keys must not keep judging watches while a listing or sign-in is up.
   const deckOnTop = isNew ? pathname === '/new' : pathname === '/' || pathname === '/index';
-  useSignInOnArrival(!isNew && deckOnTop && !holdTaste);
+  useSignInOnArrival(!isNew && deckOnTop);
 
   const [view, setView] = useState<DeckView>(isWide ? 'grid' : 'cards');
   const { columns, columnChoice, choose: chooseColumns } = useDeckColumns();
@@ -321,7 +320,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     void fetchNextPage();
   }, [fetchNextPage]);
 
-  const deckKeysOn = deckOnTop && !holdTaste && Platform.OS === 'web' && cards.length > 0;
+  const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0;
   const cardSwipeKeysOn = deckKeysOn && view === 'cards';
 
   useWebArrowSwipe(
@@ -425,15 +424,8 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     ? fresh.state === 'none' ||
       (fresh.state === 'ready' && cards.length === 0 && !fresh.hasNextPage && !fresh.loadingMore)
     : showDeckEmpty(cards.length, counts?.matched);
-  const tasteSheet = isNew
-    ? null
-    : !isSignedIn && !taste.taste.settled ? (
-      taste.ready ? (
-        <GuestTasteSheet onSettle={(next) => void taste.settle(next)} />
-      ) : (
-        <View style={styles.tasteHold} />
-      )
-    ) : null;
+  const firstRun =
+    !isNew && isDesktopWeb && isSignedIn && profileReady && needsOnboarding ? <FirstRunSheet /> : null;
 
   const loadMoreRef = useRef(fetchNextPage);
   loadMoreRef.current = fetchNextPage;
@@ -463,7 +455,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     return (
       <Screen titleControl={titleControl} inTabs>
         {frameDesktop(<Spinner />)}
-      {tasteSheet}</Screen>
+      {firstRun}</Screen>
     );
   }
 
@@ -476,7 +468,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
           <Button label="Try again" variant="outline" onPress={() => refetch()} />
         </Centered>
         )}
-      {tasteSheet}</Screen>
+      {firstRun}</Screen>
     );
   }
 
@@ -513,7 +505,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
           )}
         </Centered>
         )}
-      {tasteSheet}</Screen>
+      {firstRun}</Screen>
     );
   }
 
@@ -557,7 +549,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
             />
           </Animated.View>
         )}
-      {tasteSheet}</Screen>
+      {firstRun}</Screen>
     );
   }
 
@@ -639,7 +631,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
           </Animated.View>
         </View>
       )}
-    {tasteSheet}</Screen>
+    {firstRun}</Screen>
   );
 }
 
@@ -741,15 +733,6 @@ function tally(counts: ListingCounts | undefined, filtered: boolean) {
 }
 
 const deckStyles = (_theme: Theme) => ({
-  tasteHold: {
-    position: 'absolute' as const,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 30,
-    backgroundColor: _theme.color.background,
-  },
   headerBar: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
