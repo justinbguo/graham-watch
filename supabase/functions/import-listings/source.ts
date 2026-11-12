@@ -79,7 +79,7 @@ export type SourceItem = {
    * the other way round empties an import from any shop we misread.
    */
   available: boolean;
-  holdReason?: 'strap' | 'accessory' | 'clock';
+  holdReason?: 'strap' | 'accessory' | 'clock' | 'not_a_watch';
   /** The operator reviewed this snapshot, so publishing must not replace it. */
   operatorEdited?: boolean;
   /** Absent on rows stored before the operator console needed to show this. */

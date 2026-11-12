@@ -1,6 +1,6 @@
 import type { SourceItem } from './source.ts';
 
-export const HOLD_REASONS = ['strap', 'accessory', 'clock'] as const;
+export const HOLD_REASONS = ['strap', 'accessory', 'clock', 'not_a_watch'] as const;
 
 export type HoldReason = (typeof HOLD_REASONS)[number];
 
@@ -10,7 +10,14 @@ export type CatalogueFields = {
   productType: string | null;
   tags: string[];
   vendor: string | null;
+  sourceUrl?: string;
 };
+
+export type CatalogueRule = {
+  id: string;
+  reason: HoldReason;
+  matches: (fields: CatalogueFields) => boolean;
+} & ({ enabled: true } | { enabled: false; whenOff: 'skip' | 'pass' });
 
 export type CatalogueDecision =
   | { decision: 'watch' }
@@ -54,7 +61,6 @@ const WATCH_SHAPED: RegExp[] = [
   /\bintegrated\s+bracelet\b/i,
   /\bbuben\b[\s\S]{0,40}\b(?:zorweg|the one)\b/i,
   /\b(?:zorweg|the one)\b[\s\S]{0,40}\bbuben\b/i,
-  /\bpocket\s+watch\b/i,
   /\b(?:on|with|fitted with|attached to|comes with|including|having)\b(?:\s+\w+){0,6}\s+(?:an?\s+|the\s+)?(?:leather\s+|oyster\s+|jubilee\s+|president(?:ial)?\s+|integrated\s+)?(?:bracelets?|straps?|bands?)\b/i,
 ];
 
@@ -64,9 +70,13 @@ function watchShaped(title: string, text: string): boolean {
   return /\bbox(?:es)?\b/i.test(blob) && /\bpapers?\b/i.test(blob);
 }
 
+function mentionsClock(value: string): boolean {
+  return CLOCK_TYPE.test(value.replace(/o['’]clock/gi, ' '));
+}
+
 function clockSignal(title: string, productType: string | null, tags: string[]): boolean {
   const leaf = catalogueTypeLeaf(productType);
-  if (CLOCK_TYPE.test(title) || (leaf && CLOCK_TYPE.test(leaf))) return true;
+  if (mentionsClock(title) || (leaf && mentionsClock(leaf))) return true;
   return tags.some((tag) => fold(tag) === 'clock' || fold(tag) === 'clocks');
 }
 
@@ -102,13 +112,44 @@ function subNamedInTitle(title: string): boolean {
 function strapTitle(title: string): boolean {
   if (/\bbuckles?\b/i.test(title) && title.length <= 40 && !hasYearOrReference(title)) return true;
   if (watchNamedInTitle(title) || dialNamedInTitle(title) || subNamedInTitle(title)) return false;
-  if (/\bstraps?\b/i.test(title)) return true;
+  if (/\bstraps?\b/i.test(title)) return !strapWordDescribesWatch(title);
   if (/\b(?:oyster|jubilee|president(?:ial)?)\b.{0,24}\bbracelets?\b/i.test(title)) return true;
   if (/\bbracelets?\b/i.test(title) && /\b\d+\s*mm\b/i.test(title)) return true;
   if (/\bheavy\s+bracelets?\b/i.test(title)) return true;
   if (/\bbark\s+finish\s+bracelets?\b/i.test(title)) return true;
   if (/\b(?:rose|white|yellow)\s+gold\s+bracelets?\s*$/i.test(title)) return true;
   return false;
+}
+
+function strapWordDescribesWatch(title: string): boolean {
+  if (/\b(?:on|original|included)\s+straps?\b/i.test(title)) return true;
+  if (/\bwith\b(?:\s+\w+){0,5}\s+straps?\b/i.test(title)) return true;
+  const color = title.match(
+    /\b(?:red|green|blue|brown|grey|gray|black|navy|white|tan|pink|orange|yellow)\s+straps?\b/i,
+  );
+  if (!color || color.index == null) return false;
+  const before = title.slice(0, color.index).trim().split(/\s+/).filter(Boolean);
+  return before.length >= 2;
+}
+
+function pocketTitle(title: string): boolean {
+  return /\bpocket\s*watch/i.test(title) || /\bpocketwatch/i.test(title);
+}
+
+function pocketPath(sourceUrl: string | undefined): boolean {
+  if (!sourceUrl) return false;
+  let path = sourceUrl;
+  try {
+    path = new URL(sourceUrl).pathname;
+  } catch {
+    path = sourceUrl;
+  }
+  const folded = path.toLowerCase();
+  return (
+    folded.includes('/pocket-watches') ||
+    folded.includes('pocket-watch') ||
+    folded.includes('pocketwatch')
+  );
 }
 
 function strapConstruction(title: string, text: string): boolean {
@@ -133,6 +174,74 @@ function hold(reason: HoldReason, rule: string): CatalogueDecision {
   return { decision: 'hold', reason, rule };
 }
 
+export const CATALOGUE_RULES: readonly CatalogueRule[] = [
+  {
+    id: 'pendant-lapel-brooch',
+    reason: 'not_a_watch',
+    enabled: false,
+    whenOff: 'pass',
+    matches: ({ title }) =>
+      /\b(?:pendant|lapel|brooch|sautoir)\b/i.test(title) || /\bcufflink\s+watch\b/i.test(title),
+  },
+  {
+    id: 'handheld-stopwatch',
+    reason: 'not_a_watch',
+    enabled: false,
+    whenOff: 'pass',
+    matches: ({ title }) => /\bstop\s*-?\s*watch(?!ing)/i.test(title) && !pocketTitle(title),
+  },
+  {
+    id: 'money-clip',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ title }) => /\bmoney\s*-?\s*clips?\b/i.test(title),
+  },
+  {
+    id: 'empty-case',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ title }) =>
+      /\bcase\s+for\s+key\b/i.test(title) || /\bpocket\s*watch\s+cases?\b/i.test(title),
+  },
+  {
+    id: 'movement-only',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ title, text }) => /\bmovement\s+only\b/i.test(`${title}\n${text}`),
+  },
+  {
+    id: 'pocket-type',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ productType }) =>
+      Boolean(productType && /\bpocket\s*watch/i.test(productType)),
+  },
+  {
+    id: 'pocket-url',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ sourceUrl }) => pocketPath(sourceUrl),
+  },
+  {
+    id: 'pocket-title',
+    reason: 'not_a_watch',
+    enabled: true,
+    matches: ({ title }) => pocketTitle(title),
+  },
+];
+
+function holdFromRules(fields: CatalogueFields): CatalogueDecision | null {
+  for (const rule of CATALOGUE_RULES) {
+    if (!rule.matches(fields)) continue;
+    if (!rule.enabled) {
+      if (rule.whenOff === 'pass') return null;
+      continue;
+    }
+    return hold(rule.reason, rule.id);
+  }
+  return null;
+}
+
 function holdFromTitle(title: string): CatalogueDecision | null {
   if (objetAccessory(title)) return hold('accessory', 'objet-title');
   if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
@@ -155,6 +264,9 @@ export function classifyCatalogueItem(fields: CatalogueFields): CatalogueDecisio
   const vendor = fields.vendor;
 
   if (clockSignal(title, productType, tags)) return hold('clock', 'clock');
+
+  const ruled = holdFromRules(fields);
+  if (ruled) return ruled;
 
   const titled = holdFromTitle(title);
   if (titled) return titled;
@@ -184,6 +296,7 @@ export function fieldsFromSourceItem(item: SourceItem): CatalogueFields {
     productType: item.meta?.productType ?? null,
     tags: item.meta?.tags ?? [],
     vendor: item.meta?.vendor ?? null,
+    sourceUrl: item.sourceUrl,
   };
 }
 

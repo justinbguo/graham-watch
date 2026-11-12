@@ -8,10 +8,11 @@ Deno.test('a homepage sitemap yields every watch collection and skips cameras', 
     `${origin}/under350/uw59`,
     `${origin}/rolex/bubbleback`,
     `${origin}/cameras/leica-m5`,
+    `${origin}/pocket-watches/pw12`,
     `${origin}/watches`,
     `${origin}/blog-montauk/2012/6/11/latest`,
   ]);
-  assertEquals(paths, [`${origin}/under350`, `${origin}/rolex`]);
+  assertEquals(paths, [`${origin}/under350`, `${origin}/rolex`, `${origin}/pocket-watches`]);
 });
 
 Deno.test('falls back to the available variant when the product price is zero', () => {
