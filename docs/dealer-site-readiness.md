@@ -363,3 +363,14 @@ pixel sizes were measured on one Tropical Watch file (the `src` and the
 `srcset` `2x`) and taken from Shopify's own `width` field otherwise.
 Craft + Tailored and Danny's were not paged to the last product; the totals
 3,687 and 4,314 are `/meta.json`'s `published_products_count`.
+
+## Classic Watch NY (12 Nov 2026)
+
+The sections above are the 28 October 2026 snapshot of five other shops. This
+note does not change those verdicts.
+
+Classic Watch NY (`https://classicwatchny.com`) publishes a WooCommerce Store
+API. On 12 Nov 2026 the feed had 2,123 products. The Sold category had 1,966
+and the Watches category had 142. `per_page` 100 is 22 pages. `stock_status`
+is not the sold signal. A price of $0 is not published. `robots.txt` allowed
+`/` on that date.
