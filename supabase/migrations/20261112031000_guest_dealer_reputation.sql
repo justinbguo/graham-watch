@@ -1,10 +1,5 @@
--- A guest opens a shop from a listing before they have an account. The panel
--- asks for dealer_reputation, and that function was granted only to signed-in
--- users, so every listing logged a 401 and the shop's figures never appeared.
---
--- The figures for an approved shop are the same counts a guest can already
--- infer from the deck. An unapproved shop stays hidden unless the caller
--- manages it.
+-- A caller who does not manage the shop gets the on-deck count only.
+-- Sold totals and the sync stamp stay null. Those rows are not in the guest catalogue.
 
 create or replace function public.dealer_reputation(p_dealer_id uuid)
 returns table (
@@ -24,23 +19,32 @@ as $$
       select count(*)
       from public.listings l
       where l.dealer_id = d.id
-        and l.status = 'active'
-        and l.sold_at is null
+        and case
+          when public.controls_dealer(d.id)
+            then l.status = 'active' and l.sold_at is null
+          else public.listing_on_deck(l)
+        end
     )::integer,
-    (
-      select count(*)
-      from public.listings l
-      where l.dealer_id = d.id
-        and l.sold_at is not null
-    )::integer,
-    coalesce(
-      d.last_synced_at,
-      (
-        select max(l.availability_checked_at)
+    case
+      when public.controls_dealer(d.id) then (
+        select count(*)
         from public.listings l
         where l.dealer_id = d.id
+          and l.sold_at is not null
+      )::integer
+      else null
+    end,
+    case
+      when public.controls_dealer(d.id) then coalesce(
+        d.last_synced_at,
+        (
+          select max(l.availability_checked_at)
+          from public.listings l
+          where l.dealer_id = d.id
+        )
       )
-    )
+      else null
+    end
   from public.dealers d
   where d.id = p_dealer_id
     and (

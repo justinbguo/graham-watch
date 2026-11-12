@@ -80,8 +80,7 @@ function accessoryTitle(title: string): boolean {
 
 /**
  * Keystone files jewelry under product type Watches and puts `(Objet)` in the
- * title. A lapel watch and a pendant watch use that same marker and stay
- * watches. The word watch is what separates them.
+ * title.
  */
 function objetAccessory(title: string): boolean {
   if (!/\(\s*objet\s*\)/i.test(title)) return false;

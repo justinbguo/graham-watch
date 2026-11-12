@@ -1,11 +1,3 @@
--- A held catalogue row is not a watch. The importer already refuses to publish
--- one, and a row that reached the deck before the hold still has an active
--- listing. The next availability sweep marks that listing sold. A dealer who
--- marked it sold themselves keeps that mark.
---
--- not_a_watch is not cleared when the shop still lists the product. The hold
--- is the decision, and the product staying in the feed is expected.
-
 alter table public.listings drop constraint listings_sold_source_check;
 
 alter table public.listings
@@ -114,7 +106,7 @@ begin
 
   -- Held rows are still in the shop feed, so the sweep above leaves them for
   -- sale. Pull every held listing for this shop, including ones this page did
-  -- not see, and do not touch a sale the dealer recorded.
+  -- not see.
   with held as (
     select s.listing_id
     from public.source_items s
@@ -141,9 +133,8 @@ begin
 end;
 $$;
 
--- Keystone marks jewelry with "(Objet)" and a product type of Watches. A title
--- that also says watch (a lapel watch, a pendant watch) stays a watch. This
--- catches the rows already on the deck. Later reads use the same rule in the
+-- Keystone marks jewelry with "(Objet)" and a product type of Watches.
+-- This catches the rows already on the deck. Later reads use the same rule in the
 -- importer, then the sweep above.
 update public.source_items
 set
