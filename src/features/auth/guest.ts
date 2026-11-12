@@ -63,7 +63,15 @@ export async function askToSave(listing: ListingRef, surface: JudgeSurface): Pro
   openSignIn('save');
 }
 
-/** The save sheet closed. Without a stored session that was a dismissal, so the held save goes. */
+/** The visitor closed the sheet. The held save goes, session or not. */
+export function declinePendingSave(): void {
+  void serial(() => applyPending({ type: 'decline' }));
+}
+
+/**
+ * The sheet left without a button. A stored session means sign-in, and the
+ * hold stays for settle. No session means the route was dismissed.
+ */
 export function abandonPendingSave(): void {
   void serial(async () => {
     const { data } = await supabase.auth.getSession();

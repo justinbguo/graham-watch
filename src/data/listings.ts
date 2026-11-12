@@ -365,10 +365,13 @@ export function useListingCounts(enabled = true) {
 }
 
 export function useSaved(userId: string | null) {
+  const guest = useGuest();
   return useQuery({
     queryKey: keys.saved(userId ?? 'anonymous'),
     queryFn: () => fetchSaved(userId!),
-    enabled: Boolean(userId),
+    // A guest save is written in the moment after sign-in. Fetching before
+    // that write finishes caches an empty list for the stale window.
+    enabled: Boolean(userId) && !guest.settling,
   });
 }
 

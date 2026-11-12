@@ -24,13 +24,15 @@ and never open the sheet. A save (right swipe, right arrow, or Add to
 wishlist) opens it with `Sign in to keep this watch on your wishlist.` and the
 card springs back. That watch is held in `graham.guest.pending-save`: one slot,
 the latest save wins, gone after an hour (local `otp_expiry`; hosted may
-differ). Dismissing the sheet drops it. A reload, the email link in a new tab,
-and a web OAuth redirect keep it. Community, messages, wishlist, and profile ask for an account up
+differ). Closing the sheet drops it, and so does browser back. A reload and
+the email link keep it, including when the link replaces this tab. A web
+OAuth redirect keeps it too. Community, messages, wishlist, and profile ask for an account up
 front. Anon may read the approved catalogue (and run `search_listings` /
 `listing_counts`); swipes and everything personal stay authenticated. Once a
 session lands, `GuestProvider` writes the passes and the held save into
 `swipes` and logs one `save` buyer event under the id and time of the gesture.
-It does not wait for onboarding.
+The wishlist waits for that write, so it cannot cache an empty list from the
+moment before. It does not wait for onboarding.
 
 iOS does not browse as a guest. The first screen is the sign-in wall, and the
 deck mounts only after a session exists. There is no **Log in** control in the

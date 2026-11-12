@@ -16,6 +16,11 @@ import type { GuestSwipe } from './guestLedger';
 
 type GuestContextValue = {
   ready: boolean;
+  /**
+   * Sign-in is writing this device's judgments. Saved lists wait, so they
+   * cannot cache an empty wishlist from the moment before the write lands.
+   */
+  settling: boolean;
   /** Watches this device judged. The deck hides them. A held save is not one of them. */
   swipedIds: ReadonlySet<string>;
   /** Saves stored before saving asked for sign-in. A held save is not saved. */
@@ -42,6 +47,7 @@ export function GuestProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [ready, setReady] = useState(false);
   const [swipes, setSwipes] = useState<GuestSwipe[]>([]);
+  const [settledUser, setSettledUser] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -56,13 +62,19 @@ export function GuestProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn || !userId || !ready) return;
+    if (!userId) {
+      setSettledUser(null);
+      return;
+    }
+    if (!isSignedIn || !ready) return;
     let cancelled = false;
     settleGuest(userId)
       .then((settled) => {
-        if (cancelled || !settled) return;
-        setSwipes([]);
+        if (cancelled) return;
+        if (settled) setSwipes([]);
         // The deck and wishlist now live on the server for this account.
+        // Refresh even when this pass wrote nothing: an earlier pass may have
+        // written and been cancelled before it could refresh the cache.
         void queryClient.invalidateQueries({ queryKey: ['deck'] });
         void queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
         void queryClient.invalidateQueries({ queryKey: ['saved'] });
@@ -70,6 +82,9 @@ export function GuestProvider({ children }: PropsWithChildren) {
       })
       .catch(() => {
         // Storage stays; the next signed-in launch settles again.
+      })
+      .finally(() => {
+        if (!cancelled) setSettledUser(userId);
       });
     return () => {
       cancelled = true;
@@ -92,9 +107,12 @@ export function GuestProvider({ children }: PropsWithChildren) {
     [isSignedIn]
   );
 
+  const settling = Boolean(userId && isSignedIn && settledUser !== userId);
+
   const value = useMemo<GuestContextValue>(
     () => ({
       ready,
+      settling,
       swipedIds: new Set(isSignedIn ? [] : swipes.map((swipe) => swipe.listingId)),
       savedIds: isSignedIn
         ? []
@@ -102,7 +120,7 @@ export function GuestProvider({ children }: PropsWithChildren) {
       recordPass,
       undoPass,
     }),
-    [ready, swipes, isSignedIn, recordPass, undoPass]
+    [ready, settling, swipes, isSignedIn, recordPass, undoPass]
   );
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;

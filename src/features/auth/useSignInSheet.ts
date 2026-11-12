@@ -3,13 +3,14 @@ import { useEffect } from 'react';
 
 import { useSession } from '@/providers/session';
 
-import { abandonPendingSave, type SignInReason } from './guest';
+import { abandonPendingSave, declinePendingSave, type SignInReason } from './guest';
 
 /**
- * The sign-in sheet's reason, its close on sign-in, and what closing it means.
- * Close, Not now, the scrim, Escape, and either back unmount the route. A page
- * unload does not, so a reload, the email link, and a web OAuth redirect keep
- * a held save.
+ * The sign-in sheet's reason, and what closing it means for a held save.
+ * Close, Not now, the scrim, and Escape drop the save. Browser back does too,
+ * unless this document is unloading: the email link replaces the page, and
+ * the next one still needs the watch. Sign-in itself calls `router.back`
+ * with a stored session, which leaves the hold for settle.
  */
 export function useSignInSheet(): { reason: SignInReason; dismiss: () => void } {
   const { isSignedIn } = useSession();
@@ -20,9 +21,30 @@ export function useSignInSheet(): { reason: SignInReason; dismiss: () => void } 
     if (isSignedIn) router.back();
   }, [isSignedIn]);
 
-  // The cleanup reads the stored session, not `isSignedIn`. On a phone a new
-  // account unmounts the app for onboarding in the same commit that signs in.
-  useEffect(() => (reason === 'save' ? abandonPendingSave : undefined), [reason]);
+  useEffect(() => {
+    if (reason !== 'save' || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    let unloading = false;
+    const markUnloading = () => {
+      unloading = true;
+    };
+    const onPop = () => {
+      if (!unloading) abandonPendingSave();
+    };
+    window.addEventListener('beforeunload', markUnloading);
+    window.addEventListener('pagehide', markUnloading);
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('beforeunload', markUnloading);
+      window.removeEventListener('pagehide', markUnloading);
+      window.removeEventListener('popstate', onPop);
+    };
+  }, [reason]);
 
-  return { reason, dismiss: () => router.back() };
+  return {
+    reason,
+    dismiss: () => {
+      if (reason === 'save') declinePendingSave();
+      router.back();
+    },
+  };
 }
