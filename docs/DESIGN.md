@@ -1644,8 +1644,9 @@ grey. The bar never runs
 a query to find a number out: the wishlist count comes from the same cached list the wishlist
 screen renders, through `useSavedCount`, so the two cannot disagree. New's count is the
 size of the latest sealed catalogue batch, read once through `useNewCount`, and the New
-screen lists that same batch. Opening New does not clear it; the next full refresh
-replaces it. The New screen uses Buy's header, card, grid, and paging. The line
+screen lists that same batch. Opening New stores that batch id on the device
+and the count clears. It stays clear after a reload. The next seal is a new
+batch id, and the count comes back as that batch's size. The New screen uses Buy's header, card, grid, and paging. The line
 under the card is the batch ("12 watches from last night's update"), not the
 marketplace total.
 

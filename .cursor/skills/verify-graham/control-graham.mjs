@@ -2659,6 +2659,239 @@ async function commandVerifyRank(dryRun) {
   ok({ ...report, files });
 }
 
+async function sealLatestBatch(status) {
+  const batchId = crypto.randomUUID();
+  const sealed = await api(status.url, '/rest/v1/rpc/seal_catalogue_batch', {
+    key: status.serviceKey,
+    method: 'POST',
+    body: { p_batch_id: batchId },
+  });
+  if (!sealed.ok) {
+    fail(
+      'seal_catalogue_batch failed.',
+      'The local service role seals a batch. This command does not call the hosted project.',
+      { status: sealed.status, detail: sealed.body },
+    );
+  }
+  const latest = await api(status.url, '/rest/v1/rpc/latest_catalogue_batch', {
+    key: status.anonKey,
+    method: 'POST',
+    body: {},
+  });
+  const row = Array.isArray(latest.body) ? latest.body[0] : null;
+  const count = Array.isArray(row?.listing_ids) ? row.listing_ids.length : 0;
+  if (!latest.ok || count < 1) {
+    fail(
+      'The sealed batch has no watches on the deck.',
+      'Import a fixture listing with three photos on an approved shop, then seal. An empty latest batch draws no badge.',
+      { status: latest.status, detail: latest.body, sealed: sealed.body },
+    );
+  }
+  return { batchId: row.batch_id, count };
+}
+
+async function importFixture(status) {
+  const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+  const session = await signIn(status, PEOPLE.dealer);
+  const dealerId = await dealerIdOf(status, 'dealer');
+  const result = await api(status.url, '/functions/v1/import-listings', {
+    key: status.anonKey,
+    token: session.accessToken,
+    method: 'POST',
+    body: { action: 'fixture', dealerId, listings: [fixture] },
+  });
+  if (!result.ok) {
+    fail(
+      'Fixture import failed.',
+      'import-listings action "fixture" is local-only. Run up, then seed.',
+      { status: result.status, detail: result.body },
+    );
+  }
+  return result.body?.listings?.[0]?.id ?? null;
+}
+
+async function dismissArrival(page) {
+  const close = page.getByRole('button', { name: 'Close', exact: true });
+  if (await close.isVisible().catch(() => false)) await close.click();
+}
+
+async function newTabLabel(page) {
+  return (await page.locator('[role="tab"][aria-label^="New"]').first().getAttribute('aria-label')) ?? '';
+}
+
+async function waitForNewLabel(page, expected) {
+  const tab = page.locator(`[role="tab"][aria-label="${expected}"]`);
+  await tab.first().waitFor({ state: 'visible', timeout: 30_000 });
+}
+
+async function reloadAndExpectClear(page) {
+  const pending = page.waitForResponse(
+    (response) => response.url().includes('latest_catalogue_batch') && response.ok(),
+    { timeout: 20_000 },
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await pending;
+  await dismissArrival(page);
+  const deadline = Date.now() + 2_000;
+  let label = '';
+  while (Date.now() < deadline) {
+    label = await newTabLabel(page);
+    if (label !== 'New') break;
+    await page.waitForTimeout(100);
+  }
+  if (label !== 'New') {
+    fail(
+      'The New badge came back after a reload.',
+      'Opening New stores the batch id on this device. Reloading on Buy must keep the tab named New, with no count.',
+      { label },
+    );
+  }
+}
+
+async function commandVerifyNewBadge(dryRun) {
+  if (dryRun) {
+    ok({
+      command: 'verify-new-badge',
+      dryRun: true,
+      writes: [
+        'phone-badge.png',
+        'phone-opened.png',
+        'phone-reloaded.png',
+        'phone-returned.png',
+        'desktop-badge.png',
+        'desktop-opened.png',
+        'desktop-reloaded.png',
+        'desktop-returned.png',
+        'new-badge.webm',
+      ],
+    });
+    return;
+  }
+  if (!webUp()) {
+    fail('The web build is not being served.', 'Run the web command first. verify-new-badge does not start a second server.');
+  }
+  const status = requireStack();
+  const evidence = evidenceDir();
+  mkdirSync(evidence, { recursive: true });
+  const files = {
+    phoneBadge: path.join(evidence, 'phone-badge.png'),
+    phoneOpened: path.join(evidence, 'phone-opened.png'),
+    phoneReloaded: path.join(evidence, 'phone-reloaded.png'),
+    phoneReturned: path.join(evidence, 'phone-returned.png'),
+    desktopBadge: path.join(evidence, 'desktop-badge.png'),
+    desktopOpened: path.join(evidence, 'desktop-opened.png'),
+    desktopReloaded: path.join(evidence, 'desktop-reloaded.png'),
+    desktopReturned: path.join(evidence, 'desktop-returned.png'),
+    video: path.join(evidence, 'new-badge.webm'),
+    report: path.join(evidence, 'new-badge-report.json'),
+  };
+  await importFixture(status);
+  const first = await sealLatestBatch(status);
+
+  const videoDir = path.join(evidence, 'new-badge-video-tmp');
+  rmSync(videoDir, { recursive: true, force: true });
+  mkdirSync(videoDir, { recursive: true });
+  const chromium = await loadChromium();
+  const browser = await chromium.launch({ headless: true });
+  const phoneContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    recordVideo: { dir: videoDir, size: { width: 390, height: 844 } },
+  });
+  const phone = await phoneContext.newPage();
+  phone.setDefaultTimeout(90_000);
+  const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const desktop = await desktopContext.newPage();
+  desktop.setDefaultTimeout(90_000);
+
+  let report = null;
+  try {
+    await phone.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    await ensureSignedIn(phone, PEOPLE.buyer.email);
+    await dismissArrival(phone);
+    await waitForNewLabel(phone, `New, ${first.count}`);
+    await shoot(phone, files.phoneBadge);
+    await phone.locator(`[role="tab"][aria-label="New, ${first.count}"]`).first().click();
+    await pageBatch(phone);
+    await waitForNewLabel(phone, 'New');
+    await shoot(phone, files.phoneOpened);
+    await phone.locator('[role="tab"][aria-label="Buy"]').first().click();
+    await reloadAndExpectClear(phone);
+    await shoot(phone, files.phoneReloaded);
+
+    await desktop.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
+    await Promise.race([
+      desktop.getByRole('button', { name: 'Not now', exact: true }).waitFor({ state: 'visible', timeout: 20_000 }),
+      desktop.getByRole('button', { name: 'Close', exact: true }).waitFor({ state: 'visible', timeout: 20_000 }),
+      desktop.getByRole('tab', { name: /^New/ }).waitFor({ state: 'visible', timeout: 20_000 }),
+    ]);
+    await dismissArrival(desktop);
+    await waitForNewLabel(desktop, `New, ${first.count}`);
+    await shoot(desktop, files.desktopBadge);
+    await desktop.locator(`[role="tab"][aria-label="New, ${first.count}"]`).first().click();
+    await pageBatch(desktop);
+    await waitForNewLabel(desktop, 'New');
+    await shoot(desktop, files.desktopOpened);
+    await desktop.locator('[role="tab"][aria-label="Buy"]').first().click();
+    await reloadAndExpectClear(desktop);
+    await shoot(desktop, files.desktopReloaded);
+
+    const listingId = await importFixture(status);
+    const second = await sealLatestBatch(status);
+    if (second.batchId === first.batchId) {
+      fail('The second seal reused the first batch.', 'A newer watch needs a new batch id or the badge cannot come back.');
+    }
+
+    await phone.reload({ waitUntil: 'domcontentloaded' });
+    await dismissArrival(phone);
+    await waitForNewLabel(phone, `New, ${second.count}`);
+    await shoot(phone, files.phoneReturned);
+    await desktop.reload({ waitUntil: 'domcontentloaded' });
+    await desktop
+      .getByRole('button', { name: 'Close', exact: true })
+      .waitFor({ state: 'visible', timeout: 8_000 })
+      .catch(() => undefined);
+    await dismissArrival(desktop);
+    await waitForNewLabel(desktop, `New, ${second.count}`);
+    await shoot(desktop, files.desktopReturned);
+
+    report = {
+      command: 'verify-new-badge',
+      first,
+      second,
+      listingId,
+      phone: 'signed-in buyer, 390x844',
+      desktop: 'guest, 1280x800',
+    };
+    writeFileSync(files.report, JSON.stringify(report, null, 2));
+  } catch (error) {
+    const failed = path.join(evidence, 'new-badge-failed.png');
+    await shoot(phone, failed).catch(() => undefined);
+    fail(
+      error instanceof Error ? error.message : String(error),
+      'The New badge proof signs in on a phone, opens New, reloads on Buy, then seals a newer fixture. The failed screenshot is new-badge-failed.png.',
+      { url: phone.url(), text: (await pageText(phone)).slice(0, 800), failed },
+    );
+  } finally {
+    const video = phone.video();
+    await phoneContext.close();
+    await desktopContext.close();
+    await browser.close();
+    if (video) {
+      const recorded = await video.path();
+      if (recorded && existsSync(recorded)) renameSync(recorded, files.video);
+    }
+    rmSync(videoDir, { recursive: true, force: true });
+  }
+  if (!report || !existsSync(files.video)) {
+    fail('The New badge video was not saved.', 'Playwright writes it when the context closes.');
+  }
+  ok({ ...report, files });
+}
+
+async function pageBatch(page) {
+  await page.getByText(/watch(es)? from /).first().waitFor({ state: 'visible', timeout: 20_000 });
+}
+
 const commands = {
   doctor: () => commandDoctor(),
   up: () => commandUp(dryRun),
@@ -2678,13 +2911,14 @@ const commands = {
   'verify-operator-catalog': () => commandVerifyOperatorCatalog(dryRun),
   'verify-publish-resume': () => commandVerifyPublishResume(dryRun),
   'verify-rank': () => commandVerifyRank(dryRun),
+  'verify-new-badge': () => commandVerifyNewBadge(dryRun),
 };
 
 const run = commands[command];
 if (!run) {
   fail(
     `Unknown command "${command ?? ''}".`,
-    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank.',
+    'Commands: doctor, up, seed, sign-in <user>, follow <user> <dealer>, import, notify-drops, drops-status <user>, web, screenshot <route> <path> --as <user>, tour <dealerId>, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge, cleanup. Add --dry-run on up, seed, sign-in, follow, import, notify-drops, web, tour, cleanup, reset-proof, verify-drops, verify-operator, verify-operator-catalog, verify-publish-resume, verify-rank, verify-new-badge.',
   );
 }
 

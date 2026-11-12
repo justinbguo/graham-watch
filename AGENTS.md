@@ -31,7 +31,7 @@ Expo Router lives in `src/app`. Tabs are in `src/app/(app)/(tabs)/_layout.tsx`.
 Buyer tabs, left to right on a phone:
 
 - **Buy** (`index`). Deck, ordered by a personal score (`src/data/rank.ts`, `rank_buy_feed`). A click outweighs a save, a pass is a mild negative, an undo does not count, and a followed shop is boosted. Wide web shows a grid. A signed-out visitor gets the sign-in sheet first. After sign-in, desktop web asks "What should we show you first?" on the filter panel without dealers (`src/features/deck/FirstRunSheet.tsx`). Phone still walks the question flow.
-- **New** (`new`). The latest sealed catalogue batch, drawn with the same deck as Buy (`src/features/deck/CatalogueDeck.tsx`, data in `src/data/newListings.ts`). The red count is the batch size. Opening the tab does not clear it. Guests see it too.
+- **New** (`new`). The latest sealed catalogue batch, drawn with the same deck as Buy (`src/features/deck/CatalogueDeck.tsx`, data in `src/data/newListings.ts`). The red count is the size of that batch until this device opens New. Opening the tab stores the batch id on the device (`graham.seen-new-batch`) and the count stays clear after a reload. A later seal has a new batch id, so the count comes back. Guests and signed-in people share that device mark. Guests see the tab too.
 - **Community** (`community`). Posts to sell, buy, or trade. Tables still say `exchange_*`.
 - **Messages** (`messages`). Threads, plus the Drops row when a followed shop has unseen new watches. Signed-out visitors get the guest gate.
 - **Wishlist** (`saved`).

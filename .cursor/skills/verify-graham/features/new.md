@@ -1,6 +1,6 @@
 # New
 
-New is the tab of watches the last full nightly refresh sealed onto the deck. The count is the batch size. Opening the tab does not clear it. Guests see it. It is not Drops.
+New is the tab of watches the last full nightly refresh sealed onto the deck. The count is the size of that batch until this device opens the tab. Opening New clears it, and a reload keeps it clear. A later seal brings the count back. Guests see it. It is not Drops.
 
 ## Sub-features
 
@@ -10,7 +10,7 @@ New is the tab of watches the last full nightly refresh sealed onto the deck. Th
 
 ## How to get to it (user POV)
 
-Choose the New tab. A row opens the listing. The count stays.
+Choose the New tab. A row opens the listing. The count clears, and it is still gone after a reload on Buy. A newer sealed batch brings it back.
 
 ## Driving it with control-graham
 
@@ -19,6 +19,7 @@ Preconditions:
 - `up`, `seed`, and `web`.
 
 - **Empty batch.** Run `screenshot /new <evidence>/new.png --as buyer`. The command waits until the batch query settles. With no sealed batch the page shows `New watches appear here after the nightly update.` The tab name is `New` with no count.
+- **Seen batch.** `verify-new-badge` imports a fixture, seals it, and drives a signed-in phone and a guest desktop. The tab is `New, N`, then `New` after the click, still `New` after a reload on Buy, then `New, M` after a second fixture seal.
 - **Do not call this Drops.** Drops is `/drops`, title `New watches`, and only after a follow plus a later listing. `verify-drops` does not seal a catalogue batch.
 
 ## Gotchas
