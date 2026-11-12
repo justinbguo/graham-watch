@@ -21,7 +21,9 @@ From the repo root, with Docker running and dependencies installed (`npm ci`):
 node .cursor/skills/verify-graham/control-graham.mjs up
 ```
 
-`up` is ready when stdout is JSON with `"ok": true`, `"ready": true`, and `"url": "http://127.0.0.1:54321"`. That means `supabase start` applied migrations and `supabase/seed.sql`, a dealers read succeeded, the push capture container is on the Supabase network, and `.env.local` points the app at that stack. A health check that returns before the dealers read is not ready. `up` waits for the read.
+`up` is ready when stdout is JSON with `"ok": true`, `"ready": true`, and `"url": "http://127.0.0.1:54321"`. That means `supabase start` applied migrations and `supabase/seed.sql` on a new database, a dealers read succeeded, the push capture container is on the Supabase network, and `.env.local` points the app at that stack. A health check that returns before the dealers read is not ready. `up` waits for the read.
+
+`supabase start` does not migrate a database that already exists. A volume left from an older checkout can still answer a dealers read while Buy says `rank_buy_feed` is missing. Reset that local database with `supabase db reset --local` and run `up` again. Never pass `--linked` or a hosted database URL.
 
 `up` starts the database, auth, API, mailpit, and edge runtime. It does not start Studio, realtime, imgproxy, logflare, vector, or postgres-meta. The database CI job still starts the full stack. Verification does not need those services.
 
@@ -97,7 +99,7 @@ Fixture people, created by `seed`:
 
 `notify-drops` POSTs to the local function with the service-role JWT and `x-graham-cron-secret`. The edge runtime's `EXPO_PUSH_URL` is `http://graham-push-capture:8799/push`. The function ignores that override unless `SUPABASE_URL` is a local host, so a hosted function still posts to `https://exp.host/--/api/v2/push/send`.
 
-`screenshot` opens the route in headless Chromium at 390×844. It signs in through the sheet: button `Log in or create an account`, button `Continue with email`, placeholder `you@example.com`, textbox `Sign-in code`, button `Continue`. The sheet then returns to Buy. `/messages` presses the Messages tab and waits for the button whose accessible name matches `New from dealers you follow, <count>`. `/profile` presses Profile and checks that the drops row is gone. `/drops` opens the feed.
+`screenshot` opens the route in headless Chromium at 390×844. It signs in through the sheet: button `Log in or create an account` when the guest gate is up, button `Continue with email`, placeholder `you@example.com`, button `Send me a code`, textbox `Sign-in code`, button `Continue`. The sheet then returns to Buy. On Buy the email door can already be open, so the guest-gate button is not always on screen. `/messages` presses the Messages tab and waits for the button whose accessible name matches `New from dealers you follow, <count>`. `/profile` presses Profile and checks that the drops row is gone. `/drops` opens the feed.
 
 `tour <dealerId>` does that sign-in once and writes the Messages badge, Profile without the drops row, the drops feed, the one-dealer deep link, and a video.
 

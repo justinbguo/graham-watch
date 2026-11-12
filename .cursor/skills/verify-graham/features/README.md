@@ -33,10 +33,10 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 
 - [Onboarding](./onboarding.md) — desktop asks only what to show first. Phone still asks name, username, and birthday.
 - [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`.
-- [New](./new.md) — the latest sealed catalogue batch. Not the Drops feed.
+- [New](./new.md). The latest sealed catalogue batch. Opening the tab clears the count on this device until a later seal. Not the Drops feed.
 - [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
 - [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count on Messages. This is the proven flow.
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.
 - [Profile](./profile.md) — the signed-in profile and the shops they follow.
 - [Dealer shop management](./dealer-shop.md) — a claimed shop edited by the dealer.
-- [Operator console](./operator.md) — the separate console an operator uses to approve shops.
+- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce import reads the Store API. The catalog proof is still the Shopify stand-in.

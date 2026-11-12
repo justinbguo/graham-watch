@@ -1,18 +1,19 @@
 # Onboarding
 
-A new account answers a name, a username, a birthday, how many watches they own, which brands they like, what makes hunting hard, and whether they want alerts. Someone under 18 stops on the blocked step and is not onboarded.
+A new account finishes once, after sign-in. On desktop web that is one sheet over Buy: `What should we show you first?`, the same filter panel as Filter with the shops left out, then `Skip` or `See watches`. On a phone, and on a web window narrower than 900px, the app leaves the deck for a name, a username, a birthday, how many watches they own, which brands they like, what makes hunting hard, and whether they want alerts. Someone under 18 stops on the blocked step and is not onboarded. A guest is not asked any of this.
 
 ## Sub-features
 
-- `name`: the heading `What should we call you?`
-- `username`: the @ handle, checked before the next step.
+- `desktop-first-run`: heading `What should we show you first?`. `Skip` clears the picks. `See watches` keeps the brands that are checked. Either button finishes the profile with no birthday and no username.
+- `name`: the phone heading `What should we call you?`
+- `username`: the phone heading `Create a username`. The handle is claimed before the next step.
 - `birthday`: three wheels. Under 18 goes to `You need to be 18 to use Graham`.
-- `questions`: collection size, brands, and hunting difficulty. Continue stays off until an answer is chosen.
-- `alerts`: `Stay close to the watches you care about`, then the account is onboarded.
+- `questions`: collection size, brands, and hunting difficulty. Continue stays off until an answer is chosen. These slides have no Skip.
+- `alerts`: `Stay close to the watches you care about`. `Not now` or the permission prompt finishes the phone flow.
 
 ## How to get to it (user POV)
 
-Sign in with an email that has no finished profile. The app leaves the deck and shows the first question. There is no step counter and no Skip. Back is the arrow above the heading, except on the first slide and the blocked slide.
+Sign in with an email that has no finished profile. Desktop web stays on Buy and shows the sheet. A phone replaces the deck with the first question. There is no step counter. On the phone, Back is the arrow above the heading, except on the first slide and the blocked slide.
 
 ## Driving it with control-graham
 
@@ -21,11 +22,13 @@ Preconditions:
 - Local stack is healthy.
 - The signed-in profile has `onboarded_at` null. `seed` sets `onboarded_at`, so `buyer`, `quiet`, and `dealer` never see this flow.
 
-- **Reach the gate.** This harness does not create a half-finished account. `sign-in buyer` then `screenshot /onboarding ... --as buyer` lands on the app, not the questions, because that profile is already onboarded.
-- **Do not call that a pass.** The Drops proof does not cover onboarding. Desktop web shows `What should we show you first?` over Buy when `onboarded_at` is null. Phone shows the question flow, starting at `What should we call you?`.
+- **Reach the gate.** `screenshot` is 390px wide and signs the seeded accounts in, so it lands on the app rather than the questions.
+- **Desktop sheet.** On a stack this run started, `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode local` and do not `signin`. The keeper is 1280px wide. `click --name "Continue with email"`, `fill --name "you@example.com" --value` a new mailbox, `click --name "Send me a code"`. Local web reads Mailpit and can finish sign-in before a hand-typed code. The sheet reads `What should we show you first?`. The groups are Price, Era, Case size, and Brand. There is no Dealer group. `click --name Skip` or `See watches` closes it and leaves Buy usable.
+- **Phone questions.** A window under 900px, with `onboarded_at` still null, starts at `What should we call you?`. This keeper does not use that width.
 
 ## Gotchas
 
 - `seed` finishes onboarding on purpose so Profile can be screenshotted. That precondition makes this journey fail if you reuse those accounts.
-- The birthday trigger rejects `onboarded_at` without an adult `date_of_birth` and an `account_type`. A patched row that skips the wheels is not the user path.
-- Web copy on the alerts step says push is a mobile prompt. Continue still finishes the profile.
+- A null birthday is allowed. The trigger rejects `onboarded_at` when `account_type` is missing, and when a birthday is present and under 18. Desktop finishes with a null birthday. A patched row that skips the phone wheels is not the phone path.
+- Web copy on the alerts step says push is a mobile prompt. Continue still finishes the profile. The desktop sheet has no alerts step.
+- A native build may show a paywall after the alerts step when RevenueCat is configured. Web does not. This harness does not open that paywall.

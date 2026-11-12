@@ -1,6 +1,6 @@
 # Profile
 
-Profile is the signed-in person's name, the shop they claimed if they have one, their posts, saved watches, and the shops they follow. New watches from those shops are in Messages, not here.
+Profile is the signed-in person's name, the shop they claimed if they have one, their posts, their wishlist, and the shops they follow. New watches from those shops are in Messages, not here.
 
 ## Sub-features
 
@@ -20,7 +20,7 @@ Preconditions:
 - `up` and `seed` have run. Follow Test Bench first if the list should contain that shop.
 - `web` is serving port 8091.
 
-- **Sign in and read Following.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot /profile <evidence>/profile.png --as buyer`. The command clicks `Log in or create an account`, `Continue with email`, types `buyer@graham.test`, reads the six-digit code from Mailpit, submits `Continue`, then presses the `Profile` tab. The sheet returns to Buy, so the tab press is the way back.
+- **Sign in and read Following.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot /profile <evidence>/profile.png --as buyer`. The command clicks `Log in or create an account` when that gate is up, then `Continue with email`, types `buyer@graham.test`, clicks `Send me a code`, reads the six-digit code from Mailpit, submits `Continue`, then presses the `Profile` tab. The sheet returns to Buy, so the tab press is the way back.
 - **Pass.** The button name is `Test Bench, verified` after a follow. There is no button `New from dealers you follow`, and the Profile tab has no count. The screenshot file exists after `cleanup`.
 
 ## Gotchas

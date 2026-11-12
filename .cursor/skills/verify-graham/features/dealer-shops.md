@@ -10,7 +10,7 @@ A shop page is the dealer's name, a follow control, and the watches they have fo
 
 ## How to get to it (user POV)
 
-From a card, press the dealer. From Profile, press a shop under Following. The address is `/dealer/<id>`.
+On a card, press `Open <shop>`. A grid tile opens the listing first, and that same control is on the listing. From Profile, press a shop under Following. The address is `/dealer/<id>`.
 
 ## Driving it with control-graham
 

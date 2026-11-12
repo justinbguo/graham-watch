@@ -1,10 +1,10 @@
 # Feedback
 
-Buy offers a link named `Feedback`. It opens an X message compose addressed to Justin. It does not write a Graham inquiry, and it is not on Profile or Settings.
+Buy and New offer a link named `Feedback`. It opens an X message compose addressed to Justin. It does not write a Graham inquiry, and it is not on Profile or Settings.
 
 ## Sub-features
 
-- `feedback-link`: accessible name `Feedback`, role link. On desktop web it is a rail control with the word Feedback. On a phone it is the header icon with that name. The full-screen sign-in panel has the same link.
+- `feedback-link`: accessible name `Feedback`, role link. On desktop web it is a rail control with the word Feedback. On a phone it is the header icon with that name. The iOS sign-in wall has the same link. The web sign-in sheet does not.
 
 ## How to get to it (user POV)
 
@@ -22,4 +22,4 @@ Preconditions:
 ## Gotchas
 
 - The label is `Feedback`, not `Give feedback`.
-- Demo and local both show it. On unsigned web it is also on the sign-in panel.
+- Demo and local both show it on Buy and New. On unsigned web it stays on the deck. The modal sign-in sheet omits it.
