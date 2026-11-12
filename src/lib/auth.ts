@@ -27,9 +27,22 @@ export function callbackFailure(url: string): string | null {
 
 export async function createSessionFromUrl(url: string) {
   const failed = callbackFailure(url);
-  if (failed) throw new Error(failed);
+  if (failed) throw new Error(humanizeAuthError(failed));
 
   const { params } = QueryParams.getQueryParams(url);
+  const tokenHash = typeof params.token_hash === 'string' ? params.token_hash : '';
+  if (tokenHash) {
+    if (spentEmailHash === tokenHash) return null;
+    spentEmailHash = tokenHash;
+    const preferred = params.type === 'signup' ? 'signup' : 'email';
+    const other = preferred === 'signup' ? 'email' : 'signup';
+    const first = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: preferred });
+    if (!first.error) return first.data.session;
+    const again = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: other });
+    if (again.error) throw new Error(humanizeAuthError(again.error.message));
+    return again.data.session;
+  }
+
   const { access_token, refresh_token } = params;
   if (!access_token || !refresh_token) return null;
 
@@ -38,26 +51,66 @@ export async function createSessionFromUrl(url: string) {
   return data.session;
 }
 
+let spentEmailHash: string | null = null;
+
 /**
  * One call serves both doors. Creating an account lets GoTrue mint the user;
  * logging in does not, so an address nobody registered gets a 422 "Signups
  * not allowed for otp" instead of a silent new account under a typo.
  */
 /** GoTrue rate-limits OTP resends. Say what to do instead of quoting the timer. */
+export function retryAfterSeconds(message: string): number | null {
+  const match = message.match(/(\d+) seconds/i);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) ? seconds : null;
+}
+
 export function humanizeAuthError(message: string): string {
-  if (/security purposes|too many requests|rate limit|after \d+ seconds/i.test(message)) {
-    return 'We already sent a code. Check your email, or wait a minute before asking for another.';
+  const seconds = retryAfterSeconds(message);
+  if (seconds != null || /security purposes|too many requests|rate limit/i.test(message)) {
+    return seconds != null
+      ? `We already sent a code. You can ask for another in ${seconds} seconds.`
+      : 'We already sent a code. Check your email, or wait a minute before asking for another.';
   }
   return message;
 }
 
+/** Where a magic link should return. Web stays on this page. Native uses the app scheme. */
+export function emailRedirectTo(): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.location.origin + window.location.pathname;
+  }
+  return redirectTo;
+}
+
 /** Minimum gap between OTP requests so the client does not hit GoTrue's resend wall. */
 export const emailOtpResendCooldownMs = 60_000;
+let authNotice: string | null = null;
+const noticeListeners = new Set<() => void>();
+
+export function setAuthNotice(message: string) {
+  authNotice = message;
+  for (const listener of noticeListeners) listener();
+}
+
+export function takeAuthNotice(): string | null {
+  const message = authNotice;
+  authNotice = null;
+  return message;
+}
+
+export function subscribeAuthNotice(listener: () => void): () => void {
+  noticeListeners.add(listener);
+  return () => {
+    noticeListeners.delete(listener);
+  };
+}
 
 export async function sendEmailCode(email: string, { createAccount }: { createAccount: boolean }) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
-    options: { emailRedirectTo: redirectTo, shouldCreateUser: createAccount },
+    options: { emailRedirectTo: emailRedirectTo(), shouldCreateUser: createAccount },
   });
   if (!error) return;
   if (!createAccount && /signups not allowed/i.test(error.message)) {
@@ -75,7 +128,7 @@ export async function sendEmailCode(email: string, { createAccount }: { createAc
  */
 export async function sendEmailCodeAdaptive(email: string) {
   const trimmed = email.trim();
-  const options = { emailRedirectTo: redirectTo };
+  const options = { emailRedirectTo: emailRedirectTo() };
 
   const login = await supabase.auth.signInWithOtp({
     email: trimmed,
