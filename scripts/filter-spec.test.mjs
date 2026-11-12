@@ -122,7 +122,7 @@ test('the deck, the counts, and the facets list take their keys from the spec', 
   const keys = readFileSync(new URL('../src/data/keys.ts', import.meta.url), 'utf8');
   const spec = readFileSync(new URL('../src/features/filters/spec.ts', import.meta.url), 'utf8');
 
-  assert.match(listings, /queryKey: keys\.deck\(filters, sort, favoritesFirst, tasteKey\)/);
+  assert.match(listings, /queryKey: keys\.deck\(filters, sort, favoritesFirst\)/);
   assert.match(listings, /queryKey: keys\.counts\(filters\)/);
   assert.match(search, /queryKey: keys\.facetsQuery\(excludeOwn\)/);
   assert.match(search, /queryKey: keys\.facetsQuery\(excludeOwn, filters, excludeSwiped\)/);

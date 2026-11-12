@@ -10,9 +10,12 @@ import {
 } from 'react';
 
 import { logEvent, type EventInput } from '@/data/listingEvents';
+import { secureStorage } from '@/lib/secureStorage';
 
 import { canonicalize, type FilterSpec } from './spec';
-import { NO_FILTERS, scopeDealer, toggleRange, type Filters, type Preset } from './types';
+import { NO_FILTERS, parseFilters, scopeDealer, toggleRange, type Filters, type Preset } from './types';
+
+const DECK_FILTERS_KEY = 'graham.deck.filters';
 
 /**
  * The deck, search, and each shop filter independently. They are different
@@ -27,6 +30,8 @@ type ListKey = 'brands' | 'dealers' | 'styles' | 'materials' | 'windings' | 'com
 
 export type FilterApi = {
   filters: Filters;
+  /** Deck filters have been read from the device. Other surfaces are ready immediately. */
+  ready: boolean;
   toggle: <K extends ListKey>(key: K, value: Filters[K][number]) => void;
   setOne: (key: 'query', value: string) => void;
   /** Both ends at once, so a typed range does not land as two renders. */
@@ -47,6 +52,8 @@ type Store = {
   new: Filters;
   /** One set per shop, so Goldfinger's choices do not empty the next shop. */
   shops: Record<string, Filters>;
+  /** False until the saved deck filter has been read. The deck waits, so the first page is not the unfiltered one. */
+  ready: boolean;
   update: (surface: CatalogSurface, next: (current: Filters) => Filters) => void;
   updateShop: (dealerId: string, next: (current: Filters) => Filters) => void;
 };
@@ -60,7 +67,25 @@ export function FilterProvider({ children }: PropsWithChildren) {
   const [search, setSearch] = useState<Filters>(NO_FILTERS);
   const [latest, setLatest] = useState<Filters>(NO_FILTERS);
   const [shops, setShops] = useState<Record<string, Filters>>({});
-  useFilterEvents(deck, search, shops);
+  const [ready, setReady] = useState(false);
+  useFilterEvents(deck, search, shops, ready);
+
+  useEffect(() => {
+    let cancelled = false;
+    secureStorage.getItem(DECK_FILTERS_KEY).then((raw) => {
+      if (cancelled) return;
+      setDeck(parseFilters(raw));
+      setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    void secureStorage.setItem(DECK_FILTERS_KEY, JSON.stringify(deck));
+  }, [deck, ready]);
 
   const update = useCallback<Store['update']>((surface, next) => {
     const set = surface === 'deck' ? setDeck : surface === 'search' ? setSearch : setLatest;
@@ -75,8 +100,8 @@ export function FilterProvider({ children }: PropsWithChildren) {
   }, []);
 
   const value = useMemo<Store>(
-    () => ({ deck, search, new: latest, shops, update, updateShop }),
-    [deck, search, latest, shops, update, updateShop],
+    () => ({ deck, search, new: latest, shops, ready, update, updateShop }),
+    [deck, search, latest, shops, ready, update, updateShop],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
@@ -88,9 +113,15 @@ export function FilterProvider({ children }: PropsWithChildren) {
  * that canonicalizes to the same spec, like a stray space in the search box,
  * logs nothing either.
  */
-function useFilterEvents(deck: Filters, search: Filters, shops: Record<string, Filters>) {
+function useFilterEvents(deck: Filters, search: Filters, shops: Record<string, Filters>, ready: boolean) {
   const logged = useRef(new Map<string, string>());
   useEffect(() => {
+    if (!ready) return;
+    // The saved deck filter arrives in this same turn. Recording it first
+    // keeps a relaunch from writing a filter event the buyer did not just make.
+    if (!logged.current.has('deck')) {
+      logged.current.set('deck', canonicalize(deck).key);
+    }
     const report = (scope: string, filters: Filters, event: (filter: FilterSpec) => EventInput) => {
       const { spec, key } = canonicalize(filters);
       if ((logged.current.get(scope) ?? UNFILTERED) === key) return;
@@ -109,7 +140,7 @@ function useFilterEvents(deck: Filters, search: Filters, shops: Record<string, F
         filter,
       }));
     }
-  }, [deck, search, shops]);
+  }, [deck, ready, search, shops]);
 }
 
 export function useFilters(surface: Surface, dealerId?: string): FilterApi {
@@ -131,6 +162,7 @@ export function useFilters(surface: Surface, dealerId?: string): FilterApi {
 
     return {
       filters,
+      ready: store.ready,
       toggle: (key, item) =>
         apply((current) => {
           const list = current[key] as (typeof item)[];
@@ -157,5 +189,5 @@ export function useFilters(surface: Surface, dealerId?: string): FilterApi {
       showOnlyDealer: (dealerId) => apply((current) => scopeDealer(current, dealerId)),
       showAllDealers: () => apply((current) => scopeDealer(current, null)),
     };
-  }, [dealerId, filters, surface, update, updateShop]);
+  }, [dealerId, filters, store.ready, surface, update, updateShop]);
 }

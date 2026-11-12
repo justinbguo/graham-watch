@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 
 import { Screen } from '@/components/ui';
 import { SignInPanel } from '@/features/auth/SignInPanel';
-import { FilterProvider } from '@/features/filters/provider';
 import { SaveFlightProvider } from '@/features/saved/flight';
 import { useSession } from '@/providers/session';
 
@@ -32,10 +31,9 @@ export default function AppLayout() {
   }
 
   return (
-    <FilterProvider>
-      {/* Outside the Stack: a saved card flies over the tab bar on its way to
-          the Wishlist tab, so the overlay has to sit above every screen. */}
-      <SaveFlightProvider>
+    // The root layout already provides filters. A second provider here would
+    // hide the deck filter that onboarding writes, and Buy would ignore it.
+    <SaveFlightProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="listing/[listingId]" options={{ presentation: 'fullScreenModal' }} />
@@ -80,7 +78,6 @@ export default function AppLayout() {
             }
           />
         </Stack>
-      </SaveFlightProvider>
-    </FilterProvider>
+    </SaveFlightProvider>
   );
 }

@@ -9,7 +9,6 @@ import type { Json } from '@/lib/database';
 import type { DeckCard, DeckPhoto, Listing, ListingPhoto } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
-import { useSession } from '@/providers/session';
 
 import {
   DECK_FAVORITES_FIRST,
@@ -24,9 +23,8 @@ import {
   type DeckPage,
   type DeckSort,
 } from './deckPaging';
-import { useGuestTaste } from './guestTaste';
 import { keys } from './keys';
-import { brandKey, emptyTaste, orderFeed, type RankSeed, type RankWatch } from './rank';
+import { brandKey, emptySeed, emptyTaste, orderFeed, type RankSeed, type RankWatch } from './rank';
 
 export { DECK_LIMIT, showDeckEmpty };
 
@@ -258,13 +256,11 @@ export function usePrimeListing() {
  * sort's bookmark.
  */
 export function useDeck(limit = DECK_LIMIT, enabled = true) {
-  const { filters } = useFilters('deck');
+  const { filters, ready } = useFilters('deck');
   const guest = useGuest();
-  const { userId } = useSession();
-  const { seed, cacheKey, ready } = useGuestTaste();
   const sort = DECK_SORT;
   const favoritesFirst = DECK_FAVORITES_FIRST;
-  const tasteKey = `${userId ?? 'guest'}:${ready ? cacheKey : 'pending'}`;
+  const seed = emptySeed();
 
   const query = useInfiniteQuery<
     DeckPage<DeckCard>,
@@ -273,7 +269,7 @@ export function useDeck(limit = DECK_LIMIT, enabled = true) {
     ReturnType<typeof keys.deck>,
     string | null
   >({
-    queryKey: keys.deck(filters, sort, favoritesFirst, tasteKey),
+    queryKey: keys.deck(filters, sort, favoritesFirst),
     initialPageParam: null,
     queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, sort, favoritesFirst, seed),
     getNextPageParam: (lastPage) => nextDeckCursor(lastPage),
@@ -283,7 +279,7 @@ export function useDeck(limit = DECK_LIMIT, enabled = true) {
     // is unchanged.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
-    enabled,
+    enabled: enabled && ready,
   });
 
   const visible = useMemo(

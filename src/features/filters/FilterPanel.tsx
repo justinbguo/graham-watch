@@ -37,10 +37,13 @@ export function FilterPanel({
   surface,
   dealerId,
   variant = 'sheet',
+  showDealers = true,
 }: {
   surface: Surface;
   dealerId?: string;
   variant?: 'sheet' | 'dropdown';
+  /** First-run omits shops. Filter itself still lists them, above Brand. */
+  showDealers?: boolean;
 }) {
   const styles = useThemedStyles(panelStyles);
   const dropdown = variant === 'dropdown';
@@ -155,6 +158,20 @@ export function FilterPanel({
           )}
         </FilterGroup>
 
+        {showDealers && dealers.length ? (
+          <FilterGroup title="Dealer" selectedCount={filters.dealers.length || undefined}>
+            {rows(
+              dealers.map((facet) => ({
+                key: facet.value,
+                label: facet.label,
+                count: facet.count,
+                selected: filters.dealers.includes(facet.value),
+                onPress: () => toggle('dealers', facet.value),
+              })),
+            )}
+          </FilterGroup>
+        ) : null}
+
         {of('brand').length ? (
           <FilterGroup title="Brand" selectedCount={filters.brands.length || undefined}>
             {rows(
@@ -164,20 +181,6 @@ export function FilterPanel({
                 count: facet.count,
                 selected: filters.brands.includes(facet.value),
                 onPress: () => toggle('brands', facet.value),
-              })),
-            )}
-          </FilterGroup>
-        ) : null}
-
-        {dealers.length ? (
-          <FilterGroup title="Dealer" selectedCount={filters.dealers.length || undefined}>
-            {rows(
-              dealers.map((facet) => ({
-                key: facet.value,
-                label: facet.label,
-                count: facet.count,
-                selected: filters.dealers.includes(facet.value),
-                onPress: () => toggle('dealers', facet.value),
               })),
             )}
           </FilterGroup>
