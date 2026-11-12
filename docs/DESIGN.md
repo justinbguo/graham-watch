@@ -227,8 +227,8 @@ holds a title or that screen's own control, a count, and controls.
 
 On web, sign-in is a sheet over the deck. Guests land on Buy with the sheet
 already open, once per page load; there is no **Log in** control in the
-header. After `GUEST_SWIPE_BUDGET` judgments the sheet opens again with copy
-that says why. The sheet is the wordmark alone (no mark beside it), one
+header. A guest's save opens the sheet again with copy that says why. A pass
+never does. The sheet is the wordmark alone (no mark beside it), one
 `editorial` sentence in `text` under it, narrowed to `layout.signInLede`, and
 the doors — Apple, Google, email — with **Not now** to dismiss. On iOS, that same panel is the first screen, **Feedback** sits under the doors, and
 it does not dismiss: the header has no room for a **Log in** control beside

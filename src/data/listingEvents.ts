@@ -47,6 +47,7 @@ import {
  */
 
 export type { EventInput, ListingRef, TaggedPhoto };
+export { newId as newEventId };
 
 const BATCH_SIZE = 50;
 const FLUSH_DELAY_MS = 10_000;
@@ -75,7 +76,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => flushEvents());
 }
 
-export function logEvent(event: EventInput): void {
+/**
+ * `held` replays a gesture made before there was an account, under the id it
+ * was held with. log_buyer_events skips a replayed id, so settling the same
+ * save in two tabs is one row.
+ */
+export function logEvent(event: EventInput, held?: { id: string; occurredAt: number }): void {
   try {
     if (event.kind === 'filter' && !filterFits(event.filter)) {
       warn('a filter over 2048 bytes was not logged');
@@ -83,7 +89,7 @@ export function logEvent(event: EventInput): void {
     }
     const exposureId =
       'listing' in event ? (openExposures.get(exposureKey(event.surface, event.listing.id)) ?? null) : null;
-    push(toRow(event, { id: newId(), now: Date.now(), exposureId }));
+    push(toRow(event, { id: held?.id ?? newId(), now: held?.occurredAt ?? Date.now(), exposureId }));
     // A reload is how the deck picks up a new score. The ten-second batch
     // would still be in memory when the page goes away.
     if (

@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
+import { askToSave } from '@/features/auth/guest';
+import { judgeAction, type JudgeSurface } from '@/features/auth/guestLedger';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
 import { track } from '@/lib/analytics';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
+import { useSession } from '@/providers/session';
 
 import { deckHasCard, dropJudgedCard, restorePassedCard, type DeckCache } from './deckPaging';
 import { keys } from './keys';
+import { logEvent, type ListingRef } from './listingEvents';
 import type { ListingCounts } from './listings';
 
 async function recordSwipe(actorId: string, listingId: string, direction: SwipeDirection) {
@@ -62,6 +67,44 @@ async function deletePasses(actorId: string) {
   if (error) throw error;
 }
 
+type Verdict = 'recorded' | 'asked';
+
+type JudgeHooks = {
+  /** The verdict stands. Runs before the write drops the card from every cached deck. */
+  onAccept?: () => void;
+  /** The write landed. */
+  onRecorded?: () => void;
+};
+
+/**
+ * The only way a gesture becomes a swipe and an event. A guest's save is held
+ * and sent to sign-in. Every other verdict is logged and written.
+ */
+export function useJudge(surface: JudgeSurface) {
+  const { isSignedIn, userId } = useSession();
+  const write = useRecordSwipe(userId);
+  const { mutate } = write;
+
+  const judge = useCallback(
+    (card: ListingRef, direction: SwipeDirection, hooks?: JudgeHooks): Verdict => {
+      if (judgeAction(isSignedIn, direction) === 'ask') {
+        askToSave(card, surface);
+        return 'asked';
+      }
+      // TanStack runs onMutate synchronously inside mutate, and it drops the
+      // card from the deck. The deck has to hold the leaving slot first.
+      hooks?.onAccept?.();
+      logEvent({ kind: direction === 'right' ? 'save' : 'pass', surface, listing: card });
+      mutate({ listingId: card.id, direction }, { onSuccess: hooks?.onRecorded });
+      return 'recorded';
+    },
+    [isSignedIn, surface, mutate]
+  );
+
+  const writing: SwipeDirection | null = write.isPending ? (write.variables?.direction ?? null) : null;
+  return { judge, writing };
+}
+
 /**
  * The card leaves the deck the instant the gesture ends, before the write is
  * acknowledged. A swipe that waits on the network feels broken.
@@ -70,14 +113,17 @@ async function deletePasses(actorId: string) {
  * `staleTime: Infinity` and does not refetch on focus, so there is no later
  * fetch to fall back on: without the restore below, a save that failed took the
  * watch out of the pile for the rest of the session and saved nothing.
+ *
+ * A guest only reaches here with a pass. `useJudge` sends a guest's save to
+ * sign-in first.
  */
-export function useRecordSwipe(actorId: string | null) {
+function useRecordSwipe(actorId: string | null) {
   const queryClient = useQueryClient();
   const guest = useGuest();
 
   return useMutation({
     mutationFn: ({ listingId, direction }: { listingId: string; direction: SwipeDirection }) => {
-      if (!actorId) return guest.recordSwipe(listingId, direction);
+      if (!actorId) return guest.recordPass(listingId);
       return recordSwipe(actorId, listingId, direction);
     },
     onMutate: ({ listingId }) => {

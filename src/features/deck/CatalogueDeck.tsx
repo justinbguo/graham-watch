@@ -30,8 +30,8 @@ import { logEvent, useExposure } from '@/data/listingEvents';
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
 import { useNewListings, type NewListings } from '@/data/newListings';
 import { useOnboardingGate } from '@/data/profile';
-import { usePassCount, useRecordSwipe, useStartOver, useUndoPass } from '@/data/swipes';
-import { useGuest } from '@/features/auth/GuestProvider';
+import { useJudge, usePassCount, useStartOver, useUndoPass } from '@/data/swipes';
+import { openSignIn } from '@/features/auth/guest';
 import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
 import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
@@ -45,7 +45,7 @@ import { useOpenStack } from '@/lib/openStack';
 import { setSearchLaunchRect } from '@/lib/searchLaunch';
 import type { DeckCard, SwipeDirection } from '@/lib/models';
 import { useWebArrowSwipe } from '@/lib/webKeys';
-import { GUEST_SWIPE_BUDGET, inset, layout, motion, size, space, type, type Theme } from '@/lib/theme';
+import { inset, layout, motion, size, space, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 import { useSession } from '@/providers/session';
 
@@ -54,7 +54,6 @@ const STILL_LAST_NIGHT_MS = 36 * 60 * 60 * 1000;
 export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const isNew = source === 'new';
   const { userId, isSignedIn } = useSession();
-  const guest = useGuest();
   const { needsOnboarding, ready: profileReady } = useOnboardingGate();
   const deckFilters = useFilters('deck');
   const newFilters = useFilters('new');
@@ -117,7 +116,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const { slots } = useDeckStack(cards, retainedRef.current);
   usePrefetchDeckPhotos(cards);
   const { data: counts } = useListingCounts(!isNew);
-  const swipe = useRecordSwipe(userId);
+  const { judge: judgeSwipe } = useJudge(isNew ? 'new' : 'buy');
   const primeListing = usePrimeListing();
   const { data: passes = 0 } = usePassCount(userId);
   const startOver = useStartOver(userId);
@@ -198,58 +197,36 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     });
   }, [measureStage]);
 
-  // One step back, and only for a pass. A save is recoverable from the wishlist
-  // tab, so a right swipe retires the offer instead of queueing behind it.
-  const guestRef = useRef(guest);
-  guestRef.current = guest;
   const judge = useCallback(
-    (card: DeckCard, direction: SwipeDirection, from?: Rect) => {
-      const current = guestRef.current;
-      if (!isSignedIn && current.exhausted) {
-        current.openSignIn('budget');
-        return false;
-      }
+    (card: DeckCard, direction: SwipeDirection, from?: Rect) =>
+      judgeSwipe(card, direction, {
+        onAccept: () => {
+          // A save flies from wherever it was judged, and only the view that judged
+          // it knows where that was: the card stage here, the tile in the grid.
+          if (direction === 'right' && from) {
+            launch({ from, photo: card.photos[0]?.url });
+          }
 
-      // A save flies from wherever it was judged, and only the view that judged
-      // it knows where that was: the card stage here, the tile in the grid.
-      if (direction === 'right' && from) {
-        launch({ from, photo: card.photos[0]?.url });
-      }
+          if (isNew) {
+            setJudged((currentIds) => {
+              if (currentIds.has(card.id)) return currentIds;
+              const next = new Set(currentIds);
+              next.add(card.id);
+              return next;
+            });
+          }
 
-      if (isNew) {
-        setJudged((currentIds) => {
-          if (currentIds.has(card.id)) return currentIds;
-          const next = new Set(currentIds);
-          next.add(card.id);
-          return next;
-        });
-      }
+          // Hold the slot before the pile drops the card, so the exit keeps the
+          // same native view and the cards behind it do not shift.
+          if (direction === 'left') retainCard(card.id);
 
-      // Hold the slot before the pile drops the card, so the exit keeps the
-      // same native view and the cards behind it do not shift.
-      if (direction === 'left') retainCard(card.id);
-
-      const used = current.swipes.length + 1;
-      logEvent({
-        kind: direction === 'right' ? 'save' : 'pass',
-        surface: isNew ? 'new' : 'buy',
-        listing: card,
-      });
-      swipe.mutate(
-        { listingId: card.id, direction },
-        {
-          onSuccess: () => {
-            if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) {
-              current.openSignIn('budget');
-            }
-          },
+          // One step back, and only for a pass. A save is recoverable from the wishlist
+          // tab, so a right swipe retires the offer instead of queueing behind it.
+          setLastPass(direction === 'left' ? card : null);
+          setReturning(null);
         },
-      );
-      setLastPass(direction === 'left' ? card : null);
-      setReturning(null);
-      return true;
-    },
-    [isNew, isSignedIn, launch, retainCard, swipe],
+      }) === 'recorded',
+    [isNew, judgeSwipe, launch, retainCard],
   );
 
   const multiPhoto = (topListing?.photos.length ?? 0) > 1;
@@ -364,7 +341,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const deckToolsMobile = (
     <>
       {Platform.OS === 'android' && !isSignedIn ? (
-        <Button label="Log in" variant="ghost" onPress={() => guest.openSignIn('action')} />
+        <Button label="Log in" variant="ghost" onPress={() => openSignIn('action')} />
       ) : null}
       <UndoButton onPress={undo} />
       <FilterMenu surface={filterSurface} count={count} />

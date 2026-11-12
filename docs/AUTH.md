@@ -19,11 +19,18 @@ its own — see "Phone" below.
 
 Web opens on the deck without an account. The sign-in sheet is already open
 over Buy, once per page load. Dismiss it and the deck is there. A guest who
-browses is not asked what to show. Judgments live on the device for
-`GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the sheet again. Community, messages, wishlist, and profile ask for an account up
+browses is not asked what to show. Passes stay on the device, with no limit,
+and never open the sheet. A save (right swipe, right arrow, or Add to
+wishlist) opens it with `Sign in to keep this watch on your wishlist.` and the
+card springs back. That watch is held in `graham.guest.pending-save`: one slot,
+the latest save wins, gone after an hour (local `otp_expiry`; hosted may
+differ). Dismissing the sheet drops it. A reload, the email link in a new tab,
+and a web OAuth redirect keep it. Community, messages, wishlist, and profile ask for an account up
 front. Anon may read the approved catalogue (and run `search_listings` /
-`listing_counts`); swipes and everything personal stay authenticated. Local
-guest judgments flush into `swipes` once a session lands.
+`listing_counts`); swipes and everything personal stay authenticated. Once a
+session lands, `GuestProvider` writes the passes and the held save into
+`swipes` and logs one `save` buyer event under the id and time of the gesture.
+It does not wait for onboarding.
 
 iOS does not browse as a guest. The first screen is the sign-in wall, and the
 deck mounts only after a session exists. There is no **Log in** control in the

@@ -8,7 +8,6 @@ import type { BuyerEventSurface, SwipeDirection } from '@/lib/models';
  * module that reads or writes the storage these parse.
  */
 
-/** Where a watch is judged. A held save keeps one for its `save` event. */
 export const JUDGE_SURFACES = ['buy', 'new', 'detail'] as const satisfies readonly BuyerEventSurface[];
 export type JudgeSurface = (typeof JUDGE_SURFACES)[number];
 

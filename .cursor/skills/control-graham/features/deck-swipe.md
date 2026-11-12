@@ -37,5 +37,5 @@ Preconditions:
 - Focus in a text field eats arrow keys (`isTypingTarget`). `home` and click Buy first.
 - Desktop web at the keeper's 1280px viewport starts on the grid. `press s` toggles card and grid. The rail button is `Display, N per row` or `Display, one at a time`. There is no control named `Listings per row`, `Card View`, or `Switch to card view`. On the grid, arrows move selection instead of judging.
 - A phone-width window uses `Grid` and `One at a time` instead of Display. That is the verify-graham viewport, not this demo keeper.
-- Demo is signed in, so the ten-swipe sign-in gate does not open. Unsigned web shows the sign-in sheet. Dismiss that with `Close` or `Not now` before arrows, and the gate returns after 10 judgments.
+- Demo is signed in, so a save never opens the sign-in sheet. Unsigned web shows the sign-in sheet. Dismiss that with `Close` or `Not now` before arrows. As a guest, `ArrowRight` opens the sheet again and the card stays on top.
 - Demo reload clears passes/saves. Do not use reload as proof of persistence.

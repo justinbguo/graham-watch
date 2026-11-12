@@ -1,6 +1,6 @@
 import { Button, Centered, Heading, Message, Screen } from '@/components/ui';
 import type { LayoutWidth } from '@/lib/theme';
-import { useGuest } from '@/features/auth/GuestProvider';
+import { openSignIn } from '@/features/auth/guest';
 import { useSession } from '@/providers/session';
 
 /**
@@ -17,7 +17,6 @@ export function GuestGate({
   width?: LayoutWidth;
 }) {
   const { isSignedIn } = useSession();
-  const guest = useGuest();
 
   if (isSignedIn) return null;
 
@@ -26,7 +25,7 @@ export function GuestGate({
       <Centered>
         <Heading>Sign in to continue</Heading>
         <Message text={message} />
-        <Button label="Log in or create an account" onPress={() => guest.openSignIn('action')} />
+        <Button label="Log in or create an account" onPress={() => openSignIn('action')} />
       </Centered>
     </Screen>
   );

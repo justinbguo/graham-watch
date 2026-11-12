@@ -4,9 +4,9 @@ import { Platform, ScrollView, Text, useWindowDimensions, View } from 'react-nat
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
-import { logEvent, useExposure } from '@/data/listingEvents';
+import { useExposure } from '@/data/listingEvents';
 import { useListing, useSaved } from '@/data/listings';
-import { useRecordSwipe } from '@/data/swipes';
+import { useJudge } from '@/data/swipes';
 import { useGuest } from '@/features/auth/GuestProvider';
 import { AddToWishlist } from '@/features/listings/AddToWishlist';
 import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
@@ -17,7 +17,6 @@ import { listingSourceUrl } from '@/lib/listingSource';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
 import {
-  GUEST_SWIPE_BUDGET,
   HIT_TARGET,
   inset,
   radius,
@@ -41,11 +40,11 @@ export { ScreenErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 
 export default function ListingScreen() {
   const { listingId, from } = useLocalSearchParams<{ listingId: string; from?: string }>();
-  const { userId, isSignedIn } = useSession();
+  const { userId } = useSession();
   const guest = useGuest();
   const { data: card, isPending } = useListing(listingId);
   const { data: saved = [] } = useSaved(userId);
-  const save = useRecordSwipe(userId);
+  const { judge, writing } = useJudge('detail');
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
   const stage = deckStage(Platform.OS, useWindowDimensions().width);
@@ -56,23 +55,6 @@ export default function ListingScreen() {
   const isSaved =
     saved.some((entry) => entry.id === listingId) || guest.savedIds.includes(listingId);
 
-  const judge = (direction: 'left' | 'right', after?: () => void) => {
-    if (!isSignedIn && guest.exhausted) {
-      guest.openSignIn('budget');
-      return;
-    }
-    const used = guest.swipes.length + 1;
-    logEvent({ kind: direction === 'right' ? 'save' : 'pass', surface: 'detail', listing: card! });
-    save.mutate(
-      { listingId: card!.id, direction },
-      {
-        onSuccess: () => {
-          if (!isSignedIn && used >= GUEST_SWIPE_BUDGET) guest.openSignIn('budget');
-          after?.();
-        },
-      }
-    );
-  };
   // Search is a place to look. Passing there would drop a watch out of a deck
   // the user has not reached yet, and writing to a dealer is a step you take
   // about a watch you have kept, so saving is the only verdict it offers.
@@ -89,15 +71,11 @@ export default function ListingScreen() {
             {showPass ? (
               <PassWatch
                 block
-                loading={save.isPending && save.variables?.direction === 'left'}
-                onPress={() => judge('left', () => router.back())}
+                loading={writing === 'left'}
+                onPress={() => judge(card!, 'left', { onRecorded: () => router.back() })}
               />
             ) : null}
-            <AddToWishlist
-              block
-              loading={save.isPending && save.variables?.direction === 'right'}
-              onPress={() => judge('right')}
-            />
+            <AddToWishlist block loading={writing === 'right'} onPress={() => judge(card!, 'right')} />
           </View>
         ) : null}
         <DealerSiteButton card={card} surface="detail" grouped />

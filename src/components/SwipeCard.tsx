@@ -124,8 +124,8 @@ export const SwipeCard = memo(forwardRef<
   {
     card: DeckCard;
     /** `releaseX` is where the card sat when the thumb let go, so a save can fly
-        on from there rather than restarting at centre. False means the deck
-        refused the swipe — the guest budget is spent — and the card springs back. */
+        on from there rather than restarting at centre. False means a guest's
+        save asked for sign-in instead, and the card springs back. */
     onSwipe: (card: DeckCard, direction: SwipeDirection, releaseX: number) => boolean;
     onExpandPhoto: (card: DeckCard, index: number) => void;
     /** The exit animation finished. The deck can drop the slot it was holding. */

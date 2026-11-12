@@ -1,5 +1,4 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import {
   createContext,
   use,
@@ -10,31 +9,19 @@ import {
   type PropsWithChildren,
 } from 'react';
 
-import { GUEST_SWIPE_BUDGET } from '@/lib/design';
-import type { SwipeDirection } from '@/lib/models';
 import { useSession } from '@/providers/session';
 
-import {
-  clearGuestState,
-  flushGuestSwipes,
-  guestBudgetLeft,
-  guestSavedIds,
-  guestSwipedIds,
-  loadGuestState,
-  saveGuestState,
-  type GuestSwipe,
-} from './guest';
+import { loadGuestSwipes, recordGuestPass, settleGuest, undoGuestPass } from './guest';
+import type { GuestSwipe } from './guestLedger';
 
 type GuestContextValue = {
   ready: boolean;
-  swipes: GuestSwipe[];
-  swipedIds: Set<string>;
-  savedIds: string[];
-  remaining: number;
-  exhausted: boolean;
-  recordSwipe: (listingId: string, direction: SwipeDirection) => Promise<void>;
+  /** Watches this device judged. The deck hides them. A held save is not one of them. */
+  swipedIds: ReadonlySet<string>;
+  /** Saves stored before saving asked for sign-in. A held save is not saved. */
+  savedIds: readonly string[];
+  recordPass: (listingId: string) => Promise<void>;
   undoPass: (listingId: string) => Promise<void>;
-  openSignIn: (reason?: 'budget' | 'action') => void;
 };
 
 const GuestContext = createContext<GuestContextValue | null>(null);
@@ -46,10 +33,9 @@ export function useGuest() {
 }
 
 /**
- * Local swipe budget for people who have not signed in yet. The catalogue is
- * readable anonymously; judgments live on the device until an account exists,
- * then flush into `swipes`. Ten judgments is enough to feel the deck and not
- * enough to build a wishlist without an identity.
+ * What a signed-out visitor has judged. The catalogue is readable anonymously.
+ * Passes live on the device until an account exists, and a save asks for one
+ * first. Sign-in settles both into `swipes`.
  */
 export function GuestProvider({ children }: PropsWithChildren) {
   const { isSignedIn, userId } = useSession();
@@ -59,9 +45,9 @@ export function GuestProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let live = true;
-    loadGuestState().then((state) => {
+    loadGuestSwipes().then((stored) => {
       if (!live) return;
-      setSwipes(state.swipes);
+      setSwipes(stored);
       setReady(true);
     });
     return () => {
@@ -72,74 +58,52 @@ export function GuestProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!isSignedIn || !userId || !ready) return;
     let cancelled = false;
-    void (async () => {
-      const stored = await loadGuestState();
-      if (cancelled || stored.swipes.length === 0) return;
-      try {
-        await flushGuestSwipes(userId, stored.swipes);
-        if (cancelled) return;
+    settleGuest(userId)
+      .then((settled) => {
+        if (cancelled || !settled) return;
         setSwipes([]);
         // The deck and wishlist now live on the server for this account.
         void queryClient.invalidateQueries({ queryKey: ['deck'] });
         void queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
         void queryClient.invalidateQueries({ queryKey: ['saved'] });
         void queryClient.invalidateQueries({ queryKey: ['passes'] });
-      } catch {
-        // Leave storage alone; the next signed-in launch retries.
-      }
-    })();
+      })
+      .catch(() => {
+        // Storage stays; the next signed-in launch settles again.
+      });
     return () => {
       cancelled = true;
     };
   }, [isSignedIn, userId, ready, queryClient]);
 
-  const persist = useCallback(async (next: GuestSwipe[]) => {
-    setSwipes(next);
-    await saveGuestState({ swipes: next });
-  }, []);
-
-  const recordSwipe = useCallback(
-    async (listingId: string, direction: SwipeDirection) => {
+  const recordPass = useCallback(
+    async (listingId: string) => {
       if (isSignedIn) return;
-      if (swipes.length >= GUEST_SWIPE_BUDGET) {
-        throw new Error('Sign in to keep swiping.');
-      }
-      if (swipes.some((swipe) => swipe.listingId === listingId)) return;
-      await persist([...swipes, { listingId, direction }]);
+      setSwipes(await recordGuestPass(listingId));
     },
-    [isSignedIn, persist, swipes]
+    [isSignedIn]
   );
 
   const undoPass = useCallback(
     async (listingId: string) => {
       if (isSignedIn) return;
-      await persist(swipes.filter((swipe) => swipe.listingId !== listingId));
+      setSwipes(await undoGuestPass(listingId));
     },
-    [isSignedIn, persist, swipes]
+    [isSignedIn]
   );
-
-  const openSignIn = useCallback((reason: 'budget' | 'action' = 'action') => {
-    router.push({ pathname: '/sign-in', params: { reason } });
-  }, []);
 
   const value = useMemo<GuestContextValue>(
     () => ({
       ready,
-      swipes: isSignedIn ? [] : swipes,
-      swipedIds: isSignedIn ? new Set() : guestSwipedIds(swipes),
-      savedIds: isSignedIn ? [] : guestSavedIds(swipes),
-      remaining: isSignedIn ? GUEST_SWIPE_BUDGET : guestBudgetLeft(swipes),
-      exhausted: !isSignedIn && guestBudgetLeft(swipes) === 0,
-      recordSwipe,
+      swipedIds: new Set(isSignedIn ? [] : swipes.map((swipe) => swipe.listingId)),
+      savedIds: isSignedIn
+        ? []
+        : swipes.filter((swipe) => swipe.direction === 'right').map((swipe) => swipe.listingId),
+      recordPass,
       undoPass,
-      openSignIn,
     }),
-    [ready, swipes, isSignedIn, recordSwipe, undoPass, openSignIn]
+    [ready, swipes, isSignedIn, recordPass, undoPass]
   );
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
-}
-
-export async function discardGuestState() {
-  await clearGuestState();
 }

@@ -1,6 +1,6 @@
 # Browse and swipe
 
-Buy is the deck. A buyer passes or saves a watch. On a wide window the same watches are a grid. Guests on the web can browse, and the eleventh judgment asks them to sign in.
+Buy is the deck. A buyer passes or saves a watch. On a wide window the same watches are a grid. Guests on the web can browse and pass as much as they like. A guest's save asks them to sign in.
 
 ## Sub-features
 
@@ -9,7 +9,7 @@ Buy is the deck. A buyer passes or saves a watch. On a wide window the same watc
 - `save`: swipe right. The watch lands on the Wishlist.
 - `grid`: at 900px and wider the deck is a grid of tiles.
 - `grid-columns`: on desktop web the rail has one button, `Display, N per row` (N is 2 through 6) or `Display, one at a time` for the card deck. A press steps the count and wraps. A phone has no column picker. At phone width the view button is `Grid` while cards are showing and `One at a time` while the grid is showing. `verify-rank` clicks those phone-width names.
-- `guest-budget`: ten guest judgments, then the sign-in sheet.
+- `guest-save`: a guest's save opens the sign-in sheet and the card stays. After sign-in that watch is on the Wishlist. Closing the sheet saves nothing.
 - `filters`: the control is `Filters`. The groups run Price, Era, Case size, Dealer, Brand. Dealer is above Brand. The desktop first-run sheet uses this panel with Dealer omitted.
 - `events`: a pass, a save, an undo, an unsave, and a dealer click each flush to `log_buyer_events` immediately. Rank reads those rows. An undo takes the pass back off the score and adds no weight of its own.
 - `feedback`: a link named `Feedback` on the phone header and the desktop rail, and on New as well as Buy. It opens an X message compose. Do not send it. It is not an inquiry. The web sign-in sheet does not include it.
