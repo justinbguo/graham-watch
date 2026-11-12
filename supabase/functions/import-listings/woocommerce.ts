@@ -13,17 +13,8 @@ import {
 
 declare const positiveCentsBrand: unique symbol;
 
-/**
- * A cent amount a buyer can be shown. Zero is not a member.
- * `minorUnitsToCents` is the only constructor.
- */
 type PositiveCents = number & { readonly [positiveCentsBrand]: true };
 
-/**
- * What the rest of this file reads. `is_in_stock`, `stock_availability`,
- * `price_html`, `regular_price`, `sale_price`, `brands`, variations, and the
- * Link header are not fields here.
- */
 type ParsedWoo = {
   id: number | null;
   title: string;
@@ -39,15 +30,10 @@ type ParsedWoo = {
 };
 
 type WooIO = {
-  /** Defaults to `fetchText`, which sends GrahamBot/0.1. Tests pass a fake. */
   fetchText?: (url: URL, accept: string) => Promise<TextResponse | null>;
-  /** Defaults to a real wait. */
   pause?: (ms: number) => Promise<void>;
-  /** Store API cap is 100. Production does not set this. */
   pageSize?: number;
-  /** First products page for this call. Defaults to 1. */
   startPage?: number;
-  /** Pages to read in this call. Defaults to `MAX_PAGES`. */
   maxPages?: number;
 };
 
@@ -56,15 +42,14 @@ type PageBody =
   | { kind: 'absent' }
   | { kind: 'failed' };
 
-/** Store API accepts 100. 100 pages is the 10,000 item catalogue budget. */
 const PAGE_SIZE = 100;
-const MAX_PAGES = 100;
+const MAX_PAGES = 10_000 / PAGE_SIZE;
 const PAUSE_MS = 1_000;
 const MAX_CRAWL_DELAY_MS = 5_000;
 const PRODUCTS_PATH = '/wp-json/wc/store/v1/products';
 
-/** Same URL after a dropped socket, 403, 429, or 5xx. A 404 is an answer. */
 const RETRY_WAITS_MS = [1_000, 2_000, 4_000] as const;
+const MAX_MINOR_UNIT = 20;
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   '&amp;': '&',
@@ -82,11 +67,7 @@ const BOOK_AND_PAPERS = /\bbooks?\s+and\s+papers\b/i;
 const BOX_AND_BOOK = /\bbox\s+and\s+books?\b/i;
 const DISPLAY_SIGN = /\bdisplay\s+signs?\b/i;
 
-/**
- * Optional asterisks, then the word sold, at the start of the title.
- * `**SOLD**BREGUET` matches. A title that only contains the word does not.
- */
-const TITLE_SOLD = /^\*+\s*sold\b|^sold\b/i;
+const TITLE_STARTS_WITH_SOLD = /^\*+\s*sold\b|^sold\b/i;
 
 type TitleSkip = {
   reason: string;
@@ -101,11 +82,6 @@ const TITLE_SKIPS: readonly TitleSkip[] = [
   },
 ];
 
-/**
- * Store API `prices.price` is a minor-unit digit string.
- * cents = digits * 10^(2 - currency_minor_unit). Unit 2 leaves "1550000" as
- * 1550000. Null for empty, zero, a fraction, or any other non-integer.
- */
 function minorUnitsToCents(
   raw: unknown,
   minorUnit: unknown,
@@ -114,8 +90,7 @@ function minorUnitsToCents(
   if (typeof minorUnit !== 'number' || !Number.isSafeInteger(minorUnit)) {
     return null;
   }
-  // ISO minor units are tiny. A unit past 20 is rejected before the power is computed.
-  if (minorUnit < 0 || minorUnit > 20) return null;
+  if (minorUnit < 0 || minorUnit > MAX_MINOR_UNIT) return null;
   const digits = BigInt(raw);
   if (digits <= 0n) return null;
   const scale = 2 - minorUnit;
@@ -155,7 +130,6 @@ function decodeEntities(value: string): string {
   return named;
 }
 
-/** Booklet stays a watch. A book that comes with a watch stays a watch. */
 function isBookTitle(title: string): boolean {
   if (BOOKLET_WORD.test(title)) return false;
   if (!BOOK_WORD.test(title)) return false;
@@ -299,7 +273,6 @@ function baseItem(
   };
 }
 
-/** For sale. The price argument cannot be null or zero. */
 function forSale(
   product: ParsedWoo & { id: number },
   priceCents: PositiveCents,
@@ -312,12 +285,10 @@ function forSale(
   };
 }
 
-/** The shop said sold. The price may be null. */
 function archive(product: ParsedWoo & { id: number }): SourceItem {
   return { ...baseItem(product), available: false };
 }
 
-/** A strap, accessory, clock, or other non-wristwatch. The price may be null. */
 function held(
   product: ParsedWoo & { id: number },
   reason: HoldReason,
@@ -329,13 +300,9 @@ function soldByShop(product: ParsedWoo): boolean {
   if (product.categorySlugs.some((slug) => slug.toLowerCase() === 'sold')) {
     return true;
   }
-  return TITLE_SOLD.test(product.title.trim());
+  return TITLE_STARTS_WITH_SOLD.test(product.title.trim());
 }
 
-/**
- * One Store API product. The first match wins.
- * A kept row is a listing, a hold, or a sold archive. Anything else is a skip.
- */
 export function mapWooProduct(
   raw: Json,
   origin: string,
@@ -364,16 +331,12 @@ export function mapWooProduct(
   });
   if (decision.decision === 'hold') return held(product, decision.reason);
 
-  // A book or a sign is not stored. A hold would stamp the listing not_a_watch,
-  // and that stamp does not clear on a later read.
   for (const rule of TITLE_SKIPS) {
     if (rule.matches(product.title)) {
       return skip(product.sourceUrl, product.title, rule.reason, meta);
     }
   }
 
-  // Sold is an archive even when the price is missing. A live row with no
-  // price is a skip, so the archive check has to win first.
   if (soldByShop(product)) return archive(product);
   if (product.priceCents == null) {
     return skip(product.sourceUrl, product.title, 'no price', meta);
@@ -427,7 +390,7 @@ function classifyPage(response: TextResponse | null): PageBody {
       const parsed = JSON.parse(response.body);
       if (Array.isArray(parsed)) return { kind: 'array', products: parsed };
     } catch {
-      // A 2xx body that is not JSON is not this feed.
+      return { kind: 'absent' };
     }
     return { kind: 'absent' };
   }
@@ -450,10 +413,6 @@ function unseen(products: Json[], seen: Set<string>): Json[] {
   return fresh;
 }
 
-/**
- * Not shared with Shopify. That read retries a dropped socket, 429, and 5xx.
- * A 403 is retried here as well, then the same refusals apply.
- */
 async function robotsFor(
   origin: string,
   fetchBody: (url: URL, accept: string) => Promise<TextResponse | null>,
