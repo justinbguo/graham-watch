@@ -48,15 +48,18 @@ export function undoGuestPass(listingId: string): Promise<GuestSwipe[]> {
   });
 }
 
-/** Nothing reaches `swipes` or buyer_events until sign-in settles the held save. */
-export function askToSave(listing: ListingRef, surface: JudgeSurface): void {
+/**
+ * Holds the save, then opens the sheet. The write finishes before the route
+ * push, so a reload of the sheet still has the watch.
+ */
+export async function askToSave(listing: ListingRef, surface: JudgeSurface): Promise<void> {
   const save = {
     eventId: newEventId(),
     listing: { id: listing.id, dealer_id: listing.dealer_id },
     surface,
     heldAt: Date.now(),
   };
-  void serial(() => applyPending({ type: 'place', save }));
+  await serial(() => applyPending({ type: 'place', save }));
   openSignIn('save');
 }
 
@@ -75,22 +78,29 @@ export function abandonPendingSave(): void {
  * A throw leaves storage for the next signed-in launch. True when anything
  * was written.
  */
-export async function settleGuest(userId: string): Promise<boolean> {
-  const swipes = await loadGuestSwipes();
-  const pending = parsePendingSave(await secureStorage.getItem(PENDING_KEY), Date.now());
-  const { rows, save } = settlement(swipes, pending);
-  if (!rows.length) return false;
+export function settleGuest(userId: string): Promise<boolean> {
+  // One turn of the write queue, including the read. A save that was just
+  // asked for is already queued ahead of this, and a pass cannot land between
+  // the read and the clear.
+  return serial(async () => {
+    const swipes = await loadGuestSwipes();
+    const rawPending = await secureStorage.getItem(PENDING_KEY);
+    const pending = parsePendingSave(rawPending, Date.now());
+    if (rawPending && !pending) await secureStorage.removeItem(PENDING_KEY);
+    const { rows, save } = settlement(swipes, pending);
+    if (!rows.length) return false;
 
-  const { error } = await supabase.from('swipes').upsert(
-    rows.map((row) => ({ actor_id: userId, listing_id: row.listingId, direction: row.direction })),
-    { onConflict: 'actor_id,listing_id' },
-  );
-  if (error) throw error;
+    const { error } = await supabase.from('swipes').upsert(
+      rows.map((row) => ({ actor_id: userId, listing_id: row.listingId, direction: row.direction })),
+      { onConflict: 'actor_id,listing_id' },
+    );
+    if (error) throw error;
 
-  if (save) logEvent(save.event, save.at);
-  await serial(() => secureStorage.removeItem(SWIPES_KEY));
-  if (pending) await serial(() => applyPending({ type: 'finish', eventId: pending.eventId }));
-  return true;
+    if (save) logEvent(save.event, save.at);
+    await secureStorage.removeItem(SWIPES_KEY);
+    if (pending) await applyPending({ type: 'finish', eventId: pending.eventId });
+    return true;
+  });
 }
 
 /**

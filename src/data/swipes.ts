@@ -88,7 +88,7 @@ export function useJudge(surface: JudgeSurface) {
   const judge = useCallback(
     (card: ListingRef, direction: SwipeDirection, hooks?: JudgeHooks): Verdict => {
       if (judgeAction(isSignedIn, direction) === 'ask') {
-        askToSave(card, surface);
+        void askToSave(card, surface);
         return 'asked';
       }
       // TanStack runs onMutate synchronously inside mutate, and it drops the
@@ -123,7 +123,10 @@ function useRecordSwipe(actorId: string | null) {
 
   return useMutation({
     mutationFn: ({ listingId, direction }: { listingId: string; direction: SwipeDirection }) => {
-      if (!actorId) return guest.recordPass(listingId);
+      if (!actorId) {
+        if (direction !== 'left') throw new Error('Guest saves use askToSave.');
+        return guest.recordPass(listingId);
+      }
       return recordSwipe(actorId, listingId, direction);
     },
     onMutate: ({ listingId }) => {
