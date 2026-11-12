@@ -9,6 +9,7 @@ Buy shows a deck of watches. On web, ArrowLeft passes and ArrowRight saves. Pass
 - `deck-save` keeps the top watch via ArrowRight (wishlist side effect covered in wishlist.md).
 - `deck-undo` restores the last pass when Undo is available.
 - `deck-columns` on desktop web is one rail button: `Display, N per row` while the grid is showing (N is 2 through 6), and `Display, one at a time` for the card deck. A press steps the count and wraps.
+- `deck-filters`: the control `Filters` opens Price, Era, Case size, Dealer, then Brand. Dealer is above Brand.
 
 ## How to get to it (user POV)
 
@@ -28,6 +29,7 @@ Preconditions:
 - **Pass.** Run `press ArrowLeft`, then `wait-settle`. Snapshot: the previous top title is gone; a different watch is visible (or empty-deck copy if the deck was exhausted).
 - **Save.** From a fresh top card, run `press ArrowRight`, then `wait-settle`. Snapshot: the top card advanced. Wishlist proof belongs in [wishlist.md](./wishlist.md).
 - **Undo pass.** After a pass, run `click --name "Undo, bring back the watch you passed on"` (or `aria-click --role button --name "Undo"`). Snapshot: the passed watch is back on top.
+- **Filters.** `click --name Filters`, then `snapshot`. The dialog lists Price, Era, Case size, Dealer, then Brand. The visible rail word is Filter. The accessible name is `Filters`. Close it with `press Escape`. `Close filters` is the full-screen backdrop, and a center click lands on the panel instead of dismissing it.
 - **Proof.** Write `snapshot` to `artifacts/<id>/deck-swipe.aria.yml` and `screenshot` to `artifacts/<id>/deck-swipe.png` after the action under test.
 
 ## Gotchas

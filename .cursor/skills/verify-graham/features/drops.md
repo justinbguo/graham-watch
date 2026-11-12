@@ -34,7 +34,7 @@ Preconditions:
 - **One screen.** `screenshot /messages <evidence>/messages.png --as buyer` checks the row and the tab. `screenshot /profile` checks that Profile no longer carries the count.
 - **Whole flow.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-drops` or `npm run verify:drops`. Exit 0, and the evidence files still exist after cleanup.
 
-The captured push title is `New watches`. The body is `1 new watch from Test Bench`. `data.kind` is `drop`, `data.dealerId` is the shop, and `data.dropNotificationId` is the row id. That dealer id is the deep link the app opens with `/drops?dealerId/` plus the id. A push with no dealer id opens `/drops`.
+The captured push title is `New watches`. The body is `1 new watch from Test Bench`. `data.kind` is `drop`, `data.dealerId` is the shop, and `data.dropNotificationId` is the row id. That dealer id is the deep link `/drops?dealerId=<id>`. A push with no dealer id opens `/drops`.
 
 ## Gotchas
 

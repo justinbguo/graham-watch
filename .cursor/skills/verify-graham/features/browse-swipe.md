@@ -10,11 +10,13 @@ Buy is the deck. A buyer passes or saves a watch. On a wide window the same watc
 - `grid`: at 900px and wider the deck is a grid of tiles.
 - `grid-columns`: on desktop web the rail has one button, `Display, N per row` (N is 2 through 6) or `Display, one at a time` for the card deck. A press steps the count and wraps. A phone has no column picker. At phone width the view button is `Grid` while cards are showing and `One at a time` while the grid is showing. `verify-rank` clicks those phone-width names.
 - `guest-budget`: ten guest judgments, then the sign-in sheet.
-- `feedback`: a link named `Feedback` on the phone header and the desktop rail. It opens an X message compose. Do not send it. It is not an inquiry.
+- `filters`: the control is `Filters`. The groups run Price, Era, Case size, Dealer, Brand. Dealer is above Brand. The desktop first-run sheet uses this panel with Dealer omitted.
+- `events`: a pass, a save, an undo, an unsave, and a dealer click each flush to `log_buyer_events` immediately. Rank reads those rows. An undo takes the pass back off the score and adds no weight of its own.
+- `feedback`: a link named `Feedback` on the phone header and the desktop rail, and on New as well as Buy. It opens an X message compose. Do not send it. It is not an inquiry. The web sign-in sheet does not include it.
 
 ## How to get to it (user POV)
 
-Open the app. Web guests land on Buy with the sign-in sheet already open. Dismiss it with `Close` or `Not now` before judging a watch. A guest is not asked what to show. Web has no header `Log in`. Android shows `Log in`. iOS shows the sign-in wall first. Search is the field named `Search brand, model or reference`. Filters open from the filter control. Dealer sits above Brand.
+Open the app. Web guests land on Buy with the sign-in sheet already open. Dismiss it with `Close` or `Not now` before judging a watch. A guest is not asked what to show. Web has no header `Log in`. Android shows `Log in`. iOS shows the sign-in wall first. Search is the button named `Search brand, model or reference`. Filters open from `Filters`. Inside, Dealer sits above Brand, after Price, Era, and Case size.
 
 ## Driving it with control-graham
 
@@ -23,7 +25,7 @@ Preconditions:
 - `up` and `web` are ready. The seeded catalogue from `supabase/seed.sql` is on the deck. Test Bench's shelf listing is there too once `seed` has run.
 
 - **Open Buy.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot / <evidence>/buy.png`. The shot is the deck or the guest gate, not a proof of a swipe.
-- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. The order is `rank_buy_feed`: a dealer click outweighs a save, a pass is a mild negative, an undo does not count, and a followed shop is boosted. The command dismisses sign-in, browses as a guest, signs in as `buyer`, clicks a dealer link, reloads, then follows Test Bench and imports the fixture. The click is a `log_buyer_events` post, and the command fails if that post did not succeed. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png`, `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.
+- **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. The order is `rank_buy_feed`: a dealer click outweighs a save, a pass is a mild negative, an undo does not count, and a followed shop is boosted. The command screenshots the sign-in sheet, dismisses it, browses as a guest, signs in as `buyer`, clicks a dealer link, reloads, then follows Test Bench and imports the fixture. The click is a `log_buyer_events` post, and the command fails if that post did not succeed. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png` (the sign-in sheet, before dismiss; the filename is unchanged), `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.
 - **Pass and save are not harness commands yet.** A swipe has to happen in the browser. Do not treat a Drops screenshot as proof that pass and save work.
 
 ## Gotchas
