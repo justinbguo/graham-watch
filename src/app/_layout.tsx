@@ -129,6 +129,7 @@ function RootNavigator() {
       <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
+      <Stack.Screen name="+not-found" />
     </Stack>
   );
 }

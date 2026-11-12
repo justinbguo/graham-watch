@@ -957,6 +957,51 @@ let itemId;
     body: { sold_at: null },
   });
 
+  await api(`/rest/v1/source_items?id=eq.${itemId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { hold_reason: 'accessory', available: true },
+  });
+  const heldSweep = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: false },
+  });
+  check(
+    'a held catalogue item leaves the deck',
+    heldSweep.body?.retired === 1,
+    `got ${JSON.stringify(heldSweep.body)}`
+  );
+  const heldListing = await api(
+    `/rest/v1/listings?id=eq.${syncedListingId}&select=sold_at,sold_source`,
+    { token: dealerUser.token }
+  );
+  check(
+    'a held listing is sold as not a watch',
+    heldListing.body?.[0]?.sold_at !== null && heldListing.body?.[0]?.sold_source === 'not_a_watch',
+    JSON.stringify(heldListing.body?.[0])
+  );
+  const heldAgain = await api('/rest/v1/rpc/sync_source_availability', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId, p_seen_ids: [itemId], p_read_complete: true },
+  });
+  check(
+    'a held listing stays off the deck while the shop still lists it',
+    heldAgain.body?.relisted === 0,
+    `got ${JSON.stringify(heldAgain.body)}`
+  );
+  await api(`/rest/v1/source_items?id=eq.${itemId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { hold_reason: null },
+  });
+  await api(`/rest/v1/listings?id=eq.${syncedListingId}`, {
+    token: dealerUser.token,
+    method: 'PATCH',
+    body: { sold_at: null },
+  });
+
   // Absence from an incomplete read must not retire. Seed a second linked
   // listing, sweep with an empty seen set and complete=false, then prove it
   // stayed live; complete=true must retire it.

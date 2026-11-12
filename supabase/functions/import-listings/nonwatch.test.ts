@@ -207,6 +207,34 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
     }),
   },
   {
+    reason: 'accessory',
+    fields: item({
+      title: 'Patek Philippe White Gold Ellipse Cufflinks Ref. 9003 (Objet) 29grams',
+      productType: 'Watches',
+    }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({
+      title: 'Patek Philippe 18K Yellow Gold Lapis Cufflinks, 1960s (Objet)',
+      productType: 'Watches',
+    }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({
+      title: 'Bulgari 18k Yellow Gold Monete Ring (Objet)',
+      productType: 'Watches',
+    }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({
+      title: 'Asprey Omani Khanjar White Gold Bracelet (Objet)',
+      productType: 'Watches',
+    }),
+  },
+  {
     reason: 'clock',
     fields: item({
       title: 'Time Module Inc. Golf Ball',
@@ -216,6 +244,16 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
 ];
 
 const WATCHES: CatalogueFields[] = [
+  item({
+    title: 'Gruen Art Deco Yellow Gold & Jade Lapel Watch (Objet)',
+    productType: 'Watches',
+  }),
+  item({
+    title: 'Jaeger Lecoultre Jade Diamond Onyx Pendant Watch, Art Deco (Objet)',
+    productType: 'Watches',
+  }),
+  item({ title: 'Baylor Cufflinks', productType: 'Watches', text: 'A 17.5mm cufflinks wristwatch.' }),
+  item({ title: 'Sheffield Cufflink Watch', productType: 'Watches' }),
   item({ title: 'Audemars Piguet Royal Oak 15202ST', text: 'On a bracelet.' }),
   item({ title: 'Audemars Piguet Royal Oak Jumbo 5402ST', text: 'Integrated bracelet.' }),
   item({
