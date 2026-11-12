@@ -47,36 +47,51 @@ function display(photo: ListingPhoto): DeckPhoto {
   return { ...photo, url: listingPhotoUrl(photo) };
 }
 
+// One `in` filter is a GET query string. A shop with a thousand watches
+// makes a URL the gateway rejects, and the shop page then says it is gone.
+const FILTER_CHUNK = 80;
+
+async function rowsInChunks<T>(
+  ids: string[],
+  load: (ids: string[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += FILTER_CHUNK) {
+    chunks.push(ids.slice(start, start + FILTER_CHUNK));
+  }
+  const pages = await Promise.all(
+    chunks.map(async (slice) => {
+      const { data, error } = await load(slice);
+      if (error) throw error;
+      return data ?? [];
+    }),
+  );
+  return pages.flat();
+}
+
 /** Listings carry only a dealer_id; cards need the dealer's name and link too. */
 export async function hydrate(listings: Listing[]): Promise<DeckCard[]> {
   if (listings.length === 0) return [];
 
+  const listingIds = listings.map((listing) => listing.id);
+  const dealerIds = [...new Set(listings.map((listing) => listing.dealer_id))];
   const [photos, dealers] = await Promise.all([
-    supabase
-      .from('listing_photos')
-      .select('*')
-      .in(
-        'listing_id',
-        listings.map((l) => l.id)
-      )
-      .order('position'),
-    supabase
-      .from('dealers')
-      .select(DEALER_IDENTITY_COLUMNS)
-      .in('id', [...new Set(listings.map((l) => l.dealer_id))]),
+    rowsInChunks(listingIds, (ids) =>
+      supabase.from('listing_photos').select('*').in('listing_id', ids).order('position'),
+    ),
+    rowsInChunks(dealerIds, (ids) =>
+      supabase.from('dealers').select(DEALER_IDENTITY_COLUMNS).in('id', ids),
+    ),
   ]);
 
-  if (photos.error) throw photos.error;
-  if (dealers.error) throw dealers.error;
-
   const photosByListing = new Map<string, DeckPhoto[]>();
-  for (const photo of photos.data ?? []) {
+  for (const photo of photos) {
     const bucket = photosByListing.get(photo.listing_id) ?? [];
     bucket.push(display(photo));
     photosByListing.set(photo.listing_id, bucket);
   }
 
-  const dealerById = new Map((dealers.data ?? []).map((d) => [d.id, d]));
+  const dealerById = new Map(dealers.map((dealer) => [dealer.id, dealer]));
 
   return listings.map((listing) => ({
     ...listing,

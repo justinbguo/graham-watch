@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Platform, ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { PhotoCarousel } from '@/components/PhotoCarousel';
 import { Button, Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
@@ -12,6 +12,7 @@ import { AddToWishlist } from '@/features/listings/AddToWishlist';
 import { DealerSiteButton } from '@/features/listings/DealerSiteButton';
 import { ListingDetails } from '@/features/listings/ListingDetails';
 import { PassWatch } from '@/features/listings/PassWatch';
+import { deckStage } from '@/lib/layout';
 import { listingSourceUrl } from '@/lib/listingSource';
 import { formatPrice, formatTitle } from '@/lib/format';
 import { useOpenStack } from '@/lib/openStack';
@@ -47,6 +48,7 @@ export default function ListingScreen() {
   const save = useRecordSwipe(userId);
   const open = useOpenStack();
   const styles = useThemedStyles(detailStyles);
+  const stage = deckStage(Platform.OS, useWindowDimensions().width);
   const photoRef = useRef<View>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   useExposure(card, { surface: 'detail', photo: { listingId: card?.id, index: photoIndex } });
@@ -122,17 +124,17 @@ export default function ListingScreen() {
   }
 
   return (
-    <Screen width={Platform.OS === 'web' ? 'cardWeb' : 'reading'}>
+    <Screen width={Platform.OS === 'web' ? stage.width : 'reading'}>
       {/* Outside the scroll, on the close button's line. A name that leaves
           with the photograph is gone by the time you reach the caliber. */}
       <View style={styles.headline}>
-        <Text style={styles.model}>{formatTitle(card)}</Text>
+        <Text style={styles.model} numberOfLines={2}>{formatTitle(card)}</Text>
         <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(card)}</Text>
           <CloseButton onPress={() => router.back()} />
         </View>
       </View>
-      {Platform.OS === 'web' ? (
+      {stage.split ? (
         <View style={styles.webRow}>
           <View ref={photoRef} style={styles.webPhoto}>
             <PhotoCarousel

@@ -78,6 +78,15 @@ function accessoryTitle(title: string): boolean {
   return false;
 }
 
+/**
+ * Keystone files jewelry under product type Watches and puts `(Objet)` in the
+ * title.
+ */
+function objetAccessory(title: string): boolean {
+  if (!/\(\s*objet\s*\)/i.test(title)) return false;
+  return !/\bwatch(?:es)?\b/i.test(title);
+}
+
 function watchNamedInTitle(title: string): boolean {
   return /\bwatch(?:es)?\b/i.test(title) && !/\bwatch\s+straps?\b/i.test(title);
 }
@@ -125,6 +134,7 @@ function hold(reason: HoldReason, rule: string): CatalogueDecision {
 }
 
 function holdFromTitle(title: string): CatalogueDecision | null {
+  if (objetAccessory(title)) return hold('accessory', 'objet-title');
   if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
   if (strapTitle(title)) return hold('strap', 'strap-title');
   return null;

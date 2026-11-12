@@ -48,7 +48,17 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
     );
   }
 
-  if (error || !data?.dealer) {
+  if (error) {
+    return (
+      <Screen action={<CloseButton onPress={close} />}>
+        <Centered>
+          <Message text="This shop could not be loaded." tone="error" />
+        </Centered>
+      </Screen>
+    );
+  }
+
+  if (!data?.dealer) {
     return (
       <Screen action={<CloseButton onPress={close} />}>
         <Centered>

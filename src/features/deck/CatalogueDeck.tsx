@@ -659,18 +659,17 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
  * capped at `DECK_LIMIT` and said "20+" — a number that was never the answer
  * to either question.
  */
-/** Search and deck controls on one row so the split stays 60 / 40. */
+/** Search takes whatever width the 44px controls leave. */
 function DeckHeader({ children }: { children: ReactNode }) {
   const open = useOpenStack();
   const styles = useThemedStyles(deckStyles);
   const door = useRef<View>(null);
-  const searchWidth = `${layout.deckHeaderSearchShare * 100}%` as const;
   return (
     <View style={styles.headerBar}>
       <View
         ref={door}
         collapsable={false}
-        style={[styles.searchSlot, { width: searchWidth }]}>
+        style={styles.searchSlot}>
         <SearchDoor
           accessibilityLabel="Search brand, model or reference"
           onPress={() => {
@@ -759,8 +758,15 @@ const deckStyles = (_theme: Theme) => ({
     marginBottom: space.sm,
   },
   searchSlot: {
-    flexShrink: 0,
+    flex: 1,
     minWidth: 0,
+    overflow: 'hidden' as const,
+  },
+  actions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    flexShrink: 0,
+    gap: space.xs,
   },
   actionsSlot: {
     flex: 1,
@@ -769,11 +775,6 @@ const deckStyles = (_theme: Theme) => ({
     justifyContent: 'flex-end' as const,
     gap: space.xs,
     minWidth: 0,
-  },
-  actions: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: space.xs,
   },
   watchArea: {
     flex: 1,

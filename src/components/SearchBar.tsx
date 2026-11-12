@@ -146,6 +146,7 @@ export function SearchDoor({
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={({ pressed }) => [
+        styles.door,
         header && styles.doorHeader,
         pressed && styles.pressed,
       ]}>
@@ -206,6 +207,12 @@ const searchStyles = (theme: Theme) => ({
     height: size.searchBar,
     paddingHorizontal: space.md,
     gap: space.xs,
+  },
+  door: {
+    alignSelf: 'stretch' as const,
+    width: '100%' as const,
+    maxWidth: '100%' as const,
+    minWidth: 0,
   },
   doorHeader: {
     minHeight: HIT_TARGET,

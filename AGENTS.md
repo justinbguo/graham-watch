@@ -50,6 +50,7 @@ Stack routes under `src/app/(app)/`:
 - `dealer/[dealerId]`, `collector/[userId]`, `inquiry/[listingId]`
 - `apply`, `import-inventory`, `graham-pro`, `settings`
 - `sourcing/new`, `sourcing/[requestId]`
+- A path that is not a screen shows `+not-found` ("This page is not on Graham.").
 
 Desktop web puts the tab bar on top (`useIsDesktopWeb`). A wide window that is not desktop web uses a left rail.
 
@@ -85,7 +86,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 
 | Function | Who calls it | What it writes |
 | --- | --- | --- |
-| `import-listings` | App and operator (`src/data/dealers.ts`, `operator/src/importer.ts`, `scripts/_import.mjs`). Nightly refresh sends `action: "scheduled-refresh"` with the service role and `x-graham-cron-secret`. Local proof sends `action: "fixture"`, which the hosted function refuses. | Listings, photos, `import_jobs`, `source_items`. A strap, accessory, or clock is stored with `source_items.hold_reason` and is not published. Listings already on the deck stay there. `discover` and `preview` write nothing. |
+| `import-listings` | App and operator (`src/data/dealers.ts`, `operator/src/importer.ts`, `scripts/_import.mjs`). Nightly refresh sends `action: "scheduled-refresh"` with the service role and `x-graham-cron-secret`. Local proof sends `action: "fixture"`, which the hosted function refuses. | Listings, photos, `import_jobs`, `source_items`. A strap, accessory, or clock is stored with `source_items.hold_reason` and is not published. A title marked `(Objet)` is an accessory unless the title also says watch. The next availability sweep marks a held item's listing sold with `sold_source` `not_a_watch`. A dealer who already marked it sold keeps that mark. `discover` and `preview` write nothing. |
 | `notify-drops` | `scripts/refresh.mjs` after a catalogue write. Same service role and cron header. | `drop_notifications`, then an Expo push. Local stacks may set `EXPO_PUSH_URL` only when `SUPABASE_URL` is a local host. |
 | `claim-dealer` | `src/data/dealers.ts` | A mailbox code, then the claim. |
 | `verify-application` | `src/data/applications.ts` | A code for an application mailbox. |
