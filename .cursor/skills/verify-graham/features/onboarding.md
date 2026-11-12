@@ -22,7 +22,7 @@ Preconditions:
 - The signed-in profile has `onboarded_at` null. `seed` sets `onboarded_at`, so `buyer`, `quiet`, and `dealer` never see this flow.
 
 - **Reach the gate.** This harness does not create a half-finished account. `sign-in buyer` then `screenshot /onboarding ... --as buyer` lands on the app, not the questions, because that profile is already onboarded.
-- **Do not call that a pass.** The Drops proof does not cover onboarding. Report this feature unverified until a drive uses an account whose `onboarded_at` is null and the heading `What should we call you?` is on screen.
+- **Do not call that a pass.** The Drops proof does not cover onboarding. Desktop web shows `What should we show you first?` over Buy when `onboarded_at` is null. Phone shows the question flow, starting at `What should we call you?`.
 
 ## Gotchas
 

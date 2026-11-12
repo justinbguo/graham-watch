@@ -17,11 +17,10 @@ its own — see "Phone" below.
 
 ## Guest browsing
 
-Web opens on the deck without an account. Guests get the same Buy surface —
-search, filters, grid or cards — with the sign-in sheet open over the deck on
-arrival, once per page load. Dismiss it and the deck is there. Judgments live on
-the device for `GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the sheet
-again. Community, messages, wishlist, and profile ask for an account up
+Web opens on the deck without an account. The sign-in sheet is already open
+over Buy, once per page load. Dismiss it and the deck is there. A guest who
+browses is not asked what to show. Judgments live on the device for
+`GUEST_SWIPE_BUDGET` (10) swipes; the eleventh opens the sheet again. Community, messages, wishlist, and profile ask for an account up
 front. Anon may read the approved catalogue (and run `search_listings` /
 `listing_counts`); swipes and everything personal stay authenticated. Local
 guest judgments flush into `swipes` once a session lands.
@@ -274,12 +273,20 @@ codes, so the flow can be built and tested with no provider and no spend.
 
 ## First-run onboarding
 
-After the session exists, onboarding asks for a name, a username, a birthday
-(18+), a collection size, favorite brands, and the pain points they face while
-searching for vintage watches. It does not ask whether they buy or sell.
-Everyone finishes as a buyer. A shop is claimed from Profile. The username is
-`profiles.handle`, claimed on that slide by `claim_username` so a taken name
-is refused before the rest of the questions. The last slide is notifications.
+Desktop web asks one question after sign-in: "What should we show you first?".
+That sheet is the Buy filter panel without the Dealer section. See watches
+keeps the brand keys already written on the deck filter. Skip clears them and
+finishes. There is no name, username, or birthday on desktop, so those
+profiles can finish with a null handle and a null birthday. A birthday that
+is present and under 18 is still refused.
+
+A phone, and a phone-width browser, still asks for a name, a username, a
+birthday (18+), a collection size, brands, and the pain points they face while
+searching for vintage watches. The brand step is the same filter panel. It
+does not ask whether they buy or sell. Everyone finishes as a buyer. A shop
+is claimed from Profile. The username is `profiles.handle`, claimed on that
+slide by `claim_username` so a taken name is refused before the rest of the
+questions. The last slide is notifications.
 
 Continue on that slide requests the real OS permission on iOS and Android;
 Not now finishes without it. Android creates the `watch-updates` channel first,
