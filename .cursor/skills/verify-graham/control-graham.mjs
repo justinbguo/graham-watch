@@ -2957,16 +2957,16 @@ async function commandVerifyGuestSave(dryRun) {
   try {
     await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
     const close = page.getByRole('button', { name: 'Close', exact: true });
-    const notNow = page.getByRole('button', { name: 'Not now', exact: true });
-    const dismiss = (await close.isVisible().catch(() => false)) ? close : notNow;
-    await dismiss.waitFor({ state: 'visible', timeout: 20_000 });
-    await dismiss.click();
-    await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await close.waitFor({ state: 'visible', timeout: 20_000 });
+    await close.click();
+    await page.getByText(/\$[\d,]+/).first().waitFor({ state: 'visible', timeout: 20_000 });
     await page.keyboard.press('s');
     const first = await topDeckCard(page);
     await shoot(page, files.deck);
     await page.keyboard.press('ArrowRight');
     await page.getByText(saveCopy, { exact: true }).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByRole('button', { name: 'Continue with email' }).waitFor({ state: 'visible', timeout: 20_000 });
+    await page.waitForTimeout(400);
     const held = await page.evaluate(() => localStorage.getItem('graham.guest.pending-save'));
     if (!held || !held.includes(first.id)) {
       fail('The save was not held on this browser.', 'A guest save writes graham.guest.pending-save before the sheet opens.', {
@@ -2975,7 +2975,7 @@ async function commandVerifyGuestSave(dryRun) {
       });
     }
     await shoot(page, files.prompt);
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.keyboard.press('Escape');
     await page.getByText(saveCopy, { exact: true }).waitFor({ state: 'hidden', timeout: 20_000 });
     const still = await topDeckCard(page);
     if (still.id !== first.id) {
@@ -3025,7 +3025,7 @@ async function commandVerifyGuestSave(dryRun) {
     await page.getByRole('button', { name: 'Skip', exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
     await shoot(page, files.firstRun);
     await page.getByRole('button', { name: 'Skip', exact: true }).click();
-    await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
+    await page.getByText(/\$[\d,]+/).first().waitFor({ state: 'visible', timeout: 20_000 });
     await page.getByRole('tab', { name: /Wishlist/ }).click();
     await page.getByText(passed.label, { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
     await shoot(page, files.wishlist);
