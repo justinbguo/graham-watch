@@ -589,24 +589,33 @@ export function useDealerShop(dealerId: string) {
         return { dealer: listings[0]?.dealer ?? null, listings };
       }
 
-      const [dealer, listings] = await Promise.all([
-        supabase
-          .from('dealers')
-          .select(DEALER_IDENTITY_COLUMNS)
-          .eq('id', dealerId)
-          .maybeSingle(),
-        supabase
+      const dealer = await supabase
+        .from('dealers')
+        .select(DEALER_IDENTITY_COLUMNS)
+        .eq('id', dealerId)
+        .maybeSingle();
+      if (dealer.error) throw dealer.error;
+
+      // PostgREST stops at max_rows (1000). A shop larger than that needs the next page.
+      const PAGE = 1000;
+      const rows = [];
+      for (let page = 0; page < 20; page += 1) {
+        const from = page * PAGE;
+        const { data, error } = await supabase
           .from('listings')
           .select('*')
           .eq('dealer_id', dealerId)
           .eq('status', 'active')
           .is('sold_at', null)
-          .order('created_at', { ascending: false }),
-      ]);
-      if (dealer.error) throw dealer.error;
-      if (listings.error) throw listings.error;
+          .order('created_at', { ascending: false })
+          .order('id')
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if ((data ?? []).length < PAGE) break;
+      }
 
-      return { dealer: dealer.data, listings: await hydrate(listings.data ?? []) };
+      return { dealer: dealer.data, listings: await hydrate(rows) };
     },
   });
 }
