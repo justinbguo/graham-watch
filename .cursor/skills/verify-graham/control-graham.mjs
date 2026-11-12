@@ -2504,15 +2504,12 @@ async function commandVerifyRank(dryRun) {
   try {
     const cleared = await clearBuyerTaste(status);
     await page.goto(`http://127.0.0.1:${WEB_PORT}/`, { waitUntil: 'domcontentloaded' });
-    const heading = page.getByText('What should we show you first?', { exact: true });
-    await heading.waitFor({ state: 'visible', timeout: 20_000 });
-    await shoot(page, files.taste);
-
-    await page.getByRole('checkbox', { name: 'Rolex' }).click();
-    await page.getByRole('button', { name: 'See watches', exact: true }).click();
     const close = page.getByRole('button', { name: 'Close', exact: true });
-    await close.waitFor({ state: 'visible', timeout: 20_000 });
-    await close.click();
+    const notNow = page.getByRole('button', { name: 'Not now', exact: true });
+    const dismiss = (await close.isVisible().catch(() => false)) ? close : notNow;
+    await dismiss.waitFor({ state: 'visible', timeout: 20_000 });
+    await shoot(page, files.taste);
+    await dismiss.click();
     await page.getByText(/\d+ watches available/).first().waitFor({ state: 'visible', timeout: 20_000 });
     const guestTop = await topDeckCard(page);
     const guestBrand = await listingBrand(status, guestTop.id);
@@ -2524,13 +2521,6 @@ async function commandVerifyRank(dryRun) {
     await page.getByRole('button', { name: 'One at a time', exact: true }).click();
     await topDeckCard(page);
     await page.waitForTimeout(600);
-    if (guestBrand?.brand_key !== 'rolex') {
-      fail(
-        'The guest deck did not lead with the Rolex pick.',
-        'See watches stores the pick and the deck refetches. The top card should be a Rolex.',
-        { label: guestTop.label, brand: guestBrand },
-      );
-    }
 
     await signInBuyerOnPage(page, PEOPLE.buyer.email);
     let clickedCard = await topDeckCard(page);
@@ -2552,7 +2542,7 @@ async function commandVerifyRank(dryRun) {
     if (!clickedBrand || clickedBrand.brand_key === 'rolex') {
       fail(
         'The deck stayed on Rolex after the passes.',
-        'Passing the Rolex pick should reveal the next brand. That card is the one the proof clicks.',
+        'Passing a leading Rolex should reveal the next brand. That card is the one the proof clicks.',
         { label: clickedCard.label, brand: clickedBrand },
       );
     }
@@ -2580,7 +2570,7 @@ async function commandVerifyRank(dryRun) {
     if (rankedBrand?.brand_key !== clickedBrand.brand_key) {
       fail(
         'The clicked brand did not lead the deck after reload.',
-        'A dealer click outweighs the Rolex pick. Reload refetches the ranked page.',
+        'A dealer click outweighs a save. Reload refetches the ranked page.',
         { clicked: clickedBrand, top: rankedBrand, label: rankedTop.label },
       );
     }
@@ -2650,7 +2640,7 @@ async function commandVerifyRank(dryRun) {
     await shoot(page, failed).catch(() => undefined);
     fail(
       error instanceof Error ? error.message : String(error),
-      'The rank proof drives the guest sheet, a dealer click, and a followed shop. The failed screenshot is rank-failed.png.',
+      'The rank proof drives a guest dismiss, a dealer click, and a followed shop. The failed screenshot is rank-failed.png.',
       { url: page.url(), text: (await pageText(page)).slice(0, 800), failed },
     );
   } finally {

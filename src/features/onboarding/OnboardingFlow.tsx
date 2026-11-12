@@ -90,11 +90,6 @@ export function OnboardingFlow() {
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
     );
 
-  const toggleBrand = (value: string) =>
-    setBrands((current) =>
-      current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
-    );
-
   const enableNotifications = async () => {
     setPermissionPending(true);
     setPermissionError(null);
@@ -180,9 +175,10 @@ export function OnboardingFlow() {
   if (step === 'brands') {
     return (
       <BrandsStep
-        brands={brands}
-        onToggle={toggleBrand}
-        onContinue={() => setStep('painPoints')}
+        onContinue={(picked) => {
+          setBrands(picked);
+          setStep('painPoints');
+        }}
         onBack={() => setStep('size')}
       />
     );

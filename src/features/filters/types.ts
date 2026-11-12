@@ -51,6 +51,44 @@ export type Filters = {
   eras: string[];
 };
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function rangeList(value: unknown): Range[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const min = (item as Range).min;
+    const max = (item as Range).max;
+    if (min != null && typeof min !== 'number') return [];
+    if (max != null && typeof max !== 'number') return [];
+    return [{ min: min ?? null, max: max ?? null }];
+  });
+}
+
+/** A stored deck filter. A bad blob is an empty filter, not a thrown parse. */
+export function parseFilters(raw: string | null): Filters {
+  if (!raw) return NO_FILTERS;
+  try {
+    const value = JSON.parse(raw) as Partial<Filters>;
+    return {
+      query: typeof value.query === 'string' ? value.query : '',
+      brands: stringList(value.brands),
+      dealers: stringList(value.dealers),
+      styles: stringList(value.styles) as Filters['styles'],
+      materials: stringList(value.materials) as Filters['materials'],
+      windings: stringList(value.windings) as Filters['windings'],
+      complications: stringList(value.complications) as Filters['complications'],
+      prices: rangeList(value.prices),
+      sizes: stringList(value.sizes),
+      eras: stringList(value.eras),
+    };
+  } catch {
+    return NO_FILTERS;
+  }
+}
+
 export const NO_FILTERS: Filters = {
   query: '',
   brands: [],

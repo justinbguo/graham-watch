@@ -1,7 +1,7 @@
 {
   "name": "graham",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "src/entry.ts",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
     "@expo/vector-icons": "^15.0.2",

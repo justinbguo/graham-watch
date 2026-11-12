@@ -12,6 +12,7 @@ import { useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { useIsDesktopWeb } from '@/lib/layout';
 import { useOnboardingGate } from '@/data/profile';
 import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
@@ -112,21 +113,25 @@ function Chrome() {
 
 /**
  * Web guests land on the deck. On iOS the app layout is the sign-in wall
- * until there is a session. Signed-in users who still need onboarding go
- * there first. While the profile is loading no guard passes, the stack
- * renders nothing, and the splash screen stays up to cover it.
+ * until there is a session. A phone still walks the question flow. Desktop
+ * web stays in the app while the profile loads, then finishes on the
+ * first-run sheet. On a phone, no guard passes until the profile is loaded,
+ * the stack renders nothing, and the splash screen stays up to cover it.
  */
 function RootNavigator() {
   const { isSignedIn } = useSession();
   const { ready, needsOnboarding } = useOnboardingGate();
+  const desktopWeb = useIsDesktopWeb();
+  const questions = isSignedIn && ready && needsOnboarding && !desktopWeb;
+  const app = !isSignedIn || desktopWeb || (ready && !needsOnboarding);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!isSignedIn || (ready && !needsOnboarding)}>
+      <Stack.Protected guard={app}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={isSignedIn && ready && needsOnboarding}>
+      <Stack.Protected guard={questions}>
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
     </Stack>

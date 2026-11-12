@@ -1,8 +1,10 @@
 import type { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import { Platform } from 'react-native';
 
-import { createSessionFromUrl } from '@/lib/auth';
+import { createSessionFromUrl, humanizeAuthError, setAuthNotice } from '@/lib/auth';
 import { DEMO_USER_ID, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
@@ -51,10 +53,35 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  // Magic links and OAuth callbacks land here as a deep link.
+  // Native magic links and OAuth callbacks land here as a deep link. On web
+  // the entry file has already lifted token_hash off the address.
   useEffect(() => {
-    if (url) createSessionFromUrl(url).catch(() => undefined);
+    if (!url || Platform.OS === 'web') return;
+    createSessionFromUrl(url).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : '';
+      if (message) setAuthNotice(message);
+    });
   }, [url]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const link = window.__grahamEmailLink;
+    if (!link) return;
+    delete window.__grahamEmailLink;
+    if (link.tokenHash) {
+      const href = `https://graham.local/?token_hash=${encodeURIComponent(link.tokenHash)}&type=${encodeURIComponent(link.type ?? 'email')}`;
+      void createSessionFromUrl(href).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'That link has expired. Ask for a new code.';
+        setAuthNotice(message);
+        router.push('/sign-in');
+      });
+      return;
+    }
+    if (link.error) {
+      setAuthNotice(humanizeAuthError(link.error));
+      router.push('/sign-in');
+    }
+  }, []);
 
   return (
     <SessionContext.Provider

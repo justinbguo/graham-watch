@@ -1096,21 +1096,17 @@ height. The corner had no word, and the act it started was an email. Message
 is the act, and it needs the word. The word stays under the summary rather
 than beside it: beside the summary it took the width the dealer's name needed.
 
-## Onboarding is seven questions, then a permission
+## Onboarding
 
-Name, username, birthday, collection size, favourite brands, pain points, then
-notifications. A name, because the dealer reads it at the top of the inquiry
-email and "a buyer on Graham" is a worse way to start a conversation about a
-five-figure watch. Brands are picked from what the catalogue actually holds,
-with the count beside each one.
+Desktop web asks only "What should we show you first?" after sign-in. The sheet
+is the filter panel without dealers, narrow and centered. See watches keeps the
+brand keys on the deck filter. Skip clears them. Phone still asks name,
+username, birthday (18+), collection size, brands, pain points, then
+notifications. The brand step is that same panel. Continue stays disabled
+until at least one brand is selected, unless the catalogue has no brands.
 
-Brands rank the deck; they never filter it. A first-run answer is a guess, and hiding
-the catalogue behind a guess costs more than dealing it in a slightly worse order.
-Choosing nothing is not offered. Continue stays disabled until at least one
-brand is selected, unless the catalogue has no brands to show.
-
-The gate is `profiles.onboarded_at`, not an empty brand list: picking nothing is an
-answer, and it has to be told apart from never having been asked.
+The gate is `profiles.onboarded_at`. A desktop finish may leave the handle and
+the birthday null. A birthday that is present and under 18 is still refused.
 
 ## Profile is who you are, then the shop
 

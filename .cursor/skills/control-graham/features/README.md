@@ -31,4 +31,4 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 - [Listing detail](./listing-detail.md) — open a watch from the grid.
 - [New](./new.md) — the latest catalogue batch. Not the Drops feed.
 - [Feedback](./feedback.md) — the Feedback link on Buy. Do not send the message.
-- [Guest sign-in gate](./guest-signin.md) — taste sheet, then the sign-in sheet, on unsigned local web. Demo does not show it.
+- [Guest sign-in gate](./guest-signin.md) — the sign-in sheet on unsigned local web. Demo does not show it.

@@ -177,7 +177,13 @@ function SignInDoors({
             disabled={signIn.code.trim().length !== 6}
             onPress={signIn.submitCode}
           />
-          <Button label="Back" variant="ghost" onPress={signIn.back} />
+          <Button
+            label={signIn.resendIn > 0 ? `Resend code in ${formatWait(signIn.resendIn)}` : 'Resend code'}
+            variant="ghost"
+            disabled={signIn.busy || signIn.resendIn > 0}
+            onPress={signIn.sendCode}
+          />
+          <Button label="Use a different email" variant="ghost" onPress={signIn.back} />
         </View>
       ) : null}
 
@@ -200,7 +206,13 @@ function codeMessage(signIn: ReturnType<typeof useSignIn>): string {
   if (signIn.readingInbox) {
     return `Reading the local inbox for ${signIn.email}.`;
   }
-  return `Enter the six digit code we sent to ${signIn.email}, or open the link in that email.`;
+  return `Enter the six digit code we sent to ${signIn.email}. The link in that email signs you in.`;
+}
+
+function formatWait(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${rest.toString().padStart(2, '0')}`;
 }
 
 const panelStyles = (theme: Theme) => ({

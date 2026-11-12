@@ -189,6 +189,11 @@ additional_redirect_urls = [
   "https://graham-watch.vercel.app/**",
   "https://graham-watch-justins-projects-7504da6b.vercel.app",
   "https://graham-watch-justins-projects-7504da6b.vercel.app/**",
+  # Production web. The hosted project does not read this file. Add the same
+  # two entries under Authentication → URL configuration or a link falls back
+  # to site_url (graham://), which a browser cannot open.
+  "https://graham.watch",
+  "https://graham.watch/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
