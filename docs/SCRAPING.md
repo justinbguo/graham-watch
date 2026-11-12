@@ -37,8 +37,8 @@ The fetch step is pluggable — set `SCRAPE_PROVIDER`. Code lives in
 `supabase/functions/import-listings/scrape.ts`.
 
 Before it, the reader tries a platform adapter, which is always better when it
-applies. Shopify and Squarespace exist so far; they covered three of the first four
-dealers we looked at.
+applies. Shopify, Squarespace, and the WooCommerce Store API exist so far.
+Shopify and Squarespace covered three of the first four dealers we looked at.
 
 ## Platform adapters
 
@@ -87,6 +87,15 @@ request, four at a time, which is ordinary traffic for the dealer.
 The shop's own price and currency override anything the model infers, because the
 model only ever sees prose. A `0.00` price means "enquire", not free, and is stored
 as null.
+
+### WooCommerce
+
+`woocommerce.ts` is the third adapter. It reads `GET /wp-json/wc/store/v1/products`,
+100 products a page. `prices.price` is a minor-unit digit string. With
+`currency_minor_unit` 2, `"1550000"` is 1550000 cents. A category whose slug is
+`sold`, or a title that starts with the word `sold`, is stored with `available`
+false. A live row with no positive price is skipped. A book title and a
+display-sign title are skipped in this file, so `hold_reason` stays unset.
 
 ## Finding the catalog
 

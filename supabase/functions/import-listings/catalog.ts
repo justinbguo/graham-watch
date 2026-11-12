@@ -12,6 +12,7 @@ import {
   type SourceItem,
 } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
+import { fetchWooCommerceItems } from './woocommerce.ts';
 
 /**
  * How many watches one read may keep. Past this the read is incomplete, and
@@ -98,11 +99,19 @@ const ADAPTERS: Record<
       pause: slice?.pause,
     }),
   squarespace: (url, limit, minPhotos) => fetchSquarespaceItems(url, limit, minPhotos),
+  woocommerce: (url, limit, minPhotos, slice) =>
+    fetchWooCommerceItems(url, limit, minPhotos, {
+      startPage: slice?.startPage,
+      maxPages: slice?.maxPages,
+      pageSize: slice?.pageSize,
+      fetchText: slice?.fetchText,
+      pause: slice?.pause,
+    }),
 };
 
 export const PAGES_PER_CALL = 1;
 
-/** One slice of a Shopify feed. Absent means read the feed in this call. */
+/** One slice of a paged catalogue feed. Absent means read the feed in this call. */
 export type CatalogSlice = {
   startPage?: number;
   maxPages?: number;
