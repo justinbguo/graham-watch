@@ -225,6 +225,7 @@ export function mapProduct(
     productType: meta.productType,
     tags: meta.tags ?? [],
     vendor: meta.vendor,
+    sourceUrl,
   });
 
   // Dealers keep sold watches published with every variant marked unavailable,

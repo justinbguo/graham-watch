@@ -133,6 +133,7 @@ function mapItem(item: Json, base: URL): SourceItem | null {
     productType: meta.productType,
     tags: meta.tags ?? [],
     vendor: meta.vendor,
+    sourceUrl,
   });
   if (!photos.length && decision.decision !== 'hold') return null;
 
@@ -206,9 +207,8 @@ export async function hydrateSquarespaceItem(item: SourceItem): Promise<SourceIt
  * `/under350`) and points `dealers.website` at the homepage. The homepage is a
  * page, not a feed. Reading it as the whole catalogue retired all 85 Cool
  * Vintage Watches listings on 8 Nov 2026.
- *
- * These slugs are pages or not watches. `pocket-watches` stays.
  */
+const KEPT_COLLECTION = /^(?:pocket-watches)$/i;
 const SKIP_COLLECTION =
   /^(?:cameras?|gift-cards?|blogs?(?:-.+)?|news|testimonials?|services?|terms|about|contacts?|search(?:page)?)$/i;
 
@@ -223,7 +223,8 @@ export function squarespaceCollectionPaths(locs: readonly string[]): string[] {
       continue;
     }
     const parts = url.pathname.split('/').filter(Boolean);
-    if (parts.length < 2 || SKIP_COLLECTION.test(parts[0])) continue;
+    if (parts.length < 2) continue;
+    if (!KEPT_COLLECTION.test(parts[0]) && SKIP_COLLECTION.test(parts[0])) continue;
     const collection = `${url.origin}/${parts[0]}`;
     counts.set(collection, (counts.get(collection) ?? 0) + 1);
   }

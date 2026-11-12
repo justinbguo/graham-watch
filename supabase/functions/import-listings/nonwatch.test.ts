@@ -1,5 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
+import candidatesCsv from './fixtures/nonwatch-candidates.csv' with { type: 'text' };
 import { classifyCatalogueItem, type CatalogueFields, type HoldReason } from './nonwatch.ts';
 
 function item(fields: Partial<CatalogueFields> & { title: string }): CatalogueFields {
@@ -9,6 +10,7 @@ function item(fields: Partial<CatalogueFields> & { title: string }): CatalogueFi
     productType: fields.productType ?? null,
     tags: fields.tags ?? [],
     vendor: fields.vendor ?? null,
+    sourceUrl: fields.sourceUrl,
   };
 }
 
@@ -241,6 +243,50 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
       productType: 'Collectibles > Decorative Collectibles > Clocks > Alarm Clocks & Clock Radios',
     }),
   },
+  {
+    reason: 'not_a_watch',
+    fields: item({ title: 'Rolex Prince Pocket Watch', text: 'Silver pocket watch.' }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: 'Vintage Elgin B.W. Raymond Railroad Pocket Watch',
+      productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Pocket Watches',
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: 'Elgin 20  B.W. Raymond 8ADJ',
+      productType: 'Pocket Watches',
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: 'Illinois Canadian Dial Model 6',
+      productType: 'Wristwatches',
+      sourceUrl:
+        'https://thewatchpreserve.com/products/antique-18s-illinois-canadian-dial-model-6-railroad-pocket-watch-bunn-silver-1',
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: '1908 Illinois PW',
+      sourceUrl: 'https://www.coolvintagewatches.com/pocket-watches/pw15-5fjnb',
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: 'Antique 18s Unbranded Art Deco Edge Open Face Pocket Watch Case for Key USA',
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({ title: 'ETA 2824 Movement Only' }),
+  },
 ];
 
 const WATCHES: CatalogueFields[] = [
@@ -274,7 +320,7 @@ const WATCHES: CatalogueFields[] = [
     productType: 'Watches',
   }),
   item({ title: '2024 Omega Speedmaster', text: 'Current production. On bracelet.', productType: 'Modern' }),
-  item({ title: 'Rolex Prince Pocket Watch', text: 'Silver pocket watch.' }),
+  item({ title: 'Cartier Tank Louis', text: 'Meet at three o\'clock. On the original strap.' }),
   item({ title: 'Cartier Tank Art Deco', text: 'Wearable sculpture of a sort, with box and papers.' }),
   item({ title: 'Rolex Submariner 5513', tags: ['strap', 'bracelet'], text: 'Lug width 20mm.' }),
   item({ title: 'Heuer Autavia 1163', productType: 'DRESS', vendor: 'Heuer' }),
@@ -321,10 +367,7 @@ const WATCHES: CatalogueFields[] = [
   item({ title: 'Accutron Spaceview Steel Bracelet Vintage', productType: 'accutron' }),
   item({ title: 'Audemars Piguet Ultra Thin - 18K Yellow Gold Integrated Bracelet' }),
   item({ title: '2005 Datejust 36 116233 – Two-Tone Hidden Clasp Champagne Dial' }),
-  item({
-    title: 'Vintage Elgin B.W. Raymond Railroad Pocket Watch',
-    productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Pocket Watches',
-  }),
+  item({ title: 'Hamilton Tank Red Strap Vintage' }),
   item({
     title: "Vintage Ni-Lite 17 Jewel Men's Automatic Wristwatch ETA 2472 w Original Band NOS",
     productType: 'Jewelry & Watches > Watches, Parts & Accessories > Watches > Wristwatches',
@@ -355,4 +398,168 @@ Deno.test('holds no real watch', () => {
 Deno.test('the same product decides the same way twice', () => {
   const fields = item({ title: 'Black Saffiano Watch Strap' });
   assertEquals(classifyCatalogueItem(fields), classifyCatalogueItem(fields));
+});
+
+const TRAPS: CatalogueFields[] = [
+  item({ title: 'Hamilton Tank Red Strap Vintage' }),
+  item({ title: 'Accutron Spaceview Steel Bracelet Vintage', productType: 'accutron' }),
+  item({ title: 'Longines Sexy Bracelet Vintage' }),
+  item({ title: "Daniel Roth Le Sentier 'Lego' Sport Bracelet", productType: 'Watch' }),
+  item({ title: 'Marvin Dress Watch Bracelet', productType: 'Watch' }),
+  item({ title: 'Audemars Piguet - Puzzle Bracelet', text: 'Reference 4647/903.' }),
+  item({ title: 'Baylor Cufflinks', productType: 'Watches', text: 'A 17.5mm cufflinks wristwatch.' }),
+  item({ title: 'Panerai Luminor Black Seal Hunter Case' }),
+  item({ title: "American Watch Case Co." }),
+  item({ title: 'Bulova Monopusher "Stopwatch"' }),
+  item({ title: 'Benrus Cocktail Charm' }),
+  item({ title: 'Tubogas Bangle Watch' }),
+  item({ title: 'Invicta Reserve 52mm', text: 'A large sports wristwatch.' }),
+  item({ title: '1907 Waltham Vanguard PW', sourceUrl: 'https://example.com/watches/vanguard' }),
+  item({ title: '1909 Illinois 14kt Gold Hunter Case', sourceUrl: 'https://example.com/watches/illinois' }),
+  item({ title: 'Omega Speedmaster on strap' }),
+  item({ title: 'Rolex Submariner with a leather strap' }),
+  item({
+    title: 'Nautilus 5711',
+    text: 'Diamond cocktail wristwatch. Style is jewellery.',
+  }),
+];
+
+Deno.test('wristwatch traps stay on the deck', () => {
+  const held = TRAPS.filter((fields) => reason(fields) !== 'watch');
+  assertEquals(
+    held.map((fields) => `${fields.title} -> ${reason(fields)}`),
+    [],
+  );
+});
+
+type CsvRow = {
+  title: string;
+  url: string;
+  category: string;
+  reason: string;
+};
+
+function parseCsv(text: string): CsvRow[] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (quoted) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        cell += char;
+      }
+      continue;
+    }
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (char === '\n') {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else if (char !== '\r') {
+      cell += char;
+    }
+  }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  const [header, ...body] = rows;
+  const titleAt = header.indexOf('title');
+  const urlAt = header.indexOf('url');
+  const categoryAt = header.indexOf('category');
+  const reasonAt = header.indexOf('reason');
+  return body
+    .filter((cells) => cells.length > categoryAt)
+    .map((cells) => ({
+      title: cells[titleAt] ?? '',
+      url: cells[urlAt] ?? '',
+      category: cells[categoryAt] ?? '',
+      reason: cells[reasonAt] ?? '',
+    }));
+}
+
+function productTypeFromAudit(row: CsvRow): string | null {
+  const named = row.reason.match(/product type is '([^']+)'/);
+  if (named) return named[1];
+  if (handheldStopwatch(row)) return 'Pocket Watches';
+  return null;
+}
+
+function pocketSignal(row: CsvRow): boolean {
+  const title = row.title.toLowerCase();
+  const url = row.url.toLowerCase();
+  return (
+    title.includes('pocket watch') ||
+    title.includes('pocketwatch') ||
+    url.includes('/pocket-watches') ||
+    url.includes('pocket-watch') ||
+    url.includes('pocketwatch')
+  );
+}
+
+function handheldStopwatch(row: CsvRow): boolean {
+  return /\bstop\s*watch/.test(row.title.toLowerCase()) && !pocketSignal(row);
+}
+
+function keptForNow(row: CsvRow): boolean {
+  return (
+    row.category === 'pendant_lapel_watch' ||
+    /\b(?:pendant|lapel|brooch|sautoir)\b/i.test(row.title) ||
+    /\bcufflink\s+watch\b/i.test(row.title) ||
+    handheldStopwatch(row)
+  );
+}
+
+function expectedFromLabel(row: CsvRow): HoldReason | 'watch' {
+  if (keptForNow(row)) return 'watch';
+  if (row.category === 'jewelry') return 'accessory';
+  if (row.category === 'accessory' || row.category === 'other_part') return 'not_a_watch';
+  if (row.category === 'bracelet_part') {
+    if (row.title.includes('Florentine')) return 'watch';
+    return 'strap';
+  }
+  const typedPocket = /pocket\s*watch/i.test(productTypeFromAudit(row) ?? '');
+  if (pocketSignal(row) || typedPocket) return 'not_a_watch';
+  return 'watch';
+}
+
+Deno.test('labeled catalogue rows hold or pass from the title and url', () => {
+  const rows = parseCsv(candidatesCsv);
+  const misses = rows.filter((row) => {
+    const decided = reason(
+      item({
+        title: row.title,
+        sourceUrl: row.url,
+        productType: productTypeFromAudit(row),
+      }),
+    );
+    return decided !== expectedFromLabel(row);
+  });
+  assertEquals(
+    misses.map((row) => {
+      const decided = reason(
+        item({
+          title: row.title,
+          sourceUrl: row.url,
+          productType: productTypeFromAudit(row),
+        }),
+      );
+      return `${row.category} | ${decided} | ${expectedFromLabel(row)} | ${row.title}`;
+    }),
+    [],
+  );
 });
