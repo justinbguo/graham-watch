@@ -1,0 +1,63 @@
+{
+  "id": 33355,
+  "name": "Back To Classic Book",
+  "permalink": "https://classicwatchny.com/watches/watch-collection/back-to-classic-book/",
+  "sku": "",
+  "description": "<p><strong><a href=\"https://www.paypal.com/ncp/payment/RGBTKT3MG242A\">https://www.paypal.com/ncp/payment/RGBTKT3MG242A</a></strong></p>\n<p>Discover the most exciting and unique vintage watches I dealt with in the past 13 years of business!</p>\n<p>Featuring the sections:</p>\n<p>&#8211; Audemars Piguet through Classic 55,</p>\n<p>-Cartier through Classic 55</p>\n<p>-Piaget through Classic 55</p>\n<p>-Colors and Shapes through Classic 55 (Vacheron, Corum, Jaeger watches and the likes)</p>\n<p>-Patek th",
+  "short_description": "",
+  "is_in_stock": true,
+  "prices": {
+    "price": "16500",
+    "regular_price": "16500",
+    "sale_price": "16500",
+    "price_range": null,
+    "currency_code": "USD",
+    "currency_symbol": "$",
+    "currency_minor_unit": 2,
+    "currency_decimal_separator": ".",
+    "currency_thousand_separator": ",",
+    "currency_prefix": "$",
+    "currency_suffix": ""
+  },
+  "categories": [
+    {
+      "id": 194,
+      "name": "Watches",
+      "slug": "watch-collection"
+    }
+  ],
+  "tags": [],
+  "images": [
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/Screenshot-2025-03-13-at-4.51.05-PM.png"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/WhatsApp-Image-2025-08-11-at-13.34.12_45b63628.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/WhatsApp-Image-2025-08-11-at-13.34.40_b7624a3a.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/WhatsApp-Image-2025-08-11-at-13.34.40_ea602228.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/IMG_7670-2.jpeg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/IMG_7672-2.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/IMG_7673-2.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/IMG_7674-2.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/IMG_7675-2.jpg"
+    },
+    {
+      "src": "https://classicwatchny.com/wp-content/uploads/2025/08/WhatsApp-Image-2025-08-11-at-13.34.12_235c228d.jpg"
+    }
+  ],
+  "brands": []
+}

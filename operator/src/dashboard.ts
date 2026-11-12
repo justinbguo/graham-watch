@@ -61,32 +61,6 @@ export type Dashboard = {
   }[];
 };
 
-export type RecentUser = {
-  id: string;
-  handle: string | null;
-  first_name: string | null;
-  account_type: string | null;
-  created_at: string;
-  onboarded: boolean;
-  swipe_count: number;
-  last_active: string | null;
-};
-
-export type UserDetail = {
-  id: string;
-  handle: string | null;
-  firstName: string | null;
-  accountType: string | null;
-  onboarded: boolean;
-  favoriteBrands: string[];
-  huntingFor: string[];
-  collectionSize: string | null;
-  collectingYears: string | null;
-  searchPainPoints: string[];
-  saves: { listingId: string; brand: string; model: string | null; reference: string | null; dealerName: string; savedAt: string }[];
-  follows: { dealerId: string; name: string }[];
-};
-
 const ANSWERS: Record<string, string> = {
   not_yet: 'Not yet',
   under_a_year: 'Under a year',
@@ -244,37 +218,6 @@ export function parseDashboard(value: unknown): Dashboard {
   };
 }
 
-export function parseUserDetail(value: unknown): UserDetail {
-  const row = record(value);
-  return {
-    id: str(row.id),
-    handle: row.handle == null ? null : str(row.handle),
-    firstName: row.first_name == null ? null : str(row.first_name),
-    accountType: row.account_type == null ? null : str(row.account_type),
-    onboarded: row.onboarded === true,
-    favoriteBrands: strings(row.favorite_brands),
-    huntingFor: strings(row.hunting_for),
-    collectionSize: row.collection_size == null ? null : str(row.collection_size),
-    collectingYears: row.collecting_years == null ? null : str(row.collecting_years),
-    searchPainPoints: strings(row.search_pain_points),
-    saves: array(row.saves).map((item) => {
-      const save = record(item);
-      return {
-        listingId: str(save.listing_id),
-        brand: str(save.brand),
-        model: save.model == null ? null : str(save.model),
-        reference: save.reference == null ? null : str(save.reference),
-        dealerName: str(save.dealer_name),
-        savedAt: str(save.saved_at),
-      };
-    }),
-    follows: array(row.follows).map((item) => {
-      const follow = record(item);
-      return { dealerId: str(follow.dealer_id), name: str(follow.name) };
-    }),
-  };
-}
-
 function points(value: unknown, labelKey: string, countKey = 'count'): CountPoint[] {
   return array(value).map((item) => {
     const row = record(item);
@@ -289,10 +232,6 @@ function rollups(value: unknown): Rollup[] {
       return { value: str(row.value), count: num(row.count) };
     })
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function strings(value: unknown): string[] {
-  return array(value).map((item) => str(item));
 }
 
 function array(value: unknown): unknown[] {

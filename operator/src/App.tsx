@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 
+import { Accounts } from './Accounts';
 import { Activity } from './Activity';
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
@@ -17,6 +18,7 @@ const SCREENS = {
   dealers: 'Dealers',
   inbox: 'Inbox',
   users: 'Users',
+  accounts: 'Accounts',
   activity: 'Activity',
   applications: 'Applications',
   add: 'Add shops',
@@ -117,6 +119,8 @@ export function App() {
           <Applications />
         ) : screen === 'users' ? (
           <Users />
+        ) : screen === 'accounts' ? (
+          <Accounts />
         ) : screen === 'activity' ? (
           <Activity />
         ) : screen === 'dealers' ? (
