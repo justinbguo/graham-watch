@@ -1,6 +1,6 @@
 # New
 
-New is the tab of watches the latest catalogue batch put on the deck. It is not the Drops feed. Drops is `New watches` under Messages, and only for shops the buyer follows. Opening New does not clear its count.
+New is the tab of watches the latest catalogue batch put on the deck. It is not the Drops feed. Drops is `New watches` under Messages, and only for shops the buyer follows. Opening New clears its count on this device until a different batch id is sealed.
 
 ## Sub-features
 
@@ -10,7 +10,7 @@ New is the tab of watches the latest catalogue batch put on the deck. It is not 
 
 ## How to get to it (user POV)
 
-Open the app and choose New. Guests see it too. A row opens the listing. The count stays after the tab is opened.
+Open the app and choose New. Guests see it too. A row opens the listing. The count clears after the tab is opened, including in demo, where the stored batch id is `demo-batch`.
 
 ## Driving it with control-graham
 

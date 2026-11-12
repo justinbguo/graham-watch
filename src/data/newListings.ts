@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { demo, isDemo } from '@/lib/demo';
 import type { DeckCard } from '@/lib/models';
@@ -7,6 +8,8 @@ import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
 import { hydrate } from './listings';
+import { unseenNewCount } from './newBatchCount';
+import { markNewBatchSeen, seenNewBatchId, subscribeSeenNewBatch } from './newSeen';
 
 const PAGE_SIZE = 24;
 const EMPTY_IDS: readonly string[] = [];
@@ -66,9 +69,30 @@ function useNewBatch(enabled = true) {
   });
 }
 
-/** The red number on New. 0 while loading, on error, and before the first seal. */
+function useSeenNewBatchId(): string | null {
+  return useSyncExternalStore(subscribeSeenNewBatch, seenNewBatchId, seenNewBatchId);
+}
+
+/**
+ * The red number on New. 0 while loading, on error, before the first seal,
+ * and after this device has opened the latest batch.
+ */
 export function useNewCount(): number {
-  return useNewBatch().data?.listingIds.length ?? 0;
+  const batch = useNewBatch().data;
+  const seen = useSeenNewBatchId();
+  return unseenNewCount(
+    batch ? { id: batch.id, size: batch.listingIds.length } : null,
+    seen,
+  );
+}
+
+export function useMarkNewBatchSeen() {
+  const id = useNewBatch().data?.id;
+  useFocusEffect(
+    useCallback(() => {
+      if (id) markNewBatchSeen(id);
+    }, [id]),
+  );
 }
 
 export function useNewListings(options?: { enabled?: boolean; pageAll?: boolean }): NewListings {
