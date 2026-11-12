@@ -2273,6 +2273,11 @@ export type Database = {
           website: string
         }[]
       }
+      operator_account: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: Json
+      }
+      operator_accounts: { Args: never; Returns: Json }
       operator_activity: {
         Args: { p_limit?: number }
         Returns: {
@@ -2467,19 +2472,6 @@ export type Database = {
           year: number
         }[]
       }
-      operator_recent_users: {
-        Args: { p_limit?: number }
-        Returns: {
-          account_type: Database["public"]["Enums"]["account_type"]
-          created_at: string
-          first_name: string
-          handle: string
-          id: string
-          last_active: string
-          onboarded: boolean
-          swipe_count: number
-        }[]
-      }
       operator_refresh_schedule: {
         Args: never
         Returns: {
@@ -2511,7 +2503,6 @@ export type Database = {
         Args: { p_dealer_id: string }
         Returns: undefined
       }
-      operator_user_detail: { Args: { p_user_id: string }; Returns: Json }
       pending_source_item_count: {
         Args: { p_dealer_id: string }
         Returns: {

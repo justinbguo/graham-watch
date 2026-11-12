@@ -60,7 +60,7 @@ Desktop web puts the tab bar on top (`useIsDesktopWeb`). A wide window that is n
 
 **Dealer.** Profile, claim a shop. The claim function emails a code to a mailbox on the shop domain. After claim, the Deal tab replaces Messages. Publishing the shop onto the deck is still an operator action (`dealers.permission`).
 
-**Operator.** Not a tab. `npm run dealers` (service role) and `operator/` (anon key plus a row in `operators`). Both approve shops and answer applications. RLS stops a dealer from approving their own shop.
+**Operator.** Not a tab. `npm run dealers` (service role) and `operator/` (anon key plus a row in `operators`). Both approve shops and answer applications. RLS stops a dealer from approving their own shop. The console's Accounts screen (`operator/src/Accounts.tsx`) lists every account with its email and opens one collector's timeline, newest first, in Pacific time.
 
 ## Data
 
@@ -76,7 +76,7 @@ Tables:
 - Community: `exchange_posts`, `exchange_comments`, `exchange_photos`, `exchange_votes`
 - Messages and deals: `conversations`, `conversation_members`, `messages`, `conversation_reads`, `conversation_deals`, `checkout_defaults`, `deal_reviews`
 - Drops: `drop_notifications`, `drop_views`, `device_push_tokens`
-- Buyer events: `buyer_events`. Append-only. Only `log_buyer_events` writes it, as the signed-in caller, and only the service role reads it. Deleting an account deletes its events; deleting a listing does not. The app sends through `src/data/listingEvents.ts`.
+- Buyer events: `buyer_events`. Append-only. Only `log_buyer_events` writes it, as the signed-in caller. Operators read it through `operator_accounts` and `operator_account`, and the service role keeps the only table select. Deleting an account deletes its events; deleting a listing does not. The app sends through `src/data/listingEvents.ts`.
 
 Row-level security is on for these tables. The anon key ships in the app. Policies are proved by `npm run test:rls`. The three gates (`profiles.account_type`, `dealers.claimed_by`, `dealers.permission`) are explained in [docs/OPERATING.md](docs/OPERATING.md). `dealer_claim_codes` has RLS and no policies, so the app cannot read codes. Counts and dealer lists that must hide columns are SQL functions (`listing_counts`, `operator_dealers`), not extra tables. `listing_on_deck(listings)` is the guest catalogue predicate (active, unsold, three photos, approved shop). The anon listing policy, the seal, and `latest_catalogue_batch` all call it.
 

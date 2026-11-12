@@ -7,7 +7,10 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "module": "nodenext",
+    // Not nodenext. accounts.test.ts reaches ../src/lib/database.types.ts, and
+    // nodenext reads that file as CommonJS (the root package.json has no
+    // "type"), where its `export const Constants` fails verbatimModuleSyntax.
+    "module": "preserve",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
