@@ -53,40 +53,34 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  // Magic links and OAuth callbacks land here as a deep link.
+  // Native magic links and OAuth callbacks land here as a deep link. On web
+  // the entry file has already lifted token_hash off the address.
   useEffect(() => {
-    if (url) {
-      createSessionFromUrl(url).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : '';
-        if (message) setAuthNotice(message);
-      });
-    }
+    if (!url || Platform.OS === 'web') return;
+    createSessionFromUrl(url).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : '';
+      if (message) setAuthNotice(message);
+    });
   }, [url]);
 
-  // Strip the email-link query so a refresh does not spend the hash twice.
-  // Verification itself is createSessionFromUrl, which also covers a native open.
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    const current = new URL(window.location.href);
-    const tokenHash = current.searchParams.get('token_hash');
-    const described = current.searchParams.get('error_description') || current.searchParams.get('error');
-    if (!tokenHash && !described) return;
-    const href = current.href;
-    current.searchParams.delete('token_hash');
-    current.searchParams.delete('type');
-    current.searchParams.delete('error');
-    current.searchParams.delete('error_description');
-    window.history.replaceState(window.history.state, '', `${current.pathname}${current.search}${current.hash}`);
-    if (described) {
-      setAuthNotice(humanizeAuthError(described));
-      router.push('/sign-in');
+    const link = window.__grahamEmailLink;
+    if (!link) return;
+    delete window.__grahamEmailLink;
+    if (link.tokenHash) {
+      const href = `https://graham.local/?token_hash=${encodeURIComponent(link.tokenHash)}&type=${encodeURIComponent(link.type ?? 'email')}`;
+      void createSessionFromUrl(href).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'That link has expired. Ask for a new code.';
+        setAuthNotice(message);
+        router.push('/sign-in');
+      });
       return;
     }
-    void createSessionFromUrl(href).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'That link has expired. Ask for a new code.';
-      setAuthNotice(message);
+    if (link.error) {
+      setAuthNotice(humanizeAuthError(link.error));
       router.push('/sign-in');
-    });
+    }
   }, []);
 
   return (

@@ -58,7 +58,7 @@ let spentEmailHash: string | null = null;
  * logging in does not, so an address nobody registered gets a 422 "Signups
  * not allowed for otp" instead of a silent new account under a typo.
  */
-/** GoTrue rate-limits OTP resends. Say what to do instead of quoting the timer. */
+/** GoTrue rate-limits OTP resends. Keep the wait it asked for. */
 export function retryAfterSeconds(message: string): number | null {
   const match = message.match(/(\d+) seconds/i);
   if (!match) return null;
@@ -76,10 +76,15 @@ export function humanizeAuthError(message: string): string {
   return message;
 }
 
-/** Where a magic link should return. Web stays on this page. Native uses the app scheme. */
+/**
+ * Where a magic link should return. The sign-in sheet is its own route, so a
+ * link requested from there opens Buy, which is where the first-run sheet sits.
+ * Any other page keeps its path. Native uses the app scheme.
+ */
 export function emailRedirectTo(): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return window.location.origin + window.location.pathname;
+    const path = window.location.pathname === '/sign-in' ? '/' : window.location.pathname;
+    return window.location.origin + path;
   }
   return redirectTo;
 }

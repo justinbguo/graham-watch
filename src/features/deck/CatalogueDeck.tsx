@@ -320,7 +320,8 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     void fetchNextPage();
   }, [fetchNextPage]);
 
-  const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0;
+  const showFirstRun = !isNew && isDesktopWeb && isSignedIn && profileReady && needsOnboarding;
+  const deckKeysOn = deckOnTop && Platform.OS === 'web' && cards.length > 0 && !showFirstRun;
   const cardSwipeKeysOn = deckKeysOn && view === 'cards';
 
   useWebArrowSwipe(
@@ -424,8 +425,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
     ? fresh.state === 'none' ||
       (fresh.state === 'ready' && cards.length === 0 && !fresh.hasNextPage && !fresh.loadingMore)
     : showDeckEmpty(cards.length, counts?.matched);
-  const firstRun =
-    !isNew && isDesktopWeb && isSignedIn && profileReady && needsOnboarding ? <FirstRunSheet /> : null;
+  const firstRun = showFirstRun ? <FirstRunSheet /> : null;
 
   const loadMoreRef = useRef(fetchNextPage);
   loadMoreRef.current = fetchNextPage;

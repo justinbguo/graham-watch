@@ -55,12 +55,15 @@ async function saveOnboarding(userId: string, answers: Onboarding) {
   if (isDemo) return demo.completeOnboarding();
 
   const handle = answers.username.trim() ? normalizeUsername(answers.username) : null;
+  const firstName = answers.firstName.trim();
+  const lastName = answers.lastName.trim();
 
   const { data, error } = await supabase
     .from('profiles')
     .update({
-      first_name: answers.firstName.trim() || null,
-      last_name: answers.lastName.trim() || null,
+      // A blank name means "we did not ask", not "erase the provider name".
+      ...(firstName ? { first_name: firstName } : {}),
+      ...(lastName ? { last_name: lastName } : {}),
       ...(handle ? { handle } : {}),
       date_of_birth: answers.dateOfBirth,
       favorite_brands: answers.favoriteBrands,

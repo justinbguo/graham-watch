@@ -53,6 +53,7 @@ export function useSignIn() {
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const generation = useRef(0);
   const sending = useRef(false);
@@ -61,7 +62,9 @@ export function useSignIn() {
   useEffect(() => {
     const showNotice = () => {
       const notice = takeAuthNotice();
-      if (notice) setError(notice);
+      if (!notice) return;
+      setError(notice);
+      setStage((current) => (current === 'method' ? 'email' : current));
     };
     showNotice();
     const unsubscribe = subscribeAuthNotice(showNotice);
@@ -72,10 +75,16 @@ export function useSignIn() {
       const raw = window.sessionStorage.getItem(SIGN_IN_KEY);
       if (raw) {
         try {
-          const saved = JSON.parse(raw) as { stage?: SignInStage; email?: string; sentAt?: number | null };
+          const saved = JSON.parse(raw) as {
+            stage?: SignInStage;
+            email?: string;
+            sentAt?: number | null;
+            sentTo?: string | null;
+          };
           if (saved.email) setEmail(saved.email);
           if (saved.stage === 'email' || saved.stage === 'code') setStage(saved.stage);
           if (typeof saved.sentAt === 'number') setSentAt(saved.sentAt);
+          if (typeof saved.sentTo === 'string') setSentTo(saved.sentTo);
         } catch {
           window.sessionStorage.removeItem(SIGN_IN_KEY);
         }
@@ -99,8 +108,8 @@ export function useSignIn() {
       window.sessionStorage.removeItem(SIGN_IN_KEY);
       return;
     }
-    window.sessionStorage.setItem(SIGN_IN_KEY, JSON.stringify({ stage, email, sentAt }));
-  }, [stage, email, sentAt]);
+    window.sessionStorage.setItem(SIGN_IN_KEY, JSON.stringify({ stage, email, sentAt, sentTo }));
+  }, [stage, email, sentAt, sentTo]);
 
   useEffect(() => {
     if (!incoming) return;
@@ -130,7 +139,9 @@ export function useSignIn() {
   const deliver = useCallback(() => {
     const address = email.trim();
     if (!address.includes('@') || sending.current) return;
-    if (sentAt !== null && Date.now() - sentAt < cooldownMs()) {
+    const cooling =
+      sentTo === address && sentAt !== null && Date.now() - sentAt < cooldownMs();
+    if (cooling) {
       setStage('code');
       setError('We already sent a code. Check your email, or wait for the timer before asking for another.');
       return;
@@ -144,6 +155,7 @@ export function useSignIn() {
       } else {
         await sendEmailCode(address, { createAccount: mode === 'create' });
       }
+      setSentTo(address);
       setSentAt(Date.now());
       if (mine !== generation.current) return;
       setStage('code');
@@ -156,7 +168,7 @@ export function useSignIn() {
       setCode(token);
       await verifyEmailCode(address, token);
     });
-  }, [email, mode, run, sentAt]);
+  }, [email, mode, run, sentAt, sentTo]);
 
   const submitCode = useCallback(() => {
     const address = email.trim();

@@ -114,16 +114,16 @@ function Chrome() {
 /**
  * Web guests land on the deck. On iOS the app layout is the sign-in wall
  * until there is a session. A phone still walks the question flow. Desktop
- * web finishes inside the deck, on the first-run sheet. While the profile
- * is loading no guard passes, the stack renders nothing, and the splash
- * screen stays up to cover it.
+ * web stays in the app while the profile loads, then finishes on the
+ * first-run sheet. On a phone, no guard passes until the profile is loaded,
+ * the stack renders nothing, and the splash screen stays up to cover it.
  */
 function RootNavigator() {
   const { isSignedIn } = useSession();
   const { ready, needsOnboarding } = useOnboardingGate();
   const desktopWeb = useIsDesktopWeb();
   const questions = isSignedIn && ready && needsOnboarding && !desktopWeb;
-  const app = !isSignedIn || (ready && !needsOnboarding) || (desktopWeb && isSignedIn && ready);
+  const app = !isSignedIn || desktopWeb || (ready && !needsOnboarding);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

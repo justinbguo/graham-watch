@@ -206,7 +206,7 @@ function codeMessage(signIn: ReturnType<typeof useSignIn>): string {
   if (signIn.readingInbox) {
     return `Reading the local inbox for ${signIn.email}.`;
   }
-  return `Enter the six digit code we sent to ${signIn.email}. The link in that email opens this page.`;
+  return `Enter the six digit code we sent to ${signIn.email}. The link in that email signs you in.`;
 }
 
 function formatWait(seconds: number): string {
