@@ -29,7 +29,6 @@ export async function loadGuestSwipes(): Promise<GuestSwipe[]> {
   return parseGuestSwipes(await secureStorage.getItem(SWIPES_KEY));
 }
 
-/** Passes are the only judgment a guest writes. Returns what is stored now. */
 export function recordGuestPass(listingId: string): Promise<GuestSwipe[]> {
   return serial(async () => {
     const swipes = await loadGuestSwipes();
@@ -48,10 +47,6 @@ export function undoGuestPass(listingId: string): Promise<GuestSwipe[]> {
   });
 }
 
-/**
- * Holds the save, then opens the sheet. The write finishes before the route
- * push, so a reload of the sheet still has the watch.
- */
 export async function askToSave(listing: ListingRef, surface: JudgeSurface): Promise<void> {
   const save = {
     eventId: newEventId(),
@@ -63,15 +58,10 @@ export async function askToSave(listing: ListingRef, surface: JudgeSurface): Pro
   openSignIn('save');
 }
 
-/** The visitor closed the sheet. The held save goes, session or not. */
 export function declinePendingSave(): void {
   void serial(() => applyPending({ type: 'decline' }));
 }
 
-/**
- * The sheet left without a button. A stored session means sign-in, and the
- * hold stays for settle. No session means the route was dismissed.
- */
 export function abandonPendingSave(): void {
   void serial(async () => {
     const { data } = await supabase.auth.getSession();
@@ -79,17 +69,7 @@ export function abandonPendingSave(): void {
   });
 }
 
-/**
- * Turns what this device holds into the account's rows. Safe to run twice, in
- * two tabs, or after a crash at any line: the upsert repeats as a no-op, the
- * replayed event id inserts nothing, and `finish` leaves a newer hold alone.
- * A throw leaves storage for the next signed-in launch. True when anything
- * was written.
- */
 export function settleGuest(userId: string): Promise<boolean> {
-  // One turn of the write queue, including the read. A save that was just
-  // asked for is already queued ahead of this, and a pass cannot land between
-  // the read and the clear.
   return serial(async () => {
     const swipes = await loadGuestSwipes();
     const rawPending = await secureStorage.getItem(PENDING_KEY);
@@ -111,11 +91,6 @@ export function settleGuest(userId: string): Promise<boolean> {
   });
 }
 
-/**
- * Guest storage writes run one at a time, in call order. A SecureStore write
- * is several native calls, so a quick dismissal on Android could otherwise
- * land before the hold it undoes.
- */
 function serial<T>(task: () => Promise<T>): Promise<T> {
   const run = writes.then(task);
   writes = run.catch(() => undefined);

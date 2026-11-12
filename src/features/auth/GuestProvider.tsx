@@ -21,9 +21,7 @@ type GuestContextValue = {
    * cannot cache an empty wishlist from the moment before the write lands.
    */
   settling: boolean;
-  /** Watches this device judged. The deck hides them. A held save is not one of them. */
   swipedIds: ReadonlySet<string>;
-  /** Saves stored before saving asked for sign-in. A held save is not saved. */
   savedIds: readonly string[];
   recordPass: (listingId: string) => Promise<void>;
   undoPass: (listingId: string) => Promise<void>;
@@ -37,11 +35,6 @@ export function useGuest() {
   return value;
 }
 
-/**
- * What a signed-out visitor has judged. The catalogue is readable anonymously.
- * Passes live on the device until an account exists, and a save asks for one
- * first. Sign-in settles both into `swipes`.
- */
 export function GuestProvider({ children }: PropsWithChildren) {
   const { isSignedIn, userId } = useSession();
   const queryClient = useQueryClient();
@@ -72,9 +65,6 @@ export function GuestProvider({ children }: PropsWithChildren) {
       .then((settled) => {
         if (cancelled) return;
         if (settled) setSwipes([]);
-        // The deck and wishlist now live on the server for this account.
-        // Refresh even when this pass wrote nothing: an earlier pass may have
-        // written and been cancelled before it could refresh the cache.
         void queryClient.invalidateQueries({ queryKey: ['deck'] });
         void queryClient.invalidateQueries({ queryKey: ['listing-counts'] });
         void queryClient.invalidateQueries({ queryKey: ['saved'] });

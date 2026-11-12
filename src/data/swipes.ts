@@ -70,16 +70,10 @@ async function deletePasses(actorId: string) {
 type Verdict = 'recorded' | 'asked';
 
 type JudgeHooks = {
-  /** The verdict stands. Runs before the write drops the card from every cached deck. */
   onAccept?: () => void;
-  /** The write landed. */
   onRecorded?: () => void;
 };
 
-/**
- * The only way a gesture becomes a swipe and an event. A guest's save is held
- * and sent to sign-in. Every other verdict is logged and written.
- */
 export function useJudge(surface: JudgeSurface) {
   const { isSignedIn, userId } = useSession();
   const write = useRecordSwipe(userId);
@@ -113,9 +107,6 @@ export function useJudge(surface: JudgeSurface) {
  * `staleTime: Infinity` and does not refetch on focus, so there is no later
  * fetch to fall back on: without the restore below, a save that failed took the
  * watch out of the pile for the rest of the session and saved nothing.
- *
- * A guest only reaches here with a pass. `useJudge` sends a guest's save to
- * sign-in first.
  */
 function useRecordSwipe(actorId: string | null) {
   const queryClient = useQueryClient();

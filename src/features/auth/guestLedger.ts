@@ -1,30 +1,15 @@
 import type { EventInput, ListingRef } from '@/data/listingEventQueue';
 import type { BuyerEventSurface, SwipeDirection } from '@/lib/models';
 
-/**
- * What a signed-out device holds and what sign-in does with it. Pure, and
- * type-only in its imports, so node can load it with
- * --experimental-strip-types. `guest.ts` is the shell around it and the only
- * module that reads or writes the storage these parse.
- */
-
 export const JUDGE_SURFACES = ['buy', 'new', 'detail'] as const satisfies readonly BuyerEventSurface[];
 export type JudgeSurface = (typeof JUDGE_SURFACES)[number];
 
-/**
- * One judgment kept on the device until there is an account. New writes are
- * passes. A `right` here was stored before saving asked for sign-in, and it
- * still settles as a save.
- */
 export type GuestSwipe = { listingId: string; direction: SwipeDirection };
 
-/** A guest's save waiting for an account. At most one per device, and the latest request wins. */
 export type PendingSave = {
-  /** The buyer_events id its `save` row uses. A replayed id inserts nothing. */
   eventId: string;
   listing: ListingRef;
   surface: JudgeSurface;
-  /** Epoch ms of the gesture. The `save` row's occurred_at. */
   heldAt: number;
 };
 
@@ -42,7 +27,6 @@ export function judgeAction(signedIn: boolean, direction: SwipeDirection): Judge
   return !signedIn && direction === 'right' ? 'ask' : 'record';
 }
 
-/** The stored judgments. Anything that is not one reads as none. */
 export function parseGuestSwipes(raw: string | null): GuestSwipe[] {
   if (!raw) return [];
   try {
@@ -58,7 +42,6 @@ export function parseGuestSwipes(raw: string | null): GuestSwipe[] {
   }
 }
 
-/** The stored held save, or null when there is none, it is malformed, or it outlived the email link. */
 export function parsePendingSave(raw: string | null, now: number): PendingSave | null {
   if (!raw) return null;
   try {
@@ -89,7 +72,6 @@ export function parsePendingSave(raw: string | null, now: number): PendingSave |
 
 export type Settlement = {
   rows: GuestSwipe[];
-  /** The held save's event, under the id and time of the gesture. A stored `right` has none. */
   save: { event: EventInput; at: { id: string; occurredAt: number } } | null;
 };
 
@@ -115,10 +97,6 @@ export function settlement(swipes: readonly GuestSwipe[], pending: PendingSave |
   };
 }
 
-/**
- * `finish` clears the slot only while it still holds the save that settled,
- * so a newer request from another tab outlives an older settle.
- */
 export function nextPending(current: PendingSave | null, command: PendingCommand): PendingSave | null {
   switch (command.type) {
     case 'place':

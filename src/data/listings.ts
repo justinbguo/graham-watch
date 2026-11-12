@@ -369,8 +369,6 @@ export function useSaved(userId: string | null) {
   return useQuery({
     queryKey: keys.saved(userId ?? 'anonymous'),
     queryFn: () => fetchSaved(userId!),
-    // A guest save is written in the moment after sign-in. Fetching before
-    // that write finishes caches an empty list for the stale window.
     enabled: Boolean(userId) && !guest.settling,
   });
 }

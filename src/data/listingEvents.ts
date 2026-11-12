@@ -76,11 +76,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => flushEvents());
 }
 
-/**
- * `held` replays a gesture made before there was an account, under the id it
- * was held with. log_buyer_events skips a replayed id, so settling the same
- * save in two tabs is one row.
- */
 export function logEvent(event: EventInput, held?: { id: string; occurredAt: number }): void {
   try {
     if (event.kind === 'filter' && !filterFits(event.filter)) {

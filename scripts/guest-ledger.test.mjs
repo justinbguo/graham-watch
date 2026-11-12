@@ -1,10 +1,3 @@
-/**
- * What a signed-out device holds, and what sign-in writes from it.
- *
- * A guest's save asks for sign-in and is held in one slot. A pass is kept on
- * the device and never asks. Sign-in writes one swipes row per watch and logs
- * a save event only for the held save, under the id and time of the gesture.
- */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
