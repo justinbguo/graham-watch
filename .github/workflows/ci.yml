@@ -42,6 +42,7 @@ jobs:
           scripts/deck-stack.test.mjs
           scripts/deck-stage.test.mjs
           scripts/filter-spec.test.mjs
+          scripts/guest-ledger.test.mjs
           scripts/listing-events.test.mjs
           scripts/rank.test.mjs
           scripts/repair-photos.test.mjs
