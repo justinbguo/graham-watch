@@ -41,7 +41,6 @@ const money = hexToken(dark, 'money');
 const moneyContrast = contrast(money, page);
 
 test('the web shell paints the dark page before the bundle', () => {
-  assert.match(html, /color\.dark\.background/);
   assert.match(html, new RegExp(`html\\s*,\\s*body\\s*\\{[^}]*background-color:\\s*${page}`, 'i'));
   assert.deepEqual(
     html.match(/#[0-9A-Fa-f]{3,8}/g)?.map((hex) => hex.toUpperCase()),

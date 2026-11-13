@@ -15,7 +15,7 @@ import { hideScrollbars } from '@/lib/webScrollbars';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
-const STORAGE_KEY = 'graham.theme';
+const STORAGE_KEY = 'graham.theme' as const;
 
 function readWebTheme(): string | null {
   try {
@@ -29,7 +29,6 @@ function readWebTheme(): string | null {
 function readStoredPreference(): ThemePreference {
   const stored = Platform.OS === 'web' ? readWebTheme() : secureStorage.getItemSync(STORAGE_KEY);
   if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  // A missing or junk key stays dark. Nothing writes it until a person chooses.
   return 'dark';
 }
 

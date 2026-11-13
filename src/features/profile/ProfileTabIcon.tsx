@@ -5,11 +5,6 @@ import { useProfile } from '@/data/profile';
 import { radius, size } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
-/**
- * The Profile tab is you, so it wears your photograph, or the bundled portrait
- * when you have not set one. The focused tab draws a `size.rule` stroke in
- * the bar's colour around the square.
- */
 export function ProfileTabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
   const { userId } = useSession();
   const { data: profile } = useProfile(userId);

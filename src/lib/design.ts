@@ -121,7 +121,6 @@ export const color = {
     onAccent: '#17140F',
     brass: yellow,
     save: '#5FB68C',
-    /** Type on the dark page. Has to clear 4.5:1 on `background`. */
     money: '#238E56',
     onMoney: '#F4FBF7',
     danger: '#E0776B',

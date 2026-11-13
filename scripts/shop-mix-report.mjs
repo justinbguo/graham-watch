@@ -1,20 +1,8 @@
-/**
- * How many shops the first screens of Buy and New show.
- *
- *   npm run report:shop-mix
- *
- * Reads SUPABASE_URL and SUPABASE_ANON_KEY from the environment, or from
- * .env.local (its EXPO_PUBLIC_ names count too). Calls rank_buy_feed as a
- * guest with no filter and no taste, and latest_catalogue_batch, then prints
- * the shops in the first 20 and the first 50 of each. Writes nothing.
- */
-
 import { APP_LOCAL, hostOf, isLocalUrl, parseEnvFile } from './_env.mjs';
 
 const SIZES = [20, 50];
 const READ_ONLY_RPCS = new Set(['rank_buy_feed', 'latest_catalogue_batch']);
 
-/** Watches per shop among the first `size` dealer ids, in first-seen order. */
 export function shopCounts(dealerIds, size) {
   const counts = new Map();
   for (const id of dealerIds.slice(0, size)) counts.set(id, (counts.get(id) ?? 0) + 1);

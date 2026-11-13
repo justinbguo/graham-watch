@@ -11,14 +11,8 @@ import { useTheme, useThemedStyles } from '@/providers/theme';
 const personPortrait: ImageSource = require('../../assets/paul-graham.jpg');
 
 /**
- * A square photograph of whoever, or whatever, is being named. A person on
- * the exchange, a shop in a conversation, you on your profile.
- *
- * Square with a small radius, not a circle. The app's photographs are all
- * rectangles, and one round one in a column of them reads as a different kind
- * of thing. A shop passes `fallback`. A group passes `monogram` or `glyph`.
- * A person with no photograph, or one that fails to load, gets the bundled
- * portrait.
+ * A shop passes `fallback`. A group passes `monogram` or `glyph`. A person
+ * with no photograph, or one that fails to load, gets the bundled portrait.
  */
 export function Avatar({
   url,

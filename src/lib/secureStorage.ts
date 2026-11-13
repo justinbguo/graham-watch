@@ -43,12 +43,10 @@ export const secureStorage = {
     return assembleChunks(countRaw, chunks);
   },
 
-  /**
-   * Synchronous read for short startup values. Must match `getItem`.
-   * Do not use it for the auth session. That value is large, and this call
-   * blocks the JavaScript thread.
-   */
-  getItemSync(key: string): string | null {
+  getItemSync(key: 'graham.theme'): string | null {
+    if (key !== 'graham.theme') {
+      throw new Error('getItemSync only reads graham.theme');
+    }
     if (Platform.OS === 'web') return webStorage.getItem(key);
 
     const countRaw = SecureStore.getItem(countKey(key));

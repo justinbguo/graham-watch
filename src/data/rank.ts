@@ -6,13 +6,6 @@
  * itself adds nothing. Unsave pops the latest save on that watch. A followed
  * shop adds more than one click. A price, photos, and recency belong to the
  * watch.
- *
- * `orderFeed` does not sort by that score alone. Shops take turns: every
- * shop's best watch is seated before any shop gets a second seat, and each
- * round is ordered by score. Inside a shop the brands take turns, so one big
- * multi-brand dealer cannot fill the screen and one loved brand cannot fill a
- * shop. The same numbers and seats are in `rank_buy_feed` and `shop_mix`,
- * which is what the deck asks the database for.
  */
 
 export const RANK = {
@@ -223,13 +216,6 @@ function nextTurn(turns: Map<string, number>, key: string): number {
   return turn;
 }
 
-/**
- * Seats watches the way `shop_mix` does. A brand's turn counts its watches
- * inside one shop, best first. A shop's slot walks its brand turns, so slot 0 is the
- * shop's best watch and its next slots rotate brands. The page is slot 0 of
- * every shop by score, then slot 1, and so on. A watch with no brand is a
- * brand of its own.
- */
 export function orderFeed(
   watches: readonly RankWatch[],
   taste: RankTaste,

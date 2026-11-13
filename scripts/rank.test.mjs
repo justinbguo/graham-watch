@@ -1,9 +1,3 @@
-/**
- * The Buy score. A click beats a save, an undo drops the action it takes
- * back, a followed shop scores higher than the same watch unfollowed, shops
- * take turns, a loved brand does not take the whole top of a shop, and an
- * empty history still orders the pile.
- */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -170,8 +164,7 @@ test('a shop with many brands does not take the second seat from a shop with one
   assert.deepEqual(new Set(ordered.slice(2).map((item) => item.dealerId)), new Set(['big']));
 });
 
-/** The order before shops took turns: brand rounds across every shop. */
-function brandRounds(watches, roundTaste, nowMs) {
+function orderBeforeShopTurns(watches, roundTaste, nowMs) {
   const weights = tasteWeights(roundTaste);
   const score = (item) => scoreWatch(item, weights, roundTaste.followedDealerIds, nowMs);
   const best = (a, b) =>
@@ -211,7 +204,7 @@ test('three shops: the first 20 and first 50 show more shops than brand rounds d
   const pile = [...big, ...medium, ...small];
   const shops = (order, size) => shopCounts(order.map((item) => item.dealerId), size).size;
 
-  const before = brandRounds(pile, taste(), NOW);
+  const before = orderBeforeShopTurns(pile, taste(), NOW);
   const after = orderFeed(pile, taste(), NOW);
   assert.equal(after.length, pile.length);
   for (const size of [20, 50]) {
@@ -299,7 +292,6 @@ test('a followed new watch leads a brand the buyer clicked once', () => {
 
 const MIGRATIONS = new URL('../supabase/migrations/', import.meta.url);
 
-/** The newest migration that creates `name`, which is the body the database runs. */
 function definition(name) {
   const pattern = new RegExp(`create (or replace )?function public\\.${name}\\(`);
   const file = readdirSync(MIGRATIONS)
