@@ -49,6 +49,7 @@ jobs:
           scripts/drops-select.test.ts
           scripts/feedback-contact.test.ts
           scripts/fixture-import.test.ts
+          scripts/person-name.test.ts
           scripts/aggregator-pivot.test.mjs
           scripts/new-batch-count.test.mjs
 

@@ -1098,9 +1098,12 @@ than beside it: beside the summary it took the width the dealer's name needed.
 
 ## Onboarding
 
-Desktop web asks only "What should we show you first?" after sign-in. The sheet
-is the filter panel without dealers, narrow and centered. See watches keeps the
-brand keys on the deck filter. Skip clears them. Phone still asks name,
+Desktop web asks a name first, on one `LineField` in `ink` on the card's
+`surface`, focused on show, with no Skip. The next step is "What should we
+show you first?", with a Back arrow above the heading. The card height does
+not change between the two steps. That step is the filter panel without
+dealers, and the sheet is narrow and centered. See watches keeps the brand keys
+on the deck filter. Skip clears them. Phone still asks name,
 username, birthday (18+), collection size, brands, pain points, then
 notifications. The brand step is that same panel. Continue stays disabled
 until at least one brand is selected, unless the catalogue has no brands.

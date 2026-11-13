@@ -282,12 +282,14 @@ codes, so the flow can be built and tested with no provider and no spend.
 
 ## First-run onboarding
 
-Desktop web asks one question after sign-in: "What should we show you first?".
-That sheet is the Buy filter panel without the Dealer section. See watches
-keeps the brand keys already written on the deck filter. Skip clears them and
-finishes. There is no name, username, or birthday on desktop, so those
-profiles can finish with a null handle and a null birthday. A birthday that
-is present and under 18 is still refused.
+Desktop web asks two things after sign-in, in one sheet. First a name on one
+line, split into first and last at the first space, 80 characters at most.
+Then "What should we show you first?", which is the Buy filter panel without
+the Dealer section. See watches keeps the brand keys already written on the
+deck filter. Skip clears them and finishes. Either button writes the name.
+There is no username or birthday on desktop, so those profiles can finish
+with a null handle and a null birthday. A birthday that is present and under
+18 is still refused.
 
 A phone, and a phone-width browser, still asks for a name, a username, a
 birthday (18+), a collection size, brands, and the pain points they face while

@@ -6,6 +6,7 @@ import { signOut } from '@/lib/auth';
 import type { Database } from '@/lib/database';
 import { demo, isDemo } from '@/lib/demo';
 import type { Profile } from '@/lib/models';
+import type { PersonName } from '@/lib/personName';
 import { normalizeUsername } from '@/lib/username';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
@@ -22,8 +23,8 @@ const AVATAR_TYPES: Record<string, { ext: string; contentType: string }> = {
 };
 
 export type Onboarding = {
-  firstName: string;
-  lastName: string;
+  /** Both surfaces ask, so this is always written. An empty `last` is stored as null. */
+  name: PersonName;
   /** Already claimed on slide 2. Written again here so finishing cannot drop it. */
   username: string;
   dateOfBirth: string | null;
@@ -55,15 +56,15 @@ async function saveOnboarding(userId: string, answers: Onboarding) {
   if (isDemo) return demo.completeOnboarding();
 
   const handle = answers.username.trim() ? normalizeUsername(answers.username) : null;
-  const firstName = answers.firstName.trim();
-  const lastName = answers.lastName.trim();
+  const firstName = answers.name.first.trim();
+  if (!firstName) throw new Error('Add your name to finish.');
+  const lastName = answers.name.last?.trim() || null;
 
   const { data, error } = await supabase
     .from('profiles')
     .update({
-      // A blank name means "we did not ask", not "erase the provider name".
-      ...(firstName ? { first_name: firstName } : {}),
-      ...(lastName ? { last_name: lastName } : {}),
+      first_name: firstName,
+      last_name: lastName,
       ...(handle ? { handle } : {}),
       date_of_birth: answers.dateOfBirth,
       favorite_brands: answers.favoriteBrands,

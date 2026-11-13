@@ -3022,6 +3022,10 @@ async function commandVerifyGuestSave(dryRun) {
       });
     }
     await page.goto(link, { waitUntil: 'domcontentloaded' });
+    const nameLine = page.getByRole('textbox', { name: 'Your name' });
+    await nameLine.waitFor({ state: 'visible', timeout: 30_000 });
+    await nameLine.fill('Guest Saver');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button', { name: 'Skip', exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
     await shoot(page, files.firstRun);
     await page.getByRole('button', { name: 'Skip', exact: true }).click();

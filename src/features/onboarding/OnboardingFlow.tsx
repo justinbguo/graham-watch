@@ -64,8 +64,7 @@ export function OnboardingFlow() {
     // A shop is claimed from Profile. Onboarding no longer asks which they are,
     // and the database still requires an account type to finish.
     complete.mutate({
-      firstName,
-      lastName,
+      name: { first: firstName, last: lastName },
       username,
       dateOfBirth,
       accountType: 'buyer',
