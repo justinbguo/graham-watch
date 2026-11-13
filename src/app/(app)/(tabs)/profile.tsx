@@ -29,7 +29,7 @@ export default function Profile() {
     return (
       <GuestGate
         title="Profile"
-        message="Sign in to set up your collector profile and claim a shop."
+        message="Sign in to set up your collector profile."
       />
     );
   }
