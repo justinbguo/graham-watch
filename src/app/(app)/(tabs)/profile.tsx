@@ -5,10 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Eyebrow, Message, Screen } from '@/components/ui';
 import { GuestGate } from '@/features/auth/GuestGate';
 import { ApplicationStatusCard } from '@/features/dealers/ApplicationStatusCard';
-import {
-  ClaimByCodeCard,
-  ClaimDealerCard,
-} from '@/features/dealers/DealerShopCard';
+import { ClaimDealerCard } from '@/features/dealers/DealerShopCard';
 import { DealerShopEditor } from '@/features/dealers/DealerShopEditor';
 import { useDealerWorkspace } from '@/features/dealers/workspace';
 import { ProfileHeader } from '@/features/profile/ProfileHeader';
@@ -25,6 +22,8 @@ export { TabErrorBoundary as ErrorBoundary } from '@/components/ErrorState';
 export default function Profile() {
   const { isSignedIn } = useSession();
   const shop = useDealerWorkspace();
+  const open = useOpenStack();
+  const styles = useThemedStyles(profileStyles);
 
   if (!isSignedIn) {
     return (
@@ -35,8 +34,6 @@ export default function Profile() {
     );
   }
   const claimed = shop.shop;
-  const open = useOpenStack();
-  const styles = useThemedStyles(profileStyles);
 
   return (
     <Screen
@@ -67,9 +64,7 @@ export default function Profile() {
               onFinishVerifying={() => open('apply', undefined, '/apply')}
             />
           </View>
-        ) : (
-          <ClaimByCodeCard onStart={() => open('apply', undefined, '/apply')} />
-        )}
+        ) : null}
         <Posts
           onOpen={(id) => router.navigate({ pathname: '/community', params: { post: id } })}
           onCreate={() => router.navigate({ pathname: '/community', params: { compose: '1' } })}

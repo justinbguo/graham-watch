@@ -1,14 +1,14 @@
 import { View, type ColorValue } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
-import { fullName, useProfile } from '@/data/profile';
-import { personMonogram } from '@/lib/avatarMonogram';
+import { useProfile } from '@/data/profile';
 import { radius, size } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 
 /**
- * The Profile tab is you, so it wears your photograph or your initial. The
- * focused tab draws a `size.rule` stroke in the bar's colour around the square.
+ * The Profile tab is you, so it wears your photograph, or the bundled portrait
+ * when you have not set one. The focused tab draws a `size.rule` stroke in
+ * the bar's colour around the square.
  */
 export function ProfileTabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
   const { userId } = useSession();
@@ -24,15 +24,7 @@ export function ProfileTabIcon({ color, focused }: { color: ColorValue; focused:
         borderColor: focused ? color : 'transparent',
         borderRadius: radius.sm,
       }}>
-      <Avatar
-        url={profile?.avatar_url ?? null}
-        px={px}
-        monogram={personMonogram({
-          userId,
-          name: fullName(profile),
-          handle: profile?.handle,
-        })}
-      />
+      <Avatar url={profile?.avatar_url ?? null} px={px} />
     </View>
   );
 }

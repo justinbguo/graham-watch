@@ -1,5 +1,6 @@
 import { matchesListing } from '@/features/filters/match';
 import type { Filters } from '@/features/filters/types';
+import type { PersonName } from '@/lib/personName';
 
 import type {
   CaseMaterial,
@@ -316,6 +317,11 @@ export const demo = {
 
   setAvatar: (url: string) => {
     DEMO_PROFILE.avatar_url = url;
+  },
+
+  setName: (name: PersonName) => {
+    DEMO_PROFILE.first_name = name.first;
+    DEMO_PROFILE.last_name = name.last;
   },
 
   passCount: () => [...swiped.values()].filter((direction) => direction === 'left').length,

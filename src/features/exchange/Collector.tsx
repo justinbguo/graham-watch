@@ -4,7 +4,6 @@ import { Avatar } from '@/components/Avatar';
 import { Message, Spinner } from '@/components/ui';
 import { useCollectorPosts, type ExchangeAuthor } from '@/data/exchange';
 import { MessagePerson } from '@/features/messages/MessagePerson';
-import { personMonogram } from '@/lib/avatarMonogram';
 import { inset, size, space, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemedStyles } from '@/providers/theme';
@@ -38,15 +37,7 @@ export function Collector({
       ListHeaderComponent={
         <View style={styles.header}>
           <View style={styles.identity}>
-            <Avatar
-              url={author.avatar_url}
-              px={size.profile}
-              monogram={personMonogram({
-                userId: author.id,
-                name: author.name,
-                handle: author.handle,
-              })}
-            />
+            <Avatar url={author.avatar_url} px={size.profile} />
             <View style={styles.copy}>
               {author.handle ? <Text style={styles.handle}>@{author.handle}</Text> : null}
               {author.number ? (
