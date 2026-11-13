@@ -2751,6 +2751,13 @@ export type Database = {
         Returns: undefined
       }
       ship_to_is_complete: { Args: { p_ship_to: Json }; Returns: boolean }
+      shop_mix: {
+        Args: { p_items: Json }
+        Returns: {
+          id: string
+          slot: number
+        }[]
+      }
       store_application_claim_code: {
         Args: {
           p_application_id: string

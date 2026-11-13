@@ -84,6 +84,7 @@
     "sweep": "node scripts/sweep.mjs",
     "refresh": "node scripts/refresh.mjs",
     "catalogue:audit": "node scripts/catalogue-audit.mjs",
+    "report:shop-mix": "node scripts/shop-mix-report.mjs",
     "dealers": "node scripts/dealers.mjs",
     "dealers:local": "GRAHAM_TARGET=local node scripts/dealers.mjs",
     "snapshot": "GRAHAM_TARGET=hosted node scripts/snapshot.mjs",
