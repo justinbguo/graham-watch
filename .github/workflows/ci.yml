@@ -52,6 +52,7 @@ jobs:
           scripts/person-name.test.ts
           scripts/aggregator-pivot.test.mjs
           scripts/new-batch-count.test.mjs
+          scripts/dark-shell.test.mjs
 
       # Typecheck reads files; it does not resolve the route tree or the asset
       # graph. Deleting a screen that a navigator still registers, or importing

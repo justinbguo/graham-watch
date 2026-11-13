@@ -83,7 +83,8 @@ nobody follows.
 - A card photograph narrower than the card. The height cap does not change
   the width. The plate is the full width, and `cover` centres the watch.
 - A third palette. Sign-in ran green as an experiment and does not any more;
-  one scheme, keyed off the system, and every screen follows it.
+  one scheme. The app opens in dark until the person chooses. System still
+  follows the OS, and every screen follows that choice.
 - `text` on type that sits on a `surface` or a `fill`. That is `ink`, and
   `inkMuted` under it. The two are equal in both schemes, so the wrong one
   looks right until the day a palette lifts a container above its page.

@@ -121,7 +121,7 @@ export async function sendEmailCode(email: string, { createAccount }: { createAc
   if (!createAccount && /signups not allowed/i.test(error.message)) {
     const { shortLabel } = backendInfo();
     throw new Error(
-      `No account uses that address on ${shortLabel}. Create an account instead, or check Settings → Backend.`,
+      `No account uses that address on ${shortLabel}. Create an account instead.`,
     );
   }
   throw new Error(humanizeAuthError(error.message));

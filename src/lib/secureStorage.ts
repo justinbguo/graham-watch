@@ -22,20 +22,42 @@ async function clearChunks(key: string) {
   await SecureStore.deleteItemAsync(countKey(key));
 }
 
+function assembleChunks(countRaw: string | null, chunks: readonly (string | null)[]): string | null {
+  const count = Number(countRaw ?? 0);
+  if (!count) return null;
+  const taken = chunks.slice(0, count);
+  if (taken.length < count || taken.some((chunk) => chunk === null)) return null;
+  return taken.join('');
+}
+
 export const secureStorage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') return webStorage.getItem(key);
 
-    const count = Number((await SecureStore.getItemAsync(countKey(key))) ?? 0);
-    if (!count) return null;
-
-    const chunks: string[] = [];
+    const countRaw = await SecureStore.getItemAsync(countKey(key));
+    const count = Number(countRaw ?? 0);
+    const chunks: (string | null)[] = [];
     for (let i = 0; i < count; i++) {
-      const chunk = await SecureStore.getItemAsync(chunkKey(key, i));
-      if (chunk === null) return null;
-      chunks.push(chunk);
+      chunks.push(await SecureStore.getItemAsync(chunkKey(key, i)));
     }
-    return chunks.join('');
+    return assembleChunks(countRaw, chunks);
+  },
+
+  /**
+   * Synchronous read for short startup values. Must match `getItem`.
+   * Do not use it for the auth session. That value is large, and this call
+   * blocks the JavaScript thread.
+   */
+  getItemSync(key: string): string | null {
+    if (Platform.OS === 'web') return webStorage.getItem(key);
+
+    const countRaw = SecureStore.getItem(countKey(key));
+    const count = Number(countRaw ?? 0);
+    const chunks: (string | null)[] = [];
+    for (let i = 0; i < count; i++) {
+      chunks.push(SecureStore.getItem(chunkKey(key, i)));
+    }
+    return assembleChunks(countRaw, chunks);
   },
 
   async setItem(key: string, value: string): Promise<void> {

@@ -30,22 +30,3 @@ export function avatarMonogramLetter(name: string | null | undefined, handle?: s
   if (at) return at.charAt(0).toUpperCase();
   return '?';
 }
-
-export function personMonogramSeed(parts: {
-  userId?: string | null;
-  handle?: string | null;
-  name?: string | null;
-}): string {
-  return parts.userId ?? parts.handle ?? parts.name ?? 'collector';
-}
-
-export function personMonogram(parts: {
-  userId?: string | null;
-  handle?: string | null;
-  name?: string | null;
-}): { letter: string; seed: string } {
-  return {
-    letter: avatarMonogramLetter(parts.name, parts.handle),
-    seed: personMonogramSeed(parts),
-  };
-}

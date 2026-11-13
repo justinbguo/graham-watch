@@ -57,9 +57,9 @@ Rules:
 - `money` is a price, and only a price. A price in `save` looks like a watch you kept.
 - Dark mode is not inverted light mode. It is a warm charcoal (`#121110`), not
   black, and text is `#F3EFE8`, not white. Pure black plus pure white on OLED
-  vibrates and makes photographs look blown out. The app opens in light.
-  Settings can switch to dark or follow the system; a choice already saved
-  there is kept.
+  vibrates and makes photographs look blown out. The app opens in dark until
+  the person chooses. Settings can switch to light, dark, or system. A choice
+  already saved is kept. System still follows the OS.
 - `ink` equals `text` in both warm schemes, so reach for whichever names where
   the type sits. They only differ in a palette that lights a container
   differently from the page under it, which no palette does today.
@@ -338,8 +338,8 @@ the same slide still finishes onboarding immediately after the notification choi
 Sign-in runs on the same scheme as everything else. A green page (`forest`)
 lived here for a while as a test of whether the app should be green at all; it
 answered no, and the palette and the `ThemeOverride` that carried it are gone.
-One scheme, keyed off the system, and the status bar follows it like every
-other screen.
+One scheme. The app opens in dark until the person chooses, and System still
+follows the OS. The status bar follows that choice like every other screen.
 
 The screen is the wordmark, the sentence under it, the watch beside that
 pair, and a column of doors: Apple, Google, then email. No rule or `or`
@@ -1148,15 +1148,14 @@ wishlist draws no row, and no heading either: a heading is a promise that
 something is under it.
 
 The username slide still says "You are Collector #N on
-Graham"; the profile keeps the number only. Settings keeps the email, theme,
-sign-out, and delete account. Putting the name behind a cog made the tab look
-empty for anyone who had not claimed a shop.
+Graham"; the profile keeps the number only. Settings keeps the email, a name
+field, theme, sign-out, and delete account. Putting the name behind a cog made
+the tab look empty for anyone who had not claimed a shop.
 
 The photo is optional. Tap the tile to pick one from the library. It uses
 `radius.sm` like every other thumbnail — not a circle. The capsule is for
-things you press; a photograph is not a control. An empty tile is a sunken
-well with the account glyph, the same empty language as a listing row with no
-photograph.
+things you press; a photograph is not a control. A person with no photograph,
+or one that fails to load, gets `assets/paul-graham.jpg`.
 
 ## The card is the whole listing
 
@@ -1696,8 +1695,8 @@ post from a stranger is a person first — the title said what the watch was and
 about who was offering it. The byline was two lines deep, the name over the handle, and
 it was taking more room above the title than the fact it carried. The board now says
 the username, not the given name. The given name is the title of their profile.
-Someone with no photograph gets the account glyph,
-the same empty state the profile page uses. The photograph is read live from the
+Someone with no photograph gets the bundled portrait,
+the same picture the profile page uses. The photograph is read live from the
 profile, so changing it changes every post. The handle and the collector number
 are stamped onto the row when it is written. The face is 32 points, a step taller than the `body` line beside it. At 24 beside `label` type the byline read smaller than the title under it. The collector number was a grey
 capsule, which put a box around data. Brass type is the one accent in the byline, and it
@@ -1984,7 +1983,7 @@ A row is the other party's photograph, their name, the last line said, and when.
 shows the favicon the importer stored on `dealers.logo_url`, contained in the same
 square a person's photograph fills. A shop that declared none, or whose icon fails to
 load, gets `assets/dealer.png` — one picture every such shop shares, bundled with the
-app. A person with no photograph still gets the account glyph. A miss never draws a
+app. A person with no photograph gets the bundled portrait. A miss never draws a
 globe: an invented mark fetched for that one shop makes the name harder to trust.
 The photograph is a second door inside the row: it opens the shop page or the
 collector profile, while the name and message preview open the thread. The same
@@ -2096,8 +2095,9 @@ copied, because two copies of a licensed font drift.
 
 Two departures, and no others:
 
-- **It is dark only.** The app follows the system scheme. A tool nobody sees
-  but us does not need a second palette maintained.
+- **It is dark only.** The app opens in dark until the person chooses, and
+  System still follows the OS. A tool nobody sees but us does not need a
+  second palette maintained.
 - **Tables are set at `label` and `caption`, not `body`.** The scale is the
   app's; the density is a tool's. 14px in a row of forty shops, 13px for the
   headers above them.

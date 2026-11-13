@@ -4,10 +4,9 @@ import { Alert, Platform, ScrollView, Text, View } from 'react-native';
 import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
 import { useDeleteAccount, useProfile } from '@/data/profile';
-import { CheckoutDefaultsSettings } from '@/features/checkout/CheckoutDefaultsSettings';
-import { BackendEnvironment } from '@/features/dev/BackendEnvironment';
-import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { useFacets } from '@/data/search';
+import { AccountName } from '@/features/profile/AccountName';
+import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { signOut } from '@/lib/auth';
 import { inset, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
@@ -36,6 +35,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Eyebrow>Account</Eyebrow>
+          <AccountName />
           <Message text={session?.user.email ?? 'No email available'} />
         </View>
 
@@ -50,18 +50,6 @@ export default function SettingsScreen() {
         ) : null}
 
         <SubscriptionSettings />
-
-        <Divider />
-        <View style={styles.section}>
-          <Eyebrow>Payment &amp; shipping</Eyebrow>
-          <CheckoutDefaultsSettings />
-        </View>
-
-        <Divider />
-        <View style={styles.section}>
-          <Eyebrow>Backend</Eyebrow>
-          <BackendEnvironment />
-        </View>
 
         <Divider />
         <View style={styles.section}>

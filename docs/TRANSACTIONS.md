@@ -35,9 +35,9 @@ Nothing else from the buyer's profile.
 **Saved checkout defaults**
 
 `checkout_defaults` (one row per user, own-row RLS) holds `ship_to` and `payment_label`.
-Checkout prefills from it and offers "save to profile" toggles. Settings →
-Payment & shipping edits it. `payment_label` is a stand-in until Stripe stores a
-real payment method.
+Checkout prefills from it and offers "save to profile" toggles. The checkout
+sheet is where those defaults are edited. `payment_label` is a stand-in until
+Stripe stores a real payment method.
 
 **App**
 
