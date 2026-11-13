@@ -1,9 +1,3 @@
--- A deleted account frees its collector number. The next sign-up takes the
--- lowest positive integer no living profile holds. Deleting the only account
--- makes the next sign-up #1. Deleting #3 of 1-3 makes the next #3. Deleting
--- #2 of 1-3 makes the next #2. A living number never changes, and nobody else
--- is renumbered.
---
 -- The sequence could not do this. nextval and setval survive a rollback, so
 -- lowering it on delete would hand out a live number after a delete that rolled
 -- back. Every delete path (delete_own_account, the admin API, test cleanup)
@@ -14,13 +8,9 @@ alter table public.profiles
 
 drop sequence public.collector_number_seq;
 
--- A trigger rather than a default: a default needs a callable function, which
--- PostgREST would publish from public. Security definer because the gap query
--- has to see every profile, and RLS shows a caller only their own.
 create function public.profiles_assign_collector_number()
 returns trigger
 language plpgsql
-security definer
 set search_path = ''
 as $$
 begin
@@ -33,8 +23,6 @@ begin
   -- unique key still refuses a duplicate from anything that slips past the lock.
   perform pg_advisory_xact_lock(hashtext('public.profiles.collector_number'));
 
-  -- 1, and one past every living number. The smallest of those that nobody
-  -- holds is the next Collector #. A freed middle number is in that set.
   select min(holes.candidate)
     into new.collector_number
   from (

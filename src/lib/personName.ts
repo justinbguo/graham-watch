@@ -1,8 +1,3 @@
-/**
- * Longest line the desktop name step accepts, after trimming and collapsing
- * spaces. Room for multi-part names such as double surnames with particles.
- * Same cap as a Community post title.
- */
 export const NAME_MAX_LENGTH = 80;
 
 /** What lands in `profiles.first_name` / `profiles.last_name`. `last` is null for a one-word name. */
@@ -16,15 +11,7 @@ const collapse = (text: string) => text.trim().replace(/\s+/g, ' ');
 
 const ok = (first: string, last: string | null): NameCheck => ({ ok: true, name: { first, last } });
 
-/**
- * One typed line to a first and last name.
- *
- * Splits at the first space, the same rule `handle_new_user` applies to a
- * provider's `full_name`, so a typed name and a provider name fill the columns
- * the same way. When the line still begins with `knownFirst` (the profile's
- * current first name), that stays the first name: a provider's two-word given
- * name survives the prefill round trip and a surname-only edit.
- */
+/** First space splits, matching `handle_new_user`. A line that still starts with `knownFirst` keeps that given name. */
 export function parseName(text: string, knownFirst?: string | null): NameCheck {
   const clean = collapse(text);
   if (!clean) return { ok: false, reason: 'empty' };

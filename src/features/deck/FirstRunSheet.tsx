@@ -15,14 +15,8 @@ import { inset, layout, radius, size, space, stack, type, type Theme } from '@/l
 import { useSession } from '@/providers/session';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
-/** Filters cannot be reached without a name that passed `parseName`, so finishing cannot drop it. */
 type Step = { at: 'name' } | { at: 'filters'; name: PersonName };
 
-/**
- * Desktop onboarding: a name on one line, then the filter panel with shops left
- * out. Nothing is written until Skip or See watches, which write the name,
- * the brands, and `onboarded_at` together.
- */
 export function FirstRunSheet() {
   const desktop = useIsDesktopWeb();
   const { height } = useWindowDimensions();
@@ -118,7 +112,7 @@ export function FirstRunSheet() {
   );
 }
 
-/** Mounted per visit to the step, so the line takes focus again after Back. */
+// Focus runs on mount. Back refocuses only because this child unmounts.
 function NameLine({
   value,
   onChangeText,
@@ -133,7 +127,6 @@ function NameLine({
   const ref = useFocusOnShow();
   const theme = useTheme();
   const styles = useThemedStyles(sheetStyles);
-  // No maxLength: a pasted name cut short silently is worse than a sentence saying why.
   return (
     <View style={styles.nameBody}>
       <LineField
@@ -193,7 +186,6 @@ const sheetStyles = (theme: Theme) => ({
     ...type.body,
     color: theme.color.inkMuted,
   },
-  /** Fills the room the filter panel takes on the next step, so the footer does not move. */
   nameBody: {
     flex: 1,
     paddingHorizontal: inset.screen,

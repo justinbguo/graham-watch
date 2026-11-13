@@ -5235,8 +5235,6 @@ console.log('\ncollector numbers');
       : `expected ${beforeRollback}, rolled back held ${rolled.number}, next got ${afterRollbackNumber}`,
   );
 
-  // One transaction deletes every account, checks the three examples, then
-  // raises so Postgres rolls the wipe back. The shared database is unchanged.
   const examples = () => {
     if (!dbUrl || !isLocalUrl(dbUrl)) return { ok: false, output: `no local DB_URL from supabase status: ${dbUrl}` };
     const sql = `do $$

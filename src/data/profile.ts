@@ -23,7 +23,6 @@ const AVATAR_TYPES: Record<string, { ext: string; contentType: string }> = {
 };
 
 export type Onboarding = {
-  /** Both surfaces ask, so this is always written. An empty `last` is stored as null. */
   name: PersonName;
   /** Already claimed on slide 2. Written again here so finishing cannot drop it. */
   username: string;
