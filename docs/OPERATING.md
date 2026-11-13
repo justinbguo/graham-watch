@@ -759,10 +759,11 @@ walked by hand.
 in order, and re-seeds the inventory snapshot so the deck works again. Nothing
 local is precious, which is the point — a reset costs half a minute and no
 network. Migrations are append-only once they have run: never edit one, add a
-new file. A wipe that deletes users and keeps the schema does not return
-`collector_number_seq` to 1, so Paul is collector 1 only if the database is
-rebuilt or that same wipe runs
-`select setval('public.collector_number_seq', 1, false);`.
+new file. Deleting an account frees its collector number. The next signup
+receives the lowest positive integer that no living profile holds, so a wipe
+that deletes every account starts the next one at #1, and a hole in the
+middle is filled before any higher number is issued. There is no sequence
+to reset.
 
 The snapshot in `supabase/seed.sql` is generated. Regenerate it with
 `npm run snapshot` when the shape of the data changes, and never edit it by

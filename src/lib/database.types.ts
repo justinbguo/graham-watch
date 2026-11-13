@@ -1489,7 +1489,7 @@ export type Database = {
           collection_size?:
             | Database["public"]["Enums"]["collection_size"]
             | null
-          collector_number?: number
+          collector_number: number
           created_at?: string
           date_of_birth?: string | null
           favorite_brands?: string[]

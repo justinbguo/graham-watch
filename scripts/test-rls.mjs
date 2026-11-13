@@ -9,6 +9,9 @@
  * Run with `npm run test:rls` while `supabase start` is up.
  */
 
+import { spawnSync } from 'node:child_process';
+
+import { isLocalUrl, localStatus } from './_env.mjs';
 import { config, serviceKey } from './_supabase.mjs';
 
 // These tests create users, approve shops, and delete what they made. Against
@@ -5085,6 +5088,231 @@ console.log('\noperator accounts');
   for (const user of [watcher, collector, stranger]) {
     await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
   }
+}
+
+console.log('\ncollector numbers');
+{
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const numberOf = (id) =>
+    fetch(`${URL}/rest/v1/profiles?id=eq.${id}&select=collector_number`, { headers: admin })
+      .then((r) => r.json())
+      .then((rows) => rows?.[0]?.collector_number);
+  const removeUser = (id) =>
+    fetch(`${URL}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: admin }).then((r) => r.status);
+  const made = [];
+  const signUp = async (label) => {
+    const user = await createUser(`cn-${label}-${stamp}@example.com`);
+    made.push(user);
+    return user;
+  };
+
+  const top = await signUp('top');
+  const n = await numberOf(top.id);
+  const removed = await removeUser(top.id);
+  const again = await signUp('again');
+  const againNumber = await numberOf(again.id);
+  check(
+    'an admin-deleted top number goes to the next sign-up',
+    removed < 300 && Number.isInteger(n) && againNumber === n,
+    `delete ${removed}, top had ${n}, next got ${againNumber}`,
+  );
+
+  const heldNumbers = () =>
+    fetch(`${URL}/rest/v1/profiles?select=collector_number`, { headers: admin })
+      .then((r) => r.json())
+      .then((rows) => (rows ?? []).map((row) => row.collector_number));
+  const lowestFree = (taken, count) => {
+    const held = new Set(taken);
+    const found = [];
+    for (let i = 1; found.length < count; i += 1) {
+      if (!held.has(i)) found.push(i);
+    }
+    return found;
+  };
+
+  const mid = await signUp('mid');
+  const last = await signUp('last');
+  const midNumber = await numberOf(mid.id);
+  const lastNumber = await numberOf(last.id);
+  const left = await api('/rest/v1/rpc/delete_own_account', { token: last.token, method: 'POST', body: {} });
+  const refill = await signUp('refill');
+  const refillNumber = await numberOf(refill.id);
+  check(
+    'the higher of two new numbers goes to the next sign-up when that account is deleted',
+    left.status < 300 && lastNumber > midNumber && refillNumber === lastNumber,
+    `delete ${left.status}, mid ${midNumber}, last ${lastNumber}, next ${refillNumber}`,
+  );
+
+  await removeUser(mid.id);
+  const after = await signUp('after');
+  const afterNumber = await numberOf(after.id);
+  check(
+    'a freed middle number is reused',
+    afterNumber === midNumber,
+    `middle was ${midNumber}, next got ${afterNumber}`,
+  );
+  const kept = [await numberOf(again.id), await numberOf(refill.id)];
+  check(
+    'survivors keep their numbers',
+    kept[0] === n && kept[1] === lastNumber,
+    JSON.stringify(kept),
+  );
+
+  const beforeBurst = await heldNumbers();
+  const expectedBurst = lowestFree(beforeBurst, 6);
+  const burst = await Promise.allSettled(Array.from({ length: 6 }, (_, i) => signUp(`burst-${i}`)));
+  const joined = burst.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+  check(
+    'six sign-ups at once all succeed',
+    joined.length === 6,
+    burst.filter((r) => r.status === 'rejected').map((r) => String(r.reason)).join('; '),
+  );
+  const burstNumbers = (await Promise.all(joined.map((user) => numberOf(user.id)))).sort((a, b) => a - b);
+  check(
+    'six sign-ups at once get the six lowest free numbers',
+    JSON.stringify(burstNumbers) === JSON.stringify(expectedBurst),
+    `expected ${JSON.stringify(expectedBurst)}, got ${JSON.stringify(burstNumbers)}`,
+  );
+
+  // Foreign keys are checked after BEFORE triggers, so an id with no auth user
+  // still reaches the trigger, and the message proves which one refused it.
+  const chosen = await fetch(`${URL}/rest/v1/profiles`, {
+    method: 'POST',
+    headers: { ...admin, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ id: crypto.randomUUID(), collector_number: n + 1000 }),
+  });
+  const chosenBody = await chosen.json().catch(() => null);
+  check(
+    'an insert cannot choose a collector number',
+    chosen.status >= 400 && /assigned, not chosen/.test(chosenBody?.message ?? ''),
+    `${chosen.status} ${JSON.stringify(chosenBody)}`,
+  );
+
+  const patched = await api(`/rest/v1/profiles?id=eq.${again.id}`, {
+    token: again.token,
+    method: 'PATCH',
+    body: { collector_number: n + 1000 },
+  });
+  check(
+    'a user cannot change their own collector number',
+    patched.status >= 400 && (await numberOf(again.id)) === n,
+    `${patched.status} ${JSON.stringify(patched.body)}`,
+  );
+
+  // `supabase db query` runs one prepared statement, so it cannot hold a
+  // begin ... rollback. A DO block that always raises is one statement whose
+  // transaction always rolls back, and the error text carries the number out.
+  const dbUrl = localStatus()?.dbUrl;
+  const rolledBackSignUp = () => {
+    if (!dbUrl || !isLocalUrl(dbUrl)) return { number: null, output: `no local DB_URL from supabase status: ${dbUrl}` };
+    const sql = `do $$
+      declare
+        uid uuid := gen_random_uuid();
+        held integer;
+      begin
+        insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+        values ('00000000-0000-0000-0000-000000000000', uid, 'authenticated', 'authenticated',
+          'cn-rolled-' || uid || '@example.com', '', now(), '{}', '{}', now(), now());
+        select p.collector_number into held from public.profiles p where p.id = uid;
+        raise exception 'rolled back holding collector #%', held;
+      end $$`;
+    const run = spawnSync('supabase', ['db', 'query', '--db-url', dbUrl, sql], { encoding: 'utf8' });
+    const output = `${run.stdout ?? ''}${run.stderr ?? ''}${run.error ?? ''}`;
+    const match = output.match(/rolled back holding collector #(\d+)/);
+    return { number: match ? Number(match[1]) : null, output };
+  };
+
+  const beforeRollback = lowestFree(await heldNumbers(), 1)[0];
+  const rolled = rolledBackSignUp();
+  const afterRollback = await signUp('after-rollback');
+  const afterRollbackNumber = await numberOf(afterRollback.id);
+  check(
+    'a rolled-back sign-up does not use up its number',
+    rolled.number === beforeRollback && afterRollbackNumber === rolled.number,
+    rolled.number === null
+      ? rolled.output.slice(0, 400)
+      : `expected ${beforeRollback}, rolled back held ${rolled.number}, next got ${afterRollbackNumber}`,
+  );
+
+  // One transaction deletes every account, checks the three examples, then
+  // raises so Postgres rolls the wipe back. The shared database is unchanged.
+  const examples = () => {
+    if (!dbUrl || !isLocalUrl(dbUrl)) return { ok: false, output: `no local DB_URL from supabase status: ${dbUrl}` };
+    const sql = `do $$
+      declare
+        a uuid := gen_random_uuid();
+        b uuid := gen_random_uuid();
+        c uuid := gen_random_uuid();
+        d uuid := gen_random_uuid();
+        e uuid := gen_random_uuid();
+        f uuid := gen_random_uuid();
+        n1 integer;
+        n2 integer;
+        n3 integer;
+        n4 integer;
+        n5 integer;
+        n6 integer;
+      begin
+        delete from public.conversation_members;
+        delete from public.messages;
+        delete from public.conversations;
+        delete from auth.users;
+
+        insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+        values
+          ('00000000-0000-0000-0000-000000000000', a, 'authenticated', 'authenticated', 'cn-a-' || a || '@example.com', '', now(), '{}', '{}', now(), now()),
+          ('00000000-0000-0000-0000-000000000000', b, 'authenticated', 'authenticated', 'cn-b-' || b || '@example.com', '', now(), '{}', '{}', now(), now()),
+          ('00000000-0000-0000-0000-000000000000', c, 'authenticated', 'authenticated', 'cn-c-' || c || '@example.com', '', now(), '{}', '{}', now(), now());
+        select p.collector_number into n1 from public.profiles p where p.id = a;
+        select p.collector_number into n2 from public.profiles p where p.id = b;
+        select p.collector_number into n3 from public.profiles p where p.id = c;
+        if n1 <> 1 or n2 <> 2 or n3 <> 3 then
+          raise exception 'fresh line was % % %', n1, n2, n3;
+        end if;
+
+        delete from auth.users where id = b;
+        insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+        values ('00000000-0000-0000-0000-000000000000', d, 'authenticated', 'authenticated', 'cn-d-' || d || '@example.com', '', now(), '{}', '{}', now(), now());
+        select p.collector_number into n4 from public.profiles p where p.id = d;
+        if n4 <> 2 then
+          raise exception 'delete #2 of 1-3 gave %', n4;
+        end if;
+
+        delete from auth.users where id = c;
+        insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+        values ('00000000-0000-0000-0000-000000000000', e, 'authenticated', 'authenticated', 'cn-e-' || e || '@example.com', '', now(), '{}', '{}', now(), now());
+        select p.collector_number into n5 from public.profiles p where p.id = e;
+        if n5 <> 3 then
+          raise exception 'delete #3 of 1-3 gave %', n5;
+        end if;
+
+        delete from auth.users;
+        insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+        values ('00000000-0000-0000-0000-000000000000', f, 'authenticated', 'authenticated', 'cn-f-' || f || '@example.com', '', now(), '{}', '{}', now(), now());
+        select p.collector_number into n6 from public.profiles p where p.id = f;
+        if n6 <> 1 then
+          raise exception 'only account deleted gave %', n6;
+        end if;
+
+        raise exception 'number examples rolled back #1 % middle % top %', n6, n4, n5;
+      end $$`;
+    const run = spawnSync('supabase', ['db', 'query', '--db-url', dbUrl, sql], { encoding: 'utf8' });
+    const output = `${run.stdout ?? ''}${run.stderr ?? ''}${run.error ?? ''}`;
+    return { ok: /number examples rolled back #1 1 middle 2 top 3/.test(output), output };
+  };
+  const exampleRun = examples();
+  check(
+    'delete only account gives #1, delete #2 of 1-3 gives #2, delete #3 of 1-3 gives #3',
+    exampleRun.ok,
+    exampleRun.output.slice(0, 500),
+  );
+
+  for (const user of made) await removeUser(user.id);
 }
 
 await cleanUp();

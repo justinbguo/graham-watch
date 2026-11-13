@@ -290,7 +290,9 @@ face and size as the letters, on their baseline, with `space.md` between the
 mark and the name. The hairline runs under both. What is saved
 is the name without the mark. Under the line, in `body` and `textMuted`:
 "You are Collector #N on Graham". N is `profiles.collector_number`, assigned
-when the account is created, and it does not move if someone else leaves.
+when the account is created, and it does not move if someone else leaves. A
+deleted account's number, including one in the middle of the line, goes to
+the next sign-up.
 
 The slide starts `space.xl` below the top inset `Screen` already applied, so
 the question sits lower than a settings page. The footer stays at the bottom.

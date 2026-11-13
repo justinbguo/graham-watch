@@ -15,6 +15,8 @@ export type { Json } from './database.types';
  *   `search_listings_v2` and `rank_buy_feed` also return a null cursor on the
  *   last page.
  * - `author_number` is set by a trigger, so an insert leaves it out.
+ * - `collector_number` is set by a trigger that refuses a supplied value, so
+ *   an insert leaves it out.
  */
 type G = Generated['public'];
 type Fn = G['Functions'];
@@ -68,11 +70,13 @@ type Functions = Omit<
 };
 
 type Comments = G['Tables']['exchange_comments'];
+type Profiles = G['Tables']['profiles'];
 
-type Tables = Omit<G['Tables'], 'exchange_comments'> & {
+type Tables = Omit<G['Tables'], 'exchange_comments' | 'profiles'> & {
   exchange_comments: Omit<Comments, 'Insert'> & {
     Insert: Omit<Comments['Insert'], 'author_number'> & { author_number?: number };
   };
+  profiles: Omit<Profiles, 'Insert'> & { Insert: Omit<Profiles['Insert'], 'collector_number'> };
 };
 
 export type Database = Omit<Generated, 'public'> & {

@@ -79,5 +79,6 @@ export function localStatus() {
     anonKey: values.PUBLISHABLE_KEY ?? values.ANON_KEY,
     anonKeys: [values.ANON_KEY, values.PUBLISHABLE_KEY].filter(Boolean),
     serviceKey: values.SERVICE_ROLE_KEY,
+    dbUrl: values.DB_URL,
   };
 }
