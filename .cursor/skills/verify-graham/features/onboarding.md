@@ -1,10 +1,11 @@
 # Onboarding
 
-A new account finishes once, after sign-in. On desktop web that is one sheet over Buy: `What should we show you first?`, the same filter panel as Filter with the shops left out, then `Skip` or `See watches`. On a phone, and on a web window narrower than 900px, the app leaves the deck for a name, a username, a birthday, how many watches they own, which brands they like, what makes hunting hard, and whether they want alerts. Someone under 18 stops on the blocked step and is not onboarded. A guest is not asked any of this.
+A new account finishes once, after sign-in. On desktop web that is one sheet over Buy with two steps. First `What should we call you?` on one line, then `What should we show you first?`, the same filter panel as Filter with the shops left out, then `Skip` or `See watches`. On a phone, and on a web window narrower than 900px, the app leaves the deck for a name, a username, a birthday, how many watches they own, which brands they like, what makes hunting hard, and whether they want alerts. Someone under 18 stops on the blocked step and is not onboarded. A guest is not asked any of this.
 
 ## Sub-features
 
-- `desktop-first-run`: heading `What should we show you first?`. `Skip` clears the picks. `See watches` keeps the brands that are checked. Either button finishes the profile with no birthday and no username.
+- `desktop-name`: heading `What should we call you?`, one line labelled `Your name`. `Continue` stays off until a name is typed. Over 80 characters shows `Use 80 characters or fewer.` There is no Skip on this step.
+- `desktop-first-run`: heading `What should we show you first?`, with a `Back` arrow to the name. `Skip` clears the picks. `See watches` keeps the brands that are checked. Either button writes the name and finishes the profile with no birthday and no username.
 - `name`: the phone heading `What should we call you?`
 - `username`: the phone heading `Create a username`. The handle is claimed before the next step.
 - `birthday`: three wheels. Under 18 goes to `You need to be 18 to use Graham`.
@@ -23,7 +24,7 @@ Preconditions:
 - The signed-in profile has `onboarded_at` null. `seed` sets `onboarded_at`, so `buyer`, `quiet`, and `dealer` never see this flow.
 
 - **Reach the gate.** `screenshot` is 390px wide and signs the seeded accounts in, so it lands on the app rather than the questions.
-- **Desktop sheet.** On a stack this run started, `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode local` and do not `signin`. The keeper is 1280px wide. `click --name "Continue with email"`, `fill --name "you@example.com" --value` a new mailbox, `click --name "Send me a code"`. Local web reads Mailpit and can finish sign-in before a hand-typed code. The sheet reads `What should we show you first?`. The groups are Price, Era, Case size, and Brand. There is no Dealer group. `click --name Skip` or `See watches` closes it and leaves Buy usable.
+- **Desktop sheet.** On a stack this run started, `node .cursor/skills/control-graham/bin/control-graham.mjs up --mode local` and do not `signin`. The keeper is 1280px wide. `click --name "Continue with email"`, `fill --name "you@example.com" --value` a new mailbox, `click --name "Send me a code"`. Local web reads Mailpit and can finish sign-in before a hand-typed code. The sheet reads `What should we call you?`. `fill --name "Your name" --value` a name, `click --name Continue`. The sheet then reads `What should we show you first?`. The groups are Price, Era, Case size, and Brand. There is no Dealer group. `click --name Skip` or `See watches` closes it and leaves Buy usable.
 - **Phone questions.** A window under 900px, with `onboarded_at` still null, starts at `What should we call you?`. This keeper does not use that width.
 
 ## Gotchas

@@ -290,7 +290,9 @@ face and size as the letters, on their baseline, with `space.md` between the
 mark and the name. The hairline runs under both. What is saved
 is the name without the mark. Under the line, in `body` and `textMuted`:
 "You are Collector #N on Graham". N is `profiles.collector_number`, assigned
-when the account is created, and it does not move if someone else leaves.
+when the account is created, and it does not move if someone else leaves. A
+deleted account's number, including one in the middle of the line, goes to
+the next sign-up.
 
 The slide starts `space.xl` below the top inset `Screen` already applied, so
 the question sits lower than a settings page. The footer stays at the bottom.
@@ -1098,9 +1100,12 @@ than beside it: beside the summary it took the width the dealer's name needed.
 
 ## Onboarding
 
-Desktop web asks only "What should we show you first?" after sign-in. The sheet
-is the filter panel without dealers, narrow and centered. See watches keeps the
-brand keys on the deck filter. Skip clears them. Phone still asks name,
+Desktop web asks a name first, on one `LineField` in `ink` on the card's
+`surface`, focused on show, with no Skip. The next step is "What should we
+show you first?", with a Back arrow above the heading. The card height does
+not change between the two steps. That step is the filter panel without
+dealers, and the sheet is narrow and centered. See watches keeps the brand keys
+on the deck filter. Skip clears them. Phone still asks name,
 username, birthday (18+), collection size, brands, pain points, then
 notifications. The brand step is that same panel. Continue stays disabled
 until at least one brand is selected, unless the catalogue has no brands.

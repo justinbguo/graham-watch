@@ -31,6 +31,7 @@
     // to the edge function, and node --test strips the types itself.
     "scripts/fixture-import.test.ts",
     "scripts/feedback-contact.test.ts",
+    "scripts/person-name.test.ts",
     // node --experimental-strip-types runs it. tsc would follow the .ts import
     // into supabase/functions, which this project excludes.
     "scripts/nonwatch-dry-run.ts",

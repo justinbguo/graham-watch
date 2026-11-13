@@ -33,4 +33,4 @@ Preconditions:
 - iOS native has no guest deck. Android shows a header `Log in` instead of the web arrival sheet.
 - Closing the save sheet drops the held save. The next save asks again. Passes never ask.
 - Full email OTP completion needs Mailpit or `signin <alias>`. That is a different proof.
-- After a new account signs in, desktop web shows `What should we show you first?` over Buy. That is onboarding, not this gate. Seeded accounts already have `onboarded_at` set.
+- After a new account signs in, desktop web shows the name line, then `What should we show you first?`, over Buy. That is onboarding, not this gate. Seeded accounts already have `onboarded_at` set.

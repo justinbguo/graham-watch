@@ -31,7 +31,7 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 
 ## Features
 
-- [Onboarding](./onboarding.md) — desktop asks only what to show first. Phone still asks name, username, and birthday.
+- [Onboarding](./onboarding.md) — desktop asks a name, then what to show first. Phone still asks name, username, and birthday.
 - [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`.
 - [New](./new.md). The latest sealed catalogue batch. Opening the tab clears the count on this device until a later seal. Not the Drops feed.
 - [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
