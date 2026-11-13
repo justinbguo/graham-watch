@@ -12,6 +12,13 @@ import { inset, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemeContext, useThemedStyles, type ThemePreference } from '@/providers/theme';
 
+// The sheet is this account. Leaving it open after the session ends shows a
+// nameless Account block and hides the deck.
+function leaveAccount() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
 const APPEARANCE: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
@@ -63,7 +70,13 @@ export default function SettingsScreen() {
         </View>
 
         <Divider />
-        <Button label="Sign out" variant="outline" onPress={() => signOut()} />
+        <Button
+          label="Sign out"
+          variant="outline"
+          onPress={() => {
+            void signOut().then(leaveAccount);
+          }}
+        />
         {remove.error ? <Message text={remove.error.message} /> : null}
         <Button
           label="Delete account"
@@ -73,7 +86,7 @@ export default function SettingsScreen() {
             const title = 'Delete account?';
             const message =
               'This removes your profile, wishlist, and inquiries. A shop you claimed stays listed and becomes unclaimed.';
-            const confirm = () => remove.mutate();
+            const confirm = () => remove.mutate(undefined, { onSuccess: leaveAccount });
             // Alert.alert on web is a single OK box; a mouse has no system sheet.
             if (Platform.OS === 'web') {
               if (globalThis.confirm(`${title} ${message}`)) confirm();
