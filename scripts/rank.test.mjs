@@ -1,11 +1,5 @@
-/**
- * The Buy score. A click beats a save, an undo drops the action it takes
- * back, a followed shop scores higher than the same watch unfollowed, a
- * loved brand does not take the whole top of the feed, and an empty history
- * still orders the pile.
- */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -16,6 +10,7 @@ import {
   scoreWatch,
   tasteWeights,
 } from '../src/data/rank.ts';
+import { shopCounts } from './shop-mix-report.mjs';
 
 const NOW = Date.parse('2026-11-10T12:00:00.000Z');
 const DAY = 86_400_000;
@@ -126,17 +121,12 @@ test('a followed shop scores the follow weight above the same watch unfollowed',
   assert.equal(ordered[0].id, 'bench');
 });
 
-test('one loved brand does not take the whole top of the feed', () => {
+test('one shop still rotates brands, so a loved brand does not take its whole top', () => {
   const rolex = Array.from({ length: 6 }, (_, index) =>
     watch({ id: `rolex-${index}`, brandKey: 'rolex', createdAtMs: NOW - index * 1000 }),
   );
   const omega = Array.from({ length: 6 }, (_, index) =>
-    watch({
-      id: `omega-${index}`,
-      brandKey: 'omega',
-      dealerId: 'shop-o',
-      createdAtMs: NOW - index * 1000,
-    }),
+    watch({ id: `omega-${index}`, brandKey: 'omega', createdAtMs: NOW - index * 1000 }),
   );
   const ordered = orderFeed(
     [...rolex, ...omega],
@@ -146,10 +136,82 @@ test('one loved brand does not take the whole top of the feed', () => {
     }),
     NOW,
   );
-  const top = ordered.slice(0, 4).map((item) => item.brandKey);
-  assert.equal(top[0], 'rolex');
-  assert.equal(new Set(top).size, 2);
-  assert.ok(top.includes('omega'));
+  assert.equal(new Set(ordered.map((item) => item.dealerId)).size, 1);
+  assert.deepEqual(
+    ordered.slice(0, 4).map((item) => item.brandKey),
+    ['rolex', 'omega', 'rolex', 'omega'],
+  );
+});
+
+test('a shop with many brands does not take the second seat from a shop with one watch', () => {
+  const big = ['rolex', 'omega', 'tudor', 'cartier', 'zenith', 'heuer'].map((brand) =>
+    watch({ id: `big-${brand}`, brandKey: brand, dealerId: 'big', createdAtMs: NOW - DAY }),
+  );
+  const small = watch({ id: 'small-seiko', brandKey: 'seiko', dealerId: 'small', createdAtMs: NOW - 40 * DAY });
+  const clicked = big[3];
+  const shopTaste = taste({
+    events: [{ kind: 'dealer_click', listingId: clicked.id, at: 1 }],
+    watched: new Map([[clicked.id, clicked]]),
+  });
+  const weights = tasteWeights(shopTaste);
+  for (const item of big) {
+    assert.ok(scoreWatch(item, weights, new Set(), NOW) > scoreWatch(small, weights, new Set(), NOW));
+  }
+
+  const ordered = orderFeed([...big, small], shopTaste, NOW);
+  assert.equal(ordered[0].id, clicked.id, 'the click still picks which big-shop watch leads');
+  assert.equal(ordered[1].id, small.id, 'the small shop takes the second seat');
+  assert.deepEqual(new Set(ordered.slice(2).map((item) => item.dealerId)), new Set(['big']));
+});
+
+function orderBeforeShopTurns(watches, roundTaste, nowMs) {
+  const weights = tasteWeights(roundTaste);
+  const score = (item) => scoreWatch(item, weights, roundTaste.followedDealerIds, nowMs);
+  const best = (a, b) =>
+    score(b) - score(a) || b.createdAtMs - a.createdAtMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const byBrand = new Map();
+  for (const item of watches) {
+    const key = item.brandKey || item.id;
+    byBrand.set(key, [...(byBrand.get(key) ?? []), item]);
+  }
+  const lists = [...byBrand.values()].map((list) => list.sort(best));
+  const depth = Math.max(0, ...lists.map((list) => list.length));
+  const ordered = [];
+  for (let round = 0; round < depth; round += 1) {
+    ordered.push(...lists.map((list) => list[round]).filter(Boolean).sort(best));
+  }
+  return ordered;
+}
+
+test('three shops: the first 20 and first 50 show more shops than brand rounds did', (t) => {
+  const bigBrands = ['rolex', 'omega', 'tudor', ...Array.from({ length: 37 }, (_, index) => `house${index}`)];
+  const big = bigBrands.flatMap((brand) =>
+    [0, 1].map((copy) =>
+      watch({ id: `big-${brand}-${copy}`, brandKey: brand, dealerId: 'big', createdAtMs: NOW - 2 * DAY }),
+    ),
+  );
+  const medium = Array.from({ length: 10 }, (_, index) =>
+    watch({
+      id: `medium-${index}`,
+      brandKey: ['rolex', 'omega', 'tudor'][index % 3],
+      dealerId: 'medium',
+      createdAtMs: NOW - 20 * DAY,
+    }),
+  );
+  const small = Array.from({ length: 3 }, (_, index) =>
+    watch({ id: `small-${index}`, brandKey: 'seiko', dealerId: 'small', createdAtMs: NOW - 60 * DAY }),
+  );
+  const pile = [...big, ...medium, ...small];
+  const shops = (order, size) => shopCounts(order.map((item) => item.dealerId), size).size;
+
+  const before = orderBeforeShopTurns(pile, taste(), NOW);
+  const after = orderFeed(pile, taste(), NOW);
+  assert.equal(after.length, pile.length);
+  for (const size of [20, 50]) {
+    t.diagnostic(`first ${size}: ${shops(before, size)} shop(s) before, ${shops(after, size)} after`);
+    assert.ok(shops(after, size) > shops(before, size), `the first ${size} seat more shops`);
+  }
+  assert.deepEqual(after.slice(0, 3).map((item) => item.dealerId), ['big', 'medium', 'small']);
 });
 
 test('a cold start prefers a recent priced watch and still applies a follow', () => {
@@ -228,31 +290,55 @@ test('a followed new watch leads a brand the buyer clicked once', () => {
   assert.equal(weights.band.get('high'), RANK.clickFacet);
 });
 
-test('the database function uses these weights', () => {
-  const sql = readFileSync(
-    new URL('../supabase/migrations/20261110230000_rank_buy_feed.sql', import.meta.url),
-    'utf8',
-  );
-  assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.click}`));
-  assert.match(sql, new RegExp(`when 'save' then ${RANK.save}`));
-  assert.match(sql, new RegExp(`when 'pass' then ${RANK.pass}`));
-  assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.clickFacet}`));
-  assert.match(sql, new RegExp(`when 'save' then ${RANK.saveFacet}`));
-  assert.match(sql, new RegExp(`when 'pass' then ${RANK.passFacet}`));
-  assert.match(sql, /rank_bump\(weights, 'style', sty, facet\)/);
-  assert.match(sql, /rank_bump\(weights, 'band', band, facet\)/);
-  assert.match(sql, new RegExp(`then ${RANK.follow}`));
-  assert.match(sql, new RegExp(`then ${RANK.price}`));
-  assert.match(sql, new RegExp(`then ${RANK.recent}`));
-  assert.match(sql, new RegExp(`then ${RANK.month}`));
-  assert.match(sql, new RegExp(`then ${RANK.quarter}`));
-  assert.match(sql, new RegExp(`least\\(matched.photos, ${RANK.photoCap}\\) \\* ${RANK.photo}`));
-  assert.match(sql, new RegExp(`${RANK.brandPick}`));
-  assert.match(sql, new RegExp(`${RANK.stylePick}`));
-  assert.match(sql, new RegExp(`${RANK.bandPick}`));
-  assert.match(sql, /interval '7 days'/);
-  assert.match(sql, /interval '30 days'/);
-  assert.match(sql, /interval '90 days'/);
-  assert.match(sql, /partition by coalesce\(scored.brand_key, scored.id::text\)/);
-  assert.match(sql, /ev.kind = 'undo'/);
+const MIGRATIONS = new URL('../supabase/migrations/', import.meta.url);
+
+function definition(name) {
+  const pattern = new RegExp(`create (or replace )?function public\\.${name}\\(`);
+  const file = readdirSync(MIGRATIONS)
+    .filter((entry) => entry.endsWith('.sql'))
+    .sort()
+    .filter((entry) => pattern.test(readFileSync(new URL(entry, MIGRATIONS), 'utf8')))
+    .at(-1);
+  assert.ok(file, `no migration creates ${name}`);
+  return readFileSync(new URL(file, MIGRATIONS), 'utf8');
+}
+
+test('the database functions use these weights and seats', () => {
+  for (const name of ['buyer_taste', 'rank_weights']) {
+    const sql = definition(name);
+    assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.click}`));
+    assert.match(sql, new RegExp(`when 'save' then ${RANK.save}`));
+    assert.match(sql, new RegExp(`when 'pass' then ${RANK.pass}`));
+    assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.clickFacet}`));
+    assert.match(sql, new RegExp(`when 'save' then ${RANK.saveFacet}`));
+    assert.match(sql, new RegExp(`when 'pass' then ${RANK.passFacet}`));
+    assert.match(sql, /rank_bump\(weights, 'style', sty, facet\)/);
+    assert.match(sql, /rank_bump\(weights, 'band', band, facet\)/);
+    assert.match(sql, new RegExp(`${RANK.brandPick}`));
+    assert.match(sql, new RegExp(`${RANK.stylePick}`));
+    assert.match(sql, new RegExp(`${RANK.bandPick}`));
+    assert.match(sql, /ev.kind = 'undo'/);
+  }
+
+  const feedSql = definition('rank_buy_feed');
+  assert.match(feedSql, new RegExp(`then ${RANK.follow}`));
+  assert.match(feedSql, new RegExp(`then ${RANK.price}`));
+  assert.match(feedSql, new RegExp(`then ${RANK.recent}`));
+  assert.match(feedSql, new RegExp(`then ${RANK.month}`));
+  assert.match(feedSql, new RegExp(`then ${RANK.quarter}`));
+  assert.match(feedSql, new RegExp(`least\\(matched.photos, ${RANK.photoCap}\\) \\* ${RANK.photo}`));
+  assert.match(feedSql, /interval '7 days'/);
+  assert.match(feedSql, /interval '30 days'/);
+  assert.match(feedSql, /interval '90 days'/);
+  assert.match(feedSql, /from public\.shop_mix\(/);
+
+  const mixSql = definition('shop_mix');
+  assert.match(mixSql, /coalesce\(nullif\(i\.brand_key, ''\), i\.id::text\) as brand/);
+  assert.match(mixSql, /partition by items\.dealer_id, items\.brand\s+order by items\.score desc, items\.created_at desc, items\.id/);
+  assert.match(mixSql, /partition by turned\.dealer_id\s+order by turned\.brand_turn, turned\.score desc, turned\.created_at desc, turned\.id/);
+
+  const newSql = definition('latest_catalogue_batch');
+  assert.match(newSql, /join public\.shop_mix\(/);
+  assert.match(newSql, /'score', 0/);
+  assert.match(newSql, /order by mixed\.slot, on_deck\.created_at desc, on_deck\.id/);
 });

@@ -6,12 +6,6 @@
  * itself adds nothing. Unsave pops the latest save on that watch. A followed
  * shop adds more than one click. A price, photos, and recency belong to the
  * watch.
- *
- * `orderFeed` does not sort by that score alone. It takes each brand's best
- * remaining watch before a brand is allowed a second seat, then picks among
- * that round by score. One loved brand cannot fill the top of the feed while
- * other brands still have a watch to show. The same numbers are in
- * `rank_buy_feed`, which is what the deck asks the database for.
  */
 
 export const RANK = {
@@ -206,51 +200,40 @@ export function scoreWatch(
   );
 }
 
-function byScore(nowMs: number, weights: ReturnType<typeof tasteWeights>, followed: ReadonlySet<string>) {
-  return (a: RankWatch, b: RankWatch) => {
-    const delta =
-      scoreWatch(b, weights, followed, nowMs) - scoreWatch(a, weights, followed, nowMs);
-    if (delta !== 0) return delta;
-    if (a.createdAtMs !== b.createdAtMs) return b.createdAtMs - a.createdAtMs;
-    if (a.id < b.id) return -1;
-    if (a.id > b.id) return 1;
-    return 0;
-  };
+type Scored = { watch: RankWatch; score: number };
+
+function byScore(a: Scored, b: Scored): number {
+  if (a.score !== b.score) return b.score - a.score;
+  if (a.watch.createdAtMs !== b.watch.createdAtMs) return b.watch.createdAtMs - a.watch.createdAtMs;
+  if (a.watch.id < b.watch.id) return -1;
+  if (a.watch.id > b.watch.id) return 1;
+  return 0;
 }
 
-/**
- * One round per depth. Round 0 is every brand's best watch, highest score
- * first. Round 1 is every brand's second watch. A brand with nothing left
- * sits out that round.
- */
+function nextTurn(turns: Map<string, number>, key: string): number {
+  const turn = turns.get(key) ?? 0;
+  turns.set(key, turn + 1);
+  return turn;
+}
+
 export function orderFeed(
   watches: readonly RankWatch[],
   taste: RankTaste,
   nowMs: number,
 ): RankWatch[] {
   const weights = tasteWeights(taste);
-  const compare = byScore(nowMs, weights, taste.followedDealerIds);
-  const byBrand = new Map<string, RankWatch[]>();
-  for (const watch of watches) {
-    const key = watch.brandKey || watch.id;
-    const list = byBrand.get(key) ?? [];
-    list.push(watch);
-    byBrand.set(key, list);
-  }
-  let depth = 0;
-  for (const list of byBrand.values()) {
-    list.sort(compare);
-    depth = Math.max(depth, list.length);
-  }
-  const ordered: RankWatch[] = [];
-  for (let slot = 0; slot < depth; slot += 1) {
-    const round: RankWatch[] = [];
-    for (const list of byBrand.values()) {
-      const watch = list[slot];
-      if (watch) round.push(watch);
-    }
-    round.sort(compare);
-    ordered.push(...round);
-  }
-  return ordered;
+  const scored = watches
+    .map((watch) => ({ watch, score: scoreWatch(watch, weights, taste.followedDealerIds, nowMs) }))
+    .sort(byScore);
+  const brandTurns = new Map<string, number>();
+  const turned = scored.map((item) => ({
+    ...item,
+    turn: nextTurn(brandTurns, `${item.watch.dealerId}/${item.watch.brandKey || item.watch.id}`),
+  }));
+  const slots = new Map<string, number>();
+  return turned
+    .sort((a, b) => a.turn - b.turn || byScore(a, b))
+    .map((item) => ({ ...item, slot: nextTurn(slots, item.watch.dealerId) }))
+    .sort((a, b) => a.slot - b.slot || byScore(a, b))
+    .map((item) => item.watch);
 }

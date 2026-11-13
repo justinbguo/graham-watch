@@ -152,6 +152,57 @@ export function useSetAvatar(userId: string | null) {
   });
 }
 
+async function saveName(userId: string, name: PersonName) {
+  if (isDemo) {
+    demo.setName(name);
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      first_name: name.first,
+      last_name: name.last,
+    })
+    .eq('id', userId)
+    // A matching update that touches no row is a 204 with no error.
+    .select('id');
+
+  if (error) throw error;
+  if (!data?.length) {
+    throw new Error('Your account is no longer on this server. Sign out and sign in again.');
+  }
+}
+
+export function useSetName(userId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (name: PersonName) => {
+      if (!userId) throw new Error('Not signed in.');
+      return saveName(userId, name);
+    },
+    onMutate: async (name) => {
+      if (!userId) return;
+      const queryKey = keys.profile(userId);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Profile>(queryKey);
+      queryClient.setQueryData<Profile>(queryKey, (current) =>
+        current ? { ...current, first_name: name.first, last_name: name.last } : current
+      );
+      return { previous };
+    },
+    onError: (_error, _name, context) => {
+      if (!userId || !context?.previous) return;
+      queryClient.setQueryData(keys.profile(userId), context.previous);
+    },
+    onSettled: () => {
+      if (!userId) return;
+      queryClient.invalidateQueries({ queryKey: keys.profile(userId) });
+    },
+  });
+}
+
 /**
  * Storage refuses a delete from `storage.objects` in SQL, so the avatar cannot
  * go with the account inside `delete_own_account`. It is removed here, while

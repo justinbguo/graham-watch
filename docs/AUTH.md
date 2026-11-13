@@ -79,7 +79,7 @@ Graham has **two** Supabase projects: **local** (Docker on your Mac) and
 | --- | --- |
 | Terminal | `npm run env` or `npm run backend` — lists app, scripts, operator UI |
 | Before Metro starts | `npm run check:env` prints `app → local` or `app → hosted · …` |
-| In the app | Sign-in shows a one-line backend label; **Settings → Backend** has the full hint |
+| In the app | The sign-in error names the server (`Local · …` or `Hosted · …`) |
 | Switch | `npm run env -- local` or `npm run env -- hosted`, then **restart Metro** |
 
 **"No account uses that address"** while logging in usually means one of:
@@ -87,7 +87,7 @@ Graham has **two** Supabase projects: **local** (Docker on your Mac) and
 1. **Wrong mode** — you chose **Log in** but never created that email on *this*
    server. Use **Create account** once, or use a fixture (`npm run mock:users` on local).
 2. **Wrong server** — the account exists on hosted but the app points at local
-   (or the opposite). Match Settings → Backend to where you signed up.
+   (or the opposite). Match `npm run env` to where you signed up.
 3. **Local reset** — `npm run db:reset` deletes every local auth user. Run
    `npm run mock:users` again or create the account again.
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { brandKey, orderFeed } from '../src/data/rank.ts';
+import { brandKey, emptyTaste, orderFeed } from '../src/data/rank.ts';
 import { config, request, serviceKey } from './_supabase.mjs';
 
 const DAY = 86_400_000;
@@ -319,4 +319,68 @@ test('a signed-in buyer with no taste sees the guest catalogue', async () => {
   const guest = await walk(anon, spec());
   const plain = await walk(stranger.token, spec());
   assert.deepEqual(plain, guest);
+});
+
+test('New seats shops in turn, newest first inside a turn, without sealing a batch', async () => {
+  const HOUR = 3_600_000;
+  const shops = { a: crypto.randomUUID(), b: crypto.randomUUID(), c: crypto.randomUUID() };
+  const fixture = [
+    ['a-rolex-new', 'a', 'rolex', 1],
+    ['a-rolex-old', 'a', 'rolex', 1.5],
+    ['a-omega', 'a', 'omega', 3],
+    ['a-none', 'a', null, 4],
+    ['a-blank-1', 'a', '', 4.5],
+    ['a-blank-2', 'a', '', 5],
+    ['b-seiko', 'b', 'seiko', 2],
+    ['c-tudor', 'c', 'tudor', 6],
+  ].map(([label, shop, brand, hours]) => ({
+    label,
+    id: crypto.randomUUID(),
+    dealer_id: shops[shop],
+    brand_key: brand,
+    score: 0,
+    created_at: new Date(stamp - hours * HOUR).toISOString(),
+  }));
+  const labelOf = new Map(fixture.map((item) => [item.id, item.label]));
+  const createdOf = new Map(fixture.map((item) => [item.id, Date.parse(item.created_at)]));
+
+  const res = await api('/rest/v1/rpc/shop_mix', {
+    method: 'POST',
+    body: { p_items: fixture.map(({ label, ...item }) => item) },
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const seated = [...res.body]
+    .sort((a, b) => a.slot - b.slot || createdOf.get(b.id) - createdOf.get(a.id) || (a.id < b.id ? -1 : 1))
+    .map((row) => labelOf.get(row.id));
+
+  assert.deepEqual(seated, [
+    'a-rolex-new',
+    'b-seiko',
+    'c-tudor',
+    'a-omega',
+    'a-none',
+    'a-blank-1',
+    'a-blank-2',
+    'a-rolex-old',
+  ]);
+
+  const twin = orderFeed(
+    fixture.map((item) => ({
+      id: item.id,
+      brandKey: item.brand_key,
+      style: null,
+      priceCents: null,
+      createdAtMs: createdOf.get(item.id),
+      dealerId: item.dealer_id,
+      photoCount: 0,
+    })),
+    emptyTaste(),
+    Date.now(),
+  );
+  assert.deepEqual(seated, twin.map((watch) => labelOf.get(watch.id)));
+
+  for (const token of [anon, stranger.token]) {
+    const denied = await api('/rest/v1/rpc/shop_mix', { token, method: 'POST', body: { p_items: [] } });
+    assert.ok(denied.status >= 400, `shop_mix must not be callable by a client, got ${denied.status}`);
+  }
 });

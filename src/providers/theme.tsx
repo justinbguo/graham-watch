@@ -7,7 +7,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { StyleSheet, useColorScheme } from 'react-native';
+import { Platform, StyleSheet, useColorScheme } from 'react-native';
 
 import { secureStorage } from '@/lib/secureStorage';
 import { themes, type ColorScheme, type Theme } from '@/lib/theme';
@@ -15,7 +15,22 @@ import { hideScrollbars } from '@/lib/webScrollbars';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
-const STORAGE_KEY = 'graham.theme';
+const STORAGE_KEY = 'graham.theme' as const;
+
+function readWebTheme(): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readStoredPreference(): ThemePreference {
+  const stored = Platform.OS === 'web' ? readWebTheme() : secureStorage.getItemSync(STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  return 'dark';
+}
 
 type ThemeState = {
   theme: Theme;
@@ -27,20 +42,7 @@ const ThemeContext = createContext<ThemeState | null>(null);
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemScheme = useColorScheme();
-  // Light until someone chooses otherwise. A stored choice still wins, so
-  // Settings is not reset on the next launch.
-  const [preference, setPreferenceState] = useState<ThemePreference>('light');
-
-  useEffect(() => {
-    // secureStorage rather than a separate key-value dependency: it already
-    // exists, already handles web, and a theme choice is not worth another
-    // native module.
-    secureStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        setPreferenceState(stored);
-      }
-    });
-  }, []);
+  const [preference, setPreferenceState] = useState(readStoredPreference);
 
   const setPreference = useCallback((next: ThemePreference) => {
     setPreferenceState(next);

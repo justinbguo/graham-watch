@@ -4,14 +4,20 @@ import { Alert, Platform, ScrollView, Text, View } from 'react-native';
 import { SegmentedChoice } from '@/components/SegmentedChoice';
 import { Button, CloseButton, Divider, Eyebrow, Message, Screen } from '@/components/ui';
 import { useDeleteAccount, useProfile } from '@/data/profile';
-import { CheckoutDefaultsSettings } from '@/features/checkout/CheckoutDefaultsSettings';
-import { BackendEnvironment } from '@/features/dev/BackendEnvironment';
-import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { useFacets } from '@/data/search';
+import { AccountName } from '@/features/profile/AccountName';
+import { SubscriptionSettings } from '@/features/subscriptions/SubscriptionSettings';
 import { signOut } from '@/lib/auth';
 import { inset, stack, type, type Theme } from '@/lib/theme';
 import { useSession } from '@/providers/session';
 import { useThemeContext, useThemedStyles, type ThemePreference } from '@/providers/theme';
+
+// The sheet is this account. Leaving it open after the session ends shows a
+// nameless Account block and hides the deck.
+function leaveAccount() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
 
 const APPEARANCE: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -36,6 +42,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.section}>
           <Eyebrow>Account</Eyebrow>
+          <AccountName />
           <Message text={session?.user.email ?? 'No email available'} />
         </View>
 
@@ -53,18 +60,6 @@ export default function SettingsScreen() {
 
         <Divider />
         <View style={styles.section}>
-          <Eyebrow>Payment &amp; shipping</Eyebrow>
-          <CheckoutDefaultsSettings />
-        </View>
-
-        <Divider />
-        <View style={styles.section}>
-          <Eyebrow>Backend</Eyebrow>
-          <BackendEnvironment />
-        </View>
-
-        <Divider />
-        <View style={styles.section}>
           <Eyebrow>Appearance</Eyebrow>
           <SegmentedChoice
             label="Appearance"
@@ -75,7 +70,13 @@ export default function SettingsScreen() {
         </View>
 
         <Divider />
-        <Button label="Sign out" variant="outline" onPress={() => signOut()} />
+        <Button
+          label="Sign out"
+          variant="outline"
+          onPress={() => {
+            void signOut().then(leaveAccount);
+          }}
+        />
         {remove.error ? <Message text={remove.error.message} /> : null}
         <Button
           label="Delete account"
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
             const title = 'Delete account?';
             const message =
               'This removes your profile, wishlist, and inquiries. A shop you claimed stays listed and becomes unclaimed.';
-            const confirm = () => remove.mutate();
+            const confirm = () => remove.mutate(undefined, { onSuccess: leaveAccount });
             // Alert.alert on web is a single OK box; a mouse has no system sheet.
             if (Platform.OS === 'web') {
               if (globalThis.confirm(`${title} ${message}`)) confirm();

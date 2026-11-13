@@ -8,19 +8,16 @@ import { avatarMonogramColor } from '@/lib/avatarMonogram';
 import { radius, size, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
 
+const personPortrait: ImageSource = require('../../assets/paul-graham.jpg');
+
 /**
- * A square photograph of whoever, or whatever, is being named — a person on
- * the exchange, a shop in a conversation, you on your profile.
- *
- * Square with a small radius, not a circle: the app's photographs are all
- * rectangles, and one round one in a column of them reads as a different kind
- * of thing. Without a photo, a person gets a stable color and initial; a shop
- * passes `fallback` instead.
+ * A shop passes `fallback`. A group passes `monogram` or `glyph`. A person
+ * with no photograph, or one that fails to load, gets the bundled portrait.
  */
 export function Avatar({
   url,
   px = size.avatar,
-  glyph = 'account-outline',
+  glyph,
   fit = 'cover',
   fallback,
   monogram,
@@ -32,7 +29,7 @@ export function Avatar({
   fit?: 'cover' | 'contain';
   /** Shown when `url` is missing or fails. A shop's default picture. */
   fallback?: ImageSource;
-  /** Empty person state: one letter on a seed-stable fill. */
+  /** A group letter on a seed-stable fill. */
   monogram?: { letter: string; seed: string };
 }) {
   const styles = useThemedStyles(avatarStyles);
@@ -82,14 +79,25 @@ export function Avatar({
     );
   }
 
+  if (glyph) {
+    return (
+      <View style={[styles.photo, styles.empty, box]}>
+        <MaterialCommunityIcons
+          name={glyph}
+          size={Math.round(px / 2)}
+          color={theme.color.textMuted}
+        />
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.photo, styles.empty, box]}>
-      <MaterialCommunityIcons
-        name={glyph}
-        size={Math.round(px / 2)}
-        color={theme.color.textMuted}
-      />
-    </View>
+    <Image
+      source={personPortrait}
+      style={[styles.photo, box]}
+      contentFit="cover"
+      accessible={false}
+    />
   );
 }
 

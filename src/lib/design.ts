@@ -121,8 +121,7 @@ export const color = {
     onAccent: '#17140F',
     brass: yellow,
     save: '#5FB68C',
-    /** Lifted off the charcoal so the chip still reads as green. */
-    money: '#1E7A4A',
+    money: '#238E56',
     onMoney: '#F4FBF7',
     danger: '#E0776B',
     overlay: 'rgba(0, 0, 0, 0.6)',

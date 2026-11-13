@@ -4,7 +4,7 @@ import { Pressable } from 'react-native';
 import { Avatar } from '@/components/Avatar';
 import type { ConversationWith } from '@/data/messages';
 import { dealerPicture } from '@/features/dealers/picture';
-import { avatarMonogramLetter, personMonogram } from '@/lib/avatarMonogram';
+import { avatarMonogramLetter } from '@/lib/avatarMonogram';
 import { space } from '@/lib/theme';
 
 import { partyName } from './party';
@@ -33,17 +33,7 @@ export function PartyAvatar({
       />
     );
   } else if (who.kind === 'person') {
-    avatar = (
-      <Avatar
-        url={who.avatar_url}
-        px={px}
-        monogram={personMonogram({
-          userId: who.userId,
-          name: who.name,
-          handle: who.handle,
-        })}
-      />
-    );
+    avatar = <Avatar url={who.avatar_url} px={px} />;
   } else {
     avatar = <Avatar url={who.logoUrl} px={px} fallback={dealerPicture} fit="contain" />;
   }
