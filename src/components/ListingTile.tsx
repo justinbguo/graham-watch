@@ -135,7 +135,7 @@ function TilePhotos({
             url={dealerLogoUrl}
             px={size.iconSmall}
             fit="contain"
-            missing="hide"
+            onMiss="none"
           />
         ) : null}
         <Text style={styles.shopLabelText} numberOfLines={1}>

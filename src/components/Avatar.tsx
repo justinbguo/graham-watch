@@ -21,7 +21,7 @@ export function Avatar({
   fit = 'cover',
   fallback,
   monogram,
-  missing = 'portrait',
+  onMiss = 'person',
 }: {
   url: string | null;
   px?: number;
@@ -32,11 +32,7 @@ export function Avatar({
   fallback?: ImageSource;
   /** A group letter on a seed-stable fill. */
   monogram?: { letter: string; seed: string };
-  /**
-   * `hide` draws nothing when the picture is missing or fails. The default
-   * portrait is a person, and it must not stand in for a shop on a photograph.
-   */
-  missing?: 'portrait' | 'hide';
+  onMiss?: 'person' | 'none';
 }) {
   const styles = useThemedStyles(avatarStyles);
   const theme = useTheme();
@@ -57,6 +53,8 @@ export function Avatar({
       />
     );
   }
+
+  if (onMiss === 'none') return null;
 
   if (fallback) {
     return (
@@ -96,8 +94,6 @@ export function Avatar({
       </View>
     );
   }
-
-  if (missing === 'hide') return null;
 
   return (
     <Image
