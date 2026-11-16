@@ -21,6 +21,7 @@ export function Avatar({
   fit = 'cover',
   fallback,
   monogram,
+  onMiss = 'person',
 }: {
   url: string | null;
   px?: number;
@@ -31,6 +32,7 @@ export function Avatar({
   fallback?: ImageSource;
   /** A group letter on a seed-stable fill. */
   monogram?: { letter: string; seed: string };
+  onMiss?: 'person' | 'none';
 }) {
   const styles = useThemedStyles(avatarStyles);
   const theme = useTheme();
@@ -51,6 +53,8 @@ export function Avatar({
       />
     );
   }
+
+  if (onMiss === 'none') return null;
 
   if (fallback) {
     return (

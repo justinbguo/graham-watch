@@ -13,3 +13,7 @@
 !.npmrc
 !tsconfig.json
 !vercel.json
+# The web shell and the share image. Expo reads public/index.html when it
+# exports, and copies the rest of public/ into dist. Without this, the build
+# gets Expo's stock shell and crawlers never see the tags.
+!public

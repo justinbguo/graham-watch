@@ -183,7 +183,8 @@ nobody follows.
   stops at `layout.deckGridTileCap`, so two per row does not stretch into a poster.
   Tiles are a square photograph alone
   on the page (`contain`, `radius.md`). The shop name is a one-line `glassFill`
-  label in the bottom-left of that photograph. Under it, the title and the price
+  label in the bottom-left of that photograph, with the shop icon at `iconSmall`
+  when `logo_url` is set and the name alone when it is not. Under it, the title and the price
   share a two-line band and the specs are one line. No `surface` wraps the block. The wishlist and a shop use `ListingRow`:
   photograph on the left at `gridScanWidthShare` of the row (cap `gridPhoto`;
   wishlist and any scan row), `gridPhoto` in a shop, details on the right. The

@@ -48,6 +48,12 @@ test('the web shell paints the dark page before the bundle', () => {
   );
   assert.match(html, /%LANG_ISO_CODE%/);
   assert.match(html, /%WEB_TITLE%/);
+  assert.match(html, /property="og:title" content="Graham"/);
+  assert.match(html, /property="og:description" content="The best vintage watch dealers for a very passionate collector\."/);
+  assert.match(html, /property="og:image" content="https:\/\/www\.graham\.watch\/og\.png"/);
+  assert.match(html, /property="og:url" content="https:\/\/www\.graham\.watch"/);
+  assert.match(html, /name="twitter:card" content="summary_large_image"/);
+  assert.match(html, /name="twitter:image" content="https:\/\/www\.graham\.watch\/og\.png"/);
   assert.match(html, /<\/head>/);
   assert.match(html, /<\/body>/);
   assert.match(html, /id="root"/);
