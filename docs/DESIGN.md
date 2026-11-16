@@ -990,7 +990,9 @@ along its bottom page extra photos. Under it, on the page colour, the copy is th
 below. Tiles sit `space.sm` apart. A tap opens the listing; pass and save happen there. The
 shop name is a `caption` label in `onOverlay` on `glassFill`, `radius.lg`, in the
 bottom-left of the photograph, above the paging bars when the watch has more
-than one photo. It takes one line and ellipsizes only when the name is wider
+than one photo. The shop's own icon sits at `iconSmall` to the left of the
+name when that shop has a `logo_url`. A missing or failed icon is the name
+alone, with no gap. It takes one line and ellipsizes only when the name is wider
 than the photograph. No hearts or shipping lines on the photograph.
 
 Below the breakpoint the home grid is the same tiles as a wide window, but

@@ -9,6 +9,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { GridPhotoStrip } from '@/components/GridPhotoStrip';
 import { Pressable } from 'react-native-gesture-handler';
 
@@ -44,6 +45,7 @@ export function ListingTile({
       <TilePhotos
         photos={card.photos}
         dealerName={card.dealer?.name}
+        dealerLogoUrl={card.dealer?.logo_url}
         selected={selected}
         photoShape={photoShape}
         onPress={onPress}
@@ -83,12 +85,14 @@ export function ListingTile({
 function TilePhotos({
   photos,
   dealerName,
+  dealerLogoUrl,
   selected,
   photoShape,
   onPress,
 }: {
   photos: DeckPhoto[];
   dealerName?: string;
+  dealerLogoUrl?: string | null;
   selected: boolean;
   photoShape: 'square' | 'swipe';
   onPress?: () => void;
@@ -126,6 +130,14 @@ function TilePhotos({
       pointerEvents="none"
       style={[styles.shopLabel, photos.length > 1 && styles.shopLabelAboveBars]}>
       <View style={styles.shopPill}>
+        {dealerLogoUrl ? (
+          <Avatar
+            url={dealerLogoUrl}
+            px={size.iconSmall}
+            fit="contain"
+            missing="hide"
+          />
+        ) : null}
         <Text style={styles.shopLabelText} numberOfLines={1}>
           {dealerName}
         </Text>
@@ -348,6 +360,9 @@ const tileStyles = (theme: Theme) => {
     },
     shopPill: {
       maxWidth: '100%' as const,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: space.xs,
       backgroundColor: theme.color.glassFill,
       borderRadius: radius.lg,
       paddingHorizontal: space.sm,
@@ -356,6 +371,7 @@ const tileStyles = (theme: Theme) => {
     shopLabelText: {
       ...type.caption,
       color: theme.color.onOverlay,
+      flexShrink: 1,
     },
     pressed: {
       opacity: 0.72,
