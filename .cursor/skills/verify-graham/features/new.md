@@ -1,6 +1,6 @@
 # New
 
-New is the tab of watches the last full nightly refresh sealed onto the deck. The count is the size of that batch until this device opens the tab. Opening New clears it, and a reload keeps it clear. A later seal brings the count back. Guests see it. It is not Drops.
+New is the tab of watches the last full nightly refresh sealed onto the deck. The batch uses the same shop seating as Buy, newest first, with no personal score, so one shop does not fill the first screen. The count is the size of that batch until this device opens the tab. Opening New clears it, and a reload keeps it clear. A later seal brings the count back. Guests see it. It is not Drops.
 
 ## Sub-features
 
