@@ -194,6 +194,15 @@ export function scopeDealer(filters: Filters, dealerId: string | null): Filters 
   return { ...filters, dealers: [dealerId] };
 }
 
+/**
+ * The Buy rail's tap. The shop already on the deck clears. Any other shop
+ * becomes the one shop. Brands and price stay.
+ */
+export function pressDealer(filters: Filters, dealerId: string): Filters {
+  if (soleDealer(filters) === dealerId) return scopeDealer(filters, null);
+  return scopeDealer(filters, dealerId);
+}
+
 export function toRpcArgs(filters: Filters) {
   const price = bands(filters.prices);
   const size = bands(rangesFor(SIZE_PRESETS, filters.sizes));

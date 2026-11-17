@@ -39,8 +39,7 @@ export type FilterApi = {
   togglePrice: (preset: Preset) => void;
   replace: (next: Filters) => void;
   clear: () => void;
-  /** Deck only. Other surfaces share the type and do not call these. */
-  showOnlyDealer: (dealerId: string) => void;
+  /** Deck and New. Clears the one-shop cut. Other surfaces share the type and do not call it. */
   showAllDealers: () => void;
 };
 
@@ -186,7 +185,6 @@ export function useFilters(surface: Surface, dealerId?: string): FilterApi {
         })),
       replace: (next) => apply(() => next),
       clear: () => apply(() => NO_FILTERS),
-      showOnlyDealer: (dealerId) => apply((current) => scopeDealer(current, dealerId)),
       showAllDealers: () => apply((current) => scopeDealer(current, null)),
     };
   }, [dealerId, filters, store.ready, surface, update, updateShop]);

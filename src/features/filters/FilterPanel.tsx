@@ -3,14 +3,14 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { CheckRow } from '@/components/CheckRow';
 import { Field } from '@/components/ui';
-import { useDealerShop } from '@/data/dealers';
+import { useDealerDirectory, useDealerShop } from '@/data/dealers';
 import { useNewListings } from '@/data/newListings';
 import { useFilterFacets } from '@/data/search';
 import { inset, space, stack, type, type Theme } from '@/lib/theme';
 import { useThemedStyles } from '@/providers/theme';
 
 import { filterChips } from './chips';
-import { dealerChoices } from './dealers';
+import { DEALER_NAME_PLACEHOLDER, dealerChoices, dealerDisplayName } from './dealers';
 import { facetsOf, UNKNOWN_FACET_VALUE } from './facets';
 import { FilterGroup } from './FilterGroup';
 import { FilterSummary } from './FilterSummary';
@@ -24,6 +24,8 @@ import {
   dollarsForInput,
   isPricePreset,
 } from './types';
+
+const NO_DIRECTORY: { id: string; name: string }[] = [];
 
 /**
  * Price, era, size, brand, and every dealer this surface can actually show.
@@ -67,10 +69,19 @@ export function FilterPanel({
 
   const of = (kind: string) => facets.filter((facet) => facet.kind === kind);
   const dealers = dealerChoices(facets, surface);
+  const { data: directory = NO_DIRECTORY } = useDealerDirectory();
+  const dealerLabel = useCallback(
+    (id: string, facetLabel?: string) =>
+      dealerDisplayName(id, [{ id, name: facetLabel }, ...directory]) ?? DEALER_NAME_PLACEHOLDER,
+    [directory],
+  );
   const labelFor = useCallback(
-    (kind: string, value: string) =>
-      of(kind).find((facet) => facet.value === value)?.label ?? value,
-    [facets],
+    (kind: string, value: string) => {
+      const facetLabel = of(kind).find((facet) => facet.value === value)?.label;
+      if (kind === 'dealer') return dealerLabel(value, facetLabel);
+      return facetLabel ?? value;
+    },
+    [dealerLabel, facets],
   );
 
   const chips = useMemo(
@@ -163,7 +174,7 @@ export function FilterPanel({
             {rows(
               dealers.map((facet) => ({
                 key: facet.value,
-                label: facet.label,
+                label: dealerLabel(facet.value, facet.label),
                 count: facet.count,
                 selected: filters.dealers.includes(facet.value),
                 onPress: () => toggle('dealers', facet.value),
