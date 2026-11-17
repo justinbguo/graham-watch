@@ -3335,7 +3335,7 @@ console.log('\ndelete account');
     body: {
       dealer_id: doomedShopId,
       imported_by: doomed.id,
-      brand: 'Rolex',
+      brand: 'Omega',
       model: 'Datejust',
       price_cents: 5000000,
     },

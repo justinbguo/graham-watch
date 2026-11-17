@@ -6,7 +6,7 @@ import { config, request, serviceKey } from './_supabase.mjs';
 
 const DAY = 86_400_000;
 const stamp = Date.now();
-const seed = { brands: ['Rolex'], styles: ['diver'], priceBand: 'high' };
+const seed = { brands: ['Zenith'], styles: ['diver'], priceBand: 'high' };
 
 let url;
 let anon;
@@ -168,20 +168,22 @@ test.before(async () => {
   });
   if (!follow.ok) throw new Error(`follow: ${follow.status} ${JSON.stringify(follow.body)}`);
 
-  listings.rolexNew = await insertListing({
+  listings.zenithNew = await insertListing({
     dealer_id: dealers.open.id,
-    brand: 'Rolex',
+    brand: 'Zenith',
     model: 'Sub',
     style: 'diver',
     price_cents: 2_000_000,
+    year: 1968,
     created_at: ago(2),
   }, 3);
-  listings.rolexOld = await insertListing({
+  listings.zenithOld = await insertListing({
     dealer_id: dealers.open.id,
-    brand: 'Rolex',
+    brand: 'Zenith',
     model: 'Datejust',
     style: 'dress',
     price_cents: 400_000,
+    year: 1960,
     created_at: ago(45),
   }, 5);
   listings.omega = await insertListing({
@@ -211,7 +213,7 @@ test.before(async () => {
   listings.thin = await insertListing({
     dealer_id: dealers.open.id,
     imported_by: buyer.id,
-    brand: 'Rolex',
+    brand: 'Zenith',
     model: 'Thin',
     style: 'dress',
     price_cents: 900_000,
@@ -240,6 +242,48 @@ test.before(async () => {
     model: 'Hidden',
     style: 'diver',
     price_cents: 2_000_000,
+    created_at: ago(2),
+  }, 3);
+  listings.rolex = await insertListing({
+    dealer_id: dealers.open.id,
+    brand: 'Rolex',
+    model: 'Submariner',
+    year: 1968,
+    created_at: ago(3),
+  }, 3);
+  listings.rolexSa = await insertListing({
+    dealer_id: dealers.open.id,
+    brand: 'Rolex SA',
+    model: 'Datejust',
+    year: 1972,
+    created_at: ago(4),
+  }, 3);
+  listings.tudor = await insertListing({
+    dealer_id: dealers.open.id,
+    brand: 'Tudor',
+    model: 'Oyster',
+    year: 1968,
+    created_at: ago(5),
+  }, 3);
+  listings.late = await insertListing({
+    dealer_id: dealers.open.id,
+    brand: 'Omega',
+    model: 'Late',
+    year: 1990,
+    created_at: ago(6),
+  }, 3);
+  listings.boundary = await insertListing({
+    dealer_id: dealers.open.id,
+    brand: 'Omega',
+    model: 'Boundary',
+    year: 1985,
+    created_at: ago(7),
+  }, 3);
+  listings.ownerRolex = await insertListing({
+    dealer_id: dealers.claimed.id,
+    brand: 'ROLEX',
+    model: 'Owned',
+    year: 1975,
     created_at: ago(2),
   }, 3);
 
@@ -281,7 +325,16 @@ function expectOrder(rows, { followedDealerIds, favoriteBrandKeys }) {
 
 test('a guest page walk matches the ranker, and hidden watches stay hidden', async () => {
   const ids = await walk(anon, spec());
-  const visible = [listings.rolexNew, listings.rolexOld, listings.omega, listings.cartier, listings.patek, listings.ownShop];
+  const visible = [
+    listings.zenithNew,
+    listings.zenithOld,
+    listings.omega,
+    listings.cartier,
+    listings.patek,
+    listings.ownShop,
+    listings.tudor,
+    listings.boundary,
+  ];
   assert.deepEqual(
     ids,
     expectOrder(visible.map((listing) => ({ listing, photos: listing.model === 'Datejust' ? 5 : 3 })), {
@@ -289,19 +342,21 @@ test('a guest page walk matches the ranker, and hidden watches stay hidden', asy
       favoriteBrandKeys: [],
     }),
   );
-  for (const hidden of [listings.thin, listings.sold, listings.pending]) {
-    assert.equal(ids.includes(hidden.id), false);
+  for (const hidden of [listings.thin, listings.sold, listings.pending, listings.rolex, listings.rolexSa, listings.late, listings.ownerRolex]) {
+    assert.equal(ids.includes(hidden.id), false, hidden.model);
   }
 });
 
 test('a buyer with taste, a follow, and a pass pages the same order, including a thin import', async () => {
   const ids = await walk(buyer.token, spec());
   const visible = [
-    { listing: listings.rolexNew, photos: 3 },
-    { listing: listings.rolexOld, photos: 5 },
+    { listing: listings.zenithNew, photos: 3 },
+    { listing: listings.zenithOld, photos: 5 },
     { listing: listings.omega, photos: 3 },
     { listing: listings.cartier, photos: 3 },
     { listing: listings.thin, photos: 1 },
+    { listing: listings.tudor, photos: 3 },
+    { listing: listings.boundary, photos: 3 },
   ];
   assert.deepEqual(
     ids,
@@ -310,9 +365,44 @@ test('a buyer with taste, a follow, and a pass pages the same order, including a
       favoriteBrandKeys: ['Omega'],
     }),
   );
-  for (const hidden of [listings.patek, listings.sold, listings.pending, listings.ownShop]) {
-    assert.equal(ids.includes(hidden.id), false);
+  for (const hidden of [listings.patek, listings.sold, listings.pending, listings.ownShop, listings.rolex, listings.rolexSa, listings.late, listings.ownerRolex]) {
+    assert.equal(ids.includes(hidden.id), false, hidden.model);
   }
+});
+
+test('a buyer cannot read a Rolex or a watch made after 1985, and the shop owner still can', async () => {
+  for (const token of [anon, stranger.token]) {
+    const ids = await walk(token, spec());
+    assert.equal(ids.includes(listings.rolex.id), false);
+    assert.equal(ids.includes(listings.rolexSa.id), false);
+    assert.equal(ids.includes(listings.late.id), false);
+    assert.equal(ids.includes(listings.tudor.id), true);
+    assert.equal(ids.includes(listings.boundary.id), true);
+    const hidden = await api(`/rest/v1/listings?id=eq.${listings.rolex.id}&select=id`, { token });
+    assert.equal(hidden.status, 200);
+    assert.deepEqual(hidden.body, []);
+    const late = await api(`/rest/v1/listings?id=eq.${listings.late.id}&select=id`, { token });
+    assert.deepEqual(late.body, []);
+    const search = await api('/rest/v1/rpc/search_listings_v2', {
+      token,
+      method: 'POST',
+      body: { p_spec: spec(), p_limit: 50 },
+    });
+    assert.equal(search.status, 200, JSON.stringify(search.body));
+    const found = new Set((search.body ?? []).map((row) => row.listing.id));
+    assert.equal(found.has(listings.rolex.id), false);
+    assert.equal(found.has(listings.rolexSa.id), false);
+    assert.equal(found.has(listings.late.id), false);
+    assert.equal(found.has(listings.tudor.id), true);
+    assert.equal(found.has(listings.boundary.id), true);
+  }
+
+  const owned = await api(`/rest/v1/listings?id=eq.${listings.ownerRolex.id}&select=id,brand`, {
+    token: buyer.token,
+  });
+  assert.equal(owned.status, 200, JSON.stringify(owned.body));
+  assert.equal(owned.body[0]?.id, listings.ownerRolex.id);
+  assert.equal(owned.body[0]?.brand, 'ROLEX');
 });
 
 test('a signed-in buyer with no taste sees the guest catalogue', async () => {

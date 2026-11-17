@@ -345,7 +345,7 @@ test.before(async () => {
   rows.sub = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Submariner',
     reference: '5513',
     style: 'diver',
@@ -435,7 +435,7 @@ test.before(async () => {
   rows.explorer = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Explorer',
     reference: '1016',
     style: 'diver',
@@ -465,7 +465,7 @@ test.before(async () => {
   rows.edge5k = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Datejust',
     reference: '1601',
     style: 'dress',
@@ -480,7 +480,7 @@ test.before(async () => {
   rows.edge50k = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Daytona',
     reference: '6263',
     style: 'chronograph',
@@ -510,7 +510,7 @@ test.before(async () => {
   rows.gmt = await insertListing({
     ...base,
     dealer_id: dealers.b.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'GMT-Master',
     reference: '1675',
     style: 'diver',
@@ -525,7 +525,7 @@ test.before(async () => {
   rows.hidden = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Hidden',
     reference: `kq7-hidden-${stamp}`,
     status: 'hidden',
@@ -535,7 +535,7 @@ test.before(async () => {
   rows.sold = await insertListing({
     ...base,
     dealer_id: dealers.a.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Sold',
     reference: `kq7-sold-${stamp}`,
     sold_at: '2024-01-01T00:00:00Z',
@@ -545,7 +545,7 @@ test.before(async () => {
   rows.pending = await insertListing({
     ...base,
     dealer_id: dealers.pending.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Pending',
     reference: `kq7-pending-${stamp}`,
     price_cents: 100,
@@ -554,7 +554,7 @@ test.before(async () => {
   rows.paused = await insertListing({
     ...base,
     dealer_id: dealers.paused.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Paused',
     reference: `kq7-paused-${stamp}`,
     price_cents: 100,
@@ -563,7 +563,7 @@ test.before(async () => {
   rows.claimed = await insertListing({
     ...base,
     dealer_id: dealers.claimed.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Datejust',
     reference: `kq7-claimed-${stamp}`,
     style: 'dress',
@@ -577,7 +577,7 @@ test.before(async () => {
   rows.facetKnown = await insertListing({
     ...base,
     dealer_id: dealers.facet.id,
-    brand: 'Rolex',
+    brand: 'Heuer',
     model: 'Facet',
     reference: `kq7-facet-${stamp}`,
     style: 'diver',
@@ -759,7 +759,7 @@ test('brands, dealers, style, material, winding, and complications', async () =>
   });
   await assertParity(
     {
-      brands: ['rolex'],
+      brands: ['heuer'],
       styles: ['diver'],
       prices: [{ min: null, max: 500_000 }],
     },
@@ -798,7 +798,7 @@ test('text query matches v1 and the shop page for a term inside one field', asyn
   await assertParity({ query: 'speed' }, {
     explicit: { yes: [rows.speedy.id], no: [rows.moon.id, rows.sub.id] },
   });
-  await assertParity({ query: 'Rolex Submariner' }, {
+  await assertParity({ query: 'Heuer Submariner' }, {
     explicit: { yes: [rows.sub.id], no: [rows.gmt.id] },
   });
   await assertParity({ query: '1675' }, {
@@ -1036,8 +1036,8 @@ test('null prices and years sort last, and favorites stay ahead of a newer watch
   await mk(low, 50, 1960, 'Sortbrand');
   await mk(tieHigh, 100, 1980, 'Sortbrand');
   await mk(tieLow, 100, null, 'Sortbrand');
-  await mk(high, 500, 1970, 'Rolex');
-  await mk(missing, null, 1990, 'Sortbrand');
+  await mk(high, 500, 1970, 'Heuer');
+  await mk(missing, null, 1985, 'Sortbrand');
 
   const sortSpec = canonicalize({ dealers: [dealers.sort.id] }).spec;
   const byPrice = await pageV2(sortSpec, { limit: 1, sort: 'price_asc' });
@@ -1052,12 +1052,12 @@ test('null prices and years sort last, and favorites stay ahead of a newer watch
   );
   const oldest = await pageV2(sortSpec, { limit: 2, sort: 'oldest' });
   assert.equal(oldest.at(-1).listing.id, tieLow);
-  assert.deepEqual(oldest.slice(0, 4).map((row) => row.listing.year), [1960, 1970, 1980, 1990]);
+  assert.deepEqual(oldest.slice(0, 4).map((row) => row.listing.year), [1960, 1970, 1980, 1985]);
   const newestWatch = await pageV2(sortSpec, { limit: 5, sort: 'newest_watch' });
   assert.equal(newestWatch.at(-1).listing.id, tieLow);
   assert.deepEqual(
     newestWatch.slice(0, 4).map((row) => row.listing.year),
-    [1990, 1980, 1970, 1960],
+    [1985, 1980, 1970, 1960],
   );
 
   const filters = asFilters(sortSpec);
@@ -1073,7 +1073,7 @@ test('null prices and years sort last, and favorites stay ahead of a newer watch
   await api(`/rest/v1/profiles?id=eq.${buyer.id}`, {
     token: service,
     method: 'PATCH',
-    body: { favorite_brands: ['rolex'] },
+    body: { favorite_brands: ['heuer'] },
   });
   const fav = await pageV2(sortSpec, {
     token: buyer.token,
@@ -1157,13 +1157,13 @@ test('facet counts, with Unknown, add up to listing_counts_v2 matched', async ()
   const priced = spec({ prices: [{ min: null, max: 500_000 }] });
   const pricedRows = await assertFacetPartitions(priced);
   // GMT at $4,500 and the Datejust at $5,000. The Explorer has no price, so it
-  // is not in this Rolex count, and neither is the Submariner at $8,000.
-  assert.equal(Number(pricedRows.find((row) => row.kind === 'brand' && row.value === 'rolex').count), 2);
+  // is not in this Heuer count, and neither is the Submariner at $8,000.
+  assert.equal(Number(pricedRows.find((row) => row.kind === 'brand' && row.value === 'heuer').count), 2);
 
-  // Rolex plus dress plus under $5k. Brand counts ignore Rolex, so Tudor stays.
+  // Heuer plus dress plus under $5k. Brand counts ignore Heuer, so Tudor stays.
   // The matched count of the whole spec is smaller than that brand total.
   const selected = spec({
-    brands: ['rolex'],
+    brands: ['heuer'],
     styles: ['dress'],
     prices: [{ min: null, max: 500_000 }],
   });
@@ -1186,7 +1186,7 @@ test('a missing attribute is the Unknown bucket, and two complications are two r
     assert.equal(unknown.label, 'Unknown', kind);
     assert.equal(Number(unknown.count), 1, kind);
   }
-  assert.equal(Number(blankRows.find((row) => row.kind === 'brand' && row.value === 'rolex').count), 1);
+  assert.equal(Number(blankRows.find((row) => row.kind === 'brand' && row.value === 'heuer').count), 1);
   // One complication on one watch, none on the other. Those two rows add up.
   assert.equal(sumKind(blankRows, 'complication'), matched.matched);
 
@@ -1248,7 +1248,7 @@ test('facets follow the same visibility, swipe, and claimed-shop rules as the co
   assert.equal(dropped.matched, 1);
   const rowsAfter = await assertFacetPartitions(facetSpec, { token: buyer.token, excludeSwiped: true });
   assert.equal(
-    rowsAfter.some((row) => row.kind === 'brand' && row.value === 'rolex'),
+    rowsAfter.some((row) => row.kind === 'brand' && row.value === 'heuer'),
     false,
   );
   assert.equal(Number(rowsAfter.find((row) => row.kind === 'brand' && row.value === '').count), 1);
