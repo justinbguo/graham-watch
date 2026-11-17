@@ -1,5 +1,19 @@
 export type FacetKind = { kind: string };
 
+export const DEALER_NAME_PLACEHOLDER = 'Dealer';
+
+export function dealerDisplayName(
+  id: string,
+  known: readonly { id: string; name: string | null | undefined }[],
+): string | null {
+  for (const row of known) {
+    if (row.id !== id) continue;
+    const name = row.name?.trim();
+    if (name && name !== id) return name;
+  }
+  return null;
+}
+
 /**
  * Shops the filter may offer.
  *

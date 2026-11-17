@@ -25,6 +25,7 @@ import { deckPhotoHeight, SwipeCard, type SwipeCardHandle } from '@/components/S
 import { UndoButton } from '@/components/UndoButton';
 import { ViewToggle, type DeckView } from '@/components/ViewToggle';
 import { Button, Centered, Heading, Message, Screen, Spinner } from '@/components/ui';
+import { useDealerDirectory } from '@/data/dealers';
 import { DECK_LIMIT, shouldRefillDeck } from '@/data/deckPaging';
 import { logEvent, useExposure } from '@/data/listingEvents';
 import { showDeckEmpty, useDeck, useListingCounts, usePrimeListing, type ListingCounts } from '@/data/listings';
@@ -36,7 +37,7 @@ import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
 import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
-import { activeCount, soleDealer } from '@/features/filters/types';
+import { activeCount, pressDealer, soleDealer } from '@/features/filters/types';
 import { formatShortDate } from '@/lib/format';
 import { useSaveFlight, type Rect } from '@/features/saved/flight';
 import { isGridColumnOption } from '@/lib/gridColumns';
@@ -58,7 +59,7 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const deckFilters = useFilters('deck');
   const newFilters = useFilters('new');
   const filterApi = isNew ? newFilters : deckFilters;
-  const { filters, clear, showOnlyDealer, showAllDealers } = filterApi;
+  const { filters, clear, replace, showAllDealers } = filterApi;
   const fresh = useNewListings({ enabled: isNew, pageAll: isNew && activeCount(filters) > 0 });
   const deck = useDeck(DECK_LIMIT, !isNew);
   const [judged, setJudged] = useState<ReadonlySet<string>>(() => new Set());
@@ -128,6 +129,8 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const open = useOpenStack();
   const pathname = usePathname();
   const shownDealer = soleDealer(filters);
+  const { data: directory = [] } = useDealerDirectory();
+  const shownDealerName = directory.find((shop) => shop.id === shownDealer)?.name ?? null;
   const count = activeCount(filters);
   const filterSurface = isNew ? 'new' : 'deck';
   // Sheets sit above the tabs on the app stack; the deck stays mounted under
@@ -370,12 +373,15 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const desktopRail = isDesktopWeb ? (
     <DeckToolRail width="dealers">
       <DeckRailTools>{deckTools}</DeckRailTools>
-      <DealerDirectory selectedId={shownDealer} onSelect={showOnlyDealer} />
+      <DealerDirectory
+        selectedId={shownDealer}
+        onSelect={(id) => replace(pressDealer(filters, id))}
+      />
     </DeckToolRail>
   ) : null;
   const dealerHeader =
     shownDealer === null ? null : (
-      <DeckDealerHeader dealerId={shownDealer} onShowAll={showAllDealers} />
+      <DeckDealerHeader dealerId={shownDealer} name={shownDealerName} onShowAll={showAllDealers} />
     );
   const pinnedHeader = view === 'grid' ? null : dealerHeader;
   const frameDesktop = (content: ReactNode) => {

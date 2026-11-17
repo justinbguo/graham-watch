@@ -194,6 +194,11 @@ export function scopeDealer(filters: Filters, dealerId: string | null): Filters 
   return { ...filters, dealers: [dealerId] };
 }
 
+export function pressDealer(filters: Filters, dealerId: string): Filters {
+  if (soleDealer(filters) === dealerId) return scopeDealer(filters, null);
+  return scopeDealer(filters, dealerId);
+}
+
 export function toRpcArgs(filters: Filters) {
   const price = bands(filters.prices);
   const size = bands(rangesFor(SIZE_PRESETS, filters.sizes));
