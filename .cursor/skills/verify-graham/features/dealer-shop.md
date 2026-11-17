@@ -27,4 +27,5 @@ Preconditions:
 - `screenshot --as dealer` signs in as the dealer. Do not use that shot as the buyer badge proof.
 - The dealer's own deck hides their claimed shop. Look at Profile, not Buy, for Test Bench's editor.
 - Approving the shop is the operator console, not a control on this page.
+- Profile does not show `Do you run a shop listed here?`. `Claim this shop` shows when the signed-in email is the address published on the shop. `/apply` still starts a claim.
 - The Messages section of Deal shows `Not in scope right now, but you're free to test.` The banner is not a control. Listings, Analytics, Payments, and Support do not show it.

@@ -27,5 +27,6 @@ Preconditions:
 ## Gotchas
 
 - Demo listing photos load from `picsum.photos`; a blank photo with a correct title is still identity proof — note network failure separately via `network-summary`.
+- On the grid the shop name sits on the photograph. The shop icon shows when the shop has a logo. Demo shops have none, so the name stands alone. A failed logo leaves the name alone too.
 - Do not require dealer claim or messaging to pass this feature in demo.
 - Title and price sit on the headline row with `Close`. `View on dealer site` is a link. `Pass` is absent when the listing was opened from search, when it is already saved, or when it is sold. `Add to wishlist` is absent once the watch is saved. The grid recipe above is a fresh unsold watch, so both buttons are there. A watch already saved in this session is no longer a Buy grid button.

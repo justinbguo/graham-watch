@@ -7,6 +7,7 @@ This directory is the maintained source for verifying Graham's user-facing behav
 - One local stack only, started with `node .cursor/skills/verify-graham/control-graham.mjs up`. API `http://127.0.0.1:54321`. Do not start a second stack.
 - App web export at `http://127.0.0.1:8091`, started with the `web` command. Do not also run `npm run web` on 8081 for the same proof.
 - `node .cursor/skills/verify-graham/control-graham.mjs doctor` reports `stack.apiOk: true` and a local URL.
+- The app opens dark. A stored `graham.theme` of light, dark, or system still wins.
 - `seed` has created `buyer`, `quiet`, and `dealer` (Test Bench). The hosted project is out of bounds.
 - Never drive a stack this run did not start.
 
@@ -32,8 +33,8 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 ## Features
 
 - [Onboarding](./onboarding.md) — desktop asks a name, then what to show first. Phone still asks name, username, and birthday.
-- [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`.
-- [New](./new.md). The latest sealed catalogue batch. Opening the tab clears the count on this device until a later seal. Not the Drops feed.
+- [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`, then shops take turns.
+- [New](./new.md). The latest sealed catalogue batch, seated the same way with no personal score. Opening the tab clears the count on this device until a later seal. Not the Drops feed.
 - [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
 - [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count on Messages. This is the proven flow.
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.

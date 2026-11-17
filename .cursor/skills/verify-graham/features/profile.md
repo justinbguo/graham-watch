@@ -1,13 +1,13 @@
 # Profile
 
-Profile is the signed-in person's name, the shop they claimed if they have one, their posts, their wishlist, and the shops they follow. New watches from those shops are in Messages, not here.
+Profile is the signed-in person's name and portrait, the shop they claimed if they have one, their posts, their wishlist, and the shops they follow. Someone with no photo sees the bundled portrait. New watches from those shops are in Messages, not here. The app opens dark.
 
 ## Sub-features
 
 - `profile-page`: route `/profile`.
 - `guest-gate`: signed out, the button `Log in or create an account`.
 - `following`: shops the person follows, each with `Follow` or `Following`. The row name is `<shop>, verified`.
-- `settings`: the button `Open settings`.
+- `settings`: the button `Open settings`. The name field is `Your name`, and `Save` stays off until the name changes. Over 80 characters shows `Use 80 characters or fewer.` Appearance is `System`, `Light`, or `Dark`. The app opens dark. A stored `graham.theme` of light, dark, or system still wins.
 
 ## How to get to it (user POV)
 
@@ -26,5 +26,7 @@ Preconditions:
 ## Gotchas
 
 - The drops count is on the Messages tab. A Profile screenshot that finds `Profile, N` means the move regressed.
+- The portrait is the person's picture. A shop row uses the shop's mark. A missing shop logo does not become the portrait.
+- Settings does not list Payment & shipping or Backend. Profile does not show `Do you run a shop listed here?`.
 - `seed` sets `onboarded_at`, so Profile renders instead of onboarding.
 - The Drops proof's buyer must be the account in `--as`. `quiet` may also have an unseen count and must not be the screenshot user for the push proof.
