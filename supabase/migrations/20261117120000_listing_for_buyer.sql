@@ -10,7 +10,7 @@
 -- anon policy, the New tab, the seal, and a guest's shop count follow.
 -- rank_buy_feed is security definer and does not consult that policy, so it
 -- calls the predicate itself. A restrictive select policy covers every
--- security-invoker read (search, a shop page, the wishlist, a direct link).
+-- security invoker read (search, a shop page, the wishlist, drops, a direct link).
 -- The shop's owner, the importer, and an operator can still read the row.
 
 create function public.listing_for_buyer(p_listing public.listings)
@@ -214,52 +214,6 @@ $$;
 
 revoke all on function public.rank_buy_feed(jsonb, integer, text, jsonb) from public;
 grant execute on function public.rank_buy_feed(jsonb, integer, text, jsonb) to anon, authenticated, service_role;
-
--- New has no taste, so every watch scores 0 and the newest leads each turn.
--- The ids stay filtered by listing_on_deck, so a caller learns only ids a
--- guest could already read.
-create or replace function public.latest_catalogue_batch()
-returns table (batch_id uuid, sealed_at timestamptz, listing_ids uuid[])
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select
-    b.id,
-    b.sealed_at,
-    coalesce(
-      (
-        with on_deck as (
-          select l.id, l.dealer_id, l.brand_key, l.created_at
-          from public.catalogue_batch_listings m
-          join public.listings l on l.id = m.listing_id
-          where m.batch_id = b.id
-            and public.listing_on_deck(l)
-        )
-        select array_agg(on_deck.id order by mixed.slot, on_deck.created_at desc, on_deck.id)
-        from on_deck
-        join public.shop_mix((
-          select jsonb_agg(jsonb_build_object(
-            'id', o.id,
-            'dealer_id', o.dealer_id,
-            'brand_key', o.brand_key,
-            'score', 0,
-            'created_at', o.created_at
-          ))
-          from on_deck o
-        )) mixed on mixed.id = on_deck.id
-      ),
-      '{}'::uuid[]
-    )
-  from (
-    select c.id, c.sealed_at
-    from public.catalogue_batches c
-    order by c.sealed_at desc, c.id desc
-    limit 1
-  ) b;
-$$;
-
 
 -- Permissive policies are OR'd, so a new permissive policy cannot hide a row.
 -- Anon must not call is_operator(): that function is not granted to anon.

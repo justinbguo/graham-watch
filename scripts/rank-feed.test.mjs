@@ -200,6 +200,7 @@ test.before(async () => {
     model: 'Tank',
     style: 'other',
     price_cents: null,
+    year: null,
     created_at: ago(120),
   }, 3);
   listings.patek = await insertListing({
@@ -371,6 +372,11 @@ test('a buyer with taste, a follow, and a pass pages the same order, including a
 });
 
 test('a buyer cannot read a Rolex or a watch made after 1985, and the shop owner still can', async () => {
+  assert.equal(listings.cartier.year, null);
+  assert.equal(listings.rolex.year, 1968);
+  assert.equal(listings.tudor.year, 1968);
+  assert.equal(listings.late.year, 1990);
+  assert.equal(listings.boundary.year, 1985);
   for (const token of [anon, stranger.token]) {
     const ids = await walk(token, spec());
     assert.equal(ids.includes(listings.rolex.id), false);
@@ -378,11 +384,15 @@ test('a buyer cannot read a Rolex or a watch made after 1985, and the shop owner
     assert.equal(ids.includes(listings.late.id), false);
     assert.equal(ids.includes(listings.tudor.id), true);
     assert.equal(ids.includes(listings.boundary.id), true);
+    assert.equal(ids.includes(listings.cartier.id), true);
     const hidden = await api(`/rest/v1/listings?id=eq.${listings.rolex.id}&select=id`, { token });
     assert.equal(hidden.status, 200);
     assert.deepEqual(hidden.body, []);
     const late = await api(`/rest/v1/listings?id=eq.${listings.late.id}&select=id`, { token });
     assert.deepEqual(late.body, []);
+    const ownedHidden = await api(`/rest/v1/listings?id=eq.${listings.ownerRolex.id}&select=id`, { token });
+    assert.equal(ownedHidden.status, 200);
+    assert.deepEqual(ownedHidden.body, []);
     const search = await api('/rest/v1/rpc/search_listings_v2', {
       token,
       method: 'POST',
@@ -395,6 +405,7 @@ test('a buyer cannot read a Rolex or a watch made after 1985, and the shop owner
     assert.equal(found.has(listings.late.id), false);
     assert.equal(found.has(listings.tudor.id), true);
     assert.equal(found.has(listings.boundary.id), true);
+    assert.equal(found.has(listings.cartier.id), true);
   }
 
   const owned = await api(`/rest/v1/listings?id=eq.${listings.ownerRolex.id}&select=id,brand`, {
