@@ -2214,6 +2214,10 @@ export type Database = {
           value: string
         }[]
       }
+      listing_for_buyer: {
+        Args: { p_listing: Database["public"]["Tables"]["listings"]["Row"] }
+        Returns: boolean
+      }
       listing_gallery_ready: {
         Args: { p_listing_id: string }
         Returns: boolean
