@@ -467,7 +467,11 @@ async function postGuest(key: string, rows: readonly WireEvent[], device: string
   const timeout = setTimeout(() => abort.abort(), SEND_TIMEOUT_MS);
   try {
     const { error } = await supabase
-      .rpc('log_guest_events', { p_guest_key: key, p_events: rows, p_device: device })
+      .rpc('log_guest_events', {
+        p_guest_key: key,
+        p_events: [...rows],
+        ...(device ? { p_device: device } : {}),
+      })
       .abortSignal(abort.signal);
     return error ? (error.code ?? '') : null;
   } finally {

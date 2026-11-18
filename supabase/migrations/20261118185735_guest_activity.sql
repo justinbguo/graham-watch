@@ -184,7 +184,7 @@ comment on function public.guest_summary(uuid) is
  * Country is the cf-ipcountry header when it is two letters. XX and T1 are
  * dropped. No IP, user agent, city, or referrer is stored.
  */
-create function public.log_guest_events(p_guest_key uuid, p_events jsonb, p_device text)
+create function public.log_guest_events(p_guest_key uuid, p_events jsonb, p_device text default null)
 returns integer
 language plpgsql
 security definer

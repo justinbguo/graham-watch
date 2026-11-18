@@ -5497,11 +5497,15 @@ console.log('\nguest activity');
     capStored += result.body;
   }
   const overCap = await logGuest(ANON, capKey, [watchEvent('pass')]);
-  const capRows = await rowsFor(capKey);
+  // PostgREST stops a select at max_rows (1000). The count is in Content-Range.
+  const counted = await fetch(`${URL}/rest/v1/buyer_events?guest_key=eq.${capKey}&select=id`, {
+    headers: { ...admin, Prefer: 'count=exact', Range: '0-0' },
+  });
+  const capTotal = Number((counted.headers.get('content-range') ?? '').split('/')[1]);
   check(
     'a guest key over 2000 rows in a day stores nothing further',
-    capStored === 2000 && capStatus === 200 && overCap.status === 200 && overCap.body === 0 && capRows.length === 2000,
-    `stored ${capStored} status ${capStatus}, next ${overCap.status} ${JSON.stringify(overCap.body)}, rows ${capRows.length}`,
+    capStored === 2000 && capStatus === 200 && overCap.status === 200 && overCap.body === 0 && capTotal === 2000,
+    `stored ${capStored} status ${capStatus}, next ${overCap.status} ${JSON.stringify(overCap.body)}, rows ${capTotal}`,
   );
 
   const freshKey = crypto.randomUUID();
