@@ -101,8 +101,11 @@ are still only on your laptop. Go back to step 3, then push again.
 
 CI runs five jobs: `app`, `operator ui`, `edge functions`, `database`, and `drops verification`.
 A fifth workflow, `Deploy edge functions`, runs only after a push to `main`
-that changes a function or `supabase/config.toml`. It does not run on a pull
-request, and it does not apply migrations.
+that changes function code, shared function code, `supabase/config.toml`,
+`scripts/deploy-functions.mjs`, or the workflow file. Any of those ships
+every function, because `operator-bot` bundles `import-listings`. A test-only
+change ships nothing. It does not run on a pull request, and it does not
+apply migrations.
 Vercel builds a preview of the web app. Open the preview and click the thing
 you changed.
 

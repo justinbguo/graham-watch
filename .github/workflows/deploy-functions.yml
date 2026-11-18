@@ -1,12 +1,5 @@
 name: Deploy edge functions
 
-# Merging function code to main used to leave the hosted function on the
-# previous deploy. import-listings is the one the nightly refresh calls, and
-# a stale copy is what returned HTTP 546 for a whole night. This job ships
-# the functions whose code changed. It does not apply migrations — that
-# writes production schema and is still a deliberate `npm run db:push`
-# after a dump. See docs/OPERATING.md.
-
 on:
   push:
     branches: [main]
@@ -30,7 +23,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: deploy changed functions
+    name: deploy functions
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

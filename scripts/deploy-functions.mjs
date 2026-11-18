@@ -1,20 +1,3 @@
-/**
- * Deploy the edge functions whose code changed on this push to main.
- *
- * The project ref is the hosted Graham project. The access token is a
- * repository secret (SUPABASE_ACCESS_TOKEN), read from the environment by
- * the Supabase CLI — it is never passed as an argument.
- *
- * import-listings keeps JWT verification on. The nightly job sends the
- * service-role JWT and the cron secret. `--no-verify-jwt` is not a flag
- * this script will add. config.toml is the source of that choice, and a
- * change to it deploys every function so a missed manual deploy gets
- * caught up the next time this file or the config changes.
- *
- * Migrations are not applied here. `db push` writes production schema and
- * needs a database password this job does not have. See docs/OPERATING.md.
- */
-
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -44,34 +27,31 @@ export function importListingsKeepsJwt(configText) {
   return /^\s*verify_jwt\s*=\s*true\s*$/m.test(block) && !/verify_jwt\s*=\s*false/.test(block);
 }
 
+const SHIP_ALL = new Set([
+  'supabase/config.toml',
+  'scripts/deploy-functions.mjs',
+  '.github/workflows/deploy-functions.yml',
+]);
+
+function changedFileShipsAll(file, functions) {
+  const normalized = file.replaceAll('\\', '/');
+  if (SHIP_ALL.has(normalized)) return true;
+  const match = normalized.match(/^supabase\/functions\/([^/]+)\/(.+)$/);
+  if (!match) return false;
+  const [, name, rest] = match;
+  if (name.startsWith('_')) return true;
+  if (rest.endsWith('.test.ts') || rest.endsWith('.env.example') || rest === 'deno.ci.json') return false;
+  return functions.includes(name);
+}
+
 /**
  * @param {string[] | null} files null means the diff is unknown and every function ships
- * @param {string[]} functions directory names under supabase/functions, excluding _shared
+ * @param {string[]} functions directory names under supabase/functions, excluding shared folders
  */
-export function selectFunctions(files, functions) {
-  if (files == null) return [...functions].sort();
-
-  let all = false;
-  const chosen = new Set();
-  for (const file of files) {
-    const normalized = file.replaceAll('\\', '/');
-    if (normalized === 'supabase/config.toml') {
-      all = true;
-      continue;
-    }
-    const match = normalized.match(/^supabase\/functions\/([^/]+)\/(.+)$/);
-    if (!match) continue;
-    const [, name, rest] = match;
-    if (name.startsWith('_')) {
-      all = true;
-      continue;
-    }
-    if (rest.endsWith('.test.ts') || rest.endsWith('.env.example') || rest === 'deno.ci.json') continue;
-    if (functions.includes(name)) chosen.add(name);
-  }
-
-  if (all) return [...functions].sort();
-  return [...chosen].sort();
+export function functionsToShip(files, functions) {
+  const all = [...functions].sort();
+  if (files == null) return all;
+  return files.some((file) => changedFileShipsAll(file, functions)) ? all : [];
 }
 
 export function deployArgs(name, projectRef = PROJECT_REF) {
@@ -148,7 +128,7 @@ async function main() {
 
   const functions = listFunctionDirs();
   const files = diffFiles(process.env.BEFORE ?? '');
-  const names = selectFunctions(files, functions);
+  const names = functionsToShip(files, functions);
 
   if (names.length === 0) {
     console.log('No edge function code changed. Nothing to deploy.');

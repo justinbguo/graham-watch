@@ -10,7 +10,7 @@ import {
   listFunctionDirs,
   operatorBotSkipsJwt,
   probeManagementApi,
-  selectFunctions,
+  functionsToShip,
 } from './deploy-functions.mjs';
 
 const FUNCTIONS = [
@@ -25,16 +25,18 @@ test('the hosted project ref is the one the refresh job already calls', () => {
   assert.equal(PROJECT_REF, 'hbxgxtbtefpyutyqafoi');
 });
 
-test('a change inside one function deploys only that function', () => {
+test('a change inside one function deploys every function', () => {
   assert.deepEqual(
-    selectFunctions(['supabase/functions/import-listings/index.ts'], FUNCTIONS),
-    ['import-listings']
+    functionsToShip(['supabase/functions/import-listings/index.ts'], FUNCTIONS),
+    FUNCTIONS
+  );
+  assert.deepEqual(
+    functionsToShip(['supabase/functions/claim-dealer/index.ts'], FUNCTIONS),
+    FUNCTIONS
   );
 });
 
-// PR 91 changed only import-listings (plus docs). operator-bot bundles that
-// code at deploy time, so the hosted bot stayed on the previous reader.
-const PR_91_FILES = [
+const importerOnlyFiles = [
   'AGENTS.md',
   'docs/SCRAPING.md',
   'docs/dealer-site-readiness.md',
@@ -45,14 +47,21 @@ const PR_91_FILES = [
 
 test('an import-listings change deploys operator-bot', () => {
   const functions = listFunctionDirs();
-  const selected = selectFunctions(PR_91_FILES, functions);
-  assert.equal(selected.includes('import-listings'), true);
-  assert.equal(selected.includes('operator-bot'), true);
+  assert.equal(functions.includes('operator-bot'), true);
+  assert.deepEqual(functionsToShip(importerOnlyFiles, functions), functions);
+});
+
+test('the deploy script or the workflow file deploys every function', () => {
+  assert.deepEqual(functionsToShip(['scripts/deploy-functions.mjs'], FUNCTIONS), FUNCTIONS);
+  assert.deepEqual(
+    functionsToShip(['.github/workflows/deploy-functions.yml'], FUNCTIONS),
+    FUNCTIONS
+  );
 });
 
 test('a test, an env example, or an unrelated file deploys nothing', () => {
   assert.deepEqual(
-    selectFunctions(
+    functionsToShip(
       [
         'supabase/functions/import-listings/shopify.test.ts',
         'supabase/functions/.env.example',
@@ -66,14 +75,14 @@ test('a test, an env example, or an unrelated file deploys nothing', () => {
 
 test('shared code or config.toml deploys every function', () => {
   assert.deepEqual(
-    selectFunctions(['supabase/functions/_shared/mailer.ts'], FUNCTIONS),
+    functionsToShip(['supabase/functions/_shared/mailer.ts'], FUNCTIONS),
     FUNCTIONS
   );
-  assert.deepEqual(selectFunctions(['supabase/config.toml'], FUNCTIONS), FUNCTIONS);
+  assert.deepEqual(functionsToShip(['supabase/config.toml'], FUNCTIONS), FUNCTIONS);
 });
 
 test('an unknown diff deploys every function', () => {
-  assert.deepEqual(selectFunctions(null, FUNCTIONS), FUNCTIONS);
+  assert.deepEqual(functionsToShip(null, FUNCTIONS), FUNCTIONS);
 });
 
 test('deploy args keep JWT verification on and name the project', () => {
