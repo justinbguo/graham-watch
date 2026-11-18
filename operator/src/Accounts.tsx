@@ -12,7 +12,13 @@ import { labelAnswer } from './dashboard';
 import { formatPrice, photoUrl } from './importer';
 import { supabase } from './supabase';
 
-export function Accounts() {
+export function Accounts({
+  focusId = null,
+  onFocusUsed,
+}: {
+  focusId?: string | null;
+  onFocusUsed?: () => void;
+}) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<'number' | 'active'>('number');
@@ -31,6 +37,13 @@ export function Accounts() {
       live = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!focusId) return;
+    setDetailError(null);
+    setOpened({ id: focusId, limit: 200 });
+    onFocusUsed?.();
+  }, [focusId, onFocusUsed]);
 
   useEffect(() => {
     if (!opened) return;
