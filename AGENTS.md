@@ -102,7 +102,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 | --- | --- | --- |
 | `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, `test:rank`, generated types), `drops verification` (`npm run verify:drops`) |
 | `Catalogue refresh` | Cron `0 6 * * *`, and manual | `npm run refresh` against hosted |
-| `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships changed functions. Does not apply migrations. |
+| `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships every function when any function source, a shared folder, config, the deploy script, or the workflow changes. A test-only change ships nothing. Does not apply migrations. |
 
 Vercel deploys the Expo web app from `main`. Preview builds run on pull requests. See [docs/DEVELOPING.md](docs/DEVELOPING.md).
 

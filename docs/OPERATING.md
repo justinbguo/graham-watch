@@ -71,14 +71,16 @@ deploy that has not happened, not a bug to hunt:
 supabase secrets set RESEND_API_KEY=... SCRAPE_PROVIDER=jina JINA_API_KEY=...
 ```
 
-Functions go up from GitHub when a change to `supabase/functions/` or
-`supabase/config.toml` is pushed to `main`
+Functions go up from GitHub when a change to `supabase/functions/`,
+`supabase/config.toml`, `scripts/deploy-functions.mjs`, or the deploy
+workflow is pushed to `main`
 (`.github/workflows/deploy-functions.yml`). That is the deploy that was
-missing when `import-listings` on hosted stayed on an old copy. The workflow
-deploys only the functions whose code changed. Shared code or a config
-change deploys all of them. `import-listings` keeps `verify_jwt = true` in
-`supabase/config.toml`; the workflow refuses to run if that is turned off,
-and it never passes `--no-verify-jwt`.
+missing when `import-listings` on hosted stayed on an old copy. `operator-bot`
+bundles `import-listings` at deploy time, so any function source file, shared
+folder, config change, or change to the deploy script ships every function.
+A test file under `supabase/functions` ships nothing. `import-listings` keeps
+`verify_jwt = true` in `supabase/config.toml`; the workflow refuses to run if
+that is turned off, and it never passes `--no-verify-jwt`.
 
 One new repository secret, and nothing else:
 
