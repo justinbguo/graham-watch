@@ -287,6 +287,39 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
     reason: 'not_a_watch',
     fields: item({ title: 'ETA 2824 Movement Only' }),
   },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title:
+        '1865 Waltham P.S. Bartlett Civil War Era 18 Size Pocket Watch Same Brand Given to Abraham Lincoln at Gettysburg',
+      productType: 'Pocket Watch',
+      tags: ['Pocket Watch'],
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: '1914 Vacheron Constantin for Merimont Mens Art Deco 44mm Pocket Watch Platinum',
+      productType: 'WATCH',
+      tags: ['Pocket Watch'],
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title: "Owned/Used by ZZ Top's Dusty Hill Harley-Davidson Chrome Pocket Watch",
+      productType: 'WATCH',
+      tags: ['Pocket Watch'],
+    }),
+  },
+  {
+    reason: 'not_a_watch',
+    fields: item({
+      title:
+        '1912 Patek Philippe Vintage Ladies Miniature Pendant 18K Gold, Enamel & Diamond Watch',
+      productType: 'Pocket Watch',
+    }),
+  },
 ];
 
 const WATCHES: CatalogueFields[] = [
@@ -422,6 +455,10 @@ const TRAPS: CatalogueFields[] = [
     title: 'Nautilus 5711',
     text: 'Diamond cocktail wristwatch. Style is jewellery.',
   }),
+  item({
+    title: 'Patek Philippe Calatrava ref. 5026G',
+    productType: 'Watches and Accessories',
+  }),
 ];
 
 Deno.test('wristwatch traps stay on the deck', () => {
@@ -525,15 +562,16 @@ function keptForNow(row: CsvRow): boolean {
 }
 
 function expectedFromLabel(row: CsvRow): HoldReason | 'watch' {
-  if (keptForNow(row)) return 'watch';
   if (row.category === 'jewelry') return 'accessory';
   if (row.category === 'accessory' || row.category === 'other_part') return 'not_a_watch';
   if (row.category === 'bracelet_part') {
     if (row.title.includes('Florentine')) return 'watch';
     return 'strap';
   }
+  // A switched-off pendant or stopwatch rule does not cancel a pocket watch.
   const typedPocket = /pocket\s*watch/i.test(productTypeFromAudit(row) ?? '');
   if (pocketSignal(row) || typedPocket) return 'not_a_watch';
+  if (keptForNow(row)) return 'watch';
   return 'watch';
 }
 
