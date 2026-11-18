@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Accounts } from './Accounts';
 import { Activity } from './Activity';
@@ -38,7 +38,6 @@ export function App() {
   const [screen, setScreen] = useState<Screen>('dealers');
   const [inboxFocus, setInboxFocus] = useState<InboxFocus | null>(null);
   const [accountFocus, setAccountFocus] = useState<string | null>(null);
-  const clearAccountFocus = useCallback(() => setAccountFocus(null), []);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -124,7 +123,7 @@ export function App() {
         ) : screen === 'users' ? (
           <Users />
         ) : screen === 'accounts' ? (
-          <Accounts focusId={accountFocus} onFocusUsed={clearAccountFocus} />
+          <Accounts focusId={accountFocus} />
         ) : screen === 'guests' ? (
           <Guests
             onOpenAccount={(userId) => {
