@@ -60,10 +60,6 @@ const GUEST_SENDABLE = new Set<WireEvent['kind']>([
 
 export type DeviceKind = 'web-desktop' | 'web-mobile' | 'ios' | 'android';
 
-/**
- * The device key. A stored uuid wins. Otherwise a uuid already on the buffer
- * is adopted. Otherwise the minted id is the key.
- */
 export function resolveGuestKey(storedKey: string | null, buffer: GuestBuffer | null, minted: string): string {
   if (storedKey && UUID_RE.test(storedKey)) return storedKey;
   if (buffer && UUID_RE.test(buffer.guestKey)) return buffer.guestKey;
@@ -75,7 +71,6 @@ export function guestSendable(row: { kind: string }): boolean {
   return GUEST_SENDABLE.has(row.kind as WireEvent['kind']);
 }
 
-/** ios and android come from the platform. Web splits at the deck's wide breakpoint. */
 export function deviceKind(platform: string, width: number | null): DeviceKind | null {
   if (platform === 'ios') return 'ios';
   if (platform === 'android') return 'android';

@@ -82,12 +82,10 @@ export function parseGuest(value: unknown): GuestDetail {
   };
 }
 
-/** Operator devices stay out of the list until the toggle asks for them. */
 export function visibleGuests(guests: readonly Guest[], showOperators: boolean): Guest[] {
   return showOperators ? [...guests] : guests.filter((guest) => !guest.operator);
 }
 
-/** An operator row names the role, then the claimed first name when there is one. */
 export function guestTitle(guest: Guest): string {
   if (!guest.operator) return guest.claimedName ?? 'Guest';
   return guest.claimedName ? `Operator (${guest.claimedName})` : 'Operator';
