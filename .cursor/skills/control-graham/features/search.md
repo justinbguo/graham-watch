@@ -28,6 +28,6 @@ Preconditions:
 
 - Unsigned web shows the arrival sheet until `Close` or `Not now`. Demo does not.
 - The Buy door and the search field share the name `Search brand, model or reference`. `fill` types into the textbox. The door is a button and is not the field.
-- Search and the deck share catalogue rules in local mode; demo search reads the same six fixtures.
+- Search and the deck share catalogue rules in local mode, so a Rolex and a year after 1985 are absent there. Demo search reads the same six fixtures, including the Rolex.
 - Wait for results after typing; do not assert on a single frame mid-debounce.
 - Filters (`Filters` control) are a separate surface — prove them only when the task names filters.

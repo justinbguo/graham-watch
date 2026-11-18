@@ -8,7 +8,7 @@ Maintained source for verifying buyer-facing behavior. Read this index, then the
 - Run `doctor` and require `looksLikeGraham: true` on the owned URL.
 - Never drive a Metro/browser you did not start with `up`.
 - Default viewport is 1280×900. Demo is signed in, so Buy is usable immediately. The app opens dark. A stored `graham.theme` of light, dark, or system still wins. Desktop web starts on the grid. The rail button is `Display, N per row` (N is 2 through 6). A press steps N and wraps to `Display, one at a time`, which is the card deck. `press s` toggles the two. Arrows pass and save only in card view. There is no control named `Listings per row`.
-- Demo fixtures, top of the deck after shops take turns: Omega Speedmaster Professional 1972 (Vintage Vault), Seiko 6139 Pogue 1976 (Harbour Watch Co.), Rolex Datejust 1968 (Vintage Vault), Universal Genève Polerouter 1959 (Harbour Watch Co.), Heuer Autavia 1965 (Vintage Vault), Cartier Tank Must 1988 (Vintage Vault). Each shop's best watch comes before that shop's next.
+- Demo fixtures, top of the deck after shops take turns: Omega Speedmaster Professional 1972 (Vintage Vault), Seiko 6139 Pogue 1976 (Harbour Watch Co.), Rolex Datejust 1968 (Vintage Vault), Universal Genève Polerouter 1959 (Harbour Watch Co.), Heuer Autavia 1965 (Vintage Vault), Cartier Tank Must 1988 (Vintage Vault). Each shop's best watch comes before that shop's next. Demo does not apply the buyer catalogue rule. On a local stack a buyer does not see a Rolex, or a watch whose year is after 1985. A null year stays, 1985 stays, and Tudor stays.
 
 ## Driving conventions
 

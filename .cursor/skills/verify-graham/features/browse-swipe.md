@@ -23,7 +23,7 @@ Open the app. Web guests land on Buy with the sign-in sheet already open. Dismis
 
 Preconditions:
 
-- `up` and `web` are ready. The seeded catalogue from `supabase/seed.sql` is on the deck. Test Bench's shelf listing is there too once `seed` has run.
+- `up` and `web` are ready. The seeded catalogue from `supabase/seed.sql` is on the deck, except a Rolex and a watch whose year is after 1985. Test Bench's shelf listing is there too once `seed` has run.
 
 - **Open Buy.** Run `node .cursor/skills/verify-graham/control-graham.mjs screenshot / <evidence>/buy.png`. The shot is the deck or the guest gate, not a proof of a swipe.
 - **Rank.** Run `node .cursor/skills/verify-graham/control-graham.mjs verify-rank` after `seed` and `web`. The order is `rank_buy_feed`: a dealer click outweighs a save, a pass is a mild negative, an undo does not count, and a followed shop is boosted. Shops then take turns, so one shop's second watch waits behind the other shops' first. The command screenshots the sign-in sheet, dismisses it, browses as a guest, signs in as `buyer`, clicks a dealer link, reloads, then follows Test Bench and imports the fixture. The click is a `log_buyer_events` post, and the command fails if that post did not succeed. After the guest feed and again after the follow, it opens the grid and scrolls until the next page loads. Evidence is `guest-taste.png` (the sign-in sheet, before dismiss; the filename is unchanged), `guest-feed.png`, `guest-page.png`, `ranked-feed.png`, `followed-feed.png`, `buyer-page.png`, and `rank-buy.webm`.

@@ -27,3 +27,4 @@ Preconditions:
 - `catalogue_batches` and `catalogue_batch_listings` have no policies. The app reads them through `latest_catalogue_batch`. A buyer cannot insert a batch from the client.
 - Opening New stores the batch id in `graham.seen-new-batch` on this device. A guest and a signed-in person in the same browser share that mark.
 - Sealing is `seal_catalogue_batch` from a full `npm run refresh` that exits 0. A one-shop refresh does not seal. Do not run refresh against the hosted project from this harness.
+- The seal keeps watches that pass `listing_on_deck`. A Rolex and a year after 1985 are not in the batch. A null year stays.

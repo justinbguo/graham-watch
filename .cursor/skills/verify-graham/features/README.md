@@ -8,6 +8,7 @@ This directory is the maintained source for verifying Graham's user-facing behav
 - App web export at `http://127.0.0.1:8091`, started with the `web` command. Do not also run `npm run web` on 8081 for the same proof.
 - `node .cursor/skills/verify-graham/control-graham.mjs doctor` reports `stack.apiOk: true` and a local URL.
 - The app opens dark. A stored `graham.theme` of light, dark, or system still wins.
+- A buyer does not see a Rolex, or a watch whose stored year is after 1985. A null year stays, 1985 stays, and Tudor stays. The shop's owner, the importer, and an operator still see that row. Demo mode does not apply this rule.
 - `seed` has created `buyer`, `quiet`, and `dealer` (Test Bench). The hosted project is out of bounds.
 - Never drive a stack this run did not start.
 
@@ -40,4 +41,4 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.
 - [Profile](./profile.md) — the signed-in profile and the shops they follow.
 - [Dealer shop management](./dealer-shop.md) — a claimed shop edited by the dealer.
-- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce import reads the Store API. The catalog proof is still the Shopify stand-in.
+- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce reads the Store API, including one category URL. Squarespace reads the page HTML, and Wix reads the sitemap plus JSON-LD. The catalog proof is still the Shopify stand-in.
