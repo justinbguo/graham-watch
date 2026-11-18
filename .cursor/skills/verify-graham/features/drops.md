@@ -40,6 +40,7 @@ The captured push title is `New watches`. The body is `1 new watch from Test Ben
 
 - A watch listed before the follow, including `SHELF-1`, is not a drop. Following Test Bench does not announce the shelf.
 - A watch older than 14 days is not a drop. The seeded Goldfinger's catalogue is older than that window. Do not follow that shop in this proof.
+- The drops list is a buyer read. A Rolex, or a watch whose year is after 1985, is not in it. `DROP-1` is brand Fixture, year 1968, so this proof still counts it.
 - One row per buyer per UTC day. A second `notify-drops` the same day returns `alreadyClaimed` and sends nothing. Run `reset-proof` before a second proof.
 - No push token means no row. The Messages count does not need a token, so `quiet` can still have `unseen` greater than 0. The skip is the absence of a row and a push, plus `skipped.noTokenWithListings`.
 - Opening `/drops` or `/drops?dealerId=<id>` calls `mark_drops_seen` and the badge goes to 0. The tour screenshots Messages and Profile before it opens the feed. Opening a shop still clears that shop.

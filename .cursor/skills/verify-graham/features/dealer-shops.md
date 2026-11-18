@@ -25,5 +25,5 @@ Preconditions:
 
 - Opening the shop marks that shop's new watches seen. In the Drops proof, screenshot Messages before opening the shop, or the Messages badge will already be 0.
 - A shop that is not approved is not followable. Test Bench is inserted as approved by `seed`.
-- Goldfinger's Vintage is the seeded catalogue, id `ad0d7d71-741a-4b65-9465-641ed9cc0199`. Its watches are older than the drop window.
+- Goldfinger's Vintage is the seeded catalogue, id `ad0d7d71-741a-4b65-9465-641ed9cc0199`. Its watches are older than the drop window. A buyer on this page does not see its Rolex rows or a year after 1985. Those rows are still in the database.
 - The shop route is a modal, so it has no tab bar.

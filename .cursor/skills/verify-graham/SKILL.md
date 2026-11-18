@@ -15,9 +15,10 @@ Read [features/README.md](features/README.md) before driving a feature.
 
 ## Launch
 
-From the repo root, with Docker running and dependencies installed (`npm ci`):
+From the repo root, with Docker running and dependencies installed (`npm ci`). Screenshot and tour launch Playwright's Chromium, which `npm ci` does not download:
 
 ```bash
+npx playwright install chromium
 node .cursor/skills/verify-graham/control-graham.mjs up
 ```
 

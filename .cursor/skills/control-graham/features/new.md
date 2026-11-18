@@ -25,5 +25,5 @@ Preconditions:
 ## Gotchas
 
 - New uses Buy's header, so the screen has no title `New`. The tab is still `New`. The Drops screen title is `New watches`.
-- Demo seals three fixtures when the bundle loads, so the subtitle says last night while the timestamp is this session. Those three stay in fixture order: Omega, then Rolex, then Heuer. Shop seating applies to a sealed batch on a local database. Demo does not reseat this tab.
+- Demo seals three fixtures when the bundle loads, so the subtitle says last night while the timestamp is this session. Those three stay in fixture order: Omega, then Rolex, then Heuer. Shop seating applies to a sealed batch on a local database, and that seal omits a Rolex and a year after 1985. Demo does not reseat this tab and does not apply that omission.
 - A local database with no `seal_catalogue_batch` row shows the empty line and a tab named `New` with no count. `seed` does not seal a batch.

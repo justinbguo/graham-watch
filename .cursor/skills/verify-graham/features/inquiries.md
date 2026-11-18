@@ -25,5 +25,6 @@ Preconditions:
 ## Gotchas
 
 - `Send via Graham` on a local stack can hand mail to Mailpit. That is still a send. Do not press it while proving Drops.
+- A direct link to a Rolex, or to a watch whose year is after 1985, is not a public catalogue row. The sheet then says `That watch is no longer available.` Use `DROP-1` for this proof.
 - The hosted project must not receive a test inquiry. The harness refuses non-local URLs. Do not point the export at hosted and then press Send.
 - An inquiry is unique per listing and buyer. A second send is a different failure from a missing button.
