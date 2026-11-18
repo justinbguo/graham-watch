@@ -80,6 +80,16 @@ does not replace photographs already on the listing.
 Squarespace's default robots.txt disallows `?format=json`, so the adapter does
 not request it.
 
+Wind Vintage has no commerce collection. The homepage image grid under the
+Watches heading is the catalogue, and the sitemap is the sold archive, so it
+is not read. Each grid page supplies the title, the prose, the `PRICE:` line,
+the item number, and the photos. The last Squarespace button is the stock:
+a dollar amount is for sale, `SALE PENDING` and `SOLD` are not, and a page
+with no price and no status button is skipped. The same pacer, robots check,
+and not-a-watch hold apply. A refresh marks pending and sold watches sold,
+clears that when the button is a price again, and retires a watch that leaves
+the grid.
+
 It reads in two passes, and they happen at different times. The collection URL
 gives the list during the catalogue read. Each product URL is fetched later, in
 the publish batch, because a collection entry is only what the shop chose to show

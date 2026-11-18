@@ -299,3 +299,111 @@ Deno.test('a disallowed product page keeps the grid photos', async () => {
   assertEquals(calls, ['/robots.txt']);
   assertEquals(hydrated.photoUrls.length, 1);
 });
+
+function windPage(fields: {
+  title: string;
+  prose: string;
+  button?: string;
+  price?: string;
+  sku?: string;
+}): string {
+  const photos = [1, 2, 3]
+    .map((n) => `<img data-src="https://images.squarespace-cdn.com/content/v1/shop/${fields.sku ?? 'x'}-${n}.jpg" />`)
+    .join('');
+  const price = fields.price
+    ? `<p>PRICE: ${fields.price}${fields.sku ? ` (Item ${fields.sku})` : ''}</p>`
+    : fields.sku
+      ? `<p>Item ${fields.sku}</p>`
+      : '';
+  const button = fields.button ? `<a data-sqsp-button href="mailto:desk@windvintage.com">${fields.button}</a>` : '';
+  return `<!doctype html>Static.SQUARESPACE_CONTEXT = {};<title>${fields.title} — Wind Vintage</title><h1>${fields.title}</h1><p>${fields.prose}</p>${price}${photos}${button}`;
+}
+
+const WIND_HOME = `<!doctype html>Static.SQUARESPACE_CONTEXT = {};
+  <h1><strong>Watches</strong></h1>
+  <a
+    href="https://www.windvintage.com/sale"
+    class="image-slide-anchor"
+  ></a>
+  <a href="https://windvintage.com/pending" class="image-slide-anchor"></a>
+  <a href="https://www.windvintage.com/sold" class="image-slide-anchor"></a>
+  <a href="https://www.windvintage.com/kith" class="image-slide-anchor"></a>
+  <a href="https://www.windvintage.com/bracelet" class="image-slide-anchor"></a>
+  <a href="https://clickybezel.com/collections/wind" class="image-slide-anchor"></a>
+  <div class="newsletter-form-header"></div>`;
+
+const WIND_PAGES: Record<string, string> = {
+  '/sale': windPage({
+    title: 'Cartier Coin Watch',
+    prose: 'We believe the watch dates to circa 1927.',
+    button: '$29,000',
+    price: '$29,000',
+    sku: 'SBUXYT4008',
+  }),
+  '/pending': windPage({
+    title: 'Rolex Submariner Reference 5513',
+    prose: 'Running well.',
+    button: 'SALE PENDING',
+    price: '$21,000',
+    sku: 'SBUXYT5457',
+  }),
+  '/sold': windPage({
+    title: 'Heuer Autavia',
+    prose: 'It has left the shop.',
+    button: 'SOLD',
+    sku: 'SBUXYT5190',
+  }),
+  '/kith': windPage({
+    title: 'Rolex at Kith',
+    prose: 'Ask the partner store.',
+    button: 'J. Press.',
+  }),
+  '/bracelet': windPage({
+    title: '16mm Gay Freres Stretch Rivet 5.25 inches 1958',
+    prose: 'This stretch rivet bracelet was made by Gay Freres.',
+    button: '$1,900',
+    price: '$1,900',
+    sku: 'SBUXYT3475',
+  }),
+};
+
+Deno.test('Wind Vintage pages supply price, stock, photos, and a held bracelet', async () => {
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(`${url.hostname}${url.pathname}${url.search}`);
+    if (url.hostname.includes('clicky')) throw new Error('off-host fetch');
+    if (url.pathname === '/robots.txt') {
+      return { status: 200, body: 'User-agent: *\nAllow: /\nDisallow: /*?format=json\n' };
+    }
+    if (url.pathname === '/' || url.pathname === '') return { status: 200, body: WIND_HOME };
+    const body = WIND_PAGES[url.pathname];
+    if (!body) throw new Error(`unexpected ${url.pathname}`);
+    return { status: 200, body };
+  };
+  const read = await fetchSquarespaceItems('https://www.windvintage.com/', 10, 3, {
+    fetchText,
+    pause: async () => {},
+    maxPages: 1,
+  });
+  assertEquals(calls.some((call) => call.includes('format=json')), false);
+  assertEquals(calls.some((call) => call.includes('sitemap')), false);
+  assertEquals(read?.complete, true);
+  assertEquals(read?.nextPage, undefined);
+  const byPath = new Map(read?.items.map((item) => [new URL(item.sourceUrl).pathname, item]));
+  const sale = byPath.get('/sale');
+  assertEquals(sale?.available, true);
+  assertEquals(sale?.priceCents, 2_900_000);
+  assertEquals(sale?.externalId, 'squarespace:SBUXYT4008');
+  assertEquals((sale?.photoUrls.length ?? 0) >= 3, true);
+  assertEquals(sale?.photoUrls[0]?.includes('format=1500w'), true);
+  assertEquals(sale?.text.includes('1927'), true);
+  assertEquals(sale?.holdReason, undefined);
+  assertEquals(byPath.get('/pending')?.available, false);
+  assertEquals(byPath.get('/pending')?.priceCents, 2_100_000);
+  assertEquals(byPath.get('/sold')?.available, false);
+  assertEquals(byPath.get('/sold')?.priceCents, null);
+  assertEquals(byPath.has('/kith'), false);
+  assertEquals(read?.skipped.some((row) => row.reason === 'no price' && row.title === 'Rolex at Kith'), true);
+  assertEquals(byPath.get('/bracelet')?.holdReason, 'strap');
+  assertEquals(byPath.get('/bracelet')?.available, true);
+});

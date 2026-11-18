@@ -516,6 +516,223 @@ function looksLikeSquarespace(html: string): boolean {
   return html.includes('Static.SQUARESPACE_CONTEXT') || html.includes('data-context=');
 }
 
+function windVintageHost(url: URL): boolean {
+  return url.hostname.replace(/^www\./i, '').toLowerCase() === 'windvintage.com';
+}
+
+function plainText(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function windVintageGridUrls(html: string, base: URL): string[] {
+  const heading = html.search(/<h1\b[^>]*>[\s\S]{0,120}?Watches/i);
+  if (heading < 0) return [];
+  const newsletter = html.search(/newsletter-form-header/i);
+  const region = html.slice(heading, newsletter < 0 ? html.length : newsletter);
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const match of region.matchAll(/<a\b[^>]*>/gi)) {
+    const tag = match[0];
+    if (!/image-slide-anchor/i.test(tag)) continue;
+    const href = tag.match(/\bhref="([^"]+)"/i)?.[1];
+    if (!href) continue;
+    let url: URL;
+    try {
+      url = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (!windVintageHost(url)) continue;
+    url.protocol = base.protocol;
+    url.hostname = base.hostname;
+    url.port = base.port;
+    url.search = '';
+    url.hash = '';
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    if (seen.has(path)) continue;
+    seen.add(path);
+    url.pathname = path;
+    urls.push(url.toString());
+  }
+  return urls;
+}
+
+function windVintagePhotos(html: string): string[] {
+  const seen = new Set<string>();
+  const images: { assetUrl: string }[] = [];
+  for (const match of html.matchAll(/\bdata-src="(https:\/\/images\.squarespace-cdn\.com\/content\/[^"]+)"/gi)) {
+    const assetUrl = match[1].split(/[?#]/)[0];
+    const file = decodeURIComponent(assetUrl.split('/').pop() ?? '').toLowerCase();
+    if (!file || file.includes('favicon') || file.includes('logo') || seen.has(file)) continue;
+    seen.add(file);
+    images.push({ assetUrl });
+  }
+  return squarespacePhotoUrls({ images });
+}
+
+function windVintagePriceCents(html: string, button: string): number | null {
+  const line = html.match(/PRICE:\s*\$([0-9][0-9,]*)/);
+  const raw = line?.[1] ?? button.match(/^\$([0-9][0-9,]*)$/)?.[1];
+  if (!raw) return null;
+  const dollars = Number(raw.replaceAll(',', ''));
+  if (!Number.isFinite(dollars) || dollars <= 0) return null;
+  return Math.round(dollars * 100);
+}
+
+export type WindVintageOffer =
+  | { kind: 'item'; stock: 'sale' | 'pending' | 'sold'; item: SourceItem }
+  | { kind: 'skip'; title: string; reason: string };
+
+export function windVintageOffer(html: string, pageUrl: URL): WindVintageOffer {
+  const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  let title = h1 ? plainText(h1[1]) : '';
+  if (!title || /^wind vintage$/i.test(title)) {
+    title = plainText(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '')
+      .replace(/\s+[—–-]\s+Wind Vintage\s*$/i, '')
+      .trim();
+  }
+  const buttons = [...html.matchAll(/<a\b[^>]*\bdata-sqsp-button\b[^>]*>([\s\S]*?)<\/a>/gi)];
+  const button = plainText(buttons.at(-1)?.[1] ?? '');
+  const priceCents = windVintagePriceCents(html, button);
+  const sku = html.match(/Item\s+(SBUXYT\d+)/)?.[1] ?? null;
+  const h1End = h1?.index == null ? 0 : h1.index + h1[0].length;
+  const priceAt = html.indexOf('PRICE:', h1End);
+  const text = htmlToText(html.slice(h1End, priceAt >= 0 ? priceAt : html.length), pageUrl.toString());
+  const stock = /^sale\s+pending\b/i.test(button)
+    ? 'pending'
+    : /^sold$/i.test(button)
+      ? 'sold'
+      : /^\$[\d,]+$/.test(button) && priceCents != null
+        ? 'sale'
+        : null;
+  if (!stock) return { kind: 'skip', title, reason: 'no price' };
+
+  const photoUrls = windVintagePhotos(html);
+  const decision = classifyCatalogueItem({
+    title,
+    text,
+    productType: null,
+    tags: [],
+    vendor: null,
+    sourceUrl: pageUrl.toString(),
+  });
+  return {
+    kind: 'item',
+    stock,
+    item: {
+      externalId: sku ? `squarespace:${sku}` : productKey(pageUrl.toString()),
+      title,
+      text,
+      sourceUrl: pageUrl.toString(),
+      photoUrls,
+      priceCents,
+      currency: priceCents == null ? null : 'USD',
+      available: stock === 'sale',
+      meta: {
+        vendor: null,
+        productType: null,
+        sku,
+        photoCount: photoUrls.length,
+        publishedAt: null,
+        updatedAt: null,
+      },
+      ...(decision.decision === 'hold' ? { holdReason: decision.reason } : {}),
+    },
+  };
+}
+
+function acceptWind(
+  read: AdapterRead,
+  offer: WindVintageOffer,
+  pageUrl: string,
+  minPhotos: number,
+  seen: Set<string>,
+) {
+  if (offer.kind === 'skip') {
+    read.skipped.push({ sourceUrl: pageUrl, title: offer.title, reason: offer.reason, meta: null });
+    return;
+  }
+  const item = offer.item;
+  if (seen.has(item.externalId)) return;
+  seen.add(item.externalId);
+  if (!item.title) {
+    read.skipped.push({ sourceUrl: pageUrl, title: '', reason: 'no title', meta: null });
+    return;
+  }
+  if (!item.holdReason && item.photoUrls.length < minPhotos) {
+    read.skipped.push({
+      sourceUrl: item.sourceUrl,
+      title: item.title,
+      reason: `${item.photoUrls.length} photograph(s), under the ${minPhotos} a catalogue row needs`,
+      meta: item.meta ?? null,
+    });
+    return;
+  }
+  read.items.push(item);
+}
+
+async function readWindVintage(
+  base: URL,
+  homeHtml: string,
+  limit: number,
+  minPhotos: number,
+  startPage: number,
+  loadHtml: (url: URL) => Promise<string | null | 'budget' | 'blocked'>,
+): Promise<AdapterRead> {
+  const urls = windVintageGridUrls(homeHtml, base);
+  const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
+  const seen = new Set<string>();
+  if (!urls.length) {
+    if (!/PRICE:|data-sqsp-button/i.test(homeHtml)) {
+      read.complete = false;
+      return read;
+    }
+    acceptWind(read, windVintageOffer(homeHtml, base), base.toString(), minPhotos, seen);
+    return read;
+  }
+
+  const start = Math.max(1, Math.floor(startPage));
+  for (let index = start - 1; index < urls.length; index += 1) {
+    if (read.items.length >= limit) {
+      read.complete = false;
+      read.nextPage = index + 1;
+      return read;
+    }
+    const pageUrl = new URL(urls[index]);
+    const loaded = await loadHtml(pageUrl);
+    if (loaded === 'budget') {
+      read.complete = false;
+      read.nextPage = index + 1;
+      return read;
+    }
+    if (loaded === 'blocked') {
+      throw new CatalogueRefused(
+        `robots.txt does not allow ${pageUrl.pathname}, so this catalogue was not read.`,
+      );
+    }
+    if (typeof loaded !== 'string') {
+      read.skipped.push({
+        sourceUrl: pageUrl.toString(),
+        title: pageUrl.toString(),
+        reason: 'product page did not answer',
+        meta: null,
+      });
+      continue;
+    }
+    acceptWind(read, windVintageOffer(loaded, pageUrl), pageUrl.toString(), minPhotos, seen);
+  }
+  return read;
+}
+
 function locsFromSitemap(xml: string): string[] {
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 }
@@ -555,8 +772,9 @@ export async function fetchSquarespaceItems(
     return response.body;
   };
 
+  const wind = windVintageHost(base);
   const firstUrl = new URL(base.toString());
-  if ((io.startPage ?? 1) > 1) firstUrl.searchParams.set('offset', String(io.startPage));
+  if (!wind && (io.startPage ?? 1) > 1) firstUrl.searchParams.set('offset', String(io.startPage));
   const first = await loadHtml(firstUrl);
   if (first === 'blocked') {
     throw new CatalogueRefused(
@@ -570,6 +788,7 @@ export async function fetchSquarespaceItems(
     );
   }
   if (first == null || !looksLikeSquarespace(first)) return null;
+  if (wind) return readWindVintage(base, first, limit, minPhotos, io.startPage ?? 1, loadHtml);
 
   const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
   const seen = new Set<string>();

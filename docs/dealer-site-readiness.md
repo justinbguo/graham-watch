@@ -16,7 +16,8 @@ It tries platform feeds before anything else:
 2. **Squarespace.** The collection page's HTML `data-context` (robots.txt
    disallows `?format=json`). Same idea: title, prose, price, stock, gallery.
    An older template puts title, price, and sold-out in the product-list HTML.
-   The gallery is on the product page slideshow, read at publish.
+   The gallery is on the product page slideshow, read at publish. Wind Vintage
+   is the homepage image grid, then each watch page.
 3. **WooCommerce.** `GET /wp-json/wc/store/v1/products` with `stock_status=instock`.
    A `/product-category/<slug>/` URL limits the read to that category.
 4. **Wix Stores.** `/store-products-sitemap.xml`, then JSON-LD on each product page.
@@ -36,7 +37,7 @@ URLs are requested at `width=1500`.
 
 | Site | Fetch | Where the watches live | Verdict |
 | --- | --- | --- | --- |
-| [Wind Vintage](https://www.windvintage.com/) | 200, Squarespace, no challenge | Hand-built pages at the site root. Discovery would import the press section. | **Needs real work / avoid** |
+| [Wind Vintage](https://www.windvintage.com/) | 200, Squarespace, no challenge | Homepage image grid, then each watch page. `SALE PENDING` and `SOLD` are not for sale. | **Ready** |
 | [Tropical Watch](https://tropicalwatch.com/) | 200, custom app, no challenge | Server-rendered pages, 15 per page. Terms forbid automated access. | **Needs real work / avoid** |
 | [Craft + Tailored](https://www.craftandtailored.com/) | 200, Shopify feed | `/products.json`, USD, 3,687 products | **Ready with small changes** |
 | [Collectors Corner NY](https://collectorscornerny.com/) | 200, Shopify feed | `/products.json`, USD, 1,006 products, 94 for sale | **Ready as-is** |
@@ -44,79 +45,21 @@ URLs are requested at `width=1500`.
 
 ## Wind Vintage
 
-**Needs real work / avoid.** Plain HTTP works. The catalogue is not a feed the
-importer understands, and the URL discovery would pick is the press archive.
+The homepage image grid under the Watches heading is the catalogue. Each
+linked page is one watch. The Squarespace adapter reads that grid and does
+not open the sitemap, which is the sold archive and the press section.
 
-### Fetch
+A page carries the title, the prose, a `PRICE: $X (Item SBUXYT####)` line,
+photos on `images.squarespace-cdn.com`, and a Squarespace button. A dollar
+button is for sale. `SALE PENDING` and `SOLD` are not for sale, so a later
+refresh marks the listing sold and clears that if the button is a price
+again. A page with no price and no status button is skipped. A watch that
+drops off the grid is retired when the read finishes. Bracelets and straps
+use the same not-a-watch hold as every other shop.
 
-`https://www.windvintage.com/` returned 200 from Squarespace (478KB of HTML).
-`/products.json` is a 404. No bot challenge, no 403, no rate limit. A
-recaptcha string in the page is Squarespace's donation-captcha setting, and
-it is turned off.
-
-### Where the listings are
-
-Watches are individual Squarespace **pages** at the root
-(`/rolex-daytona-white-dial-ref-116500ln-full-set`), not commerce products and
-not `/shop/p/<slug>` items. `?format=json` on the homepage and on a watch page
-returns a page layout (`mainContent` HTML). It does not return `items` or
-`item`, which is the only shape the Squarespace adapter keeps.
-
-The homepage HTML contains about 170 of those links. The link text is empty
-(the grid is pictures), there is a single price on the whole page, and there
-is no next-page link. Two index pages exist and are the wrong size:
-`/watch-listings` is a 3-post blog, `/collections` is 5 curated entries.
-
-The sitemap is one 22MB file with 5,907 URLs. About 4,168 of them are
-one-segment pages. Discovery ignores paths with only one segment, so those
-watch pages never vote. The directory with the most URLs is `/press` (513
-sitemap URLs; the collection itself reports 789 items). A refresh that starts
-from the bare domain would open `/press`, see a real Squarespace
-collection, and import press clippings. The first item is "The Boca Raton
-Tribune: A Passion for Vintage Watches Earns National Recognition", with a
-photo, a body, no price, and no variants. No variants means the adapter marks
-the row **for sale**. That read would come in under the 1,000 cap, so it would
-be marked complete.
-
-Pointing the catalogue URL at the homepage by hand does not repair it. The
-adapter finds no `items` and falls through to one HTML page of untitled
-pictures.
-
-### Fields, from two real pages
-
-A current listing
-(`/rolex-daytona-white-dial-ref-116500ln-full-set`) is server-rendered prose:
-
-- Title and reference are in the page title (`Ref 116500LN`).
-- Asking price is a line in the body: `PRICE: $29,000`.
-- Eight original JPEGs on `images.squarespace-cdn.com`.
-- The visible text does not say sold or available. Stock is not a field.
-
-An older page (`/patek-philippe-ref-3404`) has no `PRICE:` line. The only
-dollar amount is an auction result from 2018. Same template, different job.
-A crawl of the 4,168 root URLs would mix listings with essays, and nothing on
-the page says which watches are still for sale.
-
-### Pagination
-
-There is no catalogue page to turn. The homepage is a fixed grid of about 170
-pictures. The sitemap is the only full list, and it does not say what is for
-sale.
-
-### robots.txt and terms
-
-Squarespace's robots file disallows every named AI crawler (`GPTBot`,
-`ClaudeBot`, `Google-Extended`, and the rest of that block) with `Disallow: /`.
-`GrahamBot` is not named, so it falls under `User-agent: *`, which allows
-ordinary pages and disallows `?format=json`. The adapter reads the product
-record embedded in the page HTML and does not request that query. No terms
-page is linked from the nav (Watches, Blog, Book, About, Contact, Press).
-
-### What "small" would not cover
-
-A usable import needs a way to tell a current priced listing from a press
-clipping and from an old essay, then a crawl of thousands of HTML pages.
-That is a new reader, not a tweak to the Squarespace adapter.
+`GrahamBot` is not named in robots.txt, so it falls under `User-agent: *`,
+which allows ordinary pages and disallows `?format=json`. The reader does
+not request that query.
 
 ## Tropical Watch
 

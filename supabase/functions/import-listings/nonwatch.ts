@@ -132,6 +132,7 @@ function strapTitle(title: string): boolean {
   if (/\bheavy\s+bracelets?\b/i.test(title)) return true;
   if (/\bbark\s+finish\s+bracelets?\b/i.test(title)) return true;
   if (/\b(?:rose|white|yellow)\s+gold\s+bracelets?\s*$/i.test(title)) return true;
+  if (!/\bon\b/i.test(title) && /\b(?:stretch\s+rivets?|end\s+links?)\b/i.test(title)) return true;
   return false;
 }
 
