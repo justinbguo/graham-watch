@@ -80,15 +80,12 @@ does not replace photographs already on the listing.
 Squarespace's default robots.txt disallows `?format=json`, so the adapter does
 not request it.
 
-Wind Vintage has no commerce collection. The homepage image grid under the
-Watches heading is the catalogue, and the sitemap is the sold archive, so it
-is not read. Each grid page supplies the title, the prose, the `PRICE:` line,
-the item number, and the photos. The last Squarespace button is the stock:
-a dollar amount is for sale, `SALE PENDING` and `SOLD` are not, and a page
-with no price and no status button is skipped. The same pacer, robots check,
-and not-a-watch hold apply. A refresh marks pending and sold watches sold,
-clears that when the button is a price again, and retires a watch that leaves
-the grid.
+Squarespace also reads Wind Vintage (`windvintage.com`) from the homepage
+image grid, after the Watches heading and before the newsletter block. That
+read does not open the sitemap and does not request `?format=json`. Each
+page's `PRICE:` line and the last Squarespace button are the price and the
+stock. `SALE PENDING` and `SOLD` are not for sale. A page with no price and
+no status button is skipped.
 
 It reads in two passes, and they happen at different times. The collection URL
 gives the list during the catalogue read. Each product URL is fetched later, in
@@ -253,8 +250,9 @@ decided (`feed_unavailable`, `missing_from_catalog`, or `dealer`). A dealer
 marking sold by hand sticks across later feeds; a feed-sourced sold clears if
 the shop lists the watch again.
 
-A Squarespace homepage is not a catalogue. The reader follows the sitemap to
-each products collection, and skips shelves such as cameras. A one-page scrape
+Wind Vintage is read from its homepage image grid. For every other shop, the
+reader follows the sitemap to each products collection, and skips shelves such
+as cameras. A one-page scrape
 is never complete, so a page that is not a feed cannot sell the shop's stock
 by absence. Shopify reads are sliced into eight pages per request, because one
 request cannot hash a catalogue of several thousand products.

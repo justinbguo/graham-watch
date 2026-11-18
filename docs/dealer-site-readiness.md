@@ -45,21 +45,15 @@ URLs are requested at `width=1500`.
 
 ## Wind Vintage
 
-The homepage image grid under the Watches heading is the catalogue. Each
-linked page is one watch. The Squarespace adapter reads that grid and does
-not open the sitemap, which is the sold archive and the press section.
+The Squarespace adapter reads this shop from the homepage image grid, after
+the Watches heading and before the newsletter block. It does not open the
+sitemap and it does not request `?format=json`.
 
-A page carries the title, the prose, a `PRICE: $X (Item SBUXYT####)` line,
-photos on `images.squarespace-cdn.com`, and a Squarespace button. A dollar
-button is for sale. `SALE PENDING` and `SOLD` are not for sale, so a later
-refresh marks the listing sold and clears that if the button is a price
-again. A page with no price and no status button is skipped. A watch that
-drops off the grid is retired when the read finishes. Bracelets and straps
-use the same not-a-watch hold as every other shop.
+Each page's `PRICE:` line and the last Squarespace button are the price and
+the stock. A dollar amount is for sale. `SALE PENDING` and `SOLD` are not for
+sale. A page with no price and no status button is skipped.
 
-`GrahamBot` is not named in robots.txt, so it falls under `User-agent: *`,
-which allows ordinary pages and disallows `?format=json`. The reader does
-not request that query.
+`User-agent: *` allows ordinary pages and disallows `?format=json`.
 
 ## Tropical Watch
 
