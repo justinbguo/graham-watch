@@ -7,6 +7,7 @@ import {
   deployArgs,
   deployAuthFailure,
   importListingsKeepsJwt,
+  listFunctionDirs,
   operatorBotSkipsJwt,
   probeManagementApi,
   selectFunctions,
@@ -29,6 +30,24 @@ test('a change inside one function deploys only that function', () => {
     selectFunctions(['supabase/functions/import-listings/index.ts'], FUNCTIONS),
     ['import-listings']
   );
+});
+
+// PR 91 changed only import-listings (plus docs). operator-bot bundles that
+// code at deploy time, so the hosted bot stayed on the previous reader.
+const PR_91_FILES = [
+  'AGENTS.md',
+  'docs/SCRAPING.md',
+  'docs/dealer-site-readiness.md',
+  'supabase/functions/import-listings/nonwatch.ts',
+  'supabase/functions/import-listings/squarespace.test.ts',
+  'supabase/functions/import-listings/squarespace.ts',
+];
+
+test('an import-listings change deploys operator-bot', () => {
+  const functions = listFunctionDirs();
+  const selected = selectFunctions(PR_91_FILES, functions);
+  assert.equal(selected.includes('import-listings'), true);
+  assert.equal(selected.includes('operator-bot'), true);
 });
 
 test('a test, an env example, or an unrelated file deploys nothing', () => {
