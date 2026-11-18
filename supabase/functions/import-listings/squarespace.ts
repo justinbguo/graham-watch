@@ -597,7 +597,8 @@ function dollarCents(raw: string): number | null {
 
 function windVintagePriceCents(html: string, button: string): number | null {
   const line = html.match(/PRICE\s*:\s*([^<\n]*)/);
-  if (line) return dollarCents(line[1]);
+  const fromLine = line ? dollarCents(line[1]) : null;
+  if (fromLine != null) return fromLine;
   if (/^\$[\d,]+$/.test(button)) return dollarCents(button);
   return null;
 }
@@ -693,11 +694,10 @@ async function readWindVintage(
   startPage: number,
   loadHtml: (url: URL) => Promise<string | null | 'budget' | 'blocked'>,
 ): Promise<AdapterRead> {
-  // maxPages stays unused: a maxPages of 1 would never finish inside the eight nightly slices, and the pacer is already the slice.
   const urls = windVintageGridUrls(homeHtml, base);
   const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
   const seen = new Set<string>();
-  if (!urls) {
+  if (!urls || urls.length === 0) {
     read.complete = false;
     return read;
   }
@@ -722,6 +722,7 @@ async function readWindVintage(
       );
     }
     if (typeof loaded !== 'string') {
+      read.complete = false;
       read.skipped.push({
         sourceUrl: pageUrl.toString(),
         title: pageUrl.toString(),

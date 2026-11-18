@@ -438,7 +438,7 @@ Deno.test('Wind Vintage pages supply price, stock, photos, and a held bracelet',
   assertEquals(rest?.nextPage, undefined);
 });
 
-Deno.test('a dollar button prices a Wind Vintage page only when the PRICE line is absent', async () => {
+Deno.test('a dollar button prices a Wind Vintage page when the PRICE line has no amount', async () => {
   const home = `<!doctype html>Static.SQUARESPACE_CONTEXT = {};
     <h1>Watches</h1>
     <a href="/button-only" class="image-slide-anchor"></a>
@@ -465,6 +465,48 @@ Deno.test('a dollar button prices a Wind Vintage page only when the PRICE line i
   });
   assertEquals(read?.items.map((item) => [item.title, item.priceCents, item.available]), [
     ['Rolex Datejust', 2_390_000, true],
+    ['Patek Essay', 2_390_000, true],
   ]);
-  assertEquals(read?.skipped.map((row) => [row.title, row.reason]), [['Patek Essay', 'no price']]);
+  assertEquals(read?.skipped, []);
+});
+
+Deno.test('an empty Wind Vintage grid does not retire the shop', async () => {
+  const read = await fetchSquarespaceItems('https://www.windvintage.com/', 10, 0, {
+    fetchText: async (url) => {
+      if (url.pathname === '/robots.txt') {
+        return { status: 200, body: 'User-agent: *\nAllow: /\n' };
+      }
+      return {
+        status: 200,
+        body: '<!doctype html>Static.SQUARESPACE_CONTEXT = {};<h1>Watches</h1><div class="newsletter-block"></div>',
+      };
+    },
+    pause: async () => {},
+  });
+  assertEquals(read?.recognized, true);
+  assertEquals(read?.complete, false);
+  assertEquals(read?.items, []);
+});
+
+Deno.test('a Wind Vintage page that does not answer leaves the read unfinished', async () => {
+  const home = `<!doctype html>Static.SQUARESPACE_CONTEXT = {};
+    <h1>Watches</h1>
+    <a href="/gone" class="image-slide-anchor"></a>
+    <a href="/sale" class="image-slide-anchor"></a>
+    <div class="newsletter-block"></div>`;
+  const read = await fetchSquarespaceItems('https://www.windvintage.com/', 10, 0, {
+    fetchText: async (url) => {
+      if (url.pathname === '/robots.txt') return { status: 200, body: 'User-agent: *\nAllow: /\n' };
+      if (url.pathname === '/') return { status: 200, body: home };
+      if (url.pathname === '/gone') return { status: 404, body: 'missing' };
+      return {
+        status: 200,
+        body: '<h1>Omega</h1><p>PRICE: $4,000 (Item SBUXYT1)</p><a data-sqsp-button>$4,000</a>',
+      };
+    },
+    pause: async () => {},
+  });
+  assertEquals(read?.complete, false);
+  assertEquals(read?.items.map((item) => item.title), ['Omega']);
+  assertEquals(read?.skipped.some((row) => row.reason === 'product page did not answer'), true);
 });
