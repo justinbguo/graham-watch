@@ -516,6 +516,226 @@ function looksLikeSquarespace(html: string): boolean {
   return html.includes('Static.SQUARESPACE_CONTEXT') || html.includes('data-context=');
 }
 
+function windVintageHost(url: URL): boolean {
+  return url.hostname.replace(/^www\./i, '').toLowerCase() === 'windvintage.com';
+}
+
+function windTitle(html: string): string {
+  const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  const heading = h1 ? decodeListText(h1[1]) : '';
+  if (heading) return heading;
+  const raw = (html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').replace(
+    /&mdash;|&#8212;/gi,
+    '—',
+  );
+  return decodeListText(raw).replace(/\s+—\s+Wind Vintage\s*$/i, '').trim();
+}
+
+function windVintageGridUrls(html: string, base: URL): string[] | null {
+  const heading = html.search(/<h1\b[^>]*>[\s\S]{0,120}?Watches/i);
+  if (heading < 0) return null;
+  const rest = html.slice(heading);
+  const end = rest.search(/<[^>]*\bnewsletter\b[^>]*>/i);
+  const region = end < 0 ? rest : rest.slice(0, end);
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const match of region.matchAll(/<a\b[^>]*>/gi)) {
+    const tag = match[0];
+    const className = tagAttr(tag, 'class') ?? '';
+    if (!className.split(/\s+/).includes('image-slide-anchor')) continue;
+    const href = tagAttr(tag, 'href');
+    if (!href) continue;
+    let url: URL;
+    try {
+      url = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (!windVintageHost(url)) continue;
+    url.protocol = base.protocol;
+    url.hostname = base.hostname;
+    url.port = base.port;
+    url.search = '';
+    url.hash = '';
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    if (seen.has(path)) continue;
+    seen.add(path);
+    url.pathname = path;
+    urls.push(url.toString());
+  }
+  return urls;
+}
+
+function windVintagePhotos(html: string): string[] {
+  const seen = new Set<string>();
+  const images: { assetUrl: string }[] = [];
+  for (const match of html.matchAll(/\bdata-src="([^"]+)"/gi)) {
+    let asset = match[1];
+    if (asset.startsWith('//')) asset = `https:${asset}`;
+    let parsed: URL;
+    try {
+      parsed = new URL(asset);
+    } catch {
+      continue;
+    }
+    if (parsed.hostname !== 'images.squarespace-cdn.com') continue;
+    const file = decodeURIComponent(parsed.pathname.split('/').pop() ?? '').toLowerCase();
+    if (!file || file.includes('favicon') || file.includes('logo') || seen.has(file)) continue;
+    seen.add(file);
+    images.push({ assetUrl: `${parsed.origin}${parsed.pathname}` });
+  }
+  return squarespacePhotoUrls({ images });
+}
+
+function dollarCents(raw: string): number | null {
+  const match = raw.match(/\$\s*([0-9][0-9,]*)/);
+  if (!match) return null;
+  const dollars = Number(match[1].replaceAll(',', ''));
+  if (!Number.isFinite(dollars) || dollars <= 0) return null;
+  return Math.round(dollars * 100);
+}
+
+function windVintagePriceCents(html: string, button: string): number | null {
+  const line = html.match(/PRICE\s*:\s*([^<\n]*)/);
+  const fromLine = line ? dollarCents(line[1]) : null;
+  if (fromLine != null) return fromLine;
+  if (/^\$[\d,]+$/.test(button)) return dollarCents(button);
+  return null;
+}
+
+type WindVintageOffer =
+  | { kind: 'item'; item: SourceItem }
+  | { kind: 'skip'; title: string; reason: string };
+
+function windVintageOffer(html: string, pageUrl: URL): WindVintageOffer {
+  const visible = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  const h1 = visible.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  const title = windTitle(visible);
+  const buttons = [...visible.matchAll(/<a\b[^>]*\bdata-sqsp-button\b[^>]*>([\s\S]*?)<\/a>/gi)];
+  const button = decodeListText(buttons.at(-1)?.[1] ?? '');
+  const priceCents = windVintagePriceCents(visible, button);
+  const sku = visible.match(/Item\s+(SBUXYT\d+)/)?.[1] ?? null;
+  const h1End = h1?.index == null ? 0 : h1.index + h1[0].length;
+  const priceAt = visible.indexOf('PRICE:', h1End);
+  const text = htmlToText(visible.slice(h1End, priceAt >= 0 ? priceAt : visible.length), pageUrl.toString());
+  const forSale = /^\$[\d,]+$/.test(button) && priceCents != null;
+  const pending = /^sale\s+pending\b/i.test(button);
+  const sold = /^sold$/i.test(button);
+  if (!forSale && !pending && !sold) return { kind: 'skip', title, reason: 'no price' };
+
+  const photoUrls = windVintagePhotos(visible);
+  const decision = classifyCatalogueItem({
+    title,
+    text,
+    productType: null,
+    tags: [],
+    vendor: null,
+    sourceUrl: pageUrl.toString(),
+  });
+  return {
+    kind: 'item',
+    item: {
+      externalId: sku ? `squarespace:${sku}` : productKey(pageUrl.toString()),
+      title,
+      text,
+      sourceUrl: pageUrl.toString(),
+      photoUrls,
+      priceCents,
+      currency: priceCents == null ? null : 'USD',
+      available: forSale,
+      meta: {
+        vendor: null,
+        productType: null,
+        sku,
+        photoCount: photoUrls.length,
+        publishedAt: null,
+        updatedAt: null,
+      },
+      ...(decision.decision === 'hold' ? { holdReason: decision.reason } : {}),
+    },
+  };
+}
+
+function acceptWind(
+  read: AdapterRead,
+  offer: WindVintageOffer,
+  pageUrl: string,
+  minPhotos: number,
+  seen: Set<string>,
+) {
+  if (offer.kind === 'skip') {
+    read.skipped.push({ sourceUrl: pageUrl, title: offer.title, reason: offer.reason, meta: null });
+    return;
+  }
+  const item = offer.item;
+  if (seen.has(item.externalId)) return;
+  seen.add(item.externalId);
+  if (!item.title) {
+    read.skipped.push({ sourceUrl: pageUrl, title: '', reason: 'no title', meta: null });
+    return;
+  }
+  if (!item.holdReason && item.photoUrls.length < minPhotos) {
+    read.skipped.push({
+      sourceUrl: item.sourceUrl,
+      title: item.title,
+      reason: `${item.photoUrls.length} photograph(s), under the ${minPhotos} a catalogue row needs`,
+      meta: item.meta ?? null,
+    });
+    return;
+  }
+  read.items.push(item);
+}
+
+async function readWindVintage(
+  base: URL,
+  homeHtml: string,
+  limit: number,
+  minPhotos: number,
+  startPage: number,
+  loadHtml: (url: URL) => Promise<string | null | 'budget' | 'blocked'>,
+): Promise<AdapterRead> {
+  const urls = windVintageGridUrls(homeHtml, base);
+  const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
+  const seen = new Set<string>();
+  if (!urls || urls.length === 0) {
+    read.complete = false;
+    return read;
+  }
+
+  const start = Math.max(1, Math.floor(startPage));
+  for (let index = start - 1; index < urls.length; index += 1) {
+    if (read.items.length >= limit) {
+      read.complete = false;
+      read.nextPage = index + 1;
+      return read;
+    }
+    const pageUrl = new URL(urls[index]);
+    const loaded = await loadHtml(pageUrl);
+    if (loaded === 'budget') {
+      read.complete = false;
+      read.nextPage = index + 1;
+      return read;
+    }
+    if (loaded === 'blocked') {
+      throw new CatalogueRefused(
+        `robots.txt does not allow ${pageUrl.pathname}, so this catalogue was not read.`,
+      );
+    }
+    if (typeof loaded !== 'string') {
+      read.complete = false;
+      read.skipped.push({
+        sourceUrl: pageUrl.toString(),
+        title: pageUrl.toString(),
+        reason: 'product page did not answer',
+        meta: null,
+      });
+      continue;
+    }
+    acceptWind(read, windVintageOffer(loaded, pageUrl), pageUrl.toString(), minPhotos, seen);
+  }
+  return read;
+}
+
 function locsFromSitemap(xml: string): string[] {
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 }
@@ -555,8 +775,9 @@ export async function fetchSquarespaceItems(
     return response.body;
   };
 
-  const firstUrl = new URL(base.toString());
-  if ((io.startPage ?? 1) > 1) firstUrl.searchParams.set('offset', String(io.startPage));
+  const wind = windVintageHost(base);
+  const firstUrl = wind ? new URL('/', base.origin) : new URL(base.toString());
+  if (!wind && (io.startPage ?? 1) > 1) firstUrl.searchParams.set('offset', String(io.startPage));
   const first = await loadHtml(firstUrl);
   if (first === 'blocked') {
     throw new CatalogueRefused(
@@ -570,6 +791,7 @@ export async function fetchSquarespaceItems(
     );
   }
   if (first == null || !looksLikeSquarespace(first)) return null;
+  if (wind) return readWindVintage(new URL(base.origin), first, limit, minPhotos, io.startPage ?? 1, loadHtml);
 
   const read: AdapterRead = { items: [], skipped: [], recognized: true, complete: true };
   const seen = new Set<string>();

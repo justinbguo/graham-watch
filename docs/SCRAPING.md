@@ -80,6 +80,13 @@ does not replace photographs already on the listing.
 Squarespace's default robots.txt disallows `?format=json`, so the adapter does
 not request it.
 
+Squarespace also reads Wind Vintage (`windvintage.com`) from the homepage
+image grid, after the Watches heading and before the newsletter block. That
+read does not open the sitemap and does not request `?format=json`. Each
+page's `PRICE:` line and the last Squarespace button are the price and the
+stock. `SALE PENDING` and `SOLD` are not for sale. A page with no price and
+no status button is skipped.
+
 It reads in two passes, and they happen at different times. The collection URL
 gives the list during the catalogue read. Each product URL is fetched later, in
 the publish batch, because a collection entry is only what the shop chose to show
@@ -243,8 +250,9 @@ decided (`feed_unavailable`, `missing_from_catalog`, or `dealer`). A dealer
 marking sold by hand sticks across later feeds; a feed-sourced sold clears if
 the shop lists the watch again.
 
-A Squarespace homepage is not a catalogue. The reader follows the sitemap to
-each products collection, and skips shelves such as cameras. A one-page scrape
+Wind Vintage is read from its homepage image grid. For every other shop, the
+reader follows the sitemap to each products collection, and skips shelves such
+as cameras. A one-page scrape
 is never complete, so a page that is not a feed cannot sell the shop's stock
 by absence. Shopify reads are sliced into eight pages per request, because one
 request cannot hash a catalogue of several thousand products.
