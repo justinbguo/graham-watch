@@ -229,7 +229,9 @@ On web, sign-in is a sheet over the deck. Guests land on Buy with the sheet
 already open, once per page load; there is no **Log in** control in the
 header. A guest's save opens the sheet again with copy that says why. A pass
 never does. The sheet is the wordmark alone (no mark beside it), one
-`editorial` sentence in `text` under it, narrowed to `layout.signInLede`, and
+`editorial` sentence in `text` under it, then one caption in `type.caption`
+and `textMuted` that signed-out browsing is recorded (country and device type
+only), narrowed to `layout.signInLede`, and
 the doors — Apple, Google, email — with **Not now** to dismiss. On iOS, that same panel is the first screen, **Feedback** sits under the doors, and
 it does not dismiss: the header has no room for a **Log in** control beside
 undo, filters, and the view toggle. There is no second headline, no decorative

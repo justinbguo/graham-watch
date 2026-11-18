@@ -12,13 +12,24 @@ import { labelAnswer } from './dashboard';
 import { formatPrice, photoUrl } from './importer';
 import { supabase } from './supabase';
 
-export function Accounts() {
+export function Accounts({ focusId = null }: { focusId?: string | null }) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<'number' | 'active'>('number');
   const [opened, setOpened] = useState<{ id: string; limit: number } | null>(null);
+  const [appliedFocus, setAppliedFocus] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<{ id: string; detail: AccountDetail } | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  // oxlint rejects setState inside an effect. Apply the prop here so a claimed
+  // guest opens that account when this screen mounts.
+  if (focusId !== appliedFocus) {
+    setAppliedFocus(focusId);
+    if (focusId) {
+      setDetailError(null);
+      setOpened({ id: focusId, limit: 200 });
+    }
+  }
 
   useEffect(() => {
     let live = true;

@@ -1,13 +1,13 @@
 import type { FilterSpec } from '@/features/filters/spec';
 import type { Database } from '@/lib/database';
+import { WIDE_BREAKPOINT } from '../lib/design.ts';
 import type { BuyerEventSurface, DeckCard } from '@/lib/models';
 
 /**
  * The buyer event log's rows and every decision about them: what a row holds,
- * which rows wait, merge, go, or drop, and what a failed send means. Pure, and
- * type-only in its imports, so node can load it with
- * --experimental-strip-types. `listingEvents.ts` is the shell around it, and
- * the only one of the two that screens import.
+ * which rows wait, merge, go, or drop, and what a failed send means. Pure.
+ * Node loads it with --experimental-strip-types. `listingEvents.ts` is the
+ * shell around it, and the only one of the two that screens import.
  */
 
 export type ListingRef = Pick<DeckCard, 'id' | 'dealer_id'>;
@@ -38,12 +38,46 @@ export type Owner = 'unknown' | 'guest' | UserId;
 export type Queued = { owner: Owner; row: WireEvent; retried: boolean };
 
 /**
- * One signed-out session's rows on the device, under the key minted for it.
+ * Signed-out rows still on the device, under the stable device key.
  * `claimedBy` is the account that first took those rows. The file stays until
  * the server stores them, so a later account on the phone does not adopt a
- * flush that has not landed.
+ * flush that has not landed. The key itself lives in a separate file and
+ * stays when this buffer is removed.
  */
 export type GuestBuffer = { guestKey: string; rows: WireEvent[]; claimedBy?: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const GUEST_SENDABLE = new Set<WireEvent['kind']>([
+  'impression',
+  'dwell',
+  'pass',
+  'undo',
+  'dealer_click',
+  'inquiry_open',
+  'filter',
+]);
+
+export type DeviceKind = 'web-desktop' | 'web-mobile' | 'ios' | 'android';
+
+export function resolveGuestKey(storedKey: string | null, buffer: GuestBuffer | null, minted: string): string {
+  if (storedKey && UUID_RE.test(storedKey)) return storedKey;
+  if (buffer && UUID_RE.test(buffer.guestKey)) return buffer.guestKey;
+  return minted;
+}
+
+/** Kinds a signed-out browser may send. Saves and follows wait for sign-in. */
+export function guestSendable(row: { kind: string }): boolean {
+  return GUEST_SENDABLE.has(row.kind as WireEvent['kind']);
+}
+
+export function deviceKind(platform: string, width: number | null): DeviceKind | null {
+  if (platform === 'ios') return 'ios';
+  if (platform === 'android') return 'android';
+  if (platform !== 'web') return null;
+  if (width == null || !Number.isFinite(width)) return null;
+  return width >= WIDE_BREAKPOINT ? 'web-desktop' : 'web-mobile';
+}
 
 export type Exposure = {
   id: string;
@@ -189,40 +223,46 @@ export function relabel(queue: readonly Queued[], from: Owner, to: Owner): Queue
 
 /**
  * Sign-in. The guest's rows, from the device and from memory, become
- * `user`'s, each stamped with the signed-out session's key. No other row
- * changes owner.
+ * `user`'s, each stamped with the key the caller passes. No other row
+ * changes owner. A row already in both places is kept once.
  */
 export function claimGuest(
   queue: readonly Queued[],
   stored: GuestBuffer | null,
-  mintedKey: string,
+  key: string,
   user: UserId,
 ): Queued[] {
-  const guestKey = stored?.guestKey ?? mintedKey;
   const claim = (row: WireEvent, retried: boolean): Queued => ({
     owner: user,
-    row: { ...row, guest_key: guestKey },
+    row: { ...row, guest_key: key },
     retried,
   });
+  const fromBuffer = (stored?.rows ?? []).map((row) => claim(row, false));
+  const seen = new Set(fromBuffer.map((entry) => entry.row.id));
   return [
-    ...(stored?.rows ?? []).map((row) => claim(row, false)),
-    ...queue.map((entry) => (entry.owner === 'guest' ? claim(entry.row, entry.retried) : entry)),
+    ...fromBuffer,
+    ...queue.flatMap((entry) => {
+      if (entry.owner !== 'guest') return [entry];
+      if (seen.has(entry.row.id)) return [];
+      return [claim(entry.row, entry.retried)];
+    }),
   ];
 }
 
-/** Rows into the signed-out session's buffer; past `cap` the oldest go. */
+/** Rows into the device buffer, restamped with the caller's key. Past `cap` the oldest go. */
 export function toGuestBuffer(
   stored: GuestBuffer | null,
   added: readonly WireEvent[],
-  mintedKey: string,
+  key: string,
   cap: number,
 ): { buffer: GuestBuffer; dropped: number } {
-  const guestKey = stored?.guestKey ?? mintedKey;
-  const { kept, dropped } = keepNewest(
-    [...(stored?.rows ?? []), ...added.map((row) => ({ ...row, guest_key: guestKey }))],
-    cap,
-  );
-  return { buffer: { guestKey, rows: kept, ...(stored?.claimedBy ? { claimedBy: stored.claimedBy } : {}) }, dropped };
+  const addedIds = new Set(added.map((row) => row.id));
+  const merged = [...(stored?.rows ?? []).filter((row) => !addedIds.has(row.id)), ...added].map((row) => ({
+    ...row,
+    guest_key: key,
+  }));
+  const { kept, dropped } = keepNewest(merged, cap);
+  return { buffer: { guestKey: key, rows: kept, ...(stored?.claimedBy ? { claimedBy: stored.claimedBy } : {}) }, dropped };
 }
 
 /**

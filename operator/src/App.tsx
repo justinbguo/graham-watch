@@ -6,6 +6,7 @@ import { Activity } from './Activity';
 import { AddShops } from './AddShops';
 import { Applications } from './Applications';
 import { Dealers } from './Dealers';
+import { Guests } from './Guests';
 import { Inbox, type InboxFocus } from './Inbox';
 import { SignIn } from './SignIn';
 import { Users } from './Users';
@@ -19,6 +20,7 @@ const SCREENS = {
   inbox: 'Inbox',
   users: 'Users',
   accounts: 'Accounts',
+  guests: 'Guests',
   activity: 'Activity',
   applications: 'Applications',
   add: 'Add shops',
@@ -35,6 +37,7 @@ export function App() {
   const [access, setAccess] = useState<{ userId: string; ok: boolean } | null>(null);
   const [screen, setScreen] = useState<Screen>('dealers');
   const [inboxFocus, setInboxFocus] = useState<InboxFocus | null>(null);
+  const [accountFocus, setAccountFocus] = useState<string | null>(null);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -120,7 +123,14 @@ export function App() {
         ) : screen === 'users' ? (
           <Users />
         ) : screen === 'accounts' ? (
-          <Accounts />
+          <Accounts focusId={accountFocus} />
+        ) : screen === 'guests' ? (
+          <Guests
+            onOpenAccount={(userId) => {
+              setAccountFocus(userId);
+              setScreen('accounts');
+            }}
+          />
         ) : screen === 'activity' ? (
           <Activity />
         ) : screen === 'dealers' ? (

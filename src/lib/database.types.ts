@@ -49,7 +49,7 @@ export type Database = {
           position: number | null
           received_at: string
           surface: Database["public"]["Enums"]["buyer_event_surface"]
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           dealer_id?: string | null
@@ -65,7 +65,7 @@ export type Database = {
           position?: number | null
           received_at?: string
           surface: Database["public"]["Enums"]["buyer_event_surface"]
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           dealer_id?: string | null
@@ -81,7 +81,7 @@ export type Database = {
           position?: number | null
           received_at?: string
           surface?: Database["public"]["Enums"]["buyer_event_surface"]
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1049,6 +1049,33 @@ export type Database = {
           },
         ]
       }
+      guest_devices: {
+        Row: {
+          claimed_by: string | null
+          country: string | null
+          device: string | null
+          first_seen_at: string
+          guest_key: string
+          last_seen_at: string
+        }
+        Insert: {
+          claimed_by?: string | null
+          country?: string | null
+          device?: string | null
+          first_seen_at?: string
+          guest_key: string
+          last_seen_at?: string
+        }
+        Update: {
+          claimed_by?: string | null
+          country?: string | null
+          device?: string | null
+          first_seen_at?: string
+          guest_key?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
       import_jobs: {
         Row: {
           catalog_read_at: string | null
@@ -1854,6 +1881,7 @@ export type Database = {
         Args: { p_code: string; p_dealer_id: string }
         Returns: string
       }
+      claim_guest_events: { Args: { p_guest_key: string }; Returns: number }
       claim_username: { Args: { candidate: string }; Returns: string }
       collector_profile: {
         Args: { p_user_id: string }
@@ -2131,6 +2159,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      guest_summary: { Args: { p_guest_key: string }; Returns: Json }
       in_conversation: { Args: { p_conversation_id: string }; Returns: boolean }
       is_operator: { Args: never; Returns: boolean }
       keep_edit: {
@@ -2243,6 +2272,10 @@ export type Database = {
         }[]
       }
       log_buyer_events: { Args: { p_events: Json }; Returns: number }
+      log_guest_events: {
+        Args: { p_device?: string; p_events: Json; p_guest_key: string }
+        Returns: number
+      }
       lookup_claimable_dealer: {
         Args: { p_website: string }
         Returns: {
@@ -2306,6 +2339,10 @@ export type Database = {
           source_url: string
           title: string
         }[]
+      }
+      operator_claim_guest: {
+        Args: { p_guest_key: string }
+        Returns: undefined
       }
       operator_conversation_messages: {
         Args: { p_conversation_id: string; p_limit?: number }
@@ -2404,6 +2441,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      operator_guest: {
+        Args: { p_guest_key: string; p_limit?: number }
+        Returns: Json
+      }
+      operator_guests: { Args: never; Returns: Json }
       operator_inquiries: {
         Args: {
           p_dealer_id?: string
@@ -2544,6 +2586,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      purge_unclaimed_guest_events: { Args: never; Returns: number }
       rank_bump: {
         Args: {
           p_amount: number

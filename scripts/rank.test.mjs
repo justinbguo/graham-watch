@@ -342,3 +342,17 @@ test('the database functions use these weights and seats', () => {
   assert.match(newSql, /'score', 0/);
   assert.match(newSql, /order by mixed\.slot, on_deck\.created_at desc, on_deck\.id/);
 });
+
+test('buyer_taste still scores only the signed-in account', () => {
+  const sql = definition('buyer_taste');
+  assert.match(sql, /e\.user_id = uid/);
+  assert.doesNotMatch(sql, /or e\.user_id is null/);
+});
+
+test('guest writes are capped and unclaimed rows expire after 180 days', () => {
+  const guest = definition('log_guest_events');
+  assert.match(guest, /2000/);
+  assert.match(guest, /20000/);
+  const purge = definition('purge_unclaimed_guest_events');
+  assert.match(purge, /interval '180 days'/);
+});

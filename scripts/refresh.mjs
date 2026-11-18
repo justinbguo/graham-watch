@@ -15,15 +15,16 @@
  * paused shop is not either: pause is a permission, not a second flag, so
  * the same filter skips it.
  *
- * After a full run that exits 0, the watches it put on the deck are sealed
- * into one catalogue batch for the New tab, then drops go out. A one-shop
- * run does not seal.
+ * After a full run that exits 0, unclaimed guest rows older than 180 days
+ * are purged, then the watches it put on the deck are sealed into one
+ * catalogue batch for the New tab, then drops go out. A one-shop run does
+ * not purge and does not seal.
  *
- * Exits 0 when at least one shop finished its catalogue read, the seal
- * succeeded, and the notify-drops call succeeded. A shop that failed is
- * logged and left for the next night. Exits 1 when the request itself
- * failed (missing secret, rejected cron secret, OpenAI key), every shop
- * failed, the seal failed, or notify-drops errored. Nobody to notify is not an error. Health warnings — one shop's
+ * Exits 0 when at least one shop finished its catalogue read, the purge
+ * succeeded, the seal succeeded, and the notify-drops call succeeded. A shop
+ * that failed is logged and left for the next night. Exits 1 when the request
+ * itself failed (missing secret, rejected cron secret, OpenAI key), every shop
+ * failed, the purge failed, the seal failed, or notify-drops errored. Nobody to notify is not an error. Health warnings — one shop's
  * error, an empty catalogue, missing photos, a week with nothing new — do
  * not change that exit code.
  */
@@ -180,10 +181,40 @@ if (exitCode !== 0) {
   process.exit(exitCode);
 }
 
-// A one-shop run is not a catalogue sync, so it leaves the New tab alone.
+// A one-shop run is not the nightly sweep, so it leaves the guest log and the New tab alone.
+if (!dealerId) {
+  const purged = await purgeGuests();
+  if (!purged) process.exit(1);
+}
+
 const sealed = dealerId ? true : await sealBatch();
 await notifyDrops();
 if (!sealed) process.exit(1);
+
+async function purgeGuests() {
+  let response;
+  try {
+    response = await request('/rest/v1/rpc/purge_unclaimed_guest_events', {
+      token: key,
+      method: 'POST',
+      body: {},
+    });
+  } catch (error) {
+    response = { ok: false, status: 0, body: { message: error instanceof Error ? error.message : String(error) } };
+  }
+
+  if (!response.ok) {
+    const detail = response.body?.message ?? response.body?.error ?? JSON.stringify(response.body);
+    const line = `Guest log: could not purge unclaimed rows (${response.status}): ${detail}`;
+    console.error(line);
+    annotation('error', 'GuestPurge', line);
+    return false;
+  }
+
+  const removed = typeof response.body === 'number' ? response.body : 0;
+  console.log(`Guest log: purged ${removed} unclaimed event(s) older than 180 days.`);
+  return true;
+}
 
 async function sealBatch() {
   let response;
