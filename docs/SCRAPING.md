@@ -72,8 +72,11 @@ which cut a sample from 592KB to 415KB.
 `squarespace.ts` — the shop's HTML carries the same product record Shopify's
 JSON feed would, in a `data-context` attribute: title, prose, price, stock, and
 the gallery. An older template (Cool Vintage) has no `data-context`. Its grid
-is ordinary HTML: title, price, a sold-out class, and one photo. The product
-page's JSON-LD fills in the description when that watch is published.
+is ordinary HTML: title, price, a sold-out class, and one photo. When that
+watch is published, the product page is fetched (robots check, then the same
+pause as the collection). Its slideshow, or `data-context` / JSON-LD when those
+exist, supplies the gallery. A refresh keeps the longer set: a one-photo read
+does not replace photographs already on the listing.
 Squarespace's default robots.txt disallows `?format=json`, so the adapter does
 not request it.
 

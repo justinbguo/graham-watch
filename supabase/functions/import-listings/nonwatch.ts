@@ -93,6 +93,12 @@ function accessoryTitle(title: string): boolean {
   if (/\bwinders?\b/i.test(title)) return true;
   if (/\btools?\b/i.test(title) && !/\bwatches?\b/i.test(title)) return true;
   if (/\bwatch\s+box(?:es)?\b/i.test(title) && !/\bpapers?\b/i.test(title)) return true;
+  // Apparel sold next to the watches: "Theo & Harris Cap", "GMT Hands Shirt".
+  // A bare "Cap" is a strap end (product type Nato), so that title stays a strap.
+  // "capsule" and "captain" are not the word cap.
+  if (/\bgift\s+cards?\b/i.test(title)) return true;
+  if (/\b(?:t-?shirts?|shirts?)\b/i.test(title)) return true;
+  if (!/^\s*caps?\s*$/i.test(title) && /\bcaps?\b/i.test(title)) return true;
   return false;
 }
 
@@ -246,6 +252,9 @@ function holdFromRules(fields: CatalogueFields): CatalogueDecision | null {
 }
 
 function holdFromTitle(title: string): CatalogueDecision | null {
+  // A paper ad for a watch is not the watch, even when the title says both
+  // ("1970 Grand Seiko … Dress Watch Advertisement").
+  if (/\badvertisements?\b/i.test(title)) return hold('not_a_watch', 'advertisement-title');
   if (objetAccessory(title)) return hold('accessory', 'objet-title');
   if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
   if (strapTitle(title)) return hold('strap', 'strap-title');

@@ -1,6 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
-import { photosFingerprint } from './hash.ts';
+import { photosFingerprint, refreshGallery } from './hash.ts';
 
 // The backfill migration stamps source_items.photos_hash with this same
 // digest, built in SQL because a text value cannot hold the NUL separator.
@@ -39,4 +39,12 @@ Deno.test('a gallery fingerprint is the photo URLs joined by a NUL byte', async 
   assertEquals(await photosFingerprint(urls), await sha256Hex(migrationPayload(urls)));
   assertEquals(await photosFingerprint([urls[0]]), await sha256Hex(migrationPayload([urls[0]])));
   assertEquals(await photosFingerprint([]), await sha256Hex(new Uint8Array()));
+});
+
+Deno.test('a refresh does not replace a gallery with fewer photographs', () => {
+  assertEquals(refreshGallery(6, 1), 'keep');
+  assertEquals(refreshGallery(6, 5), 'keep');
+  assertEquals(refreshGallery(6, 6), 'replace');
+  assertEquals(refreshGallery(6, 8), 'replace');
+  assertEquals(refreshGallery(0, 1), 'replace');
 });

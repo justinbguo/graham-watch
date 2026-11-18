@@ -1,12 +1,14 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
-import type { TextResponse } from './source.ts';
+import type { SourceItem, TextResponse } from './source.ts';
 import {
   fetchSquarespaceItems,
+  hydrateSquarespaceItem,
   squarespaceCollectionPaths,
   squarespacePhotoUrls,
   squarespacePrice,
   squarespaceRecords,
+  squarespaceSlideshowUrls,
 } from './squarespace.ts';
 
 Deno.test('a homepage sitemap yields every watch collection and skips cameras', () => {
@@ -220,4 +222,80 @@ Deno.test('an older product list is read from the HTML grid, not format=json', a
   ]);
   assertEquals(read?.items[0]?.photoUrls, ['https://images.example/bulova.jpg?format=1500w']);
   assertEquals(read?.items[0]?.externalId, 'squarespace:item-1');
+});
+
+const PRODUCT_PAGE = `<!doctype html>
+  <script type="application/ld+json">{"@type":"Product","name":"1960 Bulova — Cool Vintage","image":"https://images.example/one.jpg","description":"A full description.","offers":{"price":"435","priceCurrency":"USD","availability":"https://schema.org/InStock"}}</script>
+  <div id="productSlideshow">
+    <div class="slide" data-slide-index="1"><img data-src="https://images.example/one.jpg" data-image="https://images.example/one.jpg" /></div>
+    <div class="slide" data-slide-index="2"><img data-image="https://images.example/two.jpg" /></div>
+    <div class="slide" data-slide-index="3"><img data-image="https://images.example/three.jpg" /></div>
+  </div>`;
+
+Deno.test('the slideshow is the gallery when JSON-LD has one image', () => {
+  assertEquals(squarespaceSlideshowUrls(PRODUCT_PAGE), [
+    'https://images.example/one.jpg',
+    'https://images.example/two.jpg',
+    'https://images.example/three.jpg',
+  ]);
+});
+
+Deno.test('a one-photo grid takes the product-page slideshow, after robots and a pause', async () => {
+  const calls: string[] = [];
+  const pauses: number[] = [];
+  const grid: SourceItem = {
+    externalId: 'squarespace:item-1',
+    title: '1960 Bulova',
+    text: '',
+    sourceUrl: 'https://shop.example/under350/bulova',
+    photoUrls: ['https://images.example/one.jpg?format=1500w'],
+    priceCents: 43_500,
+    currency: 'USD',
+    available: true,
+  };
+  const hydrated = await hydrateSquarespaceItem(grid, {
+    fetchText: async (url) => {
+      calls.push(url.pathname);
+      if (url.pathname === '/robots.txt') {
+        return { status: 200, body: 'User-agent: *\nAllow: /\nDisallow: /*?format=json\n' };
+      }
+      return { status: 200, body: PRODUCT_PAGE };
+    },
+    pause: async (ms) => {
+      pauses.push(ms);
+    },
+  });
+  assertEquals(calls[0], '/robots.txt');
+  assertEquals(calls.includes('/under350/bulova'), true);
+  assertEquals(calls.some((call) => call.includes('format=json')), false);
+  assertEquals(pauses.includes(1000), true);
+  assertEquals(hydrated.photoUrls, [
+    'https://images.example/one.jpg?format=1500w',
+    'https://images.example/two.jpg?format=1500w',
+    'https://images.example/three.jpg?format=1500w',
+  ]);
+  assertEquals(hydrated.text.includes('full description'), true);
+});
+
+Deno.test('a disallowed product page keeps the grid photos', async () => {
+  const calls: string[] = [];
+  const grid: SourceItem = {
+    externalId: 'squarespace:item-1',
+    title: '1960 Bulova',
+    text: 'grid',
+    sourceUrl: 'https://blocked.example/under350/bulova',
+    photoUrls: ['https://images.example/one.jpg?format=1500w'],
+    priceCents: 43_500,
+    currency: 'USD',
+    available: true,
+  };
+  const hydrated = await hydrateSquarespaceItem(grid, {
+    fetchText: async (url) => {
+      calls.push(url.pathname);
+      return { status: 200, body: 'User-agent: *\nDisallow: /\n' };
+    },
+    pause: async () => {},
+  });
+  assertEquals(calls, ['/robots.txt']);
+  assertEquals(hydrated.photoUrls.length, 1);
 });

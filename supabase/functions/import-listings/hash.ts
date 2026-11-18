@@ -37,6 +37,16 @@ export function contentFingerprint(item: SourceItem): Promise<string> {
   );
 }
 
+/**
+ * A refresh may add photographs. It may not replace a fuller gallery with a
+ * shorter read. Cool Vintage's collection grid has one image; if the product
+ * page fails, the listing keeps the photos already on the deck.
+ */
+export function refreshGallery(existingCount: number, incomingCount: number): 'keep' | 'replace' {
+  if (existingCount > 0 && incomingCount < existingCount) return 'keep';
+  return 'replace';
+}
+
 export function photosFingerprint(photoUrls: string[]): Promise<string> {
   return sha256(photoUrls.join(SEP));
 }

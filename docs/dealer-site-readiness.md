@@ -16,6 +16,7 @@ It tries platform feeds before anything else:
 2. **Squarespace.** The collection page's HTML `data-context` (robots.txt
    disallows `?format=json`). Same idea: title, prose, price, stock, gallery.
    An older template puts title, price, and sold-out in the product-list HTML.
+   The gallery is on the product page slideshow, read at publish.
 3. **WooCommerce.** `GET /wp-json/wc/store/v1/products` with `stock_status=instock`.
    A `/product-category/<slug>/` URL limits the read to that category.
 4. **Wix Stores.** `/store-products-sitemap.xml`, then JSON-LD on each product page.

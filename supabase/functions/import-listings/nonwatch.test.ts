@@ -99,6 +99,22 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
     fields: item({ title: 'Rolex Explorer 1016', productType: 'Watch Winder' }),
   },
   {
+    reason: 'accessory',
+    fields: item({ title: 'Embroidered Speedy 1957 Cap', productType: null }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({ title: 'Theo & Harris Cap', productType: null }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({ title: 'GMT Hands Shirt', productType: null }),
+  },
+  {
+    reason: 'accessory',
+    fields: item({ title: 'Cool Gift Card', productType: null }),
+  },
+  {
     reason: 'clock',
     fields: item({ title: 'Movado Travel Clock', productType: 'Watches' }),
   },
@@ -245,6 +261,13 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
   },
   {
     reason: 'not_a_watch',
+    fields: item({
+      title: '1970 Grand Seiko "Japan\'s Grand Masterpiece" 61 Series Dress Watch Advertisement',
+      productType: null,
+    }),
+  },
+  {
+    reason: 'not_a_watch',
     fields: item({ title: 'Rolex Prince Pocket Watch', text: 'Silver pocket watch.' }),
   },
   {
@@ -323,6 +346,9 @@ const JUNK: Array<{ reason: HoldReason; fields: CatalogueFields }> = [
 ];
 
 const WATCHES: CatalogueFields[] = [
+  item({ title: '1962 Seiko SilverWave Diver', productType: 'Watches' }),
+  item({ title: '1962 Omega Seamaster with box and card', productType: 'Watches' }),
+  item({ title: 'Longines Captain 1960s', productType: 'Watches' }),
   item({
     title: 'Gruen Art Deco Yellow Gold & Jade Lapel Watch (Objet)',
     productType: 'Watches',

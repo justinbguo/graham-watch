@@ -1,6 +1,12 @@
 import { classifyCatalogueItem } from './nonwatch.ts';
 import { htmlToText } from './scrape.ts';
-import { assertCrawlDelay, CatalogueRefused, createPacer, policyFromRobotsResponse } from './robots.ts';
+import {
+  assertCrawlDelay,
+  CatalogueRefused,
+  createPacer,
+  policyFromRobotsResponse,
+  type RobotsPolicy,
+} from './robots.ts';
 import {
   fetchText,
   productKey,
@@ -211,16 +217,51 @@ function merge(collection: SourceItem, product: SourceItem | null): SourceItem {
  * published rather than when the catalogue is read. Hydrating a 300-watch shop
  * up front is 300 requests inside one invocation, which is what used to make a
  * large shop impossible to import at all.
+ *
+ * Cool Vintage's grid has one image. The product page slideshow has the rest.
+ * A short read must not win: `merge` keeps the longer list.
  */
-export async function hydrateSquarespaceItem(item: SourceItem): Promise<SourceItem> {
+export async function hydrateSquarespaceItem(
+  item: SourceItem,
+  io: SquarespaceIO = {},
+): Promise<SourceItem> {
   const url = new URL(item.sourceUrl);
-  // Squarespace's default robots.txt disallows `?format=json`. The product
-  // page HTML carries the same record in a data-context attribute.
-  const response = await fetchText(url, 'text/html');
+  const fetchBody = io.fetchText ?? fetchText;
+  const pause = io.pause ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const policy = await policyFor(url.origin, fetchBody, pause, io.fetchText == null);
+  if (!policy.allows(url)) return item;
+  const take = createPacer({
+    crawlDelayMs: policy.crawlDelayMs,
+    floorMs: PAUSE_MS,
+    budgetMs: io.budgetMs,
+    pause,
+  });
+  if (!(await take())) return item;
+  const response = await fetchBody(url, 'text/html');
   const product = response && response.status >= 200 && response.status < 300
-    ? mapItem(productRecord(response.body) ?? jsonLdProduct(response.body), url)
+    ? mapItem(galleryRecord(response.body), url)
     : null;
   return merge(item, product);
+}
+
+// One robots read per shop per isolate. Publish hydrates a handful of watches
+// in a row; fetching robots.txt before each of them would double the requests.
+const policyCache = new Map<string, RobotsPolicy>();
+
+async function policyFor(
+  origin: string,
+  fetchBody: (url: URL, accept: string) => Promise<TextResponse | null>,
+  pause: (ms: number) => Promise<void>,
+  cache: boolean,
+) {
+  if (cache) {
+    const hit = policyCache.get(origin);
+    if (hit) return hit;
+  }
+  const policy = await loadPolicy(origin, fetchBody, pause);
+  assertCrawlDelay(policy.crawlDelayMs);
+  if (cache) policyCache.set(origin, policy);
+  return policy;
 }
 
 /**
@@ -376,6 +417,53 @@ function jsonLdTitle(name: string): string {
   return name.trim();
 }
 
+/**
+ * Frames inside `#productSlideshow`. Cool Vintage (Squarespace 7.0) has no
+ * data-context, and its JSON-LD `image` is the one grid photo. The slideshow
+ * is the gallery the deck already shows.
+ */
+export function squarespaceSlideshowUrls(html: string): string[] {
+  const start = html.indexOf('id="productSlideshow"');
+  if (start < 0) return [];
+  const region = html.slice(start, start + 250_000);
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const slide = /<div class="slide"[^>]*>[\s\S]*?\bdata-image="(https:[^"]+)"/gi;
+  for (const match of region.matchAll(slide)) {
+    const path = match[1].split(/[?#]/)[0];
+    if (seen.has(path)) continue;
+    seen.add(path);
+    urls.push(match[1]);
+  }
+  return urls;
+}
+
+function galleryRecord(html: string): Json | null {
+  const record = productRecord(html) ?? jsonLdProduct(html);
+  if (!record) return null;
+  const slides = squarespaceSlideshowUrls(html).map((assetUrl) => ({ assetUrl }));
+  if (slides.length > squarespacePhotoUrls(record).length) {
+    return { ...record, images: slides };
+  }
+  return record;
+}
+
+function jsonLdImages(data: Json): Array<{ assetUrl: string }> {
+  const raw = data?.image;
+  const list = typeof raw === 'string' ? [raw] : Array.isArray(raw) ? raw : [];
+  const images: Array<{ assetUrl: string }> = [];
+  for (const entry of list) {
+    const value = typeof entry === 'string'
+      ? entry
+      : entry && typeof entry === 'object' && typeof entry.url === 'string'
+      ? entry.url
+      : '';
+    const asset = value.startsWith('//') ? `https:${value}` : value;
+    if (asset.startsWith('http')) images.push({ assetUrl: asset });
+  }
+  return images;
+}
+
 /** Product JSON-LD, for a 7.0 page that has no data-context record. */
 function jsonLdProduct(html: string): Json | null {
   for (const match of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)) {
@@ -389,12 +477,7 @@ function jsonLdProduct(html: string): Json | null {
     const offers = data.offers;
     if (!offers || typeof offers !== 'object') continue;
     const availability = typeof offers.availability === 'string' ? offers.availability : '';
-    const rawImage = typeof data.image === 'string'
-      ? data.image
-      : Array.isArray(data.image) && typeof data.image[0] === 'string'
-      ? data.image[0]
-      : '';
-    const asset = rawImage.startsWith('//') ? `https:${rawImage}` : rawImage;
+    const images = jsonLdImages(data);
     const price = offers.price;
     return {
       id: typeof offers.sku === 'string' ? offers.sku : undefined,
@@ -410,7 +493,7 @@ function jsonLdProduct(html: string): Json | null {
           },
         }
         : {}),
-      ...(asset.startsWith('http') ? { images: [{ assetUrl: asset }] } : {}),
+      ...(images.length ? { images } : {}),
     };
   }
   return null;
