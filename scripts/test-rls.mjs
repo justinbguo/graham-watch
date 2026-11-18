@@ -5313,6 +5313,199 @@ console.log('\ncollector numbers');
   for (const user of made) await removeUser(user.id);
 }
 
+console.log('\nguest activity');
+{
+  const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const rowsFor = (key) =>
+    fetch(`${URL}/rest/v1/buyer_events?guest_key=eq.${key}&select=id,user_id,guest_key,received_at`, {
+      headers: admin,
+    }).then((r) => r.json());
+  const deviceFor = (key) =>
+    fetch(
+      `${URL}/rest/v1/guest_devices?guest_key=eq.${key}&select=guest_key,country,device,claimed_by`,
+      { headers: admin },
+    ).then((r) => r.json());
+  const logGuest = (token, key, events, device = 'web-desktop') =>
+    api('/rest/v1/rpc/log_guest_events', {
+      token,
+      method: 'POST',
+      body: { p_guest_key: key, p_events: events, p_device: device },
+    });
+  const watchEvent = (kind, extra = {}) => ({
+    id: crypto.randomUUID(),
+    kind,
+    surface: 'buy',
+    occurred_at: new Date().toISOString(),
+    listing_id: listingId,
+    dealer_id: dealerId,
+    ...(kind === 'impression' || kind === 'dwell' ? { exposure_id: crypto.randomUUID() } : {}),
+    ...(kind === 'impression' ? { position: 0 } : {}),
+    ...(kind === 'dwell' ? { dwell_ms: 1000 } : {}),
+    ...extra,
+  });
+
+  const key = crypto.randomUUID();
+  const otherUser = crypto.randomUUID();
+  const first = watchEvent('impression', {
+    user_id: otherUser,
+    received_at: '2000-01-01T00:00:00Z',
+    guest_key: crypto.randomUUID(),
+  });
+  const logged = await logGuest(ANON, key, [first]);
+  const [row] = await rowsFor(key);
+  const devices = await deviceFor(key);
+  const receivedAt = Date.parse(row?.received_at ?? '');
+  check(
+    'a signed-out caller logs one guest event and one device',
+    logged.status === 200 &&
+      logged.body === 1 &&
+      row?.user_id === null &&
+      row?.guest_key === key &&
+      Number.isFinite(receivedAt) &&
+      Math.abs(Date.now() - receivedAt) < 2 * 60_000 &&
+      devices.length === 1 &&
+      devices[0]?.guest_key === key,
+    `got ${logged.status} ${JSON.stringify(logged.body)} ${JSON.stringify(row)} ${JSON.stringify(devices)}`,
+  );
+
+  const country = devices[0]?.country ?? null;
+  console.log(`guest_devices.country: ${country === null ? 'null' : country}`);
+  check(
+    'guest country is null or a two-letter code',
+    country === null || /^[A-Z]{2}$/.test(country),
+    JSON.stringify(country),
+  );
+
+  const replay = await logGuest(ANON, key, [first]);
+  const copies = await rowsFor(key);
+  check(
+    'a replayed guest batch stores nothing new',
+    replay.status === 200 && replay.body === 0 && copies.length === 1,
+    `got ${replay.status} ${JSON.stringify(replay.body)}, ${copies.length} rows`,
+  );
+
+  for (const [table, path] of [
+    ['buyer_events', '/rest/v1/buyer_events?select=*'],
+    ['guest_devices', '/rest/v1/guest_devices?select=*'],
+  ]) {
+    const read = await api(path);
+    check(`a guest cannot read ${table}`, read.status >= 400, `got ${read.status}`);
+  }
+
+  const signedKey = crypto.randomUUID();
+  const signed = await logGuest(buyer.token, signedKey, [watchEvent('pass')]);
+  const signedRows = await rowsFor(signedKey);
+  check(
+    'a signed-in caller cannot log guest events',
+    signed.status >= 400 && signed.body?.code === '28000' && signedRows.length === 0,
+    `${signed.status} ${JSON.stringify(signed.body)} rows ${signedRows.length}`,
+  );
+
+  const refusedKey = crypto.randomUUID();
+  const madeUp = watchEvent('pass', { listing_id: crypto.randomUUID() });
+  const tooMany = await logGuest(
+    ANON,
+    refusedKey,
+    Array.from({ length: 51 }, () => watchEvent('pass')),
+  );
+  const saved = await logGuest(ANON, refusedKey, [watchEvent('save')]);
+  const missing = await logGuest(ANON, refusedKey, [madeUp]);
+  const oversized = await logGuest(ANON, refusedKey, [
+    watchEvent('pass', { filter: { note: 'x'.repeat(70_000) } }),
+  ]);
+  const refusedRows = await rowsFor(refusedKey);
+  check(
+    'an oversized, over-long, save, or unknown-listing guest batch stores nothing',
+    [tooMany, saved, missing, oversized].every((result) => result.status >= 400) && refusedRows.length === 0,
+    JSON.stringify({
+      tooMany: tooMany.status,
+      saved: saved.status,
+      missing: missing.status,
+      oversized: oversized.status,
+      rows: refusedRows.length,
+    }),
+  );
+
+  const tasteOf = () => api('/rest/v1/rpc/buyer_taste', { token: buyer.token, method: 'POST', body: {} });
+  const feedOf = () =>
+    api('/rest/v1/rpc/rank_buy_feed', { token: buyer.token, method: 'POST', body: { p_limit: 1 } });
+  const tasteBefore = await tasteOf();
+  const feedBefore = await feedOf();
+  const landed = await logGuest(ANON, key, [watchEvent('dealer_click'), watchEvent('pass')]);
+  const tasteAfter = await tasteOf();
+  const feedAfter = await feedOf();
+  check(
+    "a guest dealer click and pass leave that account's taste and feed unchanged",
+    landed.status === 200 &&
+      landed.body === 2 &&
+      JSON.stringify(tasteAfter.body) === JSON.stringify(tasteBefore.body) &&
+      JSON.stringify(feedAfter.body) === JSON.stringify(feedBefore.body),
+    `landed ${landed.status} ${JSON.stringify(landed.body)}`,
+  );
+
+  const anonClaim = await api('/rest/v1/rpc/claim_guest_events', {
+    method: 'POST',
+    body: { p_guest_key: key },
+  });
+  const owner = await createUser(`guest-claim-${stamp}@example.com`);
+  const beforeClaim = await rowsFor(key);
+  const claimed = await api('/rest/v1/rpc/claim_guest_events', {
+    token: owner.token,
+    method: 'POST',
+    body: { p_guest_key: key },
+  });
+  const afterClaim = await rowsFor(key);
+  const [claimedDevice] = await deviceFor(key);
+  const claimedAgain = await api('/rest/v1/rpc/claim_guest_events', {
+    token: owner.token,
+    method: 'POST',
+    body: { p_guest_key: key },
+  });
+  const afterAgain = await rowsFor(key);
+  check(
+    'claiming guest events sets the user once and does not add rows',
+    anonClaim.status >= 400 &&
+      claimed.status === 200 &&
+      claimed.body === beforeClaim.length &&
+      afterClaim.length === beforeClaim.length &&
+      afterClaim.every((event) => event.user_id === owner.id) &&
+      claimedDevice?.claimed_by === owner.id &&
+      claimedAgain.status === 200 &&
+      claimedAgain.body === 0 &&
+      afterAgain.length === beforeClaim.length,
+    JSON.stringify({
+      anon: anonClaim.status,
+      claimed: claimed.body,
+      again: claimedAgain.body,
+      before: beforeClaim.length,
+      after: afterAgain.length,
+      device: claimedDevice,
+    }),
+  );
+
+  const freshKey = crypto.randomUUID();
+  const fresh = watchEvent('pass');
+  const storedFresh = await logGuest(ANON, freshKey, [fresh]);
+  const purged = await fetch(`${URL}/rest/v1/rpc/purge_unclaimed_guest_events`, {
+    method: 'POST',
+    headers: { ...admin, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  const purgedBody = await purged.json();
+  const freshRows = await rowsFor(freshKey);
+  check(
+    'purging unclaimed guest events leaves a row from this run',
+    storedFresh.status === 200 &&
+      storedFresh.body === 1 &&
+      purged.status === 200 &&
+      typeof purgedBody === 'number' &&
+      freshRows.some((event) => event.id === fresh.id),
+    `store ${storedFresh.status} ${storedFresh.body}, purge ${purged.status} ${JSON.stringify(purgedBody)}, rows ${freshRows.length}`,
+  );
+
+  await fetch(`${URL}/auth/v1/admin/users/${owner.id}`, { method: 'DELETE', headers: admin });
+}
+
 await cleanUp();
 
 console.log(failures === 0 ? '\nAll RLS checks passed.\n' : `\n${failures} RLS check(s) failed.\n`);

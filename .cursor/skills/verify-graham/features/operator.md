@@ -8,11 +8,12 @@ Operators approve shops, read the Users counts, open one account on Accounts, an
 - `dealers`: the first screen. Shops are approved here.
 - `users`: heading `Users`. Signup counts and onboarding answers. It does not open one account.
 - `accounts`: heading `Accounts`. Sort with `Number` or `Last active`. A row shows the collector number, the name, and the email. The empty pane says `Pick an account to read its timeline.` The open pane title starts with `Collector #`. The event list heading is `Timeline`. The header says `times in Pacific`. No events yet says `Nothing logged yet.`
+- `guests`: heading `Guests`. One row per signed-out device. `Show operators` is off until pressed. An unclaimed row has `This is me`. A claimed badge opens Accounts.
 - `inbox`, `activity`, `applications`, `add`: the other screens in the header.
 
 ## How to get to it (user POV)
 
-From the repo root, `npm run operator` starts Vite, usually at `http://127.0.0.1:5173`, after `npm run env -- local` has written `operator/.env.local`. Sign in with an operator account. The nav reads Dealers, Inbox, Users, Accounts, Activity, Applications, and Add shops. Accounts replaced the per-person drill-in that used to live on Users.
+From the repo root, `npm run operator` starts Vite, usually at `http://127.0.0.1:5173`, after `npm run env -- local` has written `operator/.env.local`. Sign in with an operator account. The nav reads Dealers, Inbox, Users, Accounts, Guests, Activity, Applications, and Add shops. Accounts replaced the per-person drill-in that used to live on Users.
 
 ## Driving it with control-graham
 
