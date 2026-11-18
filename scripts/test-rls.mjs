@@ -5483,6 +5483,27 @@ console.log('\nguest activity');
     }),
   );
 
+  const capKey = crypto.randomUUID();
+  let capStored = 0;
+  let capStatus = 0;
+  for (let batch = 0; batch < 40; batch += 1) {
+    const result = await logGuest(
+      ANON,
+      capKey,
+      Array.from({ length: 50 }, () => watchEvent('pass')),
+    );
+    capStatus = result.status;
+    if (result.status !== 200 || result.body !== 50) break;
+    capStored += result.body;
+  }
+  const overCap = await logGuest(ANON, capKey, [watchEvent('pass')]);
+  const capRows = await rowsFor(capKey);
+  check(
+    'a guest key over 2000 rows in a day stores nothing further',
+    capStored === 2000 && capStatus === 200 && overCap.status === 200 && overCap.body === 0 && capRows.length === 2000,
+    `stored ${capStored} status ${capStatus}, next ${overCap.status} ${JSON.stringify(overCap.body)}, rows ${capRows.length}`,
+  );
+
   const freshKey = crypto.randomUUID();
   const fresh = watchEvent('pass');
   const storedFresh = await logGuest(ANON, freshKey, [fresh]);

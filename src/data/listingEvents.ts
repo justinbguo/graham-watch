@@ -365,8 +365,15 @@ async function flush(): Promise<void> {
   const guestEntries = queue.filter((entry) => entry.owner === 'guest');
   if (guestEntries.length) {
     queue = queue.filter((entry) => entry.owner !== 'guest');
-    const key = await keepForGuest(guestEntries.map((entry) => entry.row));
-    if (owner === 'guest') await sendGuestEvents(key, guestEntries);
+    await keepForGuest(guestEntries.map((entry) => entry.row));
+  }
+  // The buffer is the source of truth for a guest, including rows left by a
+  // failed send or a reload. Sending only the rows from this flush would leave
+  // that backlog on the device until sign-in.
+  if (owner === 'guest') {
+    const stored = parseGuestBuffer(await secureStorage.getItem(GUEST_STORAGE));
+    const key = await resolveStoredKey(stored);
+    await sendGuestBuffer(key);
   }
   if (!queue.some((entry) => entry.owner !== 'guest' && entry.owner !== 'unknown')) return;
   if (Date.now() < retryAt) {
@@ -435,27 +442,20 @@ function deviceLabel(): string | null {
   return deviceKind(Platform.OS, width);
 }
 
-async function sendGuestEvents(key: string, entries: readonly Queued[]): Promise<void> {
-  const sendable = entries.filter((entry) => guestSendable(entry.row));
-  if (!sendable.length) return;
+async function sendGuestBuffer(key: string): Promise<void> {
+  const stored = parseGuestBuffer(await secureStorage.getItem(GUEST_STORAGE));
+  const rows = (stored?.rows ?? []).filter((row) => guestSendable(row));
+  if (!rows.length) return;
   const device = deviceLabel();
-  const groups = batches(sendable, BATCH_SIZE);
-  for (const [index, batch] of groups.entries()) {
-    const code = await postGuest(
-      key,
-      batch.map((entry) => entry.row),
-      device,
-    );
-    const ids = batch.map((entry) => entry.row.id);
+  const groups = batches(rows, BATCH_SIZE);
+  for (const batch of groups) {
+    const code = await postGuest(key, batch, device);
     if (code === null || isPermanentFailure(code)) {
       if (code !== null) warn(`the database refused ${batch.length} guest events (${code})`);
-      await forgetConfirmed(ids);
+      await forgetConfirmed(batch.map((row) => row.id));
       continue;
     }
-    const next = afterTransientFailure(queue, batch, groups.slice(index + 1).flat(), MEMORY_CAP);
-    queue = next.queue;
     warn(`could not send ${batch.length} guest events (${code || 'network'}), trying once more in 30 s`);
-    if (next.dropped) warn(`dropped ${next.dropped} guest events after a second failure`);
     retryAt = Date.now() + RETRY_DELAY_MS;
     flushSoon(RETRY_DELAY_MS);
     return;

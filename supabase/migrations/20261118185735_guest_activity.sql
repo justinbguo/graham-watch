@@ -258,7 +258,7 @@ begin
   where events.user_id is null
     and events.received_at > now() - interval '1 hour';
 
-  if hour_count >= 20000 then
+  if hour_count >= 20000 or hour_count + jsonb_array_length(p_events) > 20000 then
     return 0;
   end if;
 
