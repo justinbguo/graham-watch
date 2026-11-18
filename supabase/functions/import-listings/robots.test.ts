@@ -1,6 +1,13 @@
-import { assertEquals } from 'jsr:@std/assert@1';
+import { assertEquals, assertThrows } from 'jsr:@std/assert@1';
 
-import { parseRobots } from './robots.ts';
+import {
+  CatalogueRefused,
+  assertCrawlDelay,
+  createPacer,
+  parseRobots,
+  policyFromRobotsResponse,
+  robotsBodyIsHtml,
+} from './robots.ts';
 import { USER_AGENT } from './source.ts';
 
 /**
@@ -61,6 +68,51 @@ Disallow: /products.json
 Deno.test('an empty file and a missing rule allow the path', () => {
   assertEquals(allows('/products.json', ''), true);
   assertEquals(allows('/products.json', 'User-agent: *\n'), true);
+});
+
+Deno.test('a file with no user-agent line allows the site', () => {
+  const body = `
+Sitemap: https://shop.example/sitemap.xml
+Disallow: /private
+`;
+  assertEquals(allows('/products.json', body), true);
+  assertEquals(parseRobots(body, USER_AGENT).crawlDelayMs, null);
+});
+
+Deno.test('an HTML challenge served as robots.txt is refused', () => {
+  assertEquals(robotsBodyIsHtml('<!DOCTYPE html><html></html>'), true);
+  assertThrows(
+    () => policyFromRobotsResponse(200, '<html><body>Checking your browser</body></html>'),
+    CatalogueRefused,
+  );
+});
+
+Deno.test('a crawl-delay over 5 seconds is a refusal', () => {
+  assertThrows(() => assertCrawlDelay(10_000), CatalogueRefused);
+  assertCrawlDelay(5_000);
+  assertCrawlDelay(null);
+});
+
+Deno.test('a 10s crawl-delay fits a 20s budget and does not fit a 5s budget', async () => {
+  const pauses: number[] = [];
+  const pause = async (ms: number) => {
+    pauses.push(ms);
+  };
+  const tooSlow = createPacer({
+    crawlDelayMs: 10_000,
+    floorMs: 1_000,
+    budgetMs: 5_000,
+    pause,
+  });
+  assertEquals(await tooSlow(), false);
+  const fits = createPacer({
+    crawlDelayMs: 10_000,
+    floorMs: 1_000,
+    budgetMs: 20_000,
+    pause,
+  });
+  assertEquals(await fits(), true);
+  assertEquals(pauses, [10_000]);
 });
 
 Deno.test('crawl-delay is read in milliseconds from the group that applies', () => {

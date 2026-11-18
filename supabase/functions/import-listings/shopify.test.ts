@@ -371,16 +371,37 @@ Deno.test('robots.txt is read before the feed, and a disallow is not fetched', a
   assertEquals(calls, ['/robots.txt']);
 });
 
-Deno.test('a crawl-delay slower than the edge function can keep is a refusal', async () => {
-  const fetchText = async (url: URL): Promise<TextResponse> => {
+Deno.test('a crawl-delay that does not fit the read is a refusal, and one that fits is waited', async () => {
+  const refused = async (url: URL): Promise<TextResponse> => {
     if (url.pathname !== '/robots.txt') throw new Error(`fetched ${url.pathname}`);
     return { status: 200, body: 'User-agent: *\nCrawl-delay: 30\nAllow: /\n' };
   };
 
   await assertRejects(
-    () => fetchShopifyItems('https://shop.example', 100, 0, { fetchText, pause: async () => {} }),
-    CatalogueRefused
+    () =>
+      fetchShopifyItems('https://shop.example', 100, 0, {
+        fetchText: refused,
+        pause: async () => {},
+        budgetMs: 5_000,
+      }),
+    CatalogueRefused,
   );
+
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(url.pathname);
+    return { status: 200, body: 'User-agent: *\nCrawl-delay: 10\nAllow: /\n' };
+  };
+  await assertRejects(
+    () =>
+      fetchShopifyItems('https://shop.example', 10, 0, {
+        fetchText,
+        pause: async () => {},
+        budgetMs: 30_000,
+      }),
+    CatalogueRefused,
+  );
+  assertEquals(calls, ['/robots.txt']);
 });
 
 Deno.test('a crawl-delay raises the pause, and one meta failure is retried', async () => {
@@ -395,6 +416,23 @@ Deno.test('a crawl-delay raises the pause, and one meta failure is retried', asy
   assertEquals(read?.items[0]?.currency, 'USD');
   assertEquals(fixture.pauses.every((ms) => ms === 2_000), true);
   assertEquals(fixture.calls.filter((call) => call === '/meta.json').length, 2);
+});
+
+Deno.test('Connoisseur pocket watches are held, including a generic WATCH type', () => {
+  const titles = [
+    '1865 Waltham P.S. Bartlett Civil War Era 18 Size Pocket Watch Same Brand Given to Abraham Lincoln at Gettysburg',
+    '1914 Vacheron Constantin for Merimont Mens Art Deco 44mm Pocket Watch Platinum',
+    "Owned/Used by ZZ Top's Dusty Hill Harley-Davidson Chrome Pocket Watch",
+  ];
+  for (const title of titles) {
+    const item = held({
+      title,
+      handle: 'pocket-watch',
+      product_type: 'WATCH',
+      tags: 'Mens, Pocket Watch, Vintage',
+    });
+    assertEquals(item?.holdReason, 'not_a_watch', title);
+  }
 });
 
 Deno.test('merch is skipped and does not hide the watch after it', async () => {

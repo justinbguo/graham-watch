@@ -1,5 +1,11 @@
 import { classifyCatalogueItem, type HoldReason } from './nonwatch.ts';
-import { CatalogueRefused, parseRobots, type RobotsPolicy } from './robots.ts';
+import {
+  CatalogueRefused,
+  assertCrawlDelay,
+  createPacer,
+  policyFromRobotsResponse,
+  type RobotsPolicy,
+} from './robots.ts';
 import { htmlToText } from './scrape.ts';
 import {
   type AdapterRead,
@@ -35,6 +41,8 @@ type WooIO = {
   pageSize?: number;
   startPage?: number;
   maxPages?: number;
+  /** Test hook. Production uses the edge-function budget in `robots.ts`. */
+  budgetMs?: number;
 };
 
 type PageBody =
@@ -45,8 +53,8 @@ type PageBody =
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10_000 / PAGE_SIZE;
 const PAUSE_MS = 1_000;
-const MAX_CRAWL_DELAY_MS = 5_000;
 const PRODUCTS_PATH = '/wp-json/wc/store/v1/products';
+const CATEGORIES_PATH = '/wp-json/wc/store/v1/products/categories';
 
 const RETRY_WAITS_MS = [1_000, 2_000, 4_000] as const;
 const MAX_MINOR_UNIT = 20;
@@ -303,6 +311,23 @@ function soldByShop(product: ParsedWoo): boolean {
   return TITLE_STARTS_WITH_SOLD.test(product.title.trim());
 }
 
+/**
+ * The Store API's own stock flags. A sold category slug is not the only way
+ * a shop marks a watch gone: Wanna Buy A Watch files thousands of them under
+ * a differently named category, and Theo and Harris keeps the price up.
+ */
+export function wooStockClosed(raw: Json): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  if (raw.is_in_stock === false) return true;
+  if (raw.is_purchasable === false) return true;
+  const availability = raw.stock_availability;
+  const kind = typeof availability?.class === 'string' ? availability.class : '';
+  const label = typeof availability?.text === 'string' ? availability.text : '';
+  if (/out-?of-?stock/i.test(kind)) return true;
+  if (/out of stock/i.test(label)) return true;
+  return false;
+}
+
 export function mapWooProduct(
   raw: Json,
   origin: string,
@@ -337,7 +362,7 @@ export function mapWooProduct(
     }
   }
 
-  if (soldByShop(product)) return archive(product);
+  if (soldByShop(product) || wooStockClosed(raw)) return archive(product);
   if (product.priceCents == null) {
     return skip(product.sourceUrl, product.title, 'no price', meta);
   }
@@ -352,12 +377,40 @@ export function mapWooProduct(
   return forSale(product, product.priceCents);
 }
 
-function productsUrl(origin: string, page: number, pageSize: number): URL {
+/** Last segment of `/product-category/<slug>/`, including a nested slug. */
+export function wooCategorySlug(sourceUrl: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(sourceUrl);
+  } catch {
+    return null;
+  }
+  const parts = url.pathname.split('/').filter(Boolean).map((part) => {
+    try {
+      return decodeURIComponent(part);
+    } catch {
+      return part;
+    }
+  });
+  const marker = parts.findIndex((part) => part === 'product-category' || part === 'product-cat');
+  if (marker < 0 || marker === parts.length - 1) return null;
+  return parts[parts.length - 1] || null;
+}
+
+function productsUrl(
+  origin: string,
+  page: number,
+  pageSize: number,
+  categoryId: number | null,
+  inStockOnly: boolean,
+): URL {
   const url = new URL(PRODUCTS_PATH, origin);
   url.searchParams.set('per_page', String(pageSize));
   url.searchParams.set('page', String(page));
   url.searchParams.set('orderby', 'id');
   url.searchParams.set('order', 'asc');
+  if (inStockOnly) url.searchParams.set('stock_status', 'instock');
+  if (categoryId != null) url.searchParams.set('category', String(categoryId));
   return url;
 }
 
@@ -429,30 +482,50 @@ async function robotsFor(
       'Could not read robots.txt, so this catalogue was not read.',
     );
   }
-  if (response.status === 404 || response.status === 410) {
-    return parseRobots('');
-  }
-  if (response.status < 200 || response.status >= 300) {
+  return policyFromRobotsResponse(response.status, response.body);
+}
+
+async function categoryIdFor(
+  origin: string,
+  slug: string,
+  policy: RobotsPolicy,
+  fetchBody: (url: URL, accept: string) => Promise<TextResponse | null>,
+  pause: (ms: number) => Promise<void>,
+  take: () => Promise<boolean>,
+): Promise<number> {
+  const url = new URL(CATEGORIES_PATH, origin);
+  url.searchParams.set('slug', slug);
+  if (!policy.allows(url)) {
     throw new CatalogueRefused(
-      `robots.txt returned ${response.status}, so this catalogue was not read.`,
+      `robots.txt does not allow ${url.pathname}, so this catalogue was not read.`,
     );
   }
-  const body = response.body.trim();
-  if (body && !/user-agent\s*:/i.test(body)) {
+  if (!(await take())) {
     throw new CatalogueRefused(
-      'robots.txt was not a robots file, so this catalogue was not read.',
+      'The category lookup does not fit in this catalogue read.',
     );
   }
-  const policy = parseRobots(response.body);
-  if (
-    policy.crawlDelayMs !== null && policy.crawlDelayMs > MAX_CRAWL_DELAY_MS
-  ) {
-    const seconds = policy.crawlDelayMs / 1000;
+  const response = await withRetry(
+    () => fetchBody(url, 'application/json'),
+    pause,
+  );
+  let rows: Json[] = [];
+  if (response && response.status >= 200 && response.status < 300) {
+    try {
+      const parsed = JSON.parse(response.body);
+      if (Array.isArray(parsed)) rows = parsed;
+    } catch {
+      rows = [];
+    }
+  }
+  const match = rows.find((row) => row?.slug === slug);
+  const id = numericId(match?.id);
+  if (id == null) {
     throw new CatalogueRefused(
-      `robots.txt asks for a ${seconds}s pause between requests, which is longer than one catalogue read can wait.`,
+      `WooCommerce has no category "${slug}", so this catalogue was not read.`,
     );
   }
-  return policy;
+  return id;
 }
 
 /**
@@ -481,18 +554,39 @@ export async function fetchWooCommerceItems(
   const pause = io.pause ??
     ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const policy = await robotsFor(origin, fetchBody, pause);
-  const pauseMs = Math.max(PAUSE_MS, policy.crawlDelayMs ?? 0);
+  assertCrawlDelay(policy.crawlDelayMs);
+  const take = createPacer({
+    crawlDelayMs: policy.crawlDelayMs,
+    floorMs: PAUSE_MS,
+    budgetMs: io.budgetMs,
+    pause,
+  });
+  const slug = wooCategorySlug(sourceUrl);
+  const categoryId = slug
+    ? await categoryIdFor(origin, slug, policy, fetchBody, pause, take)
+    : null;
+  let inStockOnly = true;
 
-  const loadPage = async (url: URL): Promise<PageBody> => {
+  const loadPage = async (
+    url: URL,
+  ): Promise<PageBody | { kind: 'budget' } | { kind: 'unsupported-stock' }> => {
     if (!policy.allows(url)) {
       throw new CatalogueRefused(
         `robots.txt does not allow ${url.pathname}, so this catalogue was not read.`,
       );
     }
-    await pause(pauseMs);
-    return classifyPage(
-      await withRetry(() => fetchBody(url, 'application/json'), pause),
+    if (!(await take())) return { kind: 'budget' };
+    const response = await withRetry(
+      () => fetchBody(url, 'application/json'),
+      pause,
     );
+    if (
+      inStockOnly && response?.status === 400 &&
+      url.searchParams.get('stock_status') === 'instock'
+    ) {
+      return { kind: 'unsupported-stock' };
+    }
+    return classifyPage(response);
   };
 
   const read: AdapterRead = {
@@ -505,7 +599,28 @@ export async function fetchWooCommerceItems(
   let started = false;
 
   for (let page = startPage; page <= lastPage; page += 1) {
-    const loaded = await loadPage(productsUrl(origin, page, pageSize));
+    let loaded = await loadPage(
+      productsUrl(origin, page, pageSize, categoryId, inStockOnly),
+    );
+    if (!started && loaded.kind === 'unsupported-stock') {
+      // This host's Store API does not accept stock_status. Read the page
+      // as published and let wooStockClosed drop what is not for sale.
+      inStockOnly = false;
+      loaded = await loadPage(
+        productsUrl(origin, page, pageSize, categoryId, false),
+      );
+    }
+    if (loaded.kind === 'budget') {
+      if (!started) {
+        const seconds = (policy.crawlDelayMs ?? PAUSE_MS) / 1000;
+        throw new CatalogueRefused(
+          `robots.txt asks for a ${seconds}s pause between requests, and that pause does not fit in this catalogue read.`,
+        );
+      }
+      read.complete = false;
+      if (page < MAX_PAGES) read.nextPage = page;
+      return read;
+    }
     if (loaded.kind !== 'array') {
       if (!started) {
         if (loaded.kind === 'absent') return null;

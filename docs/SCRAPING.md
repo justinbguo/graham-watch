@@ -69,9 +69,13 @@ which cut a sample from 592KB to 415KB.
 
 ### Squarespace
 
-`squarespace.ts` — adding `?format=json` to any Squarespace URL returns the page's
-own data: title, prose, price, and the full image gallery. No markup parsing, no
-guessing which text belongs to which watch.
+`squarespace.ts` — the shop's HTML carries the same product record Shopify's
+JSON feed would, in a `data-context` attribute: title, prose, price, stock, and
+the gallery. An older template (Cool Vintage) has no `data-context`. Its grid
+is ordinary HTML: title, price, a sold-out class, and one photo. The product
+page's JSON-LD fills in the description when that watch is published.
+Squarespace's default robots.txt disallows `?format=json`, so the adapter does
+not request it.
 
 It reads in two passes, and they happen at different times. The collection URL
 gives the list during the catalogue read. Each product URL is fetched later, in
@@ -90,12 +94,22 @@ as null.
 
 ### WooCommerce
 
-`woocommerce.ts` is the third adapter. It reads `GET /wp-json/wc/store/v1/products`,
-100 products a page. `prices.price` is a minor-unit digit string. With
-`currency_minor_unit` 2, `"1550000"` is 1550000 cents. A category whose slug is
-`sold`, or a title that starts with the word `sold`, is stored with `available`
-false. A live row with no positive price is skipped. A book title and a
+`woocommerce.ts` reads `GET /wp-json/wc/store/v1/products`, 100 products a page,
+`stock_status=instock` when the host accepts it. A category URL such as
+`/product-category/vintage-watches/` resolves that slug and sends `category=<id>`,
+so a shop can be read as one section. `prices.price` is a minor-unit digit string.
+With `currency_minor_unit` 2, `"1550000"` is 1550000 cents. `is_in_stock` false,
+`is_purchasable` false, or an out-of-stock availability is stored with
+`available` false, and so is a category slug `sold` or a title that starts with
+`sold`. A live row with no positive price is skipped. A book title and a
 display-sign title are skipped in this file, so `hold_reason` stays unset.
+
+### Wix Stores
+
+`wix.ts` reads `/store-products-sitemap.xml` for the product URLs, then each
+product page's JSON-LD for title, price, currency, stock, and images. A strap,
+advert, or pamphlet still goes through the same not-a-watch guard as the other
+adapters.
 
 ## Finding the catalog
 
@@ -182,7 +196,8 @@ tying extraction quality to the scrape vendor.
 Shopify pages `/products.json` at 250 products a page until a short page, which
 is the end of the feed, and waits a second between requests. The reader sends
 `GrahamBot/0.1` and will not fetch a URL `robots.txt` disallows. A crawl-delay
-in that file can only slow it down. There is no availability filter on
+over 5 seconds is a refusal. A shorter one only slows the read, and it still
+has to fit in the run. There is no availability filter on
 `products.json`, and Shopify's robots file disallows collection URLs that stack
 two `filter` parameters, so the whole feed is what a complete read walks.
 A collection handle is still honoured when the catalogue URL already points at
@@ -199,7 +214,7 @@ cap stopped inside the watches still for sale, and the old 10-page stop
 (2500 products) did the same, and a stopped read never retired what it had
 not seen. Both shops fit under 10000, so a finished read can retire.
 
-Squarespace still pages its own collection JSON to the same item cap.
+Squarespace still pages a collection by the `offset` link in the page HTML, to the same item cap.
 
 The generic scrape path still reads one page only. Crawling — Firecrawl
 `/v2/crawl` or Browserbase clicking through — is what that would need.

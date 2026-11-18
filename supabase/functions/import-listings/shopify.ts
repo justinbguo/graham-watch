@@ -1,5 +1,11 @@
 import { catalogueTypeLeaf, classifyCatalogueItem } from './nonwatch.ts';
-import { CatalogueRefused, parseRobots, type RobotsPolicy } from './robots.ts';
+import {
+  CatalogueRefused,
+  assertCrawlDelay,
+  createPacer,
+  policyFromRobotsResponse,
+  type RobotsPolicy,
+} from './robots.ts';
 import { htmlToText } from './scrape.ts';
 import {
   fetchText,
@@ -28,12 +34,6 @@ export const MAX_PAGES = 40;
  * robots.txt can only raise it. One second is what the readiness read used.
  */
 export const SHOPIFY_PAUSE_MS = 1_000;
-
-/**
- * Longer than this and a large shop cannot finish inside the edge function's
- * wall clock. We refuse the read rather than crawl faster than the file asks.
- */
-const MAX_CRAWL_DELAY_MS = 5_000;
 
 /**
  * Watch dealers on Shopify also sell straps, books, tools and service plans,
@@ -299,6 +299,8 @@ export type ShopifyIO = {
   startPage?: number;
   /** Pages to read in this call. Defaults to the whole feed, up to MAX_PAGES. */
   maxPages?: number;
+  /** Test hook. Production uses the edge-function budget in `robots.ts`. */
+  budgetMs?: number;
 };
 
 type ShopMeta = { currency: string | null; name: string | null };
@@ -330,36 +332,55 @@ export async function fetchShopifyItems(
   const pause = io.pause ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
 
   const policy = await robotsPolicy(base.origin, fetchBody, pause);
-  const pauseMs = Math.max(SHOPIFY_PAUSE_MS, policy.crawlDelayMs ?? 0);
+  assertCrawlDelay(policy.crawlDelayMs);
+  const take = createPacer({
+    crawlDelayMs: policy.crawlDelayMs,
+    floorMs: SHOPIFY_PAUSE_MS,
+    budgetMs: io.budgetMs,
+    pause,
+  });
 
-  // robots.txt already went out. The next request waits, and so does each one
-  // after it. The first request of a read is the only one that does not.
-  let robotsSent = true;
-  const pace = async () => {
-    if (robotsSent) await pause(pauseMs);
-    robotsSent = true;
-  };
-
+  let stoppedForBudget = false;
   const load = async (url: URL, accept: string): Promise<TextResponse | null> => {
     if (!policy.allows(url)) {
       throw new CatalogueRefused(`robots.txt does not allow ${url.pathname}, so this catalogue was not read.`);
     }
-    await pace();
+    if (!(await take())) {
+      stoppedForBudget = true;
+      return null;
+    }
+    stoppedForBudget = false;
     const first = await fetchBody(url, accept);
     if (!transient(first)) return first;
-    await pace();
+    if (!(await take())) {
+      stoppedForBudget = true;
+      return null;
+    }
     const second = await fetchBody(url, accept);
     return transient(second) ? null : second;
   };
 
   const firstUrl = pageUrl(endpoint, startPage, pageSize);
-  const first = await load(firstUrl, 'application/json');
+  if (!policy.allows(firstUrl)) {
+    throw new CatalogueRefused(
+      `robots.txt does not allow ${firstUrl.pathname}, so this catalogue was not read.`,
+    );
+  }
+  if (!(await take())) {
+    throw new CatalogueRefused(budgetRefusal(policy.crawlDelayMs));
+  }
+  const first = await fetchBody(firstUrl, 'application/json');
+  let firstRetry = first;
+  if (transient(first)) {
+    firstRetry = (await take()) ? await fetchBody(firstUrl, 'application/json') : null;
+    if (transient(firstRetry)) firstRetry = null;
+  }
   // A 404 is "not Shopify". A feed that never answers is not permission to
   // scrape the homepage instead and call that the whole catalogue.
-  if (!first) {
+  if (!firstRetry) {
     throw new CatalogueRefused('The product feed did not answer, so this catalogue was not read.');
   }
-  const firstJson = parseJson(first);
+  const firstJson = parseJson(firstRetry);
   if (!Array.isArray(firstJson?.products)) return null;
 
   const meta = await shopMeta(base.origin, policy, load);
@@ -401,6 +422,11 @@ export async function fetchShopifyItems(
 
     const nextUrl = pageUrl(endpoint, page + 1, pageSize);
     const next = await load(nextUrl, 'application/json');
+    if (stoppedForBudget) {
+      read.complete = false;
+      read.nextPage = page + 1;
+      return read;
+    }
     const nextJson = parseJson(next);
     if (!Array.isArray(nextJson?.products)) {
       read.complete = false;
@@ -472,26 +498,13 @@ async function robotsPolicy(
   if (!response) {
     throw new CatalogueRefused('Could not read robots.txt, so this catalogue was not read.');
   }
-  // No file means the shop has no rules. Anything else we cannot parse is a
-  // reason to stop: a challenge page is not permission.
-  if (response.status === 404 || response.status === 410) return parseRobots('');
-  if (response.status < 200 || response.status >= 300) {
-    throw new CatalogueRefused(
-      `robots.txt returned ${response.status}, so this catalogue was not read.`
-    );
-  }
-  const body = response.body.trim();
-  if (body && !/user-agent\s*:/i.test(body)) {
-    throw new CatalogueRefused('robots.txt was not a robots file, so this catalogue was not read.');
-  }
-  const policy = parseRobots(response.body);
-  if (policy.crawlDelayMs !== null && policy.crawlDelayMs > MAX_CRAWL_DELAY_MS) {
-    const seconds = policy.crawlDelayMs / 1000;
-    throw new CatalogueRefused(
-      `robots.txt asks for a ${seconds}s pause between requests, which is longer than one catalogue read can wait.`
-    );
-  }
-  return policy;
+  // A missing file allows the site. HTML is a challenge, not permission.
+  return policyFromRobotsResponse(response.status, response.body);
+}
+
+function budgetRefusal(crawlDelayMs: number | null): string {
+  const seconds = (crawlDelayMs ?? 0) / 1000;
+  return `robots.txt asks for a ${seconds}s pause between requests, and that pause does not fit in this catalogue read.`;
 }
 
 /** Currency and the shop's own name. Both live in meta.json, never in products.json. */

@@ -7,15 +7,19 @@ was not called. Every request identified as `GrahamBot/0.1` and waited about a
 second before the next one.
 
 A **catalogue read** asks the shop what it sells and stores one row per product.
-It tries two platform feeds before anything else:
+It tries platform feeds before anything else:
 
 1. **Shopify.** `GET /products.json` (250 products a page) plus `/meta.json` for
    the currency. The shop's vendor, price, stock flag, and gallery are copied
    as data. The model later reads the title and description for reference,
    year, and the rest.
-2. **Squarespace.** `GET <catalog>?format=json`. Same idea: title, prose, price,
-   stock, gallery.
-3. **Otherwise** it downloads one HTML page and asks the model to find the
+2. **Squarespace.** The collection page's HTML `data-context` (robots.txt
+   disallows `?format=json`). Same idea: title, prose, price, stock, gallery.
+   An older template puts title, price, and sold-out in the product-list HTML.
+3. **WooCommerce.** `GET /wp-json/wc/store/v1/products` with `stock_status=instock`.
+   A `/product-category/<slug>/` URL limits the read to that category.
+4. **Wix Stores.** `/store-products-sitemap.xml`, then JSON-LD on each product page.
+5. **Otherwise** it downloads one HTML page and asks the model to find the
    watches on that page. It does not follow "next".
 
 Discovery guesses the catalogue URL by counting sitemap paths. The directory
@@ -66,7 +70,7 @@ The sitemap is one 22MB file with 5,907 URLs. About 4,168 of them are
 one-segment pages. Discovery ignores paths with only one segment, so those
 watch pages never vote. The directory with the most URLs is `/press` (513
 sitemap URLs; the collection itself reports 789 items). A refresh that starts
-from the bare domain would call `/press?format=json`, see a real Squarespace
+from the bare domain would open `/press`, see a real Squarespace
 collection, and import press clippings. The first item is "The Boca Raton
 Tribune: A Passion for Vintage Watches Earns National Recognition", with a
 photo, a body, no price, and no variants. No variants means the adapter marks
@@ -103,10 +107,9 @@ sale.
 Squarespace's robots file disallows every named AI crawler (`GPTBot`,
 `ClaudeBot`, `Google-Extended`, and the rest of that block) with `Disallow: /`.
 `GrahamBot` is not named, so it falls under `User-agent: *`, which allows
-ordinary pages and disallows `?format=json`. The adapter's whole method is
-that query. Squarespace still answered it with 200; the disallow is a policy
-signal, not a technical block. No terms page is linked from the nav (Watches,
-Blog, Book, About, Contact, Press).
+ordinary pages and disallows `?format=json`. The adapter reads the product
+record embedded in the page HTML and does not request that query. No terms
+page is linked from the nav (Watches, Blog, Book, About, Contact, Press).
 
 ### What "small" would not cover
 

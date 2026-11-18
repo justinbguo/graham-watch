@@ -369,8 +369,9 @@ async function platform(origin: string, catalogUrl: string): Promise<string> {
   const shopify = await getJson(`${origin}/products.json?limit=1`);
   if (Array.isArray(shopify?.products)) return 'shopify';
 
-  const squarespace = await getJson(`${catalogUrl}?format=json`);
-  if (Array.isArray(squarespace?.items) || squarespace?.item) return 'squarespace';
+  const page = await get(catalogUrl);
+  // Squarespace's robots.txt disallows ?format=json. The HTML names itself.
+  if (page && page.includes('Static.SQUARESPACE_CONTEXT')) return 'squarespace';
 
   return 'generic';
 }
