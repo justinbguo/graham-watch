@@ -1,7 +1,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@^2';
 
 import { ExtractorUnavailable, extractFields } from './extract.ts';
-import { photosFingerprint, textFingerprint } from './hash.ts';
+import { photosFingerprint, refreshGallery, textFingerprint } from './hash.ts';
 import { classifyCatalogueItem, fieldsFromSourceItem } from './nonwatch.ts';
 import { copyPhotos } from './photos.ts';
 import { mapPool } from './pool.ts';
@@ -148,16 +148,18 @@ async function publishOne(
 
   // A matching fingerprint still recopies when the stored gallery is short.
   // That is the row a killed worker leaves behind: hashes can agree while
-  // listing_photos does not yet have three rows.
-  let rewrite = photosHash !== row.photos_hash;
-  if (!rewrite) {
-    const existing = await supabase
-      .from('listing_photos')
-      .select('id', { count: 'exact', head: true })
-      .eq('listing_id', listingId);
-    if (existing.error) throw new Error(existing.error.message);
-    rewrite = (existing.count ?? 0) < MIN_PHOTOS_PER_LISTING;
-  }
+  // listing_photos does not yet have three rows. A shorter read never
+  // replaces a fuller gallery: the nightly refresh must not cut Cool Vintage
+  // back to the one grid photo.
+  const existing = await supabase
+    .from('listing_photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('listing_id', listingId);
+  if (existing.error) throw new Error(existing.error.message);
+  const existingCount = existing.count ?? 0;
+  const hashChanged = photosHash !== row.photos_hash;
+  const kept = refreshGallery(existingCount, photoUrls.length) === 'keep';
+  const rewrite = !kept && (hashChanged || existingCount < MIN_PHOTOS_PER_LISTING);
   if (rewrite) {
     // The minimum is photographs we kept. copyPhotos drops the Squarespace
     // no-image file, so a placeholder must not satisfy the count.
@@ -179,9 +181,15 @@ async function publishOne(
     if (written.error) throw new Error(written.error.message);
   }
 
+  // A kept gallery leaves photos_hash on the longer set. Stamping the short
+  // hash would make the next refresh believe the one-photo read is what's stored.
   const stamped = await supabase
     .from('source_items')
-    .update({ photos_hash: photosHash, applied_hash: row.content_hash })
+    .update(
+      kept
+        ? { applied_hash: row.content_hash }
+        : { photos_hash: photosHash, applied_hash: row.content_hash },
+    )
     .eq('id', row.id);
   if (stamped.error) {
     console.error('gallery stamp failed', row.id, stamped.error.message);

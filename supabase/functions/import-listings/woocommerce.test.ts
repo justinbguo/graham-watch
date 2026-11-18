@@ -138,9 +138,17 @@ Deno.test('sold stock stays in the archive and off the deck', () => {
     true,
   );
 
-  const stillForSale = kept({ ...live, is_in_stock: false });
-  assertEquals(stillForSale?.available, true);
-  assertEquals(stillForSale?.priceCents, 1_550_000);
+  const outOfStock = kept({
+    ...live,
+    is_in_stock: false,
+    is_purchasable: false,
+    stock_availability: { text: 'Out of stock', class: 'out-of-stock' },
+  });
+  assertEquals(outOfStock?.available, false);
+  assertEquals(outOfStock?.priceCents, 1_550_000);
+
+  const notPurchasable = kept({ ...live, id: 41099, is_purchasable: false });
+  assertEquals(notPurchasable?.available, false);
 });
 
 Deno.test('a book and a display sign are skips, and a booklet stays a watch', () => {
@@ -177,6 +185,15 @@ Deno.test('a book and a display sign are skips, and a booklet stays a watch', ()
     kept(pricedWatch({ id: 90006, name: 'Hermes signed' }))?.available,
     true,
   );
+
+  const connoisseur = kept(
+    pricedWatch({
+      id: 90008,
+      name: "Owned/Used by ZZ Top's Dusty Hill Harley-Davidson Chrome Pocket Watch",
+      categories: [{ id: 1, name: 'Watches', slug: 'watches' }],
+    }),
+  );
+  assertEquals(connoisseur?.holdReason, 'not_a_watch');
 
   const pocket = kept(
     pricedWatch({
@@ -290,7 +307,7 @@ Deno.test('the feed keeps sold watches and drops the book, the sign, and a zero 
   assertEquals(
     fixture.calls.some((call) =>
       call ===
-        '/wp-json/wc/store/v1/products?per_page=100&page=1&orderby=id&order=asc'
+        '/wp-json/wc/store/v1/products?per_page=100&page=1&orderby=id&order=asc&stock_status=instock'
     ),
     true,
   );
@@ -480,4 +497,70 @@ Deno.test('robots.txt can refuse the products path', async () => {
     CatalogueRefused,
   );
   assertEquals(calls.includes(PRODUCTS_PATH), false);
+});
+
+Deno.test('a category URL asks the Store API for that category only', async () => {
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(`${url.pathname}${url.search}`);
+    if (url.pathname === '/robots.txt') return { status: 200, body: ALLOW };
+    if (url.pathname.endsWith('/products/categories')) {
+      return {
+        status: 200,
+        body: JSON.stringify([{ id: 38, slug: 'vintage-watches', name: 'Vintage Watches' }]),
+      };
+    }
+    return { status: 200, body: JSON.stringify([live]) };
+  };
+  const read = await fetchWooCommerceItems(
+    'https://wannabuyawatch.com/product-category/vintage-watches/',
+    10,
+    1,
+    { fetchText, pause: async () => {} },
+  );
+  assertEquals(read?.items.length, 1);
+  assertEquals(calls.some((call) => call.includes('slug=vintage-watches')), true);
+  assertEquals(
+    calls.some((call) => call.includes('category=38') && call.includes('stock_status=instock')),
+    true,
+  );
+});
+
+Deno.test('a missing category is a refusal and the product feed is not read', async () => {
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(url.pathname);
+    if (url.pathname === '/robots.txt') return { status: 200, body: ALLOW };
+    return { status: 200, body: '[]' };
+  };
+  await assertRejects(
+    () =>
+      fetchWooCommerceItems(
+        'https://wannabuyawatch.com/product-category/not-a-real-category/',
+        10,
+        1,
+        { fetchText, pause: async () => {} },
+      ),
+    CatalogueRefused,
+  );
+  assertEquals(calls.includes(PRODUCTS_PATH), false);
+});
+
+Deno.test('a host that rejects stock_status is read without that filter', async () => {
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(`${url.pathname}${url.search}`);
+    if (url.pathname === '/robots.txt') return { status: 200, body: ALLOW };
+    if (url.searchParams.get('stock_status') === 'instock') {
+      return { status: 400, body: '{"code":"rest_invalid_param"}' };
+    }
+    return { status: 200, body: JSON.stringify([live]) };
+  };
+  const read = await fetchWooCommerceItems(ORIGIN, 10, 1, {
+    fetchText,
+    pause: async () => {},
+  });
+  assertEquals(read?.items[0]?.available, true);
+  assertEquals(calls.filter((call) => call.includes(PRODUCTS_PATH)).length, 2);
+  assertEquals(calls.some((call) => call.includes(PRODUCTS_PATH) && !call.includes('stock_status')), true);
 });

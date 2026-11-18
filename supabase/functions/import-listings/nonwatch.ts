@@ -16,8 +16,16 @@ export type CatalogueFields = {
 export type CatalogueRule = {
   id: string;
   reason: HoldReason;
+  /**
+   * A switched-off rule is ignored. It must not stop the list: pocket-watch
+   * rules sit after the pendant and stopwatch rules, and those two are off.
+   * Returning "this is a watch" from an off rule published pocket watches
+   * whose title also said pendant or lapel, while clocks (checked before
+   * this list) and bracelets (checked after it) still held.
+   */
+  enabled: boolean;
   matches: (fields: CatalogueFields) => boolean;
-} & ({ enabled: true } | { enabled: false; whenOff: 'skip' | 'pass' });
+};
 
 export type CatalogueDecision =
   | { decision: 'watch' }
@@ -85,6 +93,12 @@ function accessoryTitle(title: string): boolean {
   if (/\bwinders?\b/i.test(title)) return true;
   if (/\btools?\b/i.test(title) && !/\bwatches?\b/i.test(title)) return true;
   if (/\bwatch\s+box(?:es)?\b/i.test(title) && !/\bpapers?\b/i.test(title)) return true;
+  // Apparel sold next to the watches: "Theo & Harris Cap", "GMT Hands Shirt".
+  // A bare "Cap" is a strap end (product type Nato), so that title stays a strap.
+  // "capsule" and "captain" are not the word cap.
+  if (/\bgift\s+cards?\b/i.test(title)) return true;
+  if (/\b(?:t-?shirts?|shirts?)\b/i.test(title)) return true;
+  if (!/^\s*caps?\s*$/i.test(title) && /\bcaps?\b/i.test(title)) return true;
   return false;
 }
 
@@ -179,7 +193,6 @@ export const CATALOGUE_RULES: readonly CatalogueRule[] = [
     id: 'pendant-lapel-brooch',
     reason: 'not_a_watch',
     enabled: false,
-    whenOff: 'pass',
     matches: ({ title }) =>
       /\b(?:pendant|lapel|brooch|sautoir)\b/i.test(title) || /\bcufflink\s+watch\b/i.test(title),
   },
@@ -187,7 +200,6 @@ export const CATALOGUE_RULES: readonly CatalogueRule[] = [
     id: 'handheld-stopwatch',
     reason: 'not_a_watch',
     enabled: false,
-    whenOff: 'pass',
     matches: ({ title }) => /\bstop\s*-?\s*watch(?!ing)/i.test(title) && !pocketTitle(title),
   },
   {
@@ -232,17 +244,17 @@ export const CATALOGUE_RULES: readonly CatalogueRule[] = [
 
 function holdFromRules(fields: CatalogueFields): CatalogueDecision | null {
   for (const rule of CATALOGUE_RULES) {
+    if (!rule.enabled) continue;
     if (!rule.matches(fields)) continue;
-    if (!rule.enabled) {
-      if (rule.whenOff === 'pass') return null;
-      continue;
-    }
     return hold(rule.reason, rule.id);
   }
   return null;
 }
 
 function holdFromTitle(title: string): CatalogueDecision | null {
+  // A paper ad for a watch is not the watch, even when the title says both
+  // ("1970 Grand Seiko … Dress Watch Advertisement").
+  if (/\badvertisements?\b/i.test(title)) return hold('not_a_watch', 'advertisement-title');
   if (objetAccessory(title)) return hold('accessory', 'objet-title');
   if (accessoryTitle(title)) return hold('accessory', 'accessory-title');
   if (strapTitle(title)) return hold('strap', 'strap-title');
@@ -251,8 +263,12 @@ function holdFromTitle(title: string): CatalogueDecision | null {
 
 function holdFromTypeLeaf(productType: string | null): CatalogueDecision | null {
   const leaf = catalogueTypeLeaf(productType);
-  if (leaf && ACCESSORY_TYPE.test(leaf)) return hold('accessory', 'accessory-type');
-  if (leaf && STRAP_TYPE.test(leaf)) return hold('strap', 'strap-type');
+  if (!leaf) return null;
+  // "Watches and Accessories" is a shop's whole shelf, not a claim that this
+  // row is a box or a tool. A leaf that also names a strap still holds.
+  if (/\bwatches?\b/i.test(leaf) && !STRAP_TYPE.test(leaf)) return null;
+  if (ACCESSORY_TYPE.test(leaf)) return hold('accessory', 'accessory-type');
+  if (STRAP_TYPE.test(leaf)) return hold('strap', 'strap-type');
   return null;
 }
 

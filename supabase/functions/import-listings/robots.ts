@@ -25,6 +25,84 @@ export class CatalogueRefused extends Error {
   }
 }
 
+/**
+ * Wall clock for one catalogue invocation.
+ *
+ * Supabase kills an edge request that is still working after about 150s
+ * (`extract.ts`). 120s leaves room for the database write after the last page.
+ * A crawl-delay is honored inside this budget. A delay that would blow it
+ * skips the read instead of crawling faster than the file asks.
+ */
+export const CATALOGUE_RUN_BUDGET_MS = 120_000;
+
+/**
+ * A pause longer than this is a refusal, before the first catalogue request.
+ * Menta asks for 10 seconds. Waiting that out would turn one shop into a
+ * single request that still blocks the run, so the read stops instead.
+ */
+export const MAX_CRAWL_DELAY_MS = 5_000;
+
+export function assertCrawlDelay(crawlDelayMs: number | null): void {
+  if (crawlDelayMs != null && crawlDelayMs > MAX_CRAWL_DELAY_MS) {
+    throw new CatalogueRefused(
+      `robots.txt asks for a ${crawlDelayMs / 1000}s pause between requests, which is more than this catalogue read will wait.`,
+    );
+  }
+}
+
+/** A challenge page served as robots.txt. A robots file is plain text. */
+export function robotsBodyIsHtml(body: string): boolean {
+  const head = body.trim().slice(0, 256).toLowerCase();
+  return head.startsWith('<!doctype') || head.startsWith('<html') || head.startsWith('<head');
+}
+
+/**
+ * Turns one robots response into a policy.
+ *
+ * A missing file allows the site. HTML is a challenge, not a rules file, so
+ * the read stops. A text file with no `User-agent` line has no groups. RFC
+ * 9309 then says nothing applies, which is allow. Orphan `Disallow` lines
+ * before the first group are not a group, and they are not a reason to
+ * refuse the site.
+ */
+export function policyFromRobotsResponse(status: number, body: string): RobotsPolicy {
+  if (status === 404 || status === 410) return parseRobots('');
+  if (status < 200 || status >= 300) {
+    throw new CatalogueRefused(
+      `robots.txt returned ${status}, so this catalogue was not read.`,
+    );
+  }
+  if (body.trim() && robotsBodyIsHtml(body)) {
+    throw new CatalogueRefused(
+      'robots.txt was not a robots file, so this catalogue was not read.',
+    );
+  }
+  return parseRobots(body);
+}
+
+/**
+ * Waits the shop's crawl-delay (or the adapter's own floor, whichever is
+ * longer) when that wait still fits. False means this request must not go
+ * out: the caller skips the rest of the read.
+ */
+export function createPacer(options: {
+  crawlDelayMs: number | null;
+  floorMs: number;
+  budgetMs?: number;
+  pause: (ms: number) => Promise<void>;
+  now?: () => number;
+}): () => Promise<boolean> {
+  const now = options.now ?? Date.now;
+  const started = now();
+  const budget = options.budgetMs ?? CATALOGUE_RUN_BUDGET_MS;
+  const wait = Math.max(options.floorMs, options.crawlDelayMs ?? 0);
+  return async () => {
+    if (now() - started + wait > budget) return false;
+    await options.pause(wait);
+    return true;
+  };
+}
+
 function parseGroups(body: string): Group[] {
   const groups: Group[] = [];
   let current: Group | null = null;

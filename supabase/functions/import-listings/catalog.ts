@@ -12,6 +12,7 @@ import {
   type SourceItem,
 } from './source.ts';
 import { fetchSquarespaceItems } from './squarespace.ts';
+import { fetchWixItems } from './wix.ts';
 import { fetchWooCommerceItems } from './woocommerce.ts';
 
 /**
@@ -98,12 +99,25 @@ const ADAPTERS: Record<
       fetchText: slice?.fetchText,
       pause: slice?.pause,
     }),
-  squarespace: (url, limit, minPhotos) => fetchSquarespaceItems(url, limit, minPhotos),
+  squarespace: (url, limit, minPhotos, slice) =>
+    fetchSquarespaceItems(url, limit, minPhotos, {
+      startPage: slice?.startPage,
+      maxPages: slice?.maxPages,
+      fetchText: slice?.fetchText,
+      pause: slice?.pause,
+    }),
   woocommerce: (url, limit, minPhotos, slice) =>
     fetchWooCommerceItems(url, limit, minPhotos, {
       startPage: slice?.startPage,
       maxPages: slice?.maxPages,
       pageSize: slice?.pageSize,
+      fetchText: slice?.fetchText,
+      pause: slice?.pause,
+    }),
+  wix: (url, limit, minPhotos, slice) =>
+    fetchWixItems(url, limit, minPhotos, {
+      startPage: slice?.startPage,
+      maxPages: slice?.maxPages,
       fetchText: slice?.fetchText,
       pause: slice?.pause,
     }),

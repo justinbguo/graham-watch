@@ -1,6 +1,15 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
-import { squarespaceCollectionPaths, squarespacePhotoUrls, squarespacePrice } from './squarespace.ts';
+import type { SourceItem, TextResponse } from './source.ts';
+import {
+  fetchSquarespaceItems,
+  hydrateSquarespaceItem,
+  squarespaceCollectionPaths,
+  squarespacePhotoUrls,
+  squarespacePrice,
+  squarespaceRecords,
+  squarespaceSlideshowUrls,
+} from './squarespace.ts';
 
 Deno.test('a homepage sitemap yields every watch collection and skips cameras', () => {
   const origin = 'https://www.coolvintagewatches.com';
@@ -101,4 +110,192 @@ Deno.test('uses the sale price Squarespace displays', () => {
     }),
     { priceCents: 1_195_000, currency: 'USD' }
   );
+});
+
+function attribute(value: unknown): string {
+  return JSON.stringify(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+}
+
+Deno.test('a collection page is read from data-context and format=json is not requested', async () => {
+  const record = {
+    items: [
+      {
+        title: '1970 Omega Seamaster',
+        id: 'omega-1',
+        fullUrl: '/watches/p/omega',
+        description: '<p>Steel seamaster.</p>',
+        soldOut: false,
+        price: { currency: 'USD', value: '1800.00' },
+        images: [{ assetUrl: 'https://images.example/omega.jpg' }],
+        variants: [{
+          qtyInStock: 1,
+          unlimited: false,
+          price: { currency: 'USD', value: '1800.00' },
+        }],
+      },
+      {
+        title: 'Sold Cartier Tank',
+        id: 'cartier-1',
+        fullUrl: '/watches/p/tank',
+        description: '<p>Gone.</p>',
+        soldOut: true,
+        price: { currency: 'USD', value: '4000.00' },
+        images: [{ assetUrl: 'https://images.example/tank.jpg' }],
+        variants: [{
+          qtyInStock: 0,
+          unlimited: false,
+          soldOut: true,
+          price: { currency: 'USD', value: '4000.00' },
+        }],
+      },
+    ],
+    pagination: { nextPage: false },
+  };
+  const html =
+    `<!doctype html>Static.SQUARESPACE_CONTEXT = {};<div data-context="${attribute(record)}"></div>`;
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(`${url.pathname}${url.search}`);
+    if (url.pathname === '/robots.txt') {
+      return { status: 200, body: 'User-agent: *\nAllow: /\nDisallow: /*?format=json\n' };
+    }
+    return { status: 200, body: html };
+  };
+  const read = await fetchSquarespaceItems('https://shop.example/watches', 10, 1, {
+    fetchText,
+    pause: async () => {},
+  });
+  assertEquals(calls.some((call) => call.includes('format=json')), false);
+  assertEquals(read?.recognized, true);
+  assertEquals(read?.complete, true);
+  assertEquals(read?.items.map((item) => [item.title, item.available, item.priceCents]), [
+    ['1970 Omega Seamaster', true, 180_000],
+    ['Sold Cartier Tank', false, 400_000],
+  ]);
+  assertEquals(read?.items[0]?.photoUrls, ['https://images.example/omega.jpg?format=1500w']);
+  assertEquals(squarespaceRecords(html).length, 1);
+});
+
+Deno.test('an older product list is read from the HTML grid, not format=json', async () => {
+  const grid = `<!doctype html>Static.SQUARESPACE_CONTEXT = {"selectedCurrency":"USD"};
+    <div id="productList">
+      <a href="/under350/bulova" class="product hentry" data-item-id="item-1">
+        <img data-image="https://images.example/bulova.jpg" />
+        <div class="product-title">1960 Bulova Fancy</div>
+        <div class="product-price">$435.00</div>
+      </a>
+      <a href="/under350/sold" class="product hentry sold-out" data-item-id="item-2">
+        <img data-image="https://images.example/sold.jpg" />
+        <div class="product-title">Sold Omega</div>
+        <div class="product-price">$1,250.00</div>
+      </a>
+    </div>
+    <!-- PAGINATION -->`;
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(`${url.pathname}${url.search}`);
+    if (url.pathname === '/robots.txt') {
+      return { status: 200, body: 'User-agent: *\nAllow: /\nDisallow: /*?format=json\n' };
+    }
+    if (url.pathname === '/') {
+      return { status: 200, body: '<!doctype html>Static.SQUARESPACE_CONTEXT = {};' };
+    }
+    if (url.pathname === '/sitemap.xml') {
+      return {
+        status: 200,
+        body: '<urlset><loc>https://shop.example/under350/bulova</loc><loc>https://shop.example/cameras/leica</loc></urlset>',
+      };
+    }
+    if (url.pathname === '/under350') return { status: 200, body: grid };
+    throw new Error(`unexpected ${url.pathname}`);
+  };
+  const read = await fetchSquarespaceItems('https://shop.example/', 10, 1, {
+    fetchText,
+    pause: async () => {},
+  });
+  assertEquals(calls.some((call) => call.includes('format=json')), false);
+  assertEquals(calls.includes('/cameras'), false);
+  assertEquals(read?.complete, true);
+  assertEquals(read?.items.map((item) => [item.title, item.available, item.priceCents]), [
+    ['1960 Bulova Fancy', true, 43_500],
+    ['Sold Omega', false, 125_000],
+  ]);
+  assertEquals(read?.items[0]?.photoUrls, ['https://images.example/bulova.jpg?format=1500w']);
+  assertEquals(read?.items[0]?.externalId, 'squarespace:item-1');
+});
+
+const PRODUCT_PAGE = `<!doctype html>
+  <script type="application/ld+json">{"@type":"Product","name":"1960 Bulova — Cool Vintage","image":"https://images.example/one.jpg","description":"A full description.","offers":{"price":"435","priceCurrency":"USD","availability":"https://schema.org/InStock"}}</script>
+  <div id="productSlideshow">
+    <div class="slide" data-slide-index="1"><img data-src="https://images.example/one.jpg" data-image="https://images.example/one.jpg" /></div>
+    <div class="slide" data-slide-index="2"><img data-image="https://images.example/two.jpg" /></div>
+    <div class="slide" data-slide-index="3"><img data-image="https://images.example/three.jpg" /></div>
+  </div>`;
+
+Deno.test('the slideshow is the gallery when JSON-LD has one image', () => {
+  assertEquals(squarespaceSlideshowUrls(PRODUCT_PAGE), [
+    'https://images.example/one.jpg',
+    'https://images.example/two.jpg',
+    'https://images.example/three.jpg',
+  ]);
+});
+
+Deno.test('a one-photo grid takes the product-page slideshow, after robots and a pause', async () => {
+  const calls: string[] = [];
+  const pauses: number[] = [];
+  const grid: SourceItem = {
+    externalId: 'squarespace:item-1',
+    title: '1960 Bulova',
+    text: '',
+    sourceUrl: 'https://shop.example/under350/bulova',
+    photoUrls: ['https://images.example/one.jpg?format=1500w'],
+    priceCents: 43_500,
+    currency: 'USD',
+    available: true,
+  };
+  const hydrated = await hydrateSquarespaceItem(grid, {
+    fetchText: async (url) => {
+      calls.push(url.pathname);
+      if (url.pathname === '/robots.txt') {
+        return { status: 200, body: 'User-agent: *\nAllow: /\nDisallow: /*?format=json\n' };
+      }
+      return { status: 200, body: PRODUCT_PAGE };
+    },
+    pause: async (ms) => {
+      pauses.push(ms);
+    },
+  });
+  assertEquals(calls[0], '/robots.txt');
+  assertEquals(calls.includes('/under350/bulova'), true);
+  assertEquals(calls.some((call) => call.includes('format=json')), false);
+  assertEquals(pauses.includes(1000), true);
+  assertEquals(hydrated.photoUrls, [
+    'https://images.example/one.jpg?format=1500w',
+    'https://images.example/two.jpg?format=1500w',
+    'https://images.example/three.jpg?format=1500w',
+  ]);
+  assertEquals(hydrated.text.includes('full description'), true);
+});
+
+Deno.test('a disallowed product page keeps the grid photos', async () => {
+  const calls: string[] = [];
+  const grid: SourceItem = {
+    externalId: 'squarespace:item-1',
+    title: '1960 Bulova',
+    text: 'grid',
+    sourceUrl: 'https://blocked.example/under350/bulova',
+    photoUrls: ['https://images.example/one.jpg?format=1500w'],
+    priceCents: 43_500,
+    currency: 'USD',
+    available: true,
+  };
+  const hydrated = await hydrateSquarespaceItem(grid, {
+    fetchText: async (url) => {
+      calls.push(url.pathname);
+      return { status: 200, body: 'User-agent: *\nDisallow: /\n' };
+    },
+    pause: async () => {},
+  });
+  assertEquals(calls, ['/robots.txt']);
+  assertEquals(hydrated.photoUrls.length, 1);
 });
