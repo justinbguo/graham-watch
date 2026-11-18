@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, type ViewabilityConfig, type ViewToken } from 'react-native';
+import { AppState, Platform, type ViewabilityConfig, type ViewToken } from 'react-native';
 
 import { isDemo } from '@/lib/demo';
 import type { BuyerEventSurface } from '@/lib/models';
@@ -13,19 +13,23 @@ import {
   batches,
   bufferAfterSend,
   claimGuest,
+  deviceKind,
   dwellRow,
   enqueue,
   filterFits,
+  guestSendable,
   impressionRow,
   isPermanentFailure,
   parseGuestBuffer,
   reachPhoto,
   relabel,
+  resolveGuestKey,
   route,
   startExposure,
   toGuestBuffer,
   toRow,
   type EventInput,
+  type GuestBuffer,
   type ListingRef,
   type Owner,
   type Queued,
@@ -40,8 +44,9 @@ import {
  * never throws, and nothing here touches the query cache, so the log cannot
  * reach a gesture, a mutation, or the deck.
  *
- * Rows wait in memory and go in batches through `log_buyer_events`. A guest's
- * rows wait on the device until sign-in claims them. The decisions live in
+ * Rows wait in memory and go in batches through `log_buyer_events`. While
+ * signed out, the kinds a guest may send also go through `log_guest_events`.
+ * Saves and follows stay on the device until sign-in. The decisions live in
  * `listingEventQueue.ts`; this file holds the timers, storage, network, and
  * hooks.
  */
@@ -56,6 +61,7 @@ const SEND_TIMEOUT_MS = 10_000;
 const MEMORY_CAP = 500;
 const GUEST_CAP = 100;
 const GUEST_STORAGE = 'graham.events.guest';
+const GUEST_KEY = 'graham.guest.key';
 const VIEWABILITY: ViewabilityConfig = { itemVisiblePercentThreshold: 50, minimumViewTime: 500 };
 
 let owner: Owner = 'unknown';
@@ -104,8 +110,8 @@ export function logEvent(event: EventInput, held?: { id: string; occurredAt: num
 /**
  * Who the next rows belong to. Telemetry calls it once the session has loaded
  * and on every change of the signed-in id, sign-out included. Sign-in claims
- * the guest buffer: its rows go to this account with their guest key. The
- * file stays until the server confirms the insert.
+ * the guest buffer, sends those rows, then asks the server to attach rows it
+ * already stored for this device. The device key stays.
  */
 export function setEventUser(userId: string | null): void {
   if (isDemo) return;
@@ -120,6 +126,7 @@ export function setEventUser(userId: string | null): void {
   schedule(async () => {
     await claim(next);
     await flush();
+    if (owner === next) await claimGuestOnServer();
   });
 }
 
@@ -355,10 +362,11 @@ async function flush(): Promise<void> {
     clearTimeout(timer);
     timer = null;
   }
-  const guestRows = queue.filter((entry) => entry.owner === 'guest').map((entry) => entry.row);
-  if (guestRows.length) {
+  const guestEntries = queue.filter((entry) => entry.owner === 'guest');
+  if (guestEntries.length) {
     queue = queue.filter((entry) => entry.owner !== 'guest');
-    await keepForGuest(guestRows);
+    const key = await keepForGuest(guestEntries.map((entry) => entry.row));
+    if (owner === 'guest') await sendGuestEvents(key, guestEntries);
   }
   if (!queue.some((entry) => entry.owner !== 'guest' && entry.owner !== 'unknown')) return;
   if (Date.now() < retryAt) {
@@ -406,11 +414,81 @@ async function send(batch: readonly Queued[]): Promise<string | null> {
   }
 }
 
-async function keepForGuest(rows: WireEvent[]): Promise<void> {
+async function keepForGuest(rows: WireEvent[]): Promise<string> {
   const stored = parseGuestBuffer(await secureStorage.getItem(GUEST_STORAGE));
-  const { buffer, dropped } = toGuestBuffer(stored, rows, newId(), GUEST_CAP);
+  const key = await resolveStoredKey(stored);
+  const { buffer, dropped } = toGuestBuffer(stored, rows, key, GUEST_CAP);
   if (dropped) warn(`the guest buffer is full, dropped the oldest ${dropped} events`);
   await secureStorage.setItem(GUEST_STORAGE, JSON.stringify(buffer));
+  return key;
+}
+
+async function resolveStoredKey(buffer: GuestBuffer | null): Promise<string> {
+  const storedKey = await secureStorage.getItem(GUEST_KEY);
+  const key = resolveGuestKey(storedKey, buffer, newId());
+  if (storedKey !== key) await secureStorage.setItem(GUEST_KEY, key);
+  return key;
+}
+
+function deviceLabel(): string | null {
+  const width = typeof window !== 'undefined' && typeof window.innerWidth === 'number' ? window.innerWidth : null;
+  return deviceKind(Platform.OS, width);
+}
+
+async function sendGuestEvents(key: string, entries: readonly Queued[]): Promise<void> {
+  const sendable = entries.filter((entry) => guestSendable(entry.row));
+  if (!sendable.length) return;
+  const device = deviceLabel();
+  const groups = batches(sendable, BATCH_SIZE);
+  for (const [index, batch] of groups.entries()) {
+    const code = await postGuest(
+      key,
+      batch.map((entry) => entry.row),
+      device,
+    );
+    const ids = batch.map((entry) => entry.row.id);
+    if (code === null || isPermanentFailure(code)) {
+      if (code !== null) warn(`the database refused ${batch.length} guest events (${code})`);
+      await forgetConfirmed(ids);
+      continue;
+    }
+    const next = afterTransientFailure(queue, batch, groups.slice(index + 1).flat(), MEMORY_CAP);
+    queue = next.queue;
+    warn(`could not send ${batch.length} guest events (${code || 'network'}), trying once more in 30 s`);
+    if (next.dropped) warn(`dropped ${next.dropped} guest events after a second failure`);
+    retryAt = Date.now() + RETRY_DELAY_MS;
+    flushSoon(RETRY_DELAY_MS);
+    return;
+  }
+}
+
+async function postGuest(key: string, rows: readonly WireEvent[], device: string | null): Promise<string | null> {
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), SEND_TIMEOUT_MS);
+  try {
+    const { error } = await supabase
+      .rpc('log_guest_events', { p_guest_key: key, p_events: rows, p_device: device })
+      .abortSignal(abort.signal);
+    return error ? (error.code ?? '') : null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function claimGuestOnServer(): Promise<void> {
+  const storedKey = await secureStorage.getItem(GUEST_KEY);
+  const key = resolveGuestKey(storedKey, null, '');
+  if (!storedKey || key !== storedKey) return;
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), SEND_TIMEOUT_MS);
+  try {
+    const { error } = await supabase
+      .rpc('claim_guest_events', { p_guest_key: storedKey })
+      .abortSignal(abort.signal);
+    if (error) warn(`could not claim guest events (${error.code ?? 'network'})`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function claim(user: UserId): Promise<void> {
@@ -419,9 +497,18 @@ async function claim(user: UserId): Promise<void> {
   const stored = parseGuestBuffer(raw);
   // A failed flush stays on disk under the account that already claimed it.
   if (stored?.claimedBy && stored.claimedBy !== user) return;
-  queue = claimGuest(queue, stored, newId(), user);
+  const key = await resolveStoredKey(stored);
+  queue = claimGuest(queue, stored, key, user);
   if (!stored || stored.rows.length === 0 || stored.claimedBy === user) return;
-  await secureStorage.setItem(GUEST_STORAGE, JSON.stringify({ ...stored, claimedBy: user }));
+  await secureStorage.setItem(
+    GUEST_STORAGE,
+    JSON.stringify({
+      ...stored,
+      guestKey: key,
+      claimedBy: user,
+      rows: stored.rows.map((row) => ({ ...row, guest_key: key })),
+    }),
+  );
 }
 
 /** Drop stored guest rows only after `log_buyer_events` accepted their ids. */

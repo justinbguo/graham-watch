@@ -49,6 +49,7 @@ export function SignInPanel({
       <View style={[styles.copy, modal && styles.copyModal]}>
         <Wordmark variant={modal ? 'headerText' : 'signIn'} />
         <Text style={[styles.tagline, modal && styles.taglineModal]}>{tagline}</Text>
+        <Text style={styles.record}>Signed-out browsing is recorded, with country and device type only.</Text>
       </View>
 
       <SignInDoors signIn={signIn} modal={modal} />
@@ -240,6 +241,10 @@ const panelStyles = (theme: Theme) => ({
     maxWidth: layout.signInLede,
     color: theme.color.text,
     textAlign: 'center' as const,
+  },
+  record: {
+    ...type.caption,
+    color: theme.color.textMuted,
   },
   doors: {
     gap: stack.related,

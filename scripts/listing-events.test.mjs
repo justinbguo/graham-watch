@@ -13,15 +13,19 @@ import test from 'node:test';
 import {
   bufferAfterSend,
   claimGuest,
+  deviceKind,
   dwellRow,
   enqueue,
+  guestSendable,
   parseGuestBuffer,
   reachPhoto,
+  resolveGuestKey,
   route,
   startExposure,
   toGuestBuffer,
   toRow,
 } from '../src/data/listingEventQueue.ts';
+import { WIDE_BREAKPOINT } from '../src/lib/design.ts';
 
 const CAP = 500;
 const at = (id, now) => ({ id, now, exposureId: null });
@@ -64,7 +68,7 @@ test("guest rows keep their guest key and are not filed under another account", 
   const claimed = claimGuest(
     [entry('guest', inMemory), entry('user-b', someoneElse)],
     onDisk,
-    'minted-key',
+    'guest-key',
     'user-a',
   );
 
@@ -142,4 +146,51 @@ test('a failed flush keeps the guest buffer and a confirmed one drops the stored
   assert.equal(partial.guestKey, 'guest-key');
 
   assert.equal(bufferAfterSend(partial, ['guest-save'], true), null);
+});
+
+test('the same key is reused when the buffer is empty and the caller passes the stored key', () => {
+  const stored = '11111111-1111-4111-8111-111111111111';
+  const minted = '22222222-2222-4222-8222-222222222222';
+  assert.equal(resolveGuestKey(stored, null, minted), stored);
+  assert.equal(resolveGuestKey(null, { guestKey: stored, rows: [] }, minted), stored);
+  assert.equal(resolveGuestKey('not-a-uuid', { guestKey: 'guest-key', rows: [] }, minted), minted);
+
+  const pass = toRow({ kind: 'pass', surface: 'buy', listing: listing('l1') }, at('kept', 1000));
+  const { buffer } = toGuestBuffer(null, [pass], stored, 100);
+  assert.equal(buffer.guestKey, stored);
+  assert.equal(buffer.rows[0].guest_key, stored);
+});
+
+test('save and follow are not guest-sendable; pass and dealer_click are', () => {
+  const row = (kind) => toRow({ kind, surface: 'buy', listing: listing('l1') }, at(kind, 1000));
+  assert.equal(guestSendable(row('save')), false);
+  assert.equal(guestSendable(toRow({ kind: 'follow', surface: 'shop', dealer: { id: 'shop-1' } }, at('follow', 1000))), false);
+  assert.equal(guestSendable(row('pass')), true);
+  assert.equal(guestSendable(row('dealer_click')), true);
+});
+
+test('claim still stamps that key', () => {
+  const key = '11111111-1111-4111-8111-111111111111';
+  const older = '33333333-3333-4333-8333-333333333333';
+  const pass = toRow({ kind: 'pass', surface: 'buy', listing: listing('l1') }, at('from-disk', 1000));
+  const { buffer } = toGuestBuffer(null, [pass], older, 100);
+  const save = toRow({ kind: 'save', surface: 'buy', listing: listing('l2') }, at('from-memory', 1001));
+  const claimed = claimGuest([entry('guest', save)], buffer, key, 'user-a');
+
+  assert.deepEqual(
+    claimed.map((queued) => [queued.row.id, queued.owner, queued.row.guest_key]),
+    [
+      ['from-disk', 'user-a', key],
+      ['from-memory', 'user-a', key],
+    ],
+  );
+});
+
+test('device kind follows the platform and the wide breakpoint', () => {
+  assert.equal(deviceKind('ios', 400), 'ios');
+  assert.equal(deviceKind('android', 1400), 'android');
+  assert.equal(deviceKind('web', WIDE_BREAKPOINT), 'web-desktop');
+  assert.equal(deviceKind('web', WIDE_BREAKPOINT - 1), 'web-mobile');
+  assert.equal(deviceKind('web', null), null);
+  assert.equal(deviceKind('windows', 1400), null);
 });
