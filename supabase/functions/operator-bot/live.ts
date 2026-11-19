@@ -4,6 +4,7 @@ import { MAX_CATALOG_ITEMS, PAGES_PER_CALL, readCatalog, syncCatalog } from '../
 import { discover, readProfile } from '../import-listings/discover.ts';
 import { fixtureImportAllowed } from '../import-listings/fixture.ts';
 import { SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from '../import-listings/publish.ts';
+import { httpStatusOf } from '../import-listings/robots.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from '../import-listings/source.ts';
 
 import { FixtureImportOff, OperatorError, type FixtureWatch, type OperatorDeps } from './handler.ts';
@@ -286,7 +287,7 @@ export function liveDeps(): OperatorDeps {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not read that site.';
         await meter(domain, null, 'failed', 'discover', message);
-        throw new OperatorError(message, 502);
+        throw new OperatorError(message, httpStatusOf(error, 502));
       }
     },
     async inspect(sourceUrl) {
@@ -324,7 +325,7 @@ export function liveDeps(): OperatorDeps {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Inspect failed.';
         await meter(sourceUrl, null, 'failed', 'inspect', message);
-        throw new OperatorError(message, 502);
+        throw new OperatorError(message, httpStatusOf(error, 502));
       }
     },
     async importCatalog(input) {
@@ -394,7 +395,7 @@ export function liveDeps(): OperatorDeps {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Import failed.';
         await meter(input.sourceUrl, dealer.id, 'failed', 'catalog', message);
-        throw new OperatorError(message, 502);
+        throw new OperatorError(message, httpStatusOf(error, 502));
       }
     },
     async importFixture(input) {

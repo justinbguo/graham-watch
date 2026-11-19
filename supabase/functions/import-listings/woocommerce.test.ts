@@ -564,3 +564,94 @@ Deno.test('a host that rejects stock_status is read without that filter', async 
   assertEquals(calls.filter((call) => call.includes(PRODUCTS_PATH)).length, 2);
   assertEquals(calls.some((call) => call.includes(PRODUCTS_PATH) && !call.includes('stock_status')), true);
 });
+
+const OTTUHR_ROBOTS = `User-agent: *
+Disallow: /wp-content/uploads/wc-logs/
+Disallow: /wp-content/uploads/woocommerce_transient_files/
+Disallow: /wp-content/uploads/woocommerce_uploads/
+Disallow: /*?add-to-cart=
+Disallow: /*?*add-to-cart=
+Disallow: /*?*filter_
+Disallow: /*?*query_type_
+Disallow: /*?orderby=
+Disallow: /*&orderby=
+
+# --- Block filter combo crawl by Meta indexer ---
+User-agent: meta-externalagent
+Disallow: /*?*filter_
+Disallow: /*?*query_type_
+Disallow: /*?orderby=
+
+User-agent: meta-webindexer
+Disallow: /*?*filter_
+Disallow: /*?*query_type_
+Disallow: /*?orderby=
+
+# --- Block Perplexity ---
+User-agent: PerplexityBot
+Disallow: /
+
+Sitemap: https://ottuhr.com/sitemap_index.xml
+`;
+
+const OTTUHR = 'https://ottuhr.com/';
+
+Deno.test('OTTUHR robots.txt uses the unsorted feed and reads every product once', async () => {
+  const pages = [
+    [live, { ...live, id: 41013 }],
+    [{ ...live, id: 41013 }, { ...live, id: 41014 }],
+    [{ ...live, id: 41015 }],
+  ];
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(url.href);
+    if (url.pathname === '/robots.txt') return { status: 200, body: OTTUHR_ROBOTS };
+    const page = Number(url.searchParams.get('page') ?? '1');
+    return { status: 200, body: JSON.stringify(pages[page - 1] ?? []) };
+  };
+  const read = await fetchWooCommerceItems(OTTUHR, 10, 1, {
+    fetchText,
+    pause: async () => {},
+    pageSize: 2,
+  });
+  const productCalls = calls.filter((call) => call.includes(PRODUCTS_PATH));
+  assertEquals(productCalls.length, 3);
+  assertEquals(productCalls.every((call) => !call.includes('orderby=') && !call.includes('order=')), true);
+  assertEquals(productCalls.every((call) => call.includes('stock_status=instock')), true);
+  assertEquals(read?.complete, true);
+  assertEquals(read?.items.map((item) => item.externalId), [
+    'woocommerce:41012',
+    'woocommerce:41013',
+    'woocommerce:41014',
+    'woocommerce:41015',
+  ]);
+});
+
+Deno.test('a robots block names the full product URL and is not a retryable failure', async () => {
+  const calls: string[] = [];
+  const fetchText = async (url: URL): Promise<TextResponse> => {
+    calls.push(url.pathname);
+    if (url.pathname === '/robots.txt') {
+      return {
+        status: 200,
+        body: OTTUHR_ROBOTS.replace(
+          'Disallow: /*&orderby=\n',
+          'Disallow: /*&orderby=\nDisallow: /wp-json/\n',
+        ),
+      };
+    }
+    return { status: 200, body: '[]' };
+  };
+  const error = await assertRejects(
+    () => fetchWooCommerceItems(OTTUHR, 10, 1, { fetchText, pause: async () => {} }),
+    CatalogueRefused,
+  );
+  assertEquals(calls.includes(PRODUCTS_PATH), false);
+  assertEquals(
+    error.message.includes(
+      'https://ottuhr.com/wp-json/wc/store/v1/products?per_page=100&page=1&orderby=id&order=asc&stock_status=instock',
+    ),
+    true,
+  );
+  assertEquals(error.status, 400);
+});
