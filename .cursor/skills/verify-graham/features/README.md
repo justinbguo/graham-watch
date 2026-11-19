@@ -41,5 +41,5 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 - [Inquiries](./inquiries.md) — ask a dealer about a watch.
 - [Profile](./profile.md) — the signed-in profile and the shops they follow.
 - [Dealer shop management](./dealer-shop.md) — a claimed shop edited by the dealer.
-- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce reads the Store API, including one category URL. Squarespace reads the page HTML, and Wix reads the sitemap plus JSON-LD. The catalog proof is still the Shopify stand-in.
+- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce reads the Store API, including one category URL. Squarespace reads the page HTML, and Wind Vintage from the homepage image grid. Wix reads the sitemap plus JSON-LD. The catalog proof is still the Shopify stand-in.
 - [Guests](./guests.md). Signed-out browsing on the operator Guests tab. Country and device type only. Unclaimed rows last 180 days.

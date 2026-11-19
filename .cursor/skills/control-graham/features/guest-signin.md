@@ -30,6 +30,7 @@ Preconditions:
 ## Gotchas
 
 - `up --mode demo` does not show the sheet and does not show `Log in`. Reporting the demo deck as this feature is a miss.
+- Under the tagline the sheet says `Signed-out browsing is recorded, with country and device type only.` The door is still `Continue with email`. That caption is the guest log's notice. The operator Guests screen is in verify-graham's guests feature, not this one.
 - iOS native has no guest deck. Android shows a header `Log in` instead of the web arrival sheet.
 - Closing the save sheet drops the held save. The next save asks again. Passes never ask.
 - Full email OTP completion needs Mailpit or `signin <alias>`. That is a different proof.
