@@ -10,6 +10,7 @@ import { ExtractorUnavailable } from './extract.ts';
 import { discover, NO_PROFILE, normalizeDomain, readProfile, type Profile } from './discover.ts';
 import { DEFAULT_BATCH, MAX_BATCH, SCHEDULED_PUBLISH_BATCH, publishBatch, queuePublish } from './publish.ts';
 import { resolveProvider } from './scrape.ts';
+import { httpStatusOf } from './robots.ts';
 import { catalogueComplete, type SkippedItem, type SourceItem } from './source.ts';
 
 let adminClient: SupabaseClient | null = null;
@@ -734,7 +735,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Could not read that site.';
         await meter(userId, origin, null, 'failed', message);
-        return bad(message, 502);
+        return bad(message, httpStatusOf(error, 502));
       }
     }
 
@@ -775,7 +776,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Preview failed.';
         await meter(userId, sourceUrl, null, 'failed', message);
-        return bad(message, 502);
+        return bad(message, httpStatusOf(error, 502));
       }
     }
 
@@ -959,7 +960,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
           .update({ status: 'failed', error: message, finished_at: new Date().toISOString() })
           .eq('id', job);
       }
-      return bad(message, 502);
+      return bad(message, httpStatusOf(error, 502));
     }
 });
 

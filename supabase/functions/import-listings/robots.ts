@@ -17,12 +17,23 @@ export type RobotsPolicy = {
 type Rule = { allow: boolean; pattern: string };
 type Group = { agents: string[]; rules: Rule[]; crawlDelayMs: number | null };
 
-/** A catalogue read that must not start, because the shop's own rules say so. */
+/**
+ * A catalogue read that must not start, or that stopped.
+ * `status` is the HTTP status a caller should see. 400 is a rule that will
+ * not change on retry. 502 is a feed that failed this time.
+ */
 export class CatalogueRefused extends Error {
-  constructor(message: string) {
+  readonly status: number;
+
+  constructor(message: string, status = 502) {
     super(message);
     this.name = 'CatalogueRefused';
+    this.status = status;
   }
+}
+
+export function httpStatusOf(error: unknown, fallback: number): number {
+  return error instanceof CatalogueRefused ? error.status : fallback;
 }
 
 /**

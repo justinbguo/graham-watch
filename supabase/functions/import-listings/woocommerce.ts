@@ -403,15 +403,36 @@ function productsUrl(
   pageSize: number,
   categoryId: number | null,
   inStockOnly: boolean,
+  sorted: boolean,
 ): URL {
   const url = new URL(PRODUCTS_PATH, origin);
   url.searchParams.set('per_page', String(pageSize));
   url.searchParams.set('page', String(page));
-  url.searchParams.set('orderby', 'id');
-  url.searchParams.set('order', 'asc');
+  if (sorted) {
+    url.searchParams.set('orderby', 'id');
+    url.searchParams.set('order', 'asc');
+  }
   if (inStockOnly) url.searchParams.set('stock_status', 'instock');
   if (categoryId != null) url.searchParams.set('category', String(categoryId));
   return url;
+}
+
+function productsUrlFor(
+  origin: string,
+  page: number,
+  pageSize: number,
+  categoryId: number | null,
+  inStockOnly: boolean,
+  policy: RobotsPolicy,
+): URL {
+  const sorted = productsUrl(origin, page, pageSize, categoryId, inStockOnly, true);
+  if (policy.allows(sorted)) return sorted;
+  const unsorted = productsUrl(origin, page, pageSize, categoryId, inStockOnly, false);
+  if (policy.allows(unsorted)) return unsorted;
+  throw new CatalogueRefused(
+    `robots.txt does not allow ${sorted.href}, so this catalogue was not read.`,
+    400,
+  );
 }
 
 function retryable(response: TextResponse | null): boolean {
@@ -497,7 +518,8 @@ async function categoryIdFor(
   url.searchParams.set('slug', slug);
   if (!policy.allows(url)) {
     throw new CatalogueRefused(
-      `robots.txt does not allow ${url.pathname}, so this catalogue was not read.`,
+      `robots.txt does not allow ${url.href}, so this catalogue was not read.`,
+      400,
     );
   }
   if (!(await take())) {
@@ -572,7 +594,8 @@ export async function fetchWooCommerceItems(
   ): Promise<PageBody | { kind: 'budget' } | { kind: 'unsupported-stock' }> => {
     if (!policy.allows(url)) {
       throw new CatalogueRefused(
-        `robots.txt does not allow ${url.pathname}, so this catalogue was not read.`,
+        `robots.txt does not allow ${url.href}, so this catalogue was not read.`,
+        400,
       );
     }
     if (!(await take())) return { kind: 'budget' };
@@ -600,14 +623,14 @@ export async function fetchWooCommerceItems(
 
   for (let page = startPage; page <= lastPage; page += 1) {
     let loaded = await loadPage(
-      productsUrl(origin, page, pageSize, categoryId, inStockOnly),
+      productsUrlFor(origin, page, pageSize, categoryId, inStockOnly, policy),
     );
     if (!started && loaded.kind === 'unsupported-stock') {
       // This host's Store API does not accept stock_status. Read the page
       // as published and let wooStockClosed drop what is not for sale.
       inStockOnly = false;
       loaded = await loadPage(
-        productsUrl(origin, page, pageSize, categoryId, false),
+        productsUrlFor(origin, page, pageSize, categoryId, false, policy),
       );
     }
     if (loaded.kind === 'budget') {

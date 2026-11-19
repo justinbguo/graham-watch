@@ -105,7 +105,11 @@ as null.
 ### WooCommerce
 
 `woocommerce.ts` reads `GET /wp-json/wc/store/v1/products`, 100 products a page,
-`stock_status=instock` when the host accepts it. A category URL such as
+`stock_status=instock` when the host accepts it. It asks for `orderby=id`
+so a later page stays put. When robots.txt disallows that query and allows
+the same URL without `orderby` and `order`, the reader uses the allowed URL.
+A blocked URL is named in full and returned as HTTP 400, because retrying it
+will not change the file. A category URL such as
 `/product-category/vintage-watches/` resolves that slug and sends `category=<id>`,
 so a shop can be read as one section. `prices.price` is a minor-unit digit string.
 With `currency_minor_unit` 2, `"1550000"` is 1550000 cents. `is_in_stock` false,

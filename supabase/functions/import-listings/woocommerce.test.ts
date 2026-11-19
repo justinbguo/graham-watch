@@ -565,7 +565,6 @@ Deno.test('a host that rejects stock_status is read without that filter', async 
   assertEquals(calls.some((call) => call.includes(PRODUCTS_PATH) && !call.includes('stock_status')), true);
 });
 
-/** ottuhr.com/robots.txt, fetched 2026-11-19. `*` disallows any `orderby` query. */
 const OTTUHR_ROBOTS = `User-agent: *
 Disallow: /wp-content/uploads/wc-logs/
 Disallow: /wp-content/uploads/woocommerce_transient_files/
@@ -633,7 +632,13 @@ Deno.test('a robots block names the full product URL and is not a retryable fail
   const fetchText = async (url: URL): Promise<TextResponse> => {
     calls.push(url.pathname);
     if (url.pathname === '/robots.txt') {
-      return { status: 200, body: `${OTTUHR_ROBOTS}\nDisallow: /wp-json/\n` };
+      return {
+        status: 200,
+        body: OTTUHR_ROBOTS.replace(
+          'Disallow: /*&orderby=\n',
+          'Disallow: /*&orderby=\nDisallow: /wp-json/\n',
+        ),
+      };
     }
     return { status: 200, body: '[]' };
   };
@@ -648,5 +653,5 @@ Deno.test('a robots block names the full product URL and is not a retryable fail
     ),
     true,
   );
-  assertEquals((error as CatalogueRefused & { status?: number }).status, 400);
+  assertEquals(error.status, 400);
 });
