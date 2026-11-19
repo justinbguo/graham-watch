@@ -157,6 +157,21 @@ test('a gateway 503 on one shop is a warning and the next shop still runs', asyn
   assert.equal(results[1].ok, true);
 });
 
+test('a gateway 503 while reading one catalogue still refreshes the next shop', async () => {
+  const calls = [];
+  const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
+    calls.push(body.dealerId);
+    if (body.dealerId === OLD.id) return { ok: false, status: 503, body: 'HTTP 503' };
+    return syncResponse({ website: GOLD.website, found: 569, pending: 0 });
+  });
+
+  assert.deepEqual(calls, [OLD.id, GOLD.id]);
+  assert.equal(exitCode, 0);
+  assert.equal(results[0].fatal, false);
+  assert.match(results[0].error, /HTTP 503/);
+  assert.equal(results[1].ok, true);
+});
+
 test('a rejected key stops the run before the next shop', async () => {
   const calls = [];
   const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {

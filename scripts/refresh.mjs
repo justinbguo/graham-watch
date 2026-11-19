@@ -22,11 +22,12 @@
  *
  * Exits 0 when at least one shop finished its catalogue read, the purge
  * succeeded, the seal succeeded, and the notify-drops call succeeded. A shop
- * that failed is logged and left for the next night. Exits 1 when the request
- * itself failed (missing secret, rejected cron secret, OpenAI key), every shop
- * failed, the purge failed, the seal failed, or notify-drops errored. Nobody to notify is not an error. Health warnings — one shop's
- * error, an empty catalogue, missing photos, a week with nothing new — do
- * not change that exit code.
+ * that failed is logged and left for the next night. A gateway 503 is that
+ * kind of failure. Exits 1 when the request itself failed (missing secret,
+ * rejected cron secret, OpenAI key), every shop failed, the purge failed,
+ * the seal failed, or notify-drops errored. Nobody to notify is not an error.
+ * Health warnings — one shop's error, an empty catalogue, missing photos, a
+ * week with nothing new — do not change that exit code.
  */
 
 import { randomUUID } from 'node:crypto';
