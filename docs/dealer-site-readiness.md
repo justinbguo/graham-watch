@@ -50,7 +50,8 @@ the Watches heading and before the newsletter block. It does not open the
 sitemap and it does not request `?format=json`.
 
 Each page's `PRICE:` line and the last Squarespace button are the price and
-the stock. A dollar amount is for sale. `SALE PENDING` and `SOLD` are not for
+the stock. The description is the text after the product heading and before
+`PRICE:`. A dollar amount is for sale. `SALE PENDING` and `SOLD` are not for
 sale. A page with no price and no status button is skipped.
 
 `User-agent: *` allows ordinary pages and disallows `?format=json`.

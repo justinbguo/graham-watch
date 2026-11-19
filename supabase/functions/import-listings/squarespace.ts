@@ -609,15 +609,17 @@ type WindVintageOffer =
 
 function windVintageOffer(html: string, pageUrl: URL): WindVintageOffer {
   const visible = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
-  const h1 = visible.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
   const title = windTitle(visible);
   const buttons = [...visible.matchAll(/<a\b[^>]*\bdata-sqsp-button\b[^>]*>([\s\S]*?)<\/a>/gi)];
   const button = decodeListText(buttons.at(-1)?.[1] ?? '');
   const priceCents = windVintagePriceCents(visible, button);
   const sku = visible.match(/Item\s+(SBUXYT\d+)/)?.[1] ?? null;
-  const h1End = h1?.index == null ? 0 : h1.index + h1[0].length;
-  const priceAt = visible.indexOf('PRICE:', h1End);
-  const text = htmlToText(visible.slice(h1End, priceAt >= 0 ? priceAt : visible.length), pageUrl.toString());
+  // Wind titles the watch with an h2. An h1-only cut starts at the top of the
+  // page, so the nav and the logo become part of every watch's fingerprint.
+  const heading = visible.match(/<h[12]\b[^>]*>[\s\S]*?<\/h[12]>/i);
+  const proseAt = heading?.index == null ? 0 : heading.index + heading[0].length;
+  const priceAt = visible.indexOf('PRICE:', proseAt);
+  const text = htmlToText(visible.slice(proseAt, priceAt >= 0 ? priceAt : visible.length), pageUrl.toString());
   const forSale = /^\$[\d,]+$/.test(button) && priceCents != null;
   const pending = /^sale\s+pending\b/i.test(button);
   const sold = /^sold$/i.test(button);
