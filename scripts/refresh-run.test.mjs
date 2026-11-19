@@ -137,6 +137,26 @@ test('every shop failing the catalogue read fails the job', async () => {
   assert.equal(exitCode, 1);
 });
 
+test('a gateway 503 on one shop is a warning and the next shop still runs', async () => {
+  const calls = [];
+  const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
+    calls.push(body.dealerId);
+    if (body.dealerId === OLD.id) {
+      if (body.phase === 'publish') return { ok: false, status: 503, body: 'HTTP 503' };
+      return syncResponse({ website: OLD.website, pending: 2, found: 2 });
+    }
+    return syncResponse({ website: GOLD.website, found: 569, pending: 0 });
+  });
+
+  assert.deepEqual(calls, [OLD.id, OLD.id, GOLD.id]);
+  assert.equal(exitCode, 0);
+  assert.equal(results.length, 2);
+  assert.equal(results[0].fatal, false);
+  assert.equal(results[0].ok, true);
+  assert.equal(results[0].publishError, 'HTTP 503 (HTTP 503)');
+  assert.equal(results[1].ok, true);
+});
+
 test('a rejected key stops the run before the next shop', async () => {
   const calls = [];
   const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
