@@ -45,6 +45,17 @@ function errorOf(body, status) {
   return status ? `${detail} (HTTP ${status})` : detail;
 }
 
+// 401 is a bad cron secret: every later shop would fail the same way.
+// 503 is that too when the body says the model key is missing or rejected.
+// A bare gateway 503 is one shop's outage, and the night continues.
+function stopsTheNight(body, status) {
+  if (status === 401) return true;
+  if (status !== 503) return false;
+  return /OPENAI_API_KEY|not configured|Not authorized|OpenAI returned 401|OpenAI returned 403|insufficient_quota/i.test(
+    errorOf(body, status),
+  );
+}
+
 function firstResult(body) {
   const row = Array.isArray(body?.results) ? body.results[0] : null;
   return row && typeof row === 'object' ? row : null;
@@ -119,7 +130,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
   if (!sync.ok) {
     return {
       ok: false,
-      fatal: sync.status === 401 || sync.status === 503,
+      fatal: stopsTheNight(sync.body, sync.status),
       skipped: false,
       dealerId: dealer.id,
       website,
@@ -215,7 +226,7 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
     const published = await invoke({ dealerId: dealer.id, phase: 'publish' });
     if (!published.ok) {
       shop.publishError = errorOf(published.body, published.status);
-      shop.fatal = published.status === 401 || published.status === 503;
+      shop.fatal = stopsTheNight(published.body, published.status);
       return shop;
     }
 

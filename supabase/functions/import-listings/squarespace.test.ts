@@ -1,5 +1,7 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
+import { contentFingerprint } from './hash.ts';
+import journeHtml from './fixtures/wind-vintage-journe.html' with { type: 'text' };
 import type { SourceItem, TextResponse } from './source.ts';
 import {
   fetchSquarespaceItems,
@@ -509,4 +511,49 @@ Deno.test('a Wind Vintage page that does not answer leaves the read unfinished',
   assertEquals(read?.complete, false);
   assertEquals(read?.items.map((item) => item.title), ['Omega']);
   assertEquals(read?.skipped.some((row) => row.reason === 'product page did not answer'), true);
+});
+
+const WIND_JOURNE_PATH = '/fpjourne-chronomtre-rsonance-ref-rn-souveraine-platinum-grey-dial-full-set';
+
+function windHomeLinking(path: string): string {
+  return `<!doctype html>Static.SQUARESPACE_CONTEXT = {};
+    <h1>Watches</h1>
+    <a href="${path}" class="image-slide-anchor"></a>
+    <div class="newsletter-block"></div>`;
+}
+
+async function readCapturedWind(pageHtml: string): Promise<SourceItem> {
+  const read = await fetchSquarespaceItems('https://www.windvintage.com/', 10, 3, {
+    fetchText: async (url) => {
+      if (url.pathname === '/robots.txt') return { status: 200, body: 'User-agent: *\nAllow: /\n' };
+      if (url.pathname === '/') return { status: 200, body: windHomeLinking(WIND_JOURNE_PATH) };
+      if (url.pathname === WIND_JOURNE_PATH) return { status: 200, body: pageHtml };
+      return { status: 404, body: 'missing' };
+    },
+    pause: async () => {},
+  });
+  const item = read?.items[0];
+  if (!item) throw new Error('captured Wind page produced no watch');
+  return item;
+}
+
+Deno.test('a captured Wind page ignores the site header and stays stable across reads', async () => {
+  const captured = journeHtml;
+  const first = await readCapturedWind(captured);
+  const second = await readCapturedWind(captured);
+  assertEquals(first.externalId, 'squarespace:SBUXYT5910');
+  assertEquals(first.text.includes('Wind-Vintage-Logo'), false);
+  assertEquals(first.text.includes('full set with a box and card'), true);
+  assertEquals(await contentFingerprint(first), await contentFingerprint(second));
+
+  const withExtraNav = captured.replace('<h2', '<a href="/extra-shop-link">Extra</a><h2');
+  const headerChanged = await readCapturedWind(withExtraNav);
+  assertEquals(await contentFingerprint(headerChanged), await contentFingerprint(first));
+
+  const proseChanged = captured.replace(
+    'full set with a box and card',
+    'full set with a box, card, and spare strap',
+  );
+  const edited = await readCapturedWind(proseChanged);
+  assertEquals(await contentFingerprint(edited) === await contentFingerprint(first), false);
 });

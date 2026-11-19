@@ -84,8 +84,10 @@ Squarespace also reads Wind Vintage (`windvintage.com`) from the homepage
 image grid, after the Watches heading and before the newsletter block. That
 read does not open the sitemap and does not request `?format=json`. Each
 page's `PRICE:` line and the last Squarespace button are the price and the
-stock. `SALE PENDING` and `SOLD` are not for sale. A page with no price and
-no status button is skipped.
+stock. The description is the text after the product heading (`h1` or `h2`)
+and before `PRICE:`. Wind's pages title the watch with an `h2`, and the site
+header is not part of the watch. `SALE PENDING` and `SOLD` are not for sale.
+A page with no price and no status button is skipped.
 
 It reads in two passes, and they happen at different times. The collection URL
 gives the list during the catalogue read. Each product URL is fetched later, in
