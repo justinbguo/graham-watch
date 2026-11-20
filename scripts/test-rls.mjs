@@ -1021,6 +1021,9 @@ let itemId;
       content_hash: 'cm',
       available: true,
       publish: true,
+      // Older than the seen row, so the missing sweep can use the shared
+      // read stamp instead of a uuid list.
+      last_seen_at: '2020-01-01T00:00:00.000Z',
       extracted: {
         brand: 'Omega',
         model: 'Speedmaster',

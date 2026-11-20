@@ -25,17 +25,41 @@ export const SYNC_PAGE_BUDGET = 8;
 
 const MAX_SYNC_SLICES = 8;
 
+// A bare gateway 503 is one shop's outage. Any other shop failure fails the
+// night, including a statement timeout, after the loop has tried every shop.
+function plainGatewayWarning(shop) {
+  if (shop.fatal || shop.skipped) return false;
+  if (!shop.ok) return shop.status === 503;
+  return Boolean(shop.publishError) && shop.publishError.endsWith('(HTTP 503)');
+}
+
+function shopBreaksTheRun(shop) {
+  if (shop.skipped) return false;
+  if (shop.fatal) return true;
+  if (plainGatewayWarning(shop)) return false;
+  if (!shop.ok || shop.publishError) return true;
+  return false;
+}
+
 export function refreshExitCode(results) {
   if (results.some((shop) => shop.fatal)) return 1;
-  if (results.length > 0 && results.every((shop) => !shop.ok)) return 1;
+  const attempted = results.filter((shop) => !shop.skipped);
+  if (attempted.length > 0 && attempted.every((shop) => !shop.ok)) return 1;
+  if (results.some((shop) => shopBreaksTheRun(shop))) return 1;
   return 0;
 }
 
 /** What to print when the job itself goes red. A publish-time key rejection has no `error` of its own. */
 export function refreshFailureReason(results) {
   const fatal = results.find((shop) => shop.fatal);
-  if (!fatal) return 'Every shop failed.';
-  return fatal.error ?? fatal.publishError ?? 'Refresh failed.';
+  if (fatal) return fatal.error ?? fatal.publishError ?? 'Refresh failed.';
+  const hard = results.filter((shop) => shopBreaksTheRun(shop));
+  if (hard.length === 0) return 'Every shop failed.';
+  const first = hard[0];
+  const detail = first.error ?? first.publishError ?? 'Refresh failed.';
+  const where = first.website ?? first.dealerId ?? 'A shop';
+  if (hard.length === 1) return `${where}: ${detail}`;
+  return `${hard.length} shops failed. ${where}: ${detail}`;
 }
 
 function errorOf(body, status) {

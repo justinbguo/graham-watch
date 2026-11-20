@@ -1,10 +1,12 @@
 /**
  * What the nightly job says about each shop after the refresh itself.
  *
- * A shop that failed, a shop whose read came back empty, a shop with live
- * watches and no photographs, or a shop with nothing new for a week, is a
- * warning on the job. It is not a failed job. One broken shop must not hide
- * the others, and a stable catalogue must not turn the check red.
+ * A shop whose read came back empty, a shop with live watches and no
+ * photographs, or a shop with nothing new for a week, is a warning on the
+ * job. A plain gateway 503 is that kind of warning too. Any other shop
+ * failure fails the process, in `refreshExitCode`, after every shop has
+ * been attempted. One broken shop must not hide the others, and a stable
+ * catalogue must not turn the check red.
  *
  * Quiet means a successful run where nothing was added, changed, or
  * published. Seven of those in a row is the flag. A skipped run (the

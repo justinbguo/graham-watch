@@ -20,14 +20,15 @@
  * catalogue batch for the New tab, then drops go out. A one-shop run does
  * not purge and does not seal.
  *
- * Exits 0 when at least one shop finished its catalogue read, the purge
- * succeeded, the seal succeeded, and the notify-drops call succeeded. A shop
- * that failed is logged and left for the next night. A gateway 503 is that
- * kind of failure. Exits 1 when the request itself failed (missing secret,
- * rejected cron secret, OpenAI key), every shop failed, the purge failed,
- * the seal failed, or notify-drops errored. Nobody to notify is not an error.
- * Health warnings — one shop's error, an empty catalogue, missing photos, a
- * week with nothing new — do not change that exit code.
+ * Exits 0 when every shop finished or was skipped, a plain gateway 503 is the
+ * only shop failure, the purge succeeded, the seal succeeded, and the
+ * notify-drops call succeeded. The loop still attempts every shop after a
+ * failure. A plain gateway 503 is a warning. Exits 1 when any other shop
+ * failed (including a statement timeout), the request itself failed (missing
+ * secret, rejected cron secret, OpenAI key), every shop failed, the purge
+ * failed, the seal failed, or notify-drops errored. Nobody to notify is not
+ * an error. An empty catalogue, missing photos, or a week with nothing new
+ * does not change the exit code.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -82,7 +83,8 @@ if (dealerId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 console.log(describeTarget());
 
 // stderr is in the log either way. On Actions, the annotation puts the failed
-// shop on the job summary while the check itself stays green.
+// shop on the job summary. A plain gateway 503 stays a warning. Any other
+// shop failure exits 1 after the loop.
 function annotation(level, title, message) {
   if (process.env.GITHUB_ACTIONS !== 'true') return;
   const encoded = String(message)
