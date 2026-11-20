@@ -106,7 +106,7 @@ test('a refused shop is not a health failure', () => {
   assert.deepEqual(shopFlags({ ...SHOP, skipped: true, ok: true }, [], null), []);
 });
 
-test('one shop failing stays a warning: the job exit code is unchanged', () => {
+test('one shop failing is still listed in the health report and fails the job', () => {
   const failed = { ...SHOP, ok: false, error: 'HTTP 546' };
   const healthy = { ...SHOP, dealerId: '22222222-2222-2222-2222-222222222222', website: 'https://oldschoolseconds.com' };
   const report = healthReport([
@@ -114,7 +114,7 @@ test('one shop failing stays a warning: the job exit code is unchanged', () => {
     { label: healthy.website, flags: shopFlags(healthy, [quietRun({ published: 1 })], null) },
   ]);
 
-  assert.equal(refreshExitCode([failed, healthy]), 0);
+  assert.equal(refreshExitCode([failed, healthy]), 1);
   assert.match(report.text, /errors \(1\)/);
   assert.equal(report.warnings.length, 1);
   assert.equal(report.warnings[0].title, 'ShopHealth');
