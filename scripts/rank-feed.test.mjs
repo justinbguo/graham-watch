@@ -485,3 +485,250 @@ test('New seats shops in turn, newest first inside a turn, without sealing a bat
     assert.ok(denied.status >= 400, `shop_mix must not be callable by a client, got ${denied.status}`);
   }
 });
+
+test('a shop that is not approved disappears for buyers and comes back when published', async () => {
+  const buyer = await createUser(`pause-buyer-${stamp}@graham.test`);
+  const owner = await createUser(`pause-owner-${stamp}@graham.test`);
+  const operator = await createUser(`pause-operator-${stamp}@graham.test`);
+  const op = await api('/rest/v1/operators', {
+    method: 'POST',
+    prefer: 'return=minimal',
+    body: { user_id: operator.id },
+  });
+  assert.equal(op.status, 201, JSON.stringify(op.body));
+
+  const shop = await insertDealer({
+    name: `Pause Shop ${stamp}`,
+    website: `https://pause-${stamp}.test`,
+    permission: 'approved',
+  });
+  const ownedShop = await insertDealer({
+    name: `Pause Owned ${stamp}`,
+    website: `https://pause-owned-${stamp}.test`,
+    permission: 'approved',
+    claimed_by: owner.id,
+  });
+
+  try {
+    const follow = await api('/rest/v1/dealer_follows', {
+      token: buyer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { user_id: buyer.id, dealer_id: shop.id },
+    });
+    assert.equal(follow.status, 201, JSON.stringify(follow.body));
+
+    const listedAt = new Date(Date.now() + 1000).toISOString();
+    const shown = await insertListing({
+      dealer_id: shop.id,
+      brand: 'Tudor',
+      model: 'Shown',
+      year: 1968,
+      price_cents: 400_000,
+      created_at: listedAt,
+    }, 3);
+    const saved = await insertListing({
+      dealer_id: shop.id,
+      brand: 'Omega',
+      model: 'Saved',
+      year: 1970,
+      price_cents: 500_000,
+      created_at: listedAt,
+    }, 3);
+    const owned = await insertListing({
+      dealer_id: ownedShop.id,
+      brand: 'Tudor',
+      model: 'Owned',
+      year: 1965,
+      price_cents: 300_000,
+    }, 3);
+
+    const seal = await api('/rest/v1/rpc/seal_catalogue_batch', {
+      method: 'POST',
+      body: { p_batch_id: crypto.randomUUID() },
+    });
+    assert.equal(seal.status, 200, JSON.stringify(seal.body));
+
+    const swipe = await api('/rest/v1/swipes', {
+      token: buyer.token,
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { actor_id: buyer.id, listing_id: saved.id, direction: 'right' },
+    });
+    assert.equal(swipe.status, 201, JSON.stringify(swipe.body));
+
+    async function setPermission(dealerId, permission) {
+      const res = await api(`/rest/v1/dealers?id=eq.${dealerId}`, {
+        method: 'PATCH',
+        prefer: 'return=representation',
+        body: { permission },
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.body?.[0]?.permission, permission);
+    }
+
+    async function readPaths(token) {
+      const detail = await api(`/rest/v1/listings?id=eq.${shown.id}&select=id`, { token });
+      const shopPage = await api(
+        `/rest/v1/listings?dealer_id=eq.${shop.id}&status=eq.active&sold_at=is.null&select=id`,
+        { token },
+      );
+      const photos = await api(`/rest/v1/listing_photos?listing_id=eq.${shown.id}&select=listing_id`, { token });
+      const wishlist = await api(`/rest/v1/listings?id=eq.${saved.id}&select=id`, { token });
+      const search = await api('/rest/v1/rpc/search_listings', {
+        token,
+        method: 'POST',
+        body: { p_limit: 50, p_exclude_own: false, p_dealers: [shop.id] },
+      });
+      const searchV2 = await api('/rest/v1/rpc/search_listings_v2', {
+        token,
+        method: 'POST',
+        body: { p_spec: { dealers: [shop.id] }, p_limit: 50, p_exclude_own: false },
+      });
+      const rank = await api('/rest/v1/rpc/rank_buy_feed', {
+        token,
+        method: 'POST',
+        body: { p_spec: { dealers: [shop.id] }, p_limit: 20 },
+      });
+      const counts = await api('/rest/v1/rpc/listing_counts', {
+        token,
+        method: 'POST',
+        body: { p_exclude_own: false, p_dealers: [shop.id] },
+      });
+      const fresh = await api('/rest/v1/rpc/latest_catalogue_batch', { token, method: 'POST' });
+      const drops = await api('/rest/v1/rpc/followed_new_listing_ids', { token, method: 'POST' });
+      const rule = await api('/rest/v1/rpc/listing_for_buyer', {
+        token,
+        method: 'POST',
+        body: { p_listing: shown },
+      });
+      for (const res of [detail, shopPage, photos, wishlist, search, searchV2, rank, counts, fresh, rule]) {
+        assert.equal(res.status, 200, JSON.stringify(res.body));
+      }
+      const ids = (body) => (body ?? []).map((row) => row.id ?? row.listing?.id);
+      return {
+        detail: ids(detail.body).includes(shown.id),
+        shop: ids(shopPage.body).includes(shown.id) && ids(shopPage.body).includes(saved.id),
+        photos: (photos.body ?? []).length > 0,
+        wishlist: ids(wishlist.body).includes(saved.id),
+        search: ids(search.body).includes(shown.id) && ids(search.body).includes(saved.id),
+        searchV2: ids(searchV2.body).includes(shown.id) && ids(searchV2.body).includes(saved.id),
+        rankShown: ids(rank.body).includes(shown.id),
+        rankSaved: ids(rank.body).includes(saved.id),
+        count: Number(counts.body?.[0]?.matched ?? -1),
+        freshShown: (fresh.body?.[0]?.listing_ids ?? []).includes(shown.id),
+        freshSaved: (fresh.body?.[0]?.listing_ids ?? []).includes(saved.id),
+        drops: drops.status === 200 && (drops.body ?? []).some((row) => row.id === shown.id),
+        buyerRule: rule.body,
+      };
+    }
+
+    const open = await readPaths(anon);
+    assert.deepEqual(open, {
+      detail: true,
+      shop: true,
+      photos: true,
+      wishlist: true,
+      search: true,
+      searchV2: true,
+      rankShown: true,
+      rankSaved: true,
+      count: 2,
+      freshShown: true,
+      freshSaved: true,
+      drops: false,
+      buyerRule: true,
+    });
+    const openBuyer = await readPaths(buyer.token);
+    assert.equal(openBuyer.drops, true);
+    assert.equal(openBuyer.detail, true);
+    assert.equal(openBuyer.wishlist, true);
+    assert.equal(openBuyer.rankShown, true);
+    assert.equal(openBuyer.rankSaved, false);
+    assert.equal(openBuyer.buyerRule, true);
+
+    await setPermission(shop.id, 'paused');
+    await setPermission(ownedShop.id, 'paused');
+
+    for (const token of [anon, buyer.token]) {
+      const hidden = await readPaths(token);
+      assert.equal(hidden.buyerRule, false, 'listing_for_buyer');
+      assert.deepEqual(
+        {
+          detail: hidden.detail,
+          shop: hidden.shop,
+          photos: hidden.photos,
+          wishlist: hidden.wishlist,
+          search: hidden.search,
+          searchV2: hidden.searchV2,
+          rankShown: hidden.rankShown,
+          rankSaved: hidden.rankSaved,
+          count: hidden.count,
+          freshShown: hidden.freshShown,
+          freshSaved: hidden.freshSaved,
+          drops: hidden.drops,
+        },
+        {
+          detail: false,
+          shop: false,
+          photos: false,
+          wishlist: false,
+          search: false,
+          searchV2: false,
+          rankShown: false,
+          rankSaved: false,
+          count: 0,
+          freshShown: false,
+          freshSaved: false,
+          drops: false,
+        },
+      );
+    }
+
+    const consoleRows = await api('/rest/v1/rpc/operator_listings', {
+      token: operator.token,
+      method: 'POST',
+      body: { p_dealer_id: shop.id },
+    });
+    assert.equal(consoleRows.status, 200, JSON.stringify(consoleRows.body));
+    assert.equal((consoleRows.body ?? []).some((row) => row.id === shown.id), true);
+    assert.equal((consoleRows.body ?? []).some((row) => row.id === saved.id), true);
+
+    const ownerRead = await api(`/rest/v1/listings?id=eq.${owned.id}&select=id`, { token: owner.token });
+    assert.equal(ownerRead.status, 200, JSON.stringify(ownerRead.body));
+    assert.equal(ownerRead.body?.[0]?.id, owned.id);
+    const strangerOwned = await api(`/rest/v1/listings?id=eq.${owned.id}&select=id`, { token: buyer.token });
+    assert.deepEqual(strangerOwned.body, []);
+
+    await setPermission(shop.id, 'approved');
+    const resumed = await readPaths(anon);
+    assert.equal(resumed.buyerRule, true);
+    assert.equal(resumed.detail, true);
+    assert.equal(resumed.shop, true);
+    assert.equal(resumed.photos, true);
+    assert.equal(resumed.wishlist, true);
+    assert.equal(resumed.search, true);
+    assert.equal(resumed.searchV2, true);
+    assert.equal(resumed.rankShown, true);
+    assert.equal(resumed.rankSaved, true);
+    assert.equal(resumed.count, 2);
+    assert.equal(resumed.freshShown, true);
+    assert.equal(resumed.freshSaved, true);
+    const resumedBuyer = await readPaths(buyer.token);
+    assert.equal(resumedBuyer.drops, true);
+    assert.equal(resumedBuyer.wishlist, true);
+
+    await setPermission(shop.id, 'pending');
+    const pending = await readPaths(anon);
+    assert.equal(pending.buyerRule, false);
+    assert.equal(pending.detail, false);
+    assert.equal(pending.search, false);
+    assert.equal(pending.freshShown, false);
+    assert.equal(pending.count, 0);
+  } finally {
+    await api(`/rest/v1/dealers?id=in.(${shop.id},${ownedShop.id})`, {
+      method: 'DELETE',
+      prefer: 'return=minimal',
+    });
+  }
+});

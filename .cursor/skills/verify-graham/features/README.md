@@ -9,6 +9,7 @@ This directory is the maintained source for verifying Graham's user-facing behav
 - `node .cursor/skills/verify-graham/control-graham.mjs doctor` reports `stack.apiOk: true` and a local URL.
 - The app opens dark. A stored `graham.theme` of light, dark, or system still wins.
 - A buyer does not see a Rolex, or a watch whose stored year is after 1985. A null year stays, 1985 stays, and Tudor stays. The shop's owner, the importer, and an operator still see that row. Demo mode does not apply this rule.
+- A shop that is paused, pending, or revoked has no watches a guest or a signed-in buyer can read. Publishing the shop shows them again. The operator console still lists them. The shop's owner still reads that shop's rows.
 - `seed` has created `buyer`, `quiet`, and `dealer` (Test Bench). The hosted project is out of bounds.
 - Never drive a stack this run did not start.
 
