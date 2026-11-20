@@ -119,10 +119,11 @@ test('a 546 on one shop is logged and the next shop still runs', async () => {
   });
 
   assert.deepEqual(calls, [OLD.id, GOLD.id]);
-  assert.equal(exitCode, 0);
+  assert.equal(exitCode, 1);
   assert.equal(results[0].ok, false);
   assert.match(results[0].error, /HTTP 546/);
   assert.equal(results[1].ok, true);
+  assert.match(refreshFailureReason(results), /HTTP 546/);
   assert.deepEqual(formatShop(results[0]).slice(1), [
     '  failed: Function failed due to not having enough compute resources (HTTP 546)',
   ]);
@@ -135,6 +136,27 @@ test('every shop failing the catalogue read fails the job', async () => {
     body: { message: 'CPU Time exceeded' },
   }));
   assert.equal(exitCode, 1);
+});
+
+test('a statement timeout on one shop fails the run and the next shop still runs', async () => {
+  const calls = [];
+  const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
+    calls.push(body.dealerId);
+    if (body.dealerId === OLD.id) {
+      return syncResponse({
+        ok: false,
+        error: 'canceling statement due to statement timeout',
+      });
+    }
+    return syncResponse({ website: GOLD.website, found: 569, pending: 0 });
+  });
+
+  assert.deepEqual(calls, [OLD.id, GOLD.id]);
+  assert.equal(results[0].ok, false);
+  assert.match(results[0].error, /statement timeout/);
+  assert.equal(results[1].ok, true);
+  assert.equal(exitCode, 1);
+  assert.match(refreshFailureReason(results), /statement timeout/);
 });
 
 test('a gateway 503 on one shop is a warning and the next shop still runs', async () => {
