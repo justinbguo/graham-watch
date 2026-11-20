@@ -30,12 +30,13 @@ jobs:
 
       # One request per shop, then short publish requests. A single request
       # that refreshed every shop exceeded the isolate's 2s CPU budget and
-      # died HTTP 546 before printing anything. Exits 0 when at least one
-      # shop read its catalogue. The job goes red when every shop failed,
-      # or the request itself was rejected (missing secret, bad key).
+      # died HTTP 546 before printing anything. The loop attempts every shop.
+      # The job goes red when any shop fails. A plain gateway 503 stays a
+      # warning, unless every shop failed that way. A rejected request
+      # (missing secret, bad key) goes red too.
       #
-      # One shop's error, an empty catalogue, missing photos, or a week of
-      # nothing new is a warning annotation. It does not fail this job.
+      # An empty catalogue, missing photos, or a week of nothing new is a
+      # warning annotation. It does not fail this job.
       # notify-drops does: a non-2xx response, a delivery failure, or an
       # insert failure exits 1 after the catalogue write. Hosted functions
       # are updated by .github/workflows/deploy-functions.yml when they

@@ -159,6 +159,24 @@ test('a statement timeout on one shop fails the run and the next shop still runs
   assert.match(refreshFailureReason(results), /statement timeout/);
 });
 
+test('a publish error other than a gateway 503 fails the run and the next shop still runs', async () => {
+  const calls = [];
+  const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
+    calls.push(body.dealerId);
+    if (body.dealerId === OLD.id && body.phase === 'publish') {
+      return { ok: false, status: 500, body: { message: 'canceling statement due to statement timeout' } };
+    }
+    if (body.dealerId === OLD.id) return syncResponse({ website: OLD.website, pending: 2, found: 2 });
+    return syncResponse({ website: GOLD.website, found: 569, pending: 0 });
+  });
+
+  assert.deepEqual(calls, [OLD.id, OLD.id, GOLD.id]);
+  assert.equal(results[0].ok, true);
+  assert.match(results[0].publishError, /statement timeout/);
+  assert.equal(results[1].ok, true);
+  assert.equal(exitCode, 1);
+});
+
 test('a gateway 503 on one shop is a warning and the next shop still runs', async () => {
   const calls = [];
   const { results, exitCode } = await runRefresh([OLD, GOLD], async (body) => {
