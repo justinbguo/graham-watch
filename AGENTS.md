@@ -101,7 +101,7 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 
 | Workflow | When | Jobs |
 | --- | --- | --- |
-| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, `test:rank`, generated types), `drops verification` (`npm run verify:drops`) |
+| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (`check:comments`, typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, `test:rank`, generated types), `drops verification` (`npm run verify:drops`) |
 | `Catalogue refresh` | Cron `0 6 * * *`, and manual | `npm run refresh` against hosted |
 | `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships every function when any function source, a shared folder, config, the deploy script, or the workflow changes. A test-only change ships nothing. Does not apply migrations. |
 
@@ -130,6 +130,24 @@ GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_
 `npm run verify:drops` runs `.cursor/skills/verify-graham/control-graham.mjs`. One local stack, project id `graham-watch`, API `http://127.0.0.1:54321`, web `http://127.0.0.1:8091`. Read `.cursor/skills/verify-graham/SKILL.md` and `features/README.md` before driving a feature. The hosted project is out of bounds for that harness.
 
 `.cursor/skills/control-graham` is the demo Metro path (`EXPO_PUBLIC_DEMO=1`) for deck, search, and wishlist. Supabase proofs stay on `verify-graham`.
+
+## Comments and docs
+
+Do not add comments. Do not add markdown files. `AGENTS.md` is the only
+product doc you extend, and only with a fact that a route, table, function,
+or workflow change just made true. Delete the sentence that change made false.
+
+A comment is allowed only when the code cannot show the constraint: a
+platform limit, a rejected alternative that looks obvious, or an argument
+that is unused on purpose. One line. Name the constraint. Do not restate
+the next line, the history, or a doc.
+
+Allowed docs besides this file: `CLAUDE.md` (the one-line pointer),
+`assets/CREDITS.md`, `.cursor/rules/` invariants, and a principle skill.
+`studio/` is a vendored template. Do not treat its markdown as Graham.
+
+Setup, design essays, product specs, and per-shop scrape logs are not docs.
+If a rule is not in this file or in a cursor rule, it is not a rule.
 
 ## Rules that bite
 
