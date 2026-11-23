@@ -34,13 +34,30 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 
 ## Features
 
-- [Onboarding](./onboarding.md) — desktop asks a name, then what to show first. Phone still asks name, username, and birthday.
-- [Browse and swipe](./browse-swipe.md) — the Buy deck, pass, and save. Rank is `rank_buy_feed`, then shops take turns.
-- [New](./new.md). The latest sealed catalogue batch, seated the same way with no personal score. Opening the tab clears the count on this device until a later seal. Not the Drops feed.
-- [Dealer shops](./dealer-shops.md) — a shop's page and its watches.
-- [Follow and Drops](./drops.md) — follow a shop, get one push for a watch listed after that, see the unseen count on Messages. This is the proven flow.
-- [Inquiries](./inquiries.md) — ask a dealer about a watch.
-- [Profile](./profile.md) — the signed-in profile and the shops they follow.
-- [Dealer shop management](./dealer-shop.md) — a claimed shop edited by the dealer.
-- [Operator console](./operator.md). Approve shops, and open Accounts for one person's timeline. Users stays the counts screen. WooCommerce reads the Store API, including one category URL. Squarespace reads the page HTML, and Wind Vintage from the homepage image grid. Wix reads the sitemap plus JSON-LD. The catalog proof is still the Shopify stand-in.
-- [Guests](./guests.md). Signed-out browsing on the operator Guests tab. Country and device type only. Unclaimed rows last 180 days.
+`$CG` is `node .cursor/skills/control-graham/bin/control-graham.mjs`. `$VG` is `node .cursor/skills/verify-graham/control-graham.mjs`. This list is the index. The recipe files stay in this directory.
+
+- Buy deck. `/`. Demo. `$CG press ArrowLeft`. Recipe: [browse-swipe.md](./browse-swipe.md).
+- Grid. Buy at 1280. Demo. `$CG snapshot`.
+- Filters. `Filters`, and `/filters/deck`. Demo for the sheet. `npm run test:filters` for `listing_matches`.
+- Search. `/search`. Demo. `$CG fill --name "Search brand, model or reference"`.
+- Listing. `/listing/[listingId]`. Demo.
+- Wishlist. `/saved`. Demo.
+- New. `/new`. Local. `$VG verify-new-badge`. Demo badge is a different batch. Recipe: [new.md](./new.md).
+- Guest sheet. Local, before sign-in. Demo does not show it.
+- Onboarding. Desktop sheet on Buy. Phone `/onboarding`. Local, new mailbox. `seed` accounts skip it. Recipe: [onboarding.md](./onboarding.md).
+- Profile. `/profile`. Local. Recipe: [profile.md](./profile.md).
+- Settings. `/settings`. Local.
+- Follow and Drops. `/dealer/[dealerId]`, `/drops`. Local. `npm run verify:drops`. Recipe: [drops.md](./drops.md).
+- Ranking. `rank_buy_feed` then `shop_mix`. Local. `$VG verify-rank` and `npm run test:rank`.
+- Shop mix report. `npm run report:shop-mix`. Reads only.
+- Operator. `npm run operator`. Local. `$VG verify-operator` hits `operator-bot` and does not open the Vite screen. Recipe: [operator.md](./operator.md).
+- Fixture import. `$VG import`. Local only. Hosted refuses `action: "fixture"`.
+- Import screen. `/import-inventory`. No command opens it.
+- Nightly refresh. `npm run refresh` against the local stack. One shop skips purge and seal.
+- Catalogue audit. `npm run catalogue:audit`. Writes nothing.
+- Claim. `/apply` and `claim-dealer`. No command sends the code.
+- Community and Messages. `/community`, `/messages`. Local. Pause banner is expected.
+- Enquiry. `/inquiry/[listingId]`. The send button can mail. No `inquire` command. Recipe: [inquiries.md](./inquiries.md).
+- Sourcing. `/sourcing/new`. In memory. The tab is `href: null`.
+
+Demo includes a Rolex and a 1988 Cartier. Local applies `listing_for_buyer`. A paused shop disappears for a guest and a signed-in buyer. The owner and an operator still read it.
