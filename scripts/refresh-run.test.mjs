@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { formatShop, refreshDealer, refreshFailureReason, runRefresh, SYNC_PAGE_BUDGET } from './refresh-run.mjs';
 
@@ -334,6 +337,53 @@ test('a catalogue that names a next page is read again before anything is publis
   assert.equal(shop.published, 2);
 });
 
+test('a shop that still names a next page on the eighth slice fails the job and publishes nothing', async () => {
+  const calls = [];
+  const { results, exitCode } = await runRefresh([OLD], async (body) => {
+    calls.push(body.phase);
+    return syncResponse({
+      nextPage: body.page + SYNC_PAGE_BUDGET,
+      pending: 0,
+      complete: false,
+      found: 10,
+    });
+  });
+
+  assert.equal(calls.filter((phase) => phase === 'sync').length, 8);
+  assert.equal(calls.includes('publish'), false);
+  assert.equal(results[0].pending, 0);
+  assert.equal(results[0].ok, false);
+  assert.equal(exitCode, 1);
+});
+
+test('a shop that finishes on the eighth slice still publishes', async () => {
+  let syncs = 0;
+  const { results, exitCode } = await runRefresh([OLD], async (body) => {
+    if (body.phase === 'publish') {
+      return {
+        ok: true,
+        status: 200,
+        body: { bounded: true, results: [{ ok: true, published: 2, processed: 2, pending: 0 }] },
+      };
+    }
+    syncs += 1;
+    if (syncs < 8) {
+      return syncResponse({
+        nextPage: body.page + SYNC_PAGE_BUDGET,
+        pending: 0,
+        complete: false,
+      });
+    }
+    return syncResponse({ found: 80, pending: 2, complete: true });
+  });
+
+  assert.equal(syncs, 8);
+  assert.equal(results[0].ok, true);
+  assert.equal(results[0].published, 2);
+  assert.equal(results[0].pending, 0);
+  assert.equal(exitCode, 0);
+});
+
 test('a revoked shop the function refuses is not a failed refresh', async () => {
   const shop = await refreshDealer(OLD, async () => ({
     ok: true,
@@ -343,4 +393,139 @@ test('a revoked shop the function refuses is not a failed refresh', async () => 
   assert.equal(shop.ok, true);
   assert.equal(shop.skipped, true);
   assert.match(formatShop(shop)[1], /not an approved shop/);
+});
+
+const SWEEP_DEALER = '33333333-3333-3333-3333-333333333333';
+
+function sweepSync(open) {
+  return {
+    bounded: true,
+    results: [
+      {
+        ok: true,
+        website: 'https://oldschoolseconds.com',
+        found: open ? 10 : 4,
+        changed: 0,
+        added: open ? 10 : 0,
+        retired: 0,
+        relisted: 0,
+        published: 0,
+        pending: 0,
+        complete: !open,
+        ...(open ? { nextPage: 9 } : {}),
+      },
+    ],
+  };
+}
+
+function startSweep(open) {
+  const hits = [];
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    hits.push(url.pathname);
+    const json = (payload) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+    if (url.pathname === '/rest/v1/dealers') {
+      json([{ id: SWEEP_DEALER, name: 'Old School Seconds', website: 'https://oldschoolseconds.com' }]);
+      return;
+    }
+    if (url.pathname === '/functions/v1/import-listings') {
+      json(sweepSync(open));
+      return;
+    }
+    if (url.pathname === '/functions/v1/notify-drops') {
+      json({ users: 0, sent: 0, failed: 0, tokensRemoved: 0, alreadyClaimed: 0, skipped: {} });
+      return;
+    }
+    if (url.pathname === '/rest/v1/rpc/purge_unclaimed_guest_events') {
+      json(0);
+      return;
+    }
+    if (url.pathname === '/rest/v1/rpc/seal_catalogue_batch') {
+      json([{ created: true, listing_count: 0 }]);
+      return;
+    }
+    if (url.pathname === '/rest/v1/rpc/catalogue_photo_gaps') {
+      json([]);
+      return;
+    }
+    json([]);
+  });
+  return new Promise((resolve, reject) => {
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (address == null || typeof address === 'string') {
+        reject(new Error('sweep stub did not bind'));
+        return;
+      }
+      resolve({ server, hits, port: address.port });
+    });
+  });
+}
+
+function runSweep(port, dealerId) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['scripts/refresh.mjs', ...(dealerId ? [dealerId] : [])], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      env: {
+        ...process.env,
+        GRAHAM_CRON_SECRET: 'refresh-next-page-test',
+        SUPABASE_URL: `http://127.0.0.1:${port}`,
+        SUPABASE_ANON_KEY: 'anon',
+        SUPABASE_SERVICE_ROLE_KEY: 'service',
+        GITHUB_ACTIONS: '',
+        GITHUB_STEP_SUMMARY: '',
+      },
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+test('a one-shop run that finishes skips purge and seal', async () => {
+  const sweep = await startSweep(false);
+  try {
+    const run = await runSweep(sweep.port, SWEEP_DEALER);
+    assert.equal(run.code, 0, run.stderr);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/purge_unclaimed_guest_events'), false);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/seal_catalogue_batch'), false);
+    assert.equal(sweep.hits.includes('/functions/v1/import-listings'), true);
+  } finally {
+    await new Promise((resolve) => sweep.server.close(resolve));
+  }
+});
+
+test('a full run that stops on a next page does not purge or seal', async () => {
+  const sweep = await startSweep(true);
+  try {
+    const run = await runSweep(sweep.port, null);
+    assert.equal(run.code, 1, `${run.stdout}\n${run.stderr}`);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/purge_unclaimed_guest_events'), false);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/seal_catalogue_batch'), false);
+    assert.equal(sweep.hits.filter((path) => path === '/functions/v1/import-listings').length, 8);
+  } finally {
+    await new Promise((resolve) => sweep.server.close(resolve));
+  }
+});
+
+test('a full run that finishes inside the slice cap still purges and seals', async () => {
+  const sweep = await startSweep(false);
+  try {
+    const run = await runSweep(sweep.port, null);
+    assert.equal(run.code, 0, run.stderr);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/purge_unclaimed_guest_events'), true);
+    assert.equal(sweep.hits.includes('/rest/v1/rpc/seal_catalogue_batch'), true);
+  } finally {
+    await new Promise((resolve) => sweep.server.close(resolve));
+  }
 });
