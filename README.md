@@ -64,9 +64,9 @@ are no invented fixtures, because placeholder photos beside real watches ruined
 every judgement about how the app looked. Nothing is scraped and no OpenAI call
 is made, so a reset is free and works offline.
 
-The seeded shop belongs to a seed account rather than to you, on purpose: the
-deck hides listings you imported yourself, so a seed owned by the account you
-sign in with would look like a seed that failed.
+The seeded shop belongs to a seed account rather than to you. The deck hides
+a shop from the account that claimed it. Importing the rows does not. This
+seed shop is unclaimed, so the account that fetched it still sees the watches.
 
 Regenerate it from a live project when the shape of the data changes:
 
