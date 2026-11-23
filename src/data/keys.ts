@@ -1,24 +1,16 @@
 import { countsCacheKey, deckCacheKey, facetsQueryKey, filterCacheToken } from '@/features/filters/spec';
 
-import { DECK_FAVORITES_FIRST, DECK_SORT, type DeckSort } from './deckPaging';
-
 /**
  * Every cached query is identified by one of these keys. Keeping them in one
  * place is what makes invalidation safe — a mutation can look up exactly which
  * caches it invalidates instead of guessing at a string.
  */
 export const keys = {
-  // The deck is cached per filter, sort, and favorites-first setting. Changing
-  // any of them is a different deck, not a stale cursor. The second entry is
-  // the FilterSpec token — sorted, deduped, defaults omitted — so
-  // Rolex-then-Tudor and a blank query share a pile with Tudor-then-Rolex.
-  // Counts stay on that token alone; they do not change with the sort.
-  deck: (
-    filters: unknown = null,
-    sort: DeckSort = DECK_SORT,
-    favoritesFirst: boolean = DECK_FAVORITES_FIRST,
-    taste = '',
-  ) => deckCacheKey(filters, sort, favoritesFirst, taste),
+  // The deck is cached per filter and taste. Changing either is a different
+  // deck, not a stale cursor. The second entry is the FilterSpec token —
+  // sorted, deduped, defaults omitted — so Rolex-then-Tudor and a blank query
+  // share a pile with Tudor-then-Rolex. Counts stay on that token alone.
+  deck: (filters: unknown = null, taste = '') => deckCacheKey(filters, taste),
   search: (filters: unknown) => ['search', filterCacheToken(filters)] as const,
   // Two numbers about the same filter set the deck is keyed on, but a separate
   // key: the deck is frozen while it is being swiped and these are not.

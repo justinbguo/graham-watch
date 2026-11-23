@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
 
 import { CheckMark } from '@/components/CheckRow';
-import type { DealerInventoryItem, ListingEdits } from '@/data/dealers';
+import type { DealerInventoryItem, ListingPatch } from '@/data/dealers';
 import { formatTitle } from '@/lib/format';
 import { HIT_TARGET, radius, size, space, type, type Theme } from '@/lib/theme';
 import { useTheme, useThemedStyles } from '@/providers/theme';
@@ -46,7 +46,7 @@ export function SellerListingTableRow({
   selected: boolean;
   busy: boolean;
   onToggleSelect: () => void;
-  onSave: (changes: ListingEdits) => void;
+  onSave: (changes: ListingPatch) => void;
   onEdit: () => void;
   onTogglePublished: () => void;
   onToggleSold: () => void;

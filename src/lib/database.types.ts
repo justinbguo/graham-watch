@@ -2103,6 +2103,12 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      filter_listing_ids: {
+        Args: { p_ids: string[]; p_spec: Json }
+        Returns: {
+          id: string
+        }[]
+      }
       followed_new_listing_ids: {
         Args: never
         Returns: {
@@ -2609,15 +2615,26 @@ export type Database = {
         }[]
       }
       rank_followed: { Args: { p_dealer: string }; Returns: boolean }
+      rank_open_cursor: {
+        Args: { p_cursor: string; p_seed: Json }
+        Returns: {
+          created_at: string
+          id: string
+          score: number
+          slot: number
+        }[]
+      }
       rank_pack_cursor: {
         Args: {
           p_created_at: string
           p_id: string
           p_score: number
           p_slot: number
+          p_taste: string
         }
         Returns: string
       }
+      rank_taste_hash: { Args: { p_seed: Json }; Returns: string }
       rank_unpack_cursor: {
         Args: { p_cursor: string }
         Returns: {
@@ -2625,6 +2642,7 @@ export type Database = {
           id: string
           score: number
           slot: number
+          taste: string
         }[]
       }
       rank_weights: { Args: { p_seed: Json }; Returns: Json }

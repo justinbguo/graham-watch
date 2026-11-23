@@ -64,6 +64,22 @@ test('a missing brand is refused before it reaches the database', () => {
   assert.match(edits.error, /brand/);
 });
 
+test('a year of 12 is refused', () => {
+  const edits = editsFrom({
+    brand: 'Omega',
+    model: '',
+    reference: '',
+    year: '12',
+    size: '',
+    price: '',
+    condition: '',
+    description: '',
+  });
+  assert.equal(isEdits(edits), false);
+  if (isEdits(edits)) return;
+  assert.equal(edits.error, 'That year is not a watch.');
+});
+
 test('a negative price is refused', () => {
   const edits = editsFrom({
     brand: 'Omega',

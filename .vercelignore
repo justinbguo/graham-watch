@@ -17,3 +17,7 @@
 # exports, and copies the rest of public/ into dist. Without this, the build
 # gets Expo's stock shell and crawlers never see the tags.
 !public
+# The dealer editor and the operator form share this parse. The operator
+# Vite build cannot import it from src/, because that tree extends the Expo
+# tsconfig. Both deploys use this ignore list, so the folder has to be named.
+!shared

@@ -40,9 +40,11 @@ type Block = Mosaic | Strip;
 export function ExploreGrid({
   cards,
   onOpen,
+  onEndReached,
 }: {
   cards: DeckCard[];
   onOpen: (card: DeckCard) => void;
+  onEndReached?: () => void;
 }) {
   const styles = useThemedStyles(gridStyles);
   const [width, setWidth] = useState(0);
@@ -66,6 +68,8 @@ export function ExploreGrid({
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.6}
           renderItem={({ item }) =>
             item.kind === 'mosaic' ? (
               <MosaicBlock block={item} cell={cell} onOpen={onOpen} />

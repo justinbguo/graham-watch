@@ -732,3 +732,141 @@ test('a shop that is not approved disappears for buyers and comes back when publ
     });
   }
 });
+
+async function feedPage(token, cursor, spec = {}) {
+  return api('/rest/v1/rpc/rank_buy_feed', {
+    token,
+    method: 'POST',
+    body: { p_spec: spec, p_limit: 2, p_cursor: cursor, p_seed: {} },
+  });
+}
+
+test('a two-word query matches the same watches on Buy, Search, and New', async () => {
+  const shop = await insertDealer({
+    name: `Filter Shop ${stamp}`,
+    website: `https://filter-shop-${stamp}.test`,
+    permission: 'approved',
+  });
+  const person = await createUser(`filter-query-${stamp}@graham.test`);
+  try {
+    const hit = await insertListing({
+      dealer_id: shop.id,
+      brand: 'Tudor',
+      model: 'Zzproof Qq5513',
+      year: 1968,
+      price_cents: 400_000,
+      created_at: ago(10),
+    }, 3);
+    const miss = await insertListing({
+      dealer_id: shop.id,
+      brand: 'Tudor',
+      model: 'Plain',
+      reference: '1000',
+      year: 1968,
+      price_cents: 400_000,
+      created_at: ago(11),
+    }, 3);
+    const spec = { query: 'zzproof qq5513' };
+    const buy = await api('/rest/v1/rpc/rank_buy_feed', {
+      token: person.token,
+      method: 'POST',
+      body: { p_spec: spec, p_limit: 20, p_cursor: null, p_seed: {} },
+    });
+    const search = await api('/rest/v1/rpc/search_listings_v2', {
+      token: person.token,
+      method: 'POST',
+      body: {
+        p_spec: spec,
+        p_limit: 20,
+        p_cursor: null,
+        p_exclude_own: false,
+        p_exclude_swiped: false,
+      },
+    });
+    const fresh = await api('/rest/v1/rpc/filter_listing_ids', {
+      token: person.token,
+      method: 'POST',
+      body: { p_ids: [hit.id, miss.id], p_spec: spec },
+    });
+    if (!buy.ok) throw new Error(`buy ${buy.status} ${JSON.stringify(buy.body)}`);
+    if (!search.ok) throw new Error(`search ${search.status} ${JSON.stringify(search.body)}`);
+    if (!fresh.ok) throw new Error(`new ${fresh.status} ${JSON.stringify(fresh.body)}`);
+    const buyIds = (buy.body ?? []).map((row) => row.listing.id).sort();
+    const searchIds = (search.body ?? []).map((row) => row.listing.id).sort();
+    const newIds = (fresh.body ?? []).map((row) => row.id).sort();
+    assert.deepEqual(buyIds, [hit.id]);
+    assert.deepEqual(searchIds, [hit.id]);
+    assert.deepEqual(newIds, [hit.id]);
+  } finally {
+    await api(`/rest/v1/dealers?id=eq.${shop.id}`, { method: 'DELETE', prefer: 'return=minimal' });
+    await fetch(`${url}/auth/v1/admin/users/${person.id}`, {
+      method: 'DELETE',
+      headers: { apikey: service, Authorization: `Bearer ${service}` },
+    });
+  }
+});
+
+test('a save changes page 2', async () => {
+  const shop = await insertDealer({
+    name: `Taste Shop ${stamp}`,
+    website: `https://taste-shop-${stamp}.test`,
+    permission: 'approved',
+  });
+  const person = await createUser(`taste-page-${stamp}@graham.test`);
+  const brands = ['Accutron', 'Bulova', 'Certina', 'Doxa'];
+  try {
+    const rows = [];
+    for (let index = 0; index < brands.length; index += 1) {
+      rows.push(await insertListing({
+        dealer_id: shop.id,
+        brand: brands[index],
+        model: `Page ${index}`,
+        year: 1968,
+        price_cents: 400_000,
+        style: 'dress',
+        created_at: ago(20 - index),
+      }, 3));
+    }
+    const first = await feedPage(person.token, null);
+    if (!first.ok) throw new Error(`page 1 ${first.status} ${JSON.stringify(first.body)}`);
+    const cursor = first.body?.[0]?.cursor ?? null;
+    assert.equal(typeof cursor, 'string');
+    const second = await feedPage(person.token, cursor);
+    if (!second.ok) throw new Error(`page 2 ${second.status} ${JSON.stringify(second.body)}`);
+    const before = (second.body ?? []).map((row) => row.listing.id);
+    assert.equal(before.length, 2);
+    const saved = rows[0];
+    const event = await api('/rest/v1/rpc/log_buyer_events', {
+      token: person.token,
+      method: 'POST',
+      body: {
+        p_events: [{
+          id: crypto.randomUUID(),
+          kind: 'save',
+          surface: 'buy',
+          occurred_at: new Date().toISOString(),
+          listing_id: saved.id,
+          dealer_id: shop.id,
+        }],
+      },
+    });
+    if (!event.ok) throw new Error(`save ${event.status} ${JSON.stringify(event.body)}`);
+    const stale = await feedPage(person.token, cursor);
+    assert.equal(stale.ok, false);
+    assert.match(JSON.stringify(stale.body), /does not match this search/);
+    const again = await feedPage(person.token, null);
+    if (!again.ok) throw new Error(`fresh page 1 ${again.status} ${JSON.stringify(again.body)}`);
+    const nextCursor = again.body?.[0]?.cursor ?? null;
+    const moved = await feedPage(person.token, nextCursor);
+    if (!moved.ok) throw new Error(`fresh page 2 ${moved.status} ${JSON.stringify(moved.body)}`);
+    const after = (moved.body ?? []).map((row) => row.listing.id);
+    assert.notDeepEqual(after, before);
+    assert.equal((again.body ?? []).some((row) => row.listing.id === saved.id), true);
+  } finally {
+    await api(`/rest/v1/dealers?id=eq.${shop.id}`, { method: 'DELETE', prefer: 'return=minimal' });
+    await fetch(`${url}/auth/v1/admin/users/${person.id}`, {
+      method: 'DELETE',
+      headers: { apikey: service, Authorization: `Bearer ${service}` },
+    });
+  }
+});

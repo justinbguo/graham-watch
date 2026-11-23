@@ -6,7 +6,7 @@ import type { InfiniteData } from '@tanstack/react-query';
  * `rank_buy_feed` returns one page and an opaque cursor. The cursor is a
  * bookmark the database made for this filter and this taste. The next request
  * sends that string back and does not read it. A cursor from a different
- * order is rejected, so the query key includes the taste: a new taste is a
+ * taste is rejected, so the query key includes the taste: a new taste is a
  * new query, and a new query starts with no cursor.
  *
  * The pile used to be one page and nothing else. After about twenty swipes
@@ -22,20 +22,6 @@ export const DECK_LIMIT = 20;
 
 /** Fetch the next page once the pile is this thin, while the top card is still up. */
 export const DECK_REFILL_AT = 5;
-
-/**
- * The deck's order. `search_listings_v2` rejects a cursor built for a
- * different one of these, or for the other favorites-first setting.
- */
-export const DECK_SORTS = ['newest', 'price_asc', 'price_desc', 'oldest', 'newest_watch'] as const;
-
-export type DeckSort = (typeof DECK_SORTS)[number];
-
-/** What the deck asks for until a sort control exists. Same order the offset deck used. */
-export const DECK_SORT: DeckSort = 'newest';
-
-/** Favorite brands still lead the pile, as they did before the cursor. */
-export const DECK_FAVORITES_FIRST = true;
 
 export type DeckPage<T> = {
   cards: T[];

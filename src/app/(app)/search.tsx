@@ -24,7 +24,15 @@ export default function Search() {
   const open = useOpenStack();
   const primeListing = usePrimeListing();
   const { filters, setOne } = useFilters('search');
-  const { data: results = [], isPending, error, refetch } = useSearch(filters);
+  const {
+    cards: results,
+    isPending,
+    error,
+    refetch,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useSearch(filters);
   const { compose } = useLocalSearchParams<{ compose?: string }>();
   const root = useRef<View>(null);
   const field = useRef<TextInput>(null);
@@ -135,6 +143,9 @@ export default function Search() {
         ) : (
           <ExploreGrid
             cards={results}
+            onEndReached={() => {
+              if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+            }}
             onOpen={(item) => {
               field.current?.blur();
               primeListing(item);
