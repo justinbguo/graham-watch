@@ -203,30 +203,28 @@ async function refreshProfile(
 
 async function findDealer(
   supabase: SupabaseClient,
-  userId: string,
   sourceUrl: string,
-  isOperator: () => Promise<boolean>,
   dealerId?: string,
   name?: string,
   email?: string
 ): Promise<string | null> {
-  // An operator manages every shop by definition — that is what the operator
-  // console is. Without this, re-reading a catalogue an operator did not
-  // personally introduce is refused, which is most of them once dealers start
-  // importing their own.
-  const mine = async (row: { claimed_by: string | null; created_by: string | null }) =>
-    row.claimed_by === userId || row.created_by === userId || (await isOperator());
+  const mine = async (id: string) => {
+    const { data, error } = await supabase.rpc('controls_dealer', { p_dealer_id: id });
+    if (error) throw new Error(error.message);
+    if (data !== true) throw new Error('You do not manage that dealer.');
+  };
 
   if (dealerId) {
     const { data: owned } = await supabase
       .from('dealers')
-      .select('id, claimed_by, created_by, logo_url, website')
+      .select('id, logo_url, website')
       .eq('id', dealerId)
       .maybeSingle();
 
-    if (!owned || !(await mine(owned))) {
+    if (!owned) {
       throw new Error('You do not manage that dealer.');
     }
+    await mine(owned.id);
     const homepage = owned.website ?? websiteOf(sourceUrl).website;
     const profile = await readProfile(homepage, undefined, owned.logo_url);
     await refreshProfile(supabase, owned.id, profile, owned.logo_url);
@@ -240,7 +238,7 @@ async function findDealer(
   // a dealer that already exists.
   const { data: existing } = await supabase
     .from('dealers')
-    .select('id, name, claimed_by, created_by, logo_url')
+    .select('id, name, logo_url')
     .eq('website', website)
     .maybeSingle();
 
@@ -250,9 +248,7 @@ async function findDealer(
   // signed in, so without this a stranger could name any shop's URL and make us
   // pay for the catalogue read. The writes would fail on RLS a moment later,
   // but the scrape credit and the model call were already spent.
-  if (!(await mine(existing))) {
-    throw new Error('You do not manage that dealer.');
-  }
+  await mine(existing.id);
 
   // Dealers imported before we could read the shop's real name are stuck with
   // their hostname on every card. Re-running the import repairs that.
@@ -891,9 +887,7 @@ const userFetch = withSupabase({ auth: 'user' }, async (req: Request, ctx: any) 
     try {
       const found = await findDealer(
         ctx.supabase,
-        userId,
         sourceUrl,
-        isOperator,
         typeof body.dealerId === 'string' ? body.dealerId : undefined,
         named,
         addressed
