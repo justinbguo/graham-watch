@@ -242,6 +242,13 @@ export async function refreshDealer(dealer, invoke, maxPublishCalls = MAX_PUBLIS
     publishError: null,
   };
 
+  if (typeof row.nextPage === 'number') {
+    shop.ok = false;
+    shop.complete = false;
+    shop.error = `Catalogue read stopped at page ${row.nextPage}.`;
+    return shop;
+  }
+
   // An older function already tried to publish everything inside the sync.
   if (sync.body?.bounded !== true || shop.pending <= 0) return shop;
 
