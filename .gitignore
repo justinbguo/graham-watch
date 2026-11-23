@@ -47,6 +47,7 @@ deno.lock
 
 # local env
 .env
+.env.production
 .supabase-db-password
 .vercel
 
