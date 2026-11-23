@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 import { useCallback } from 'react';
 
 import { askToSave } from '@/features/auth/guest';
@@ -12,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/session';
 
 import { deckHasCard, dropJudgedCard, restorePassedCard, type DeckCache } from './deckPaging';
+import { deckTasteEpoch, subscribeDeckTaste } from './deckTaste';
 import { keys } from './keys';
 import { logEvent, type ListingRef } from './listingEvents';
 import type { ListingCounts } from './listings';
@@ -191,7 +193,8 @@ export function useUndoPass(actorId: string | null) {
   const queryClient = useQueryClient();
   const guest = useGuest();
   const { filters } = useFilters('deck');
-  const deckKey = keys.deck(filters);
+  const taste = useSyncExternalStore(subscribeDeckTaste, deckTasteEpoch, deckTasteEpoch);
+  const deckKey = keys.deck(filters, taste);
 
   return useMutation({
     mutationFn: (card: DeckCard) => {

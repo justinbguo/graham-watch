@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { useGuest } from '@/features/auth/GuestProvider';
 import { useFilters } from '@/features/filters/provider';
@@ -11,9 +11,7 @@ import { demo, isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
 import {
-  DECK_FAVORITES_FIRST,
   DECK_LIMIT,
-  DECK_SORT,
   newCardsOnLastPage,
   nextDeckCursor,
   shouldRefillDeck,
@@ -21,8 +19,8 @@ import {
   visibleDeckCards,
   type DeckCache,
   type DeckPage,
-  type DeckSort,
 } from './deckPaging';
+import { bumpDeckTaste, deckTasteEpoch, staleTasteCursor, subscribeDeckTaste } from './deckTaste';
 import { keys } from './keys';
 import { brandKey, emptySeed, emptyTaste, orderFeed, type RankSeed, type RankWatch } from './rank';
 
@@ -130,8 +128,6 @@ async function fetchDeckPage(
   limit: number,
   filters: Filters,
   cursor: string | null,
-  _sort: DeckSort,
-  _favoritesFirst: boolean,
   seed: RankSeed,
 ): Promise<DeckPage<DeckCard>> {
   if (isDemo) return demoDeckPage(filters, cursor, limit, seed);
@@ -139,9 +135,7 @@ async function fetchDeckPage(
   // The deck hides watches already judged, and a shop this account has claimed.
   // Importing a listing does not hide it. A guest has no account, so nothing
   // is theirs to hide and `swipes` has no rows for them. The cursor is what
-  // moves a guest forward, the same way it moves a signed-in buyer. Sort and
-  // favorites-first stay on the query key so a different order is still a
-  // different pile.
+  // moves a guest forward, the same way it moves a signed-in buyer.
   const { data, error } = await supabase.rpc('rank_buy_feed', {
     p_spec: canonicalize(filters).spec as Json,
     p_limit: limit,
@@ -152,7 +146,10 @@ async function fetchDeckPage(
       priceBand: seed.priceBand,
     },
   });
-  if (error) throw error;
+  if (error) {
+    if (cursor && staleTasteCursor(error)) bumpDeckTaste();
+    throw error;
+  }
 
   const rows = data ?? [];
   return {
@@ -251,16 +248,15 @@ export function usePrimeListing() {
  * not the end of the catalogue.
  *
  * `useInfiniteQuery` keeps each page with the cursor that fetched it, under
- * the query key. Changing the filter or the sort changes the key, and the new
+ * the query key. Changing the filter or the taste changes the key, and the new
  * query starts at `initialPageParam: null` — the first page, not the previous
- * sort's bookmark.
+ * taste's bookmark.
  */
 export function useDeck(limit = DECK_LIMIT, enabled = true) {
   const { filters, ready } = useFilters('deck');
   const guest = useGuest();
-  const sort = DECK_SORT;
-  const favoritesFirst = DECK_FAVORITES_FIRST;
   const seed = emptySeed();
+  const taste = useSyncExternalStore(subscribeDeckTaste, deckTasteEpoch, deckTasteEpoch);
 
   const query = useInfiniteQuery<
     DeckPage<DeckCard>,
@@ -269,9 +265,9 @@ export function useDeck(limit = DECK_LIMIT, enabled = true) {
     ReturnType<typeof keys.deck>,
     string | null
   >({
-    queryKey: keys.deck(filters, sort, favoritesFirst),
+    queryKey: keys.deck(filters, taste),
     initialPageParam: null,
-    queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, sort, favoritesFirst, seed),
+    queryFn: ({ pageParam }) => fetchDeckPage(limit, filters, pageParam, seed),
     getNextPageParam: (lastPage) => nextDeckCursor(lastPage),
     // The deck is consumed by swiping, not by refetching. Re-running the first
     // page mid-pile would shuffle cards out from under the user's thumb. The

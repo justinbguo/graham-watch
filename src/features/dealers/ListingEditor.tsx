@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Field, Message } from '@/components/ui';
-import { useUpdateDealerListing, type ListingEdits } from '@/data/dealers';
+import { useUpdateDealerListing } from '@/data/dealers';
+import { dealerListingChanges } from '@/features/listings/listingParse';
 import type { WatchCatalogHit } from '@/data/watchCatalog';
 import { Constants } from '@/lib/database';
 import { humanize } from '@/lib/format';
@@ -82,47 +83,10 @@ function listFields(columns: string[]): string {
   return `the ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
-/** Empty means "we do not know", which is a null column rather than an empty string. */
-const orNull = (value: string) => (value.trim() ? value.trim() : null);
-
-function intOrNull(value: string): number | null {
-  const parsed = Number.parseInt(value.trim(), 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function decimalOrNull(value: string): number | null {
-  const parsed = Number.parseFloat(value.trim().replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function editsFrom(draft: Draft): ListingEdits {
-  const price = decimalOrNull(draft.price);
-
-  return {
-    brand: draft.brand.trim(),
-    model: orNull(draft.model),
-    reference: orNull(draft.reference),
-    year: intOrNull(draft.year),
-    caliber: orNull(draft.caliber),
-    condition: orNull(draft.condition),
-    price_cents: price == null ? null : Math.round(price * 100),
-    currency: draft.currency,
-    case_size_mm: decimalOrNull(draft.caseSize),
-    description: orNull(draft.description),
-    source_url: orNull(draft.sourceUrl),
-    winding: draft.winding,
-    case_material: draft.caseMaterial,
-    dial_color: draft.dialColor,
-    style: draft.style,
-    complications: draft.complications,
-    has_box: draft.hasBox,
-    has_papers: draft.hasPapers,
-  };
-}
-
 export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () => void }) {
   const styles = useThemedStyles(editorStyles);
   const [draft, setDraft] = useState(() => draftFrom(card));
+  const [problem, setProblem] = useState<string | null>(null);
   const save = useUpdateDealerListing(card.dealer_id);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
@@ -359,6 +323,7 @@ export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () =
         <Message text="Buyers follow this link, and inquiry emails carry it. It is also how a refresh recognises this watch, so changing it can import the watch a second time." />
       </Group>
 
+      {problem ? <Message text={problem} tone="error" /> : null}
       {save.error ? <Message text={save.error.message} tone="error" /> : null}
 
       <View style={styles.actions}>
@@ -366,9 +331,15 @@ export function ListingEditor({ card, onSaved }: { card: DeckCard; onSaved: () =
           label="Save changes"
           loading={save.isPending}
           disabled={!draft.brand.trim()}
-          onPress={() =>
-            save.mutate({ listingId: card.id, changes: editsFrom(draft) }, { onSuccess: onSaved })
-          }
+          onPress={() => {
+            const changes = dealerListingChanges(draft);
+            if ('error' in changes) {
+              setProblem(changes.error);
+              return;
+            }
+            setProblem(null);
+            save.mutate({ listingId: card.id, changes }, { onSuccess: onSaved });
+          }}
         />
       </View>
     </ScrollView>

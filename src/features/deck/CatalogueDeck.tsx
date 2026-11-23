@@ -34,7 +34,6 @@ import { useOnboardingGate } from '@/data/profile';
 import { useJudge, usePassCount, useStartOver, useUndoPass } from '@/data/swipes';
 import { openSignIn } from '@/features/auth/guest';
 import { useSignInOnArrival } from '@/features/auth/useSignInOnArrival';
-import { matchesListing } from '@/features/filters/match';
 import { useFilters } from '@/features/filters/provider';
 import { filterCacheToken } from '@/features/filters/spec';
 import { activeCount, pressDealer, soleDealer } from '@/features/filters/types';
@@ -60,15 +59,19 @@ export function CatalogueDeck({ source }: { source: 'buy' | 'new' }) {
   const newFilters = useFilters('new');
   const filterApi = isNew ? newFilters : deckFilters;
   const { filters, clear, replace, showAllDealers } = filterApi;
-  const fresh = useNewListings({ enabled: isNew, pageAll: isNew && activeCount(filters) > 0 });
+  const fresh = useNewListings({
+    enabled: isNew,
+    pageAll: isNew && activeCount(filters) > 0,
+    filters: isNew ? filters : undefined,
+  });
   const deck = useDeck(DECK_LIMIT, !isNew);
   const [judged, setJudged] = useState<ReadonlySet<string>>(() => new Set());
   const batchCards = fresh.state === 'ready' ? fresh.cards : undefined;
   const cards = useMemo(() => {
     if (!isNew) return deck.data ?? [];
     if (!batchCards) return [];
-    return batchCards.filter((card) => !judged.has(card.id) && matchesListing(card, filters));
-  }, [isNew, deck.data, batchCards, judged, filters]);
+    return batchCards.filter((card) => !judged.has(card.id));
+  }, [isNew, deck.data, batchCards, judged]);
   const isPending = isNew ? fresh.state === 'loading' : deck.isPending;
   const error = isNew
     ? fresh.state === 'error'

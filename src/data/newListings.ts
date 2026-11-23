@@ -2,11 +2,16 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
+import { matchesListing } from '@/features/filters/match';
+import { canonicalize } from '@/features/filters/spec';
+import type { Filters } from '@/features/filters/types';
+import type { Json } from '@/lib/database';
 import { demo, isDemo } from '@/lib/demo';
 import type { DeckCard } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 
 import { keys } from './keys';
+import { matchingListingIds } from './listingMatch';
 import { hydrate } from './listings';
 import { unseenNewCount } from './newBatchCount';
 import { markNewBatchSeen, seenNewBatchId, subscribeSeenNewBatch } from './newSeen';
@@ -95,20 +100,44 @@ export function useMarkNewBatchSeen() {
   );
 }
 
-export function useNewListings(options?: { enabled?: boolean; pageAll?: boolean }): NewListings {
+export function useNewListings(options?: {
+  enabled?: boolean;
+  pageAll?: boolean;
+  filters?: Filters;
+}): NewListings {
   const enabled = options?.enabled !== false;
   const pageAll = options?.pageAll === true && enabled;
+  const filters = options?.filters;
   const batch = useNewBatch(enabled);
   const current = batch.data ?? null;
-  const ids = current?.listingIds ?? [];
+  const ids = current?.listingIds ?? EMPTY_IDS;
+  const token = filters ? canonicalize(filters).key : '';
+  const matched = useQuery({
+    queryKey: ['new-match', current?.id ?? 'none', token, ids] as const,
+    enabled: enabled && !isDemo && Boolean(filters) && ids.length > 0,
+    queryFn: () => matchingListingIds(ids, canonicalize(filters ?? {}).spec as Json),
+  });
+  const filteredIds = useMemo(() => {
+    if (!filters) return ids;
+    if (isDemo) {
+      const keep = new Set(
+        demo.listings([...ids]).filter((card) => matchesListing(card, filters)).map((card) => card.id),
+      );
+      return ids.filter((id) => keep.has(id));
+    }
+    if (!matched.data) return EMPTY_IDS;
+    const keep = new Set(matched.data);
+    return ids.filter((id) => keep.has(id));
+  }, [filters, ids, matched.data]);
+  const matchPending = Boolean(filters) && !isDemo && ids.length > 0 && matched.isPending;
 
   const pages = useInfiniteQuery({
-    queryKey: keys.newPage(current?.id ?? 'none', current?.listingIds ?? EMPTY_IDS),
-    enabled: enabled && ids.length > 0,
+    queryKey: keys.newPage(current?.id ?? 'none', filteredIds),
+    enabled: enabled && filteredIds.length > 0 && !matchPending,
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => fetchPage(ids.slice(pageParam, pageParam + PAGE_SIZE)),
+    queryFn: ({ pageParam }) => fetchPage(filteredIds.slice(pageParam, pageParam + PAGE_SIZE)),
     getNextPageParam: (_last, _all, offset) =>
-      offset + PAGE_SIZE < ids.length ? offset + PAGE_SIZE : undefined,
+      offset + PAGE_SIZE < filteredIds.length ? offset + PAGE_SIZE : undefined,
     staleTime: Infinity,
   });
 
@@ -128,10 +157,10 @@ export function useNewListings(options?: { enabled?: boolean; pageAll?: boolean 
 
   const cards = useMemo(() => (pages.data?.pages ?? []).flat(), [pages.data]);
 
-  if (!enabled || batch.isPending) return { state: 'loading' };
-  if (batch.isError) return { state: 'error', refetch };
+  if (!enabled || batch.isPending || matchPending) return { state: 'loading' };
+  if (batch.isError || matched.isError) return { state: 'error', refetch };
   if (!current) return { state: 'none', refetch };
-  if (ids.length > 0 && pages.isPending) return { state: 'loading' };
+  if (filteredIds.length > 0 && pages.isPending) return { state: 'loading' };
   if (pages.isError) return { state: 'error', refetch };
 
   const loaded = pages.data?.pages ?? [];

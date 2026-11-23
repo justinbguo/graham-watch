@@ -1,3 +1,5 @@
+import { parseListingNumbers } from '../../src/features/listings/listingParse.ts';
+
 /**
  * The fields an operator may correct on a watch, in the shape the form holds
  * and the shape `operator_edit_listing` expects.
@@ -29,7 +31,7 @@ export type ListingSource = {
   description: string | null;
 };
 
-export type ListingEdits = {
+export type OperatorListingEdits = {
   p_brand: string;
   p_model: string | null;
   p_reference: string | null;
@@ -59,46 +61,25 @@ export function draftFrom(listing: ListingSource): ListingDraft {
   };
 }
 
-export function editsFrom(draft: ListingDraft): ListingEdits | { error: string } {
-  const brand = draft.brand.trim();
-  if (!brand) return { error: 'A watch needs a brand.' };
-
-  const year = parseWhole(draft.year, 'Year');
-  if (typeof year === 'string') return { error: year };
-  if (year != null && (year < 1800 || year > new Date().getFullYear() + 1)) {
-    return { error: 'That year is not a watch.' };
-  }
-
-  const size = parseDecimal(draft.size, 'Case size');
-  if (typeof size === 'string') return { error: size };
-  if (size != null && (size <= 0 || size > 80)) {
-    return { error: 'Case size is in millimetres.' };
-  }
-
-  const price = dollarsToCents(draft.price);
-  if (typeof price === 'string') return { error: price };
-
-  const description = emptyToNull(draft.description);
-  if (description && description.length > 8000) return { error: 'Description is too long.' };
-
+export function editsFrom(draft: ListingDraft): OperatorListingEdits | { error: string } {
+  const parsed = parseListingNumbers({
+    brand: draft.brand,
+    year: draft.year,
+    caseSize: draft.size,
+    price: draft.price,
+    description: draft.description,
+  });
+  if ('error' in parsed) return parsed;
   return {
-    p_brand: brand,
+    p_brand: parsed.brand,
     p_model: emptyToNull(draft.model),
     p_reference: emptyToNull(draft.reference),
-    p_year: year,
-    p_case_size_mm: size,
-    p_price_cents: price,
+    p_year: parsed.year,
+    p_case_size_mm: parsed.caseSize,
+    p_price_cents: parsed.priceCents,
     p_condition: emptyToNull(draft.condition),
-    p_description: description,
+    p_description: parsed.description,
   };
-}
-
-export function dollarsToCents(value: string): number | null | string {
-  const trimmed = value.trim().replace(/[$,]/g, '');
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0) return 'Price cannot be negative.';
-  return Math.round(parsed * 100);
 }
 
 function emptyToNull(value: string): string | null {
@@ -106,21 +87,8 @@ function emptyToNull(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseWhole(value: string, label: string): number | null | string {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!/^\d+$/.test(trimmed)) return `${label} should be a whole number.`;
-  return Number.parseInt(trimmed, 10);
-}
-
-function parseDecimal(value: string, label: string): number | null | string {
-  const trimmed = value.trim().replace(',', '.');
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return `${label} should be a number.`;
-  return parsed;
-}
-
-export function isEdits(value: ListingEdits | { error: string }): value is ListingEdits {
+export function isEdits(
+  value: OperatorListingEdits | { error: string },
+): value is OperatorListingEdits {
   return !('error' in value);
 }

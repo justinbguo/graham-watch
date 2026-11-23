@@ -1,31 +1,46 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { catalogueFacets, UNKNOWN_FACET_VALUE } from '@/features/filters/facets';
 import { canonicalize } from '@/features/filters/spec';
-import { toRpcArgs, type Filters } from '@/features/filters/types';
+import type { Filters } from '@/features/filters/types';
 import type { Json } from '@/lib/database';
 import { demo, isDemo } from '@/lib/demo';
 import type { DeckCard } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 
+import type { DeckPage } from './deckPaging';
 import { hydrate } from './listings';
 import { keys } from './keys';
 
+const SEARCH_PAGE = 24;
+
 export type Facet = { kind: string; value: string; label: string; count: number };
 
-async function fetchSearch(filters: Filters, limit: number): Promise<DeckCard[]> {
-  if (isDemo) return demo.search(filters);
+async function fetchSearchPage(filters: Filters, cursor: string | null): Promise<DeckPage<DeckCard>> {
+  if (isDemo) {
+    if (cursor) return { cards: [], cursor: null };
+    return { cards: demo.search(filters), cursor: null };
+  }
 
-  const { data, error } = await supabase.rpc('search_listings', {
-    p_limit: limit,
+  const { data, error } = await supabase.rpc('search_listings_v2', {
+    p_spec: canonicalize(filters).spec as Json,
+    p_limit: SEARCH_PAGE,
+    p_cursor: cursor ?? undefined,
     // The deck hides watches from a shop this account has claimed. Search is
     // where you check a shop you just published is actually findable, so it
     // keeps them. Importing a listing does not hide it from the deck.
     p_exclude_own: false,
-    ...toRpcArgs(filters),
+    p_exclude_swiped: false,
+    p_sort: 'newest',
+    p_favorites_first: false,
   });
   if (error) throw error;
-  return hydrate(data ?? []);
+  const rows = data ?? [];
+  return {
+    cards: await hydrate(rows.map((row) => row.listing)),
+    cursor: rows[0]?.cursor ?? null,
+  };
 }
 
 async function fetchFacets(excludeOwn: boolean): Promise<Facet[]> {
@@ -75,20 +90,21 @@ async function fetchFilterFacets(
   return (data ?? []) as Facet[];
 }
 
-export function useSearch(filters: Filters, limit = 50) {
-  return useQuery({
+export function useSearch(filters: Filters) {
+  const query = useInfiniteQuery({
     queryKey: keys.search(filters),
-    queryFn: () => fetchSearch(filters, limit),
-    // Unlike the deck, results are meant to change as you type.
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => fetchSearchPage(filters, pageParam),
+    getNextPageParam: (page) => page.cursor ?? undefined,
     staleTime: 30_000,
   });
+  const cards = useMemo(
+    () => (query.data?.pages ?? []).flatMap((page) => page.cards),
+    [query.data],
+  );
+  return { ...query, cards };
 }
 
-/**
- * How many watches match, not how many this page is showing. The list stops
- * at 50, so its length freezes there and a newly published watch never moves
- * the number.
- */
 export function useSearchCount(filters: Filters) {
   return useQuery({
     queryKey: keys.searchCount(filters),
@@ -96,10 +112,10 @@ export function useSearchCount(filters: Filters) {
     queryFn: async () => {
       if (isDemo) return demo.search(filters).length;
 
-      const { data, error } = await supabase.rpc('listing_counts', {
+      const { data, error } = await supabase.rpc('listing_counts_v2', {
+        p_spec: canonicalize(filters).spec as Json,
         p_exclude_swiped: false,
         p_exclude_own: false,
-        ...toRpcArgs(filters),
       });
       if (error) throw error;
       return Number(data?.[0]?.matched ?? 0);

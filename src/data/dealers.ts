@@ -35,7 +35,7 @@ export type DealerShopEdits = Partial<
   Pick<Dealer, 'name' | 'description' | 'instagram' | 'logo_url' | 'website'>
 >;
 
-export type ListingEdits = Partial<
+export type ListingPatch = Partial<
   Pick<
     Listing,
     | 'brand'
@@ -255,7 +255,7 @@ export function useUpdateDealerShop(dealerId: string | null) {
 function patchInventoryItem(
   items: DealerInventoryItem[],
   listingId: string,
-  changes: ListingEdits,
+  changes: ListingPatch,
 ): DealerInventoryItem[] {
   return items.map((item) => (item.id === listingId ? { ...item, ...changes } : item));
 }
@@ -270,7 +270,7 @@ export function useUpdateDealerListing(dealerId: string | null) {
       changes,
     }: {
       listingId: string;
-      changes: ListingEdits;
+      changes: ListingPatch;
     }) => {
       const { error } = await supabase.from('listings').update(changes).eq('id', listingId);
       if (error) throw error;

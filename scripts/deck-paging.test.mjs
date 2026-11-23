@@ -5,7 +5,7 @@
  * said the catalogue was finished even when `matched` was still above zero.
  * A refill asks for the next page while five or fewer cards are in hand.
  * The cursor is a bookmark. The client sends it back and does not read it.
- * A different filter or sort is a different query, so it starts with no cursor.
+ * A different filter or taste is a different query, so it starts with no cursor.
  *
  * The grid keeps every card, so "five left" never happens and the refill
  * does not run. Scrolling to the tail asks for the next page on that same
@@ -18,9 +18,7 @@ import test from 'node:test';
 import { NO_FILTERS } from '../src/features/filters/types.ts';
 import { countsCacheKey, deckCacheKey } from '../src/features/filters/spec.ts';
 import {
-  DECK_FAVORITES_FIRST,
   DECK_LIMIT,
-  DECK_SORT,
   cardsInDeck,
   dropJudgedCard,
   newCardsOnLastPage,
@@ -248,25 +246,17 @@ test('a repeated page does not spin the refill, and a swipe removes the card onc
   assert.equal(restorePassedCard(restored, { id: 'b' }), restored);
 });
 
-test('changing filter or sort is a new query and does not reuse the cursor', () => {
-  assert.equal(DECK_SORT, deckCacheKey(null)[2]);
-  assert.equal(DECK_FAVORITES_FIRST, deckCacheKey(null)[3]);
-
-  const newest = deckCacheKey({ brands: ['rolex'] }, 'newest', true);
-  const byPrice = deckCacheKey({ brands: ['rolex'] }, 'price_asc', true);
-  const byAge = deckCacheKey({ brands: ['rolex'] }, 'oldest', true);
-  const tudor = deckCacheKey({ brands: ['tudor'] }, 'newest', true);
-  const favoritesOff = deckCacheKey({ brands: ['rolex'] }, 'newest', false);
-  assert.notDeepEqual(newest, byPrice);
-  assert.notDeepEqual(newest, byAge);
-  assert.notDeepEqual(newest, tudor);
-  assert.notDeepEqual(newest, favoritesOff);
-  // Counts ignore sort. A swipe still updates the one count for this filter.
-  assert.equal(newest[1], byPrice[1]);
-  assert.deepEqual(countsCacheKey(newest[1]), ['listing-counts', newest[1]]);
+test('changing filter or taste is a new query and does not reuse the cursor', () => {
+  const rolex = deckCacheKey({ brands: ['rolex'] });
+  const afterSave = deckCacheKey({ brands: ['rolex'] }, '1');
+  const tudor = deckCacheKey({ brands: ['tudor'] });
+  assert.notDeepEqual(rolex, afterSave);
+  assert.notDeepEqual(rolex, tudor);
+  assert.equal(rolex[1], afterSave[1]);
+  assert.deepEqual(countsCacheKey(rolex[1]), ['listing-counts', rolex[1]]);
   assert.deepEqual(
-    deckCacheKey({ brands: ['tudor', 'rolex'] }, 'price_desc', true),
-    deckCacheKey({ brands: ['rolex', 'tudor'] }, 'price_desc', true),
+    deckCacheKey({ brands: ['tudor', 'rolex'] }),
+    deckCacheKey({ brands: ['rolex', 'tudor'] }),
   );
 
   const newestServer = createCatalogue(45);
@@ -285,7 +275,9 @@ test('changing filter or sort is a new query and does not reuse the cursor', () 
   assert.match(listings, /useInfiniteQuery<[^;]{0,500}string \| null/);
   assert.match(listings, /initialPageParam: null,/);
   assert.match(listings, /getNextPageParam: \(lastPage\) => nextDeckCursor\(lastPage\)/);
-  assert.match(listings, /queryFn: \(\{ pageParam \}\) => fetchDeckPage\(limit, filters, pageParam, sort, favoritesFirst, seed\)/);
+  assert.match(listings, /queryFn: \(\{ pageParam \}\) => fetchDeckPage\(limit, filters, pageParam, seed\)/);
+  assert.match(listings, /queryKey: keys\.deck\(filters, taste\)/);
+  assert.match(listings, /bumpDeckTaste\(\)/);
   assert.match(listings, /rpc\('rank_buy_feed'/);
   assert.match(listings, /rpc\('listing_counts_v2'/);
   assert.match(listings, /p_cursor: cursor/);
@@ -336,7 +328,7 @@ test('deck and counts keys ignore filter order and defaults', () => {
   // load that module (its import has no extension; the app bundler resolves it),
   // so this checks the delegation instead of importing it.
   const keysSource = readFileSync(new URL('../src/data/keys.ts', import.meta.url), 'utf8');
-  assert.match(keysSource, /deckCacheKey\(filters, sort, favoritesFirst, taste\)/);
+  assert.match(keysSource, /deckCacheKey\(filters, taste\)/);
   assert.match(keysSource, /counts: \(filters: unknown\) => countsCacheKey\(filters\)/);
 });
 

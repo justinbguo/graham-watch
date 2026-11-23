@@ -4,6 +4,7 @@ import type { Database } from '@/lib/database';
 import { isDemo } from '@/lib/demo';
 import { supabase } from '@/lib/supabase';
 
+import { communityPosts } from './communityFeed';
 import {
   exchangeShowcaseAuthor,
   exchangeShowcaseCollectorPosts,
@@ -216,7 +217,7 @@ export function useExchangeFeed() {
   return useQuery({
     queryKey: keys.exchange,
     queryFn: async (): Promise<ExchangePost[]> => {
-      if (isDemo) return exchangeShowcasePosts();
+      if (isDemo) return communityPosts([], exchangeShowcasePosts(), true);
       const { data, error } = await supabase.rpc('exchange_feed');
       if (error) throw error;
       const live = (data ?? []).map((row) => ({
@@ -233,10 +234,7 @@ export function useExchangeFeed() {
         my_vote: Number(row.my_vote) as VoteValue,
         cover_url: row.cover_path ? exchangePhotoUrl(row.cover_path) : null,
       }));
-      const examples = exchangeShowcasePosts().filter(
-        (post) => !live.some((row) => row.id === post.id),
-      );
-      return [...live, ...examples];
+      return communityPosts(live, exchangeShowcasePosts(), false);
     },
   });
 }

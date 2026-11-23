@@ -8,6 +8,8 @@ import { ListingRow } from '@/components/ListingRow';
 import { Centered, CloseButton, Message, Screen, Spinner } from '@/components/ui';
 import { dealerPicture } from '@/features/dealers/picture';
 import { useDealerShop } from '@/data/dealers';
+import { useListingMatch } from '@/data/listingMatch';
+import { isDemo } from '@/lib/demo';
 import { useMarkDropsSeen } from '@/data/drops';
 import { usePrimeListing } from '@/data/listings';
 import { matchesListing } from '@/features/filters/match';
@@ -25,6 +27,12 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
   const primeListing = usePrimeListing();
   const { filters } = useFilters('shop', dealerId);
   const { data, isPending, error } = useDealerShop(dealerId);
+  const listings = data?.listings ?? [];
+  const match = useListingMatch(
+    listings.map((card) => card.id),
+    filters,
+    !isDemo && listings.length > 0,
+  );
   const { mutate: markSeen } = useMarkDropsSeen();
 
   // Opening the shop is seeing its new watches. The feed's count drops by
@@ -32,15 +40,15 @@ export function DealerShop({ dealerId }: { dealerId: string }) {
   useEffect(() => {
     markSeen(dealerId);
   }, [dealerId, markSeen]);
-  const listings = data?.listings ?? [];
-  const shown = useMemo(
-    () => listings.filter((card) => matchesListing(card, filters)),
-    [listings, filters],
-  );
+  const shown = useMemo(() => {
+    if (isDemo) return listings.filter((card) => matchesListing(card, filters));
+    const keep = new Set(match.data ?? []);
+    return listings.filter((card) => keep.has(card.id));
+  }, [listings, filters, match.data]);
   const chosen = activeCount(filters);
   const close = () => router.back();
 
-  if (isPending) {
+  if (isPending || (!isDemo && listings.length > 0 && match.isPending && !match.data)) {
     return (
       <Screen action={<CloseButton onPress={close} />}>
         <Spinner />
