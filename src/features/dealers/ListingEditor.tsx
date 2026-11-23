@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, Eyebrow, Field, Message } from '@/components/ui';
 import { useUpdateDealerListing } from '@/data/dealers';
-import { dealerListingChanges } from '@/features/listings/listingParse';
+import { dealerListingChanges } from '../../../shared/listingParse';
 import type { WatchCatalogHit } from '@/data/watchCatalog';
 import { Constants } from '@/lib/database';
 import { humanize } from '@/lib/format';

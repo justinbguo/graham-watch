@@ -1,4 +1,4 @@
-import { parseListingNumbers } from '../../src/features/listings/listingParse.ts';
+import { parseListingNumbers } from '../../shared/listingParse.ts';
 
 /**
  * The fields an operator may correct on a watch, in the shape the form holds

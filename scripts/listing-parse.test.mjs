@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { dealerListingChanges } from '../src/features/listings/listingParse.ts';
+import { dealerListingChanges } from '../shared/listingParse.ts';
 
 const draft = {
   brand: 'Omega',
