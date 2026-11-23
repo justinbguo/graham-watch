@@ -56,7 +56,7 @@ Desktop web puts the tab bar on top (`useIsDesktopWeb`). A wide window that is n
 
 ## Who does what
 
-**Buyer.** Sign in, finish onboarding (name, username, birthday 18+, notification permission), swipe Buy, follow a shop from Community or the shop page, read Drops from Messages, message a claimed shop, email an unclaimed shop. Community and Messages stay in the app under a pause banner. Buying a watch uses the listing's dealer page.
+**Buyer.** Sign in. Desktop web finishes in `FirstRunSheet` with a name and favorite brands, an empty username, a null birthday, and notifications off. Phone still walks the question flow, including a username, a birthday of 18 or over, and the notification permission. Then swipe Buy, follow a shop from Community or the shop page, read Drops from Messages, message a claimed shop, and email an unclaimed shop. Community and Messages stay in the app under a pause banner. Buying a watch uses the listing's dealer page.
 
 **Dealer.** Profile, claim a shop. The open "Do you run a shop listed here?" card is hidden. Claim this shop still shows when the signed-in email is on the shop's site, and `/apply` still starts a claim. The claim function emails a code to a mailbox on the shop domain. After claim, the Deal tab replaces Messages. Publishing the shop onto the deck is still an operator action (`dealers.permission`).
 
@@ -95,13 +95,13 @@ Code is `supabase/functions`. `verify_jwt` stays on for every function except `o
 | `send-inquiry` | `src/data/inquiries.ts` | Sends the inquiry mail and updates the inquiry row. |
 | `operator-bot` | A bot that holds `GRAHAM_OPERATOR_SECRET` and calls the function over HTTPS. No signed-in session. | Discover, inspect, and import. Inspect and import read one Shopify page per call and store the next page on the running `import_jobs` row, so the same body continues the feed. A finished read is reused for six hours, and each later import publishes one batch of two watches and returns `publish.pending`. While a page remains, `catalogue` is `partial` and `publish.pending` is the real queue, which is still empty. Fixture import on a local stack. Approve and unapprove through `bot_set_dealer_permission`. `enrich-icons` refreshes `dealers.logo_url` and does not import listings. It is a dry run unless `dryRun` is false. Reads one shop's listing counts and latest `import_jobs` row. Audit rows in `operator_actions` with `actor` `operator-bot`. |
 
-`npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops. A full run that exits 0 calls `purge_unclaimed_guest_events` (unclaimed guest rows older than 180 days), then `seal_catalogue_batch` with one run id per process, which records the watches on the deck created in the last 7 days and not yet in a batch. Then it calls `notify-drops`. A one-shop run (`npm run refresh -- <dealer-id>`) does not purge and does not seal. A shop that fails for any reason other than a plain gateway 503 fails the job after every approved shop has been attempted. A plain gateway 503 stays a warning. A failed purge, seal, or notify call fails the job. `npm run catalogue:audit` compares each approved shop's public feed with the catalogue and writes nothing. `npm run report:shop-mix` counts shops in the first 20 and first 50 cards of Buy and New. It only reads. The committed seed is one shop, so those two windows stay 1 there.
+`npm run refresh` is the daily Catalogue refresh (06:00 UTC, plus `workflow_dispatch`). It re-reads approved shops. A full run that exits 0 calls `purge_unclaimed_guest_events` (unclaimed guest rows older than 180 days), then `seal_catalogue_batch` with one run id per process, which records the watches on the deck created in the last 7 days and not yet in a batch. Then it calls `notify-drops`. A one-shop run (`npm run refresh -- <dealer-id>`) does not purge and does not seal. The loop attempts every approved shop. A plain gateway 503 on one shop stays a warning. `refreshExitCode` returns 1 when every attempted shop is not ok, including a night of only 503s, and when any other shop failure is in the results. A failed purge, seal, or notify call fails the job. `npm run catalogue:audit` compares each approved shop's public feed with the catalogue and writes nothing. `npm run report:shop-mix` counts shops in the first 20 and first 50 cards of Buy and New. It only reads. The committed seed is one shop, so those two windows stay 1 there.
 
 ## CI and deploys
 
 | Workflow | When | Jobs |
 | --- | --- | --- |
-| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, `test:rank`, generated types), `drops verification` (`npm run verify:drops`) |
+| `CI` (`.github/workflows/ci.yml`) | Push to `main`, and every pull request | `app` (`check:comments`, typecheck, web export, planner tests), `operator ui`, `edge functions` (`deno check` on all seven, then `deno test`), `database` (migrations, `test:rls`, `test:filters`, `test:rank`, generated types), `drops verification` (`npm run verify:drops`) |
 | `Catalogue refresh` | Cron `0 6 * * *`, and manual | `npm run refresh` against hosted |
 | `Deploy edge functions` | Push to `main` that touches `supabase/functions/**`, `supabase/config.toml`, `scripts/deploy-functions.mjs`, or the workflow file. Manual deploys every function. | Ships every function when any function source, a shared folder, config, the deploy script, or the workflow changes. A test-only change ships nothing. Does not apply migrations. |
 
@@ -130,6 +130,24 @@ GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_
 `npm run verify:drops` runs `.cursor/skills/verify-graham/control-graham.mjs`. One local stack, project id `graham-watch`, API `http://127.0.0.1:54321`, web `http://127.0.0.1:8091`. Read `.cursor/skills/verify-graham/SKILL.md` and `features/README.md` before driving a feature. The hosted project is out of bounds for that harness.
 
 `.cursor/skills/control-graham` is the demo Metro path (`EXPO_PUBLIC_DEMO=1`) for deck, search, and wishlist. Supabase proofs stay on `verify-graham`.
+
+## Comments and docs
+
+Do not add comments. Do not add markdown files. `AGENTS.md` is the only
+product doc you extend, and only with a fact that a route, table, function,
+or workflow change just made true. Delete the sentence that change made false.
+
+A comment is allowed only when the code cannot show the constraint: a
+platform limit, a rejected alternative that looks obvious, or an argument
+that is unused on purpose. One line. Name the constraint. Do not restate
+the next line, the history, or a doc.
+
+Allowed docs besides this file: `CLAUDE.md` (the one-line pointer),
+`assets/CREDITS.md`, `.cursor/rules/` invariants, and a principle skill.
+`studio/` is a vendored template. Do not treat its markdown as Graham.
+
+Setup, design essays, product specs, and per-shop scrape logs are not docs.
+If a rule is not in this file or in a cursor rule, it is not a rule.
 
 ## Rules that bite
 

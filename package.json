@@ -55,6 +55,7 @@
     "start:dev": "npm run check:env && expo start --dev-client",
     "postinstall": "node scripts/guard-unhandled-nav.mjs",
     "check:env": "node scripts/check-env.mjs",
+    "check:comments": "node scripts/check-comments.mjs",
     "env": "node scripts/env.mjs",
     "backend": "node scripts/env.mjs",
     "typecheck": "tsc --noEmit",

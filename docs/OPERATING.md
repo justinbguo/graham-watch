@@ -206,7 +206,7 @@ bug as broken when it is working.
 | --- | --- | --- |
 | `profiles.account_type` | Always `buyer` from onboarding. **Routing only — proves nothing.** | Onboarding, not a question |
 | `dealers.claimed_by` | This account controls this shop: reads hidden listings, edits them, sees inquiries, refreshes the catalogue | Proving a mailbox on the shop's domain |
-| `dealers.permission` | Whether this shop's watches reach buyers' decks | An operator, from the CLI only |
+| `dealers.permission` | Whether this shop's watches reach buyers' decks | An operator. `operator/src/Dealers.tsx` and `npm run dealers` both call `set_dealer_permission`. |
 
 `account_type` grants nothing on purpose. Onboarding no longer asks, and writes
 `buyer`. Every dealer power comes from `claimed_by`.
@@ -214,13 +214,14 @@ bug as broken when it is working.
 `permission` is unreachable from the app by RLS, so a shop can never publish its
 own inventory. That is why importing a shop does not make it visible.
 
-Finishing onboarding also requires `profiles.date_of_birth` of 18 or over and
-a `profiles.handle`. The birthday is an age gate, not a permission. The handle
-is the username from slide 2: lowercase, unique, 3–20 characters, starting
-with a letter. `claim_username` reserves it there. A trigger refuses
-`onboarded_at` without either.
+Desktop web finishes in `FirstRunSheet` with a name and favorite brands, an
+empty username, a null birthday, and notifications off. Phone still walks the
+question flow, including a username, a birthday of 18 or over, and the
+notification question. `profiles_onboarded_must_be_adult` refuses a birthday
+that is present and under 18. A null birthday and a null handle can finish.
+Clearing a handle that was already set is refused. `onboarded_at` is the gate.
 
-The final onboarding question calls `expo-notifications` for the OS permission.
+On the phone, the final onboarding question calls `expo-notifications` for the OS permission.
 On Android it creates the `watch-updates` channel before the request; without a
 channel Android 13 does not show its prompt. The result is stored in
 `profiles.notifications_enabled`. That column records the permission answer.
@@ -241,9 +242,10 @@ about that watch. A shop that has not claimed its account shows **Email the
 shop** instead of a composer, and that email is the inquiry. Writing is a
 separate deliberate act, never a side effect of saving.
 
-Search is the same catalogue as a list with filters. Both read `search_listings`,
-which only returns watches that are active, unsold, and belong to an approved
-shop. A watch missing from the deck is nearly always one of those three.
+Search is the same catalogue as a list with filters. Search calls
+`search_listings`. Buy calls `rank_buy_feed`. Both keep watches that are
+active, unsold, and on an approved shop. A watch missing from the deck is
+nearly always one of those three.
 
 ### The dealer path
 
@@ -559,13 +561,13 @@ approved*. A shop that is pending or revoked reads zero however much it holds.
 read fills and `Import` draws from. A shop can hold five hundred here and no
 listings at all; that is the normal state right after it is added.
 
-A gap between the first two is sold or deactivated stock — or the whole shop not
-being approved, which is what `Publish` changes. The deck also hides from you
-the watches you imported yourself, and anything you have already swiped, so
-that count cannot be read off one shop. Search does not hide your imports:
-that is where you check a shop you just published is findable. Adding a shop
-still only reads its catalogue. The watches reach Search once they are imported
-and the shop is approved.
+A gap between the first two is sold or deactivated stock, or the whole shop not
+being approved, which is what `Publish` changes. The deck hides a shop from the
+account that claimed it. Importing the rows does not hide them. A watch you
+have already swiped is off your deck, so that count cannot be read off one shop.
+Search does not hide your imports. That is where you check a shop you just
+published is findable. Adding a shop still only reads its catalogue. The watches
+reach Search once they are imported and the shop is approved.
 
 Under Catalogue, `N queued` is an import that stopped part way. The rows stay
 marked, so importing again drains exactly those. `N failed` are catalogue items
@@ -866,7 +868,7 @@ one-time code after `npm run mock:users -- --yes --gold-only`.
 | `bea@graham.test` | Bea Cole, `@bea` | The second buyer, for a buyer-to-buyer thread. | `npm run mock:users` |
 | `dealer@graham.test` | Dana Hart, `@desk` | Dealer. Owns Mock Desk and answers Ada in the app. | `npm run mock:users` |
 | `gold@graham.test` | Max Goldfinger, `@goldfinger` | Dealer. Owns **Goldfinger's Vintage** (claim via script). | `npm run mock:users` (local) or `npm run mock:users -- --yes --gold-only` (hosted) |
-| `seed-shop@graham.test` | none | Added Goldfinger's Vintage. Never sign in as it: the deck hides a shop's watches from whoever added it, so it shows an empty deck. | `npm run db:reset` |
+| `seed-shop@graham.test` | none | Added Goldfinger's Vintage. The deck hides a shop from the account that claimed it. This seed shop is unclaimed, so this account still sees the watches. | `npm run db:reset` |
 | `operator@graham.local` | none | Operator UI sign-in, password `graham-operator`. The terminal scripts import as this account. | `npm run dealers:local -- operator` |
 
 Sign in to the app as Ada, Bea, or Dana with **Log in with email**. The code
@@ -910,8 +912,8 @@ Working-as-designed, so do not debug these:
 | Demo mode: `Open in my mail app` opens a composer to `vintagevault.test` | `demoMailDraft` composes offline against the fixture shop. The address is not real; do not send it. |
 | A function returns `404 Function not found` locally, and the file is right there | The local stack reads the functions directory once, at `supabase start`, and keeps the list in an env var on the edge container. A function written since then is not served, and restarting the container does not help. `npm run db:stop && npm run db:start`. |
 | An anon REST request returns zero rows | Listings are invisible unauthenticated by policy. Says nothing about whether data exists; count with the service-role key. |
-| An imported shop's watches are not in any deck | `permission` is still `pending`. Needs `dealers -- approve`. |
-| A watch vanishes from the deck | Sold, deactivated, or its shop was revoked. `search_listings` filters all three. |
+| An imported shop's watches are not in any deck | `permission` is still `pending`. An operator approves it. `operator/src/Dealers.tsx` and `npm run dealers -- approve` both call `set_dealer_permission`. |
+| A watch vanishes from the deck | Sold, deactivated, or its shop was revoked. `rank_buy_feed` filters all three. |
 | No email arrives in a real inbox, locally | Everything goes to Mailpit by design. |
 | A dealer on `shop.com` cannot use `me@mail.shop.com` | The domain rule is the exact host with `www.` stripped, never a parent — otherwise anyone with a `squarespace.com` address could claim a Squarespace shop. |
 | Apple's own button is missing in Expo Go | The native module does not load there. The door on screen is ours, and it needs a Services ID before Apple answers. |
