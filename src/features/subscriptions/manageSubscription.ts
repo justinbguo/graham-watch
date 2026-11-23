@@ -1,5 +1,3 @@
-import Purchases from 'react-native-purchases';
-
 import { isRevenueCatEnabled } from '@/lib/revenuecat';
 
 import { subscriptionErrorMessage } from './errors';
@@ -13,6 +11,10 @@ export async function openSubscriptionManagement(): Promise<
   }
 
   try {
+    if (process.env.EXPO_OS === 'web') {
+      return { ok: false, message: 'Subscription management is only available in the mobile app.' };
+    }
+    const { default: Purchases } = await import('react-native-purchases');
     await Purchases.showManageSubscriptions();
     return { ok: true };
   } catch (error) {

@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { useGuest } from '@/features/auth/GuestProvider';
@@ -22,6 +23,7 @@ import {
 } from './deckPaging';
 import { bumpDeckTaste, deckTasteEpoch, staleTasteCursor, subscribeDeckTaste } from './deckTaste';
 import { keys } from './keys';
+import { LISTING_PHOTO_WIDTH, boundDealerPhoto } from './photoUrl';
 import { brandKey, emptySeed, emptyTaste, orderFeed, type RankSeed, type RankWatch } from './rank';
 
 export { DECK_LIMIT, showDeckEmpty };
@@ -34,9 +36,15 @@ export const DEALER_IDENTITY_COLUMNS =
 
 /** Our copy when we have one, the dealer's own file when a copy failed. */
 export function listingPhotoUrl(photo: Pick<ListingPhoto, 'storage_path' | 'source_url'>): string {
-  return photo.storage_path
-    ? supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path).data.publicUrl
-    : photo.source_url;
+  if (photo.storage_path) {
+    const url = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path, {
+      transform: { width: LISTING_PHOTO_WIDTH, quality: 75 },
+    }).data.publicUrl;
+    const parsed = new URL(url);
+    parsed.searchParams.set('format', 'webp');
+    return parsed.toString();
+  }
+  return boundDealerPhoto(photo.source_url);
 }
 
 function display(photo: ListingPhoto): DeckPhoto {
@@ -152,6 +160,16 @@ async function fetchDeckPage(
   }
 
   const rows = data ?? [];
+  const coverUrls = rows.flatMap((row) => {
+    if (!row.cover_storage_path && !row.cover_source_url) return [];
+    return [
+      listingPhotoUrl({
+        storage_path: row.cover_storage_path,
+        source_url: row.cover_source_url ?? '',
+      }),
+    ];
+  });
+  if (coverUrls.length > 0) void Image.prefetch(coverUrls, 'memory-disk');
   return {
     cards: await hydrate(rows.map((row) => row.listing)),
     // One bookmark for the page. Null means there is no next page.

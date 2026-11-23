@@ -225,6 +225,7 @@ const CARDS: DeckCard[] = FIXTURES.map((fixture, index) => {
     availability_checked_at: null,
     edited_fields: [],
     created_at: new Date(Date.now() - index * 86_400_000).toISOString(),
+    photo_count: 3,
     // Three, so the carousel has something to page through in demo mode.
     photos: [0, 1, 2].map((position) => {
       const url = `https://picsum.photos/seed/${encodeURIComponent(fixture.reference)}-${position}/900/1200`;

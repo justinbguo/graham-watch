@@ -57,7 +57,11 @@ type Functions = Omit<
   };
   rank_buy_feed: Omit<RankFeed, 'Args' | 'Returns'> & {
     Args: Omit<RankFeed['Args'], 'p_cursor'> & { p_cursor?: string | null };
-    Returns: (Omit<RankFeedRow, 'cursor'> & { cursor: string | null })[];
+    Returns: (Omit<RankFeedRow, 'cursor' | 'cover_storage_path' | 'cover_source_url'> & {
+      cursor: string | null;
+      cover_storage_path: string | null;
+      cover_source_url: string | null;
+    })[];
   };
   save_exchange_post: WithArgs<
     Fn['save_exchange_post'],

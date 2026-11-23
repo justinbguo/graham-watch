@@ -309,13 +309,14 @@ function spec() {
   };
 }
 
-function expectOrder(rows, { followedDealerIds, favoriteBrandKeys }) {
+function expectOrder(rows, { followedDealerIds, favoriteBrandKeys, events = [] }) {
   const now = Date.now();
+  const watches = rows.map((row) => watchOf(row.listing, row.photos));
   return orderFeed(
-    rows.map((row) => watchOf(row.listing, row.photos)),
+    watches,
     {
-      events: [],
-      watched: new Map(),
+      events,
+      watched: new Map(watches.map((watch) => [watch.id, watch])),
       followedDealerIds,
       seed,
       favoriteBrandKeys,
@@ -369,6 +370,57 @@ test('a buyer with taste, a follow, and a pass pages the same order, including a
   for (const hidden of [listings.patek, listings.sold, listings.pending, listings.ownShop, listings.rolex, listings.rolexSa, listings.late, listings.ownerRolex]) {
     assert.equal(ids.includes(hidden.id), false, hidden.model);
   }
+});
+
+test('the page names its cover, and a click then an undo then an unsave net to the brand weight', async () => {
+  const page = await api('/rest/v1/rpc/rank_buy_feed', {
+    token: anon,
+    method: 'POST',
+    body: { p_spec: spec(), p_limit: 5, p_cursor: null, p_seed: {} },
+  });
+  assert.equal(page.status, 200, JSON.stringify(page.body));
+  assert.ok(page.body.length > 0);
+  for (const row of page.body) {
+    assert.equal(row.cover_source_url, `https://example.test/rank-${stamp}-0.jpg`);
+    assert.equal(row.cover_storage_path, null);
+  }
+
+  const taster = await createUser(`taste-${stamp}@graham.test`);
+  const log = (kind) =>
+    api('/rest/v1/rpc/log_buyer_events', {
+      token: taster.token,
+      method: 'POST',
+      body: {
+        p_events: [
+          {
+            id: crypto.randomUUID(),
+            kind,
+            surface: 'detail',
+            occurred_at: new Date().toISOString(),
+            listing_id: listings.cartier.id,
+            dealer_id: listings.cartier.dealer_id,
+          },
+        ],
+      },
+    });
+  const taste = async () => {
+    const res = await api('/rest/v1/rpc/buyer_taste', { token: taster.token, method: 'POST', body: {} });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    return res.body.brand?.[listings.cartier.brand_key] ?? 0;
+  };
+
+  const clicked = await log('dealer_click');
+  assert.equal(clicked.status, 200, JSON.stringify(clicked.body));
+  assert.equal(await taste(), 300);
+  const undone = await log('undo');
+  assert.equal(undone.status, 200, JSON.stringify(undone.body));
+  assert.equal(await taste(), 0);
+  const saved = await log('save');
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(await taste(), 200);
+  const unsaved = await log('unsave');
+  assert.equal(unsaved.status, 200, JSON.stringify(unsaved.body));
+  assert.equal(await taste(), 0);
 });
 
 test('a buyer cannot read a Rolex or a watch made after 1985, and the shop owner still can', async () => {

@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 
 import { dealerSocialButtonStyles, dealerSocialHitSlop } from '@/features/dealers/socialButton';

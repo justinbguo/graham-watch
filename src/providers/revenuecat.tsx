@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, type PropsWithChildren } from 'react';
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import type { CustomerInfo } from 'react-native-purchases';
 
 import { cacheCustomerInfo } from '@/data/subscriptions';
 import { isRevenueCatEnabled, revenueCatApiKey } from '@/lib/revenuecat';
@@ -20,19 +20,32 @@ export function RevenueCatProvider({ children }: PropsWithChildren) {
     if (!isRevenueCatEnabled() || configured.current) return;
     configured.current = true;
 
-    Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
-    Purchases.configure({ apiKey: revenueCatApiKey() });
+    if (process.env.EXPO_OS === 'web') return;
+    void import('react-native-purchases').then(({ default: Purchases, LOG_LEVEL }) => {
+      Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
+      Purchases.configure({ apiKey: revenueCatApiKey() });
+    });
   }, []);
 
   useEffect(() => {
     if (!isRevenueCatEnabled()) return;
 
-    const listener = (info: Awaited<ReturnType<typeof Purchases.getCustomerInfo>>) => {
-      cacheCustomerInfo(queryClient, info);
-    };
-    Purchases.addCustomerInfoUpdateListener(listener);
+    if (process.env.EXPO_OS === 'web') return;
+    let remove = () => undefined;
+    let alive = true;
+    void import('react-native-purchases').then(({ default: Purchases }) => {
+      if (!alive) return;
+      const listener = (info: CustomerInfo) => {
+        cacheCustomerInfo(queryClient, info);
+      };
+      Purchases.addCustomerInfoUpdateListener(listener);
+      remove = () => {
+        Purchases.removeCustomerInfoUpdateListener(listener);
+      };
+    });
     return () => {
-      Purchases.removeCustomerInfoUpdateListener(listener);
+      alive = false;
+      remove();
     };
   }, [queryClient]);
 
@@ -42,7 +55,10 @@ export function RevenueCatProvider({ children }: PropsWithChildren) {
     if (!userId) {
       if (linkedUserId.current) {
         linkedUserId.current = null;
-        void Purchases.logOut().catch(() => undefined);
+        if (process.env.EXPO_OS === 'web') return;
+        void import('react-native-purchases')
+          .then(({ default: Purchases }) => Purchases.logOut())
+          .catch(() => undefined);
       }
       return;
     }
@@ -50,7 +66,9 @@ export function RevenueCatProvider({ children }: PropsWithChildren) {
     if (linkedUserId.current === userId) return;
 
     linkedUserId.current = userId;
-    void Purchases.logIn(userId)
+    if (process.env.EXPO_OS === 'web') return;
+    void import('react-native-purchases')
+      .then(({ default: Purchases }) => Purchases.logIn(userId))
       .then(({ customerInfo }) => {
         cacheCustomerInfo(queryClient, customerInfo);
       })

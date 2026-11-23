@@ -176,17 +176,19 @@ export function GridPhotoStrip({
         if (event.nativeEvent.actionName === 'increment') snapTo(page + 1);
         if (event.nativeEvent.actionName === 'decrement') snapTo(page - 1);
       }}>
-      <Animated.View style={stripStyle} pointerEvents="none">
-        {photos.map((photo) => (
-          <View key={photo.id} style={{ width, height }}>
-            <Image
-              source={{ uri: photo.url }}
-              style={styles.fill}
-              contentFit={contentFit}
-              accessible={false}
-            />
-          </View>
-        ))}
+      <Animated.View style={[stripStyle, { position: 'relative' }]} pointerEvents="none">
+        {photos.map((photo, index) =>
+          Math.abs(index - page) > 1 ? null : (
+            <View key={photo.id} style={{ position: 'absolute', left: index * width, width, height }}>
+              <Image
+                source={{ uri: photo.url }}
+                style={styles.fill}
+                contentFit={contentFit}
+                accessible={false}
+              />
+            </View>
+          ),
+        )}
       </Animated.View>
       <View pointerEvents="none" style={styles.bars}>
         {photos.map((photo, index) => (
