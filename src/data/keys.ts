@@ -6,10 +6,6 @@ import { countsCacheKey, deckCacheKey, facetsQueryKey, filterCacheToken } from '
  * caches it invalidates instead of guessing at a string.
  */
 export const keys = {
-  // The deck is cached per filter and taste. Changing either is a different
-  // deck, not a stale cursor. The second entry is the FilterSpec token —
-  // sorted, deduped, defaults omitted — so Rolex-then-Tudor and a blank query
-  // share a pile with Tudor-then-Rolex. Counts stay on that token alone.
   deck: (filters: unknown = null, taste = '') => deckCacheKey(filters, taste),
   search: (filters: unknown) => ['search', filterCacheToken(filters)] as const,
   // Two numbers about the same filter set the deck is keyed on, but a separate
