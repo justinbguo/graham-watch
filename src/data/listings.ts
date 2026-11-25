@@ -140,10 +140,6 @@ async function fetchDeckPage(
 ): Promise<DeckPage<DeckCard>> {
   if (isDemo) return demoDeckPage(filters, cursor, limit, seed);
 
-  // The deck hides watches already judged, and a shop this account has claimed.
-  // Importing a listing does not hide it. A guest has no account, so nothing
-  // is theirs to hide and `swipes` has no rows for them. The cursor is what
-  // moves a guest forward, the same way it moves a signed-in buyer.
   const { data, error } = await supabase.rpc('rank_buy_feed', {
     p_spec: canonicalize(filters).spec as Json,
     p_limit: limit,

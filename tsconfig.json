@@ -16,9 +16,6 @@
   // Each has its own build, which type checks it.
   "exclude": [
     "node_modules",
-    // Own tsconfig. The operator Vite build resolves the nearest config for
-    // this file, and the app config extends expo/tsconfig.base, which that
-    // install does not have.
     "shared",
     "supabase/functions",
     "operator",

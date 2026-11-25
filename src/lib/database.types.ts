@@ -2048,6 +2048,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      drop_candidate_listings: {
+        Args: { p_now: string }
+        Returns: {
+          created_at: string
+          dealer_id: string
+          id: string
+          sold_at: string
+          status: Database["public"]["Enums"]["listing_status"]
+        }[]
+      }
       drop_max_age: { Args: never; Returns: string }
       exchange_feed: {
         Args: never
