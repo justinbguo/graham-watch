@@ -33,6 +33,7 @@ Preconditions:
 
 - `screenshot /` signs in as the named user, then waits for the line `N watches available`. A web guest sees the sign-in sheet first, so the email door can already be visible.
 - Demo mode (`EXPO_PUBLIC_DEMO=1`) never hits this stack. Do not export the web build with that variable set.
-- A claimed shop is hidden from the dealer's own deck. Test Bench's watches stay visible to `buyer`.
+- A claimed shop is hidden from the dealer's own deck. Test Bench's watches stay visible to `buyer`. Importing a watch does not hide it.
+- A signed-in pass or save is a row in `swipes`, so a later fetch does not return that watch. A guest's pass is not stored, so a new session shows that watch again.
 - Opening a tile shows `View on dealer site` when that watch has a source URL. Pass and save on the wide grid still happen from card view, or from that listing.
 - `npm run report:shop-mix` prints how many shops are in the first 20 and the first 50 of Buy and New. It reads with the anon key and writes nothing. Point it at the local stack.
