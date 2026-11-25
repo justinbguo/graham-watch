@@ -34,23 +34,27 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 
 ## Features
 
-`$CG` is `node .cursor/skills/control-graham/bin/control-graham.mjs`. `$VG` is `node .cursor/skills/verify-graham/control-graham.mjs`. This list is the index. The recipe files stay in this directory.
+`$CG` is `node .cursor/skills/control-graham/bin/control-graham.mjs`. `$VG` is `node .cursor/skills/verify-graham/control-graham.mjs`. This list is the index. Local recipes are in this directory. Demo recipes are in `control-graham/features`.
 
-- Buy deck. `/`. Demo. `$CG press ArrowLeft`. Recipe: [browse-swipe.md](./browse-swipe.md).
-- Grid. Buy at 1280. Demo. `$CG snapshot`.
-- Filters. `Filters`, and `/filters/deck`. Demo for the sheet. `npm run test:filters` for `listing_matches`.
-- Search. `/search`. Demo. `$CG fill --name "Search brand, model or reference"`.
-- Listing. `/listing/[listingId]`. Demo.
-- Wishlist. `/saved`. Demo.
-- New. `/new`. Local. `$VG verify-new-badge`. Demo badge is a different batch. Recipe: [new.md](./new.md).
-- Guest sheet. Local, before sign-in. Demo does not show it.
+- Buy deck. `/`. Demo. `$CG press ArrowLeft`. Demo recipe: [deck-swipe.md](../../control-graham/features/deck-swipe.md). Local recipe: [browse-swipe.md](./browse-swipe.md).
+- Grid. Buy at 1280. Demo. `$CG snapshot`. Recipe: [deck-swipe.md](../../control-graham/features/deck-swipe.md).
+- Filters. `Filters`, and `/filters/deck`. Demo for the sheet. `npm run test:filters` for `listing_matches`. The sheet names are in [deck-swipe.md](../../control-graham/features/deck-swipe.md).
+- Search. `/search`. Demo. `$CG fill --name "Search brand, model or reference"`. Recipe: [search.md](../../control-graham/features/search.md).
+- Listing. `/listing/[listingId]`. Demo. Recipe: [listing-detail.md](../../control-graham/features/listing-detail.md).
+- Wishlist. `/saved`. Demo. Recipe: [wishlist.md](../../control-graham/features/wishlist.md).
+- New. `/new`. Local. `$VG verify-new-badge`. Demo badge is a different batch. Local recipe: [new.md](./new.md). Demo recipe: [new.md](../../control-graham/features/new.md).
+- Guest sheet. Local, before sign-in. Demo does not show it. Recipe: [guest-signin.md](../../control-graham/features/guest-signin.md).
+- Feedback. Buy and New. Demo. Do not send the message. Recipe: [feedback.md](../../control-graham/features/feedback.md).
 - Onboarding. Desktop sheet on Buy. Phone `/onboarding`. Local, new mailbox. `seed` accounts skip it. Recipe: [onboarding.md](./onboarding.md).
 - Profile. `/profile`. Local. Recipe: [profile.md](./profile.md).
 - Settings. `/settings`. Local.
+- Shop page. `/dealer/[dealerId]`. Local. Recipe: [dealer-shops.md](./dealer-shops.md).
+- Shop editor. Profile and the Deal tab. Local. Recipe: [dealer-shop.md](./dealer-shop.md).
 - Follow and Drops. `/dealer/[dealerId]`, `/drops`. Local. `npm run verify:drops`. Recipe: [drops.md](./drops.md).
 - Ranking. `rank_buy_feed` then `shop_mix`. Local. `$VG verify-rank` and `npm run test:rank`.
 - Shop mix report. `npm run report:shop-mix`. Reads only.
 - Operator. `npm run operator`. Local. `$VG verify-operator` hits `operator-bot` and does not open the Vite screen. Recipe: [operator.md](./operator.md).
+- Guests. Operator console. Local. The harness does not open the screen. Recipe: [guests.md](./guests.md).
 - Fixture import. `$VG import`. Local only. Hosted refuses `action: "fixture"`.
 - Import screen. `/import-inventory`. No command opens it.
 - Nightly refresh. `npm run refresh` against the local stack. One shop skips purge and seal.
