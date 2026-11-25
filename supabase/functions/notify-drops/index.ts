@@ -2,7 +2,6 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 import { chunk, dropPushMessages, EXPO_CHUNK, resolveExpoPushUrl, readTickets, ticketsFromExpoBody } from './expo.ts';
 import {
-  dropCutoff,
   reportDrops,
   utcDay,
   type DropFollow,
@@ -95,42 +94,26 @@ async function loadFollows(db: SupabaseClient): Promise<DropFollow[]> {
   });
 }
 
-async function loadListings(db: SupabaseClient, follows: DropFollow[], now: Date): Promise<DropListing[]> {
-  const approved = follows.filter((follow) => follow.permission === 'approved');
-  if (approved.length === 0) return [];
-  // Same instant dropCutoff uses. gte keeps a watch created exactly 14 days ago.
-  const earliest = new Date(dropCutoff(now)).toISOString();
-  const dealerIds = [...new Set(approved.map((follow) => follow.dealerId))];
-  const listings: DropListing[] = [];
-  for (const ids of chunksOf(dealerIds)) {
-    const rows = await eachPage<{
-      id: string;
-      dealer_id: string;
-      created_at: string;
-      status: string;
-      sold_at: string | null;
-    }>((from, to) =>
-      db
-        .from('listings')
-        .select('id, dealer_id, created_at, status, sold_at')
-        .in('dealer_id', ids)
-        .eq('status', 'active')
-        .is('sold_at', null)
-        .gte('created_at', earliest)
-        .order('id')
-        .range(from, to),
-    );
-    for (const row of rows) {
-      listings.push({
-        id: row.id,
-        dealerId: row.dealer_id,
-        createdAt: row.created_at,
-        status: row.status,
-        soldAt: row.sold_at,
-      });
-    }
-  }
-  return listings;
+async function loadListings(db: SupabaseClient, now: Date): Promise<DropListing[]> {
+  const rows = await eachPage<{
+    id: string;
+    dealer_id: string;
+    created_at: string;
+    status: string;
+    sold_at: string | null;
+  }>((from, to) =>
+    db
+      .rpc('drop_candidate_listings', { p_now: now.toISOString() })
+      .order('id')
+      .range(from, to),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    dealerId: row.dealer_id,
+    createdAt: row.created_at,
+    status: row.status,
+    soldAt: row.sold_at,
+  }));
 }
 
 async function loadNotices(db: SupabaseClient, userIds: string[]): Promise<DropNotice[]> {
@@ -258,7 +241,7 @@ Deno.serve(async (req) => {
     const follows = await loadFollows(db);
     const userIds = [...new Set(follows.map((follow) => follow.userId))];
     const [listings, notices, tokens, tokenAccounts] = await Promise.all([
-      loadListings(db, follows, now),
+      loadListings(db, now),
       loadNotices(db, userIds),
       loadTokens(db, userIds),
       loadTokenUserIds(db),

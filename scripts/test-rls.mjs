@@ -1197,12 +1197,23 @@ console.log('\ndealer contact and stats');
   });
   check('a buyer can still read a dealer name', visible.body?.length === 1);
 
-  const own = await api('/rest/v1/rpc/dealer_stats', {
+  const importerStats = await api('/rest/v1/rpc/dealer_stats', {
     token: importer.token,
     method: 'POST',
     body: { p_dealer_id: dealerId },
   });
-  check('an importer sees stats for their own dealer', own.status === 200, `got ${own.status}`);
+  check(
+    'an importer cannot read stats after someone else claims the shop',
+    importerStats.status >= 400,
+    `got ${importerStats.status}`,
+  );
+
+  const own = await api('/rest/v1/rpc/dealer_stats', {
+    token: dealerUser.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check('the claimer sees stats for their shop', own.status === 200, `got ${own.status}`);
   check(
     'stats count the swipe without naming who made it',
     own.body?.some((row) => row.saves === 1) && !JSON.stringify(own.body).includes(buyer.id)
@@ -2753,6 +2764,16 @@ console.log('\noperators');
     'an operator controls an unclaimed shop it did not add',
     unclaimedShop?.can_import === true
   );
+  const unclaimedStats = await api('/rest/v1/rpc/dealer_stats', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'an operator reads stats for an unclaimed shop it did not add',
+    unclaimedStats.status === 200,
+    `got ${unclaimedStats.status} ${JSON.stringify(unclaimedStats.body)?.slice(0, 160)}`,
+  );
   check(
     'an unclaimed shop is flagged neglected',
     unclaimedShop?.neglect_flags?.includes('unclaimed') === true,
@@ -2887,6 +2908,16 @@ console.log('\noperators');
   check(
     'an operator does not control a shop a dealer has claimed',
     (await setClaim(dealerUser.id))?.can_import === false
+  );
+  const claimedStats = await api('/rest/v1/rpc/dealer_stats', {
+    token: buyer.token,
+    method: 'POST',
+    body: { p_dealer_id: dealerId },
+  });
+  check(
+    'an operator cannot read stats after someone else claims the shop',
+    claimedStats.status >= 400,
+    `got ${claimedStats.status}`,
   );
 
   // The flag has to agree with what the write would really do. A screen that
@@ -4962,7 +4993,7 @@ console.log('\nbuyer events');
 
   const shopReport = async () => {
     const body = { p_dealer_id: dealerId };
-    const stats = await api('/rest/v1/rpc/dealer_stats', { token: importer.token, method: 'POST', body });
+    const stats = await api('/rest/v1/rpc/dealer_stats', { token: dealerUser.token, method: 'POST', body });
     const top = await api('/rest/v1/rpc/dealer_top_customers', { token: importer.token, method: 'POST', body });
     return { stats: stats.body, top: top.body };
   };
@@ -5533,6 +5564,307 @@ console.log('\nguest activity');
 
   await fetch(`${URL}/auth/v1/admin/users/${owner.id}`, { method: 'DELETE', headers: admin });
 }
+
+console.log('\nbuyer gate on skipped paths');
+await (async () => {
+  const P_NOW = '2026-11-23T18:00:00.000Z';
+  const DAY = 24 * 60 * 60 * 1000;
+  const at = (msBefore) => new Date(Date.parse(P_NOW) - msBefore).toISOString();
+  const serviceJson = {
+    apikey: SERVICE,
+    Authorization: `Bearer ${SERVICE}`,
+    'Content-Type': 'application/json',
+  };
+  const serviceHeaders = {
+    ...serviceJson,
+    Prefer: 'return=representation',
+  };
+  const createdUsers = [];
+  const createdShops = [];
+
+  const serviceRpc = async (body) => {
+    const response = await fetch(`${URL}/rest/v1/rpc/drop_candidate_listings`, {
+      method: 'POST',
+      headers: serviceJson,
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    return { status: response.status, body: text ? JSON.parse(text) : null };
+  };
+
+  const insertShop = async (row) => {
+    const response = await fetch(`${URL}/rest/v1/dealers?select=id`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify(row),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(`dealer ${response.status} ${JSON.stringify(body)}`);
+    createdShops.push(body[0].id);
+    return body[0];
+  };
+
+  const follow = async (userId, dealerId, createdAt) => {
+    const response = await fetch(`${URL}/rest/v1/dealer_follows`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({ user_id: userId, dealer_id: dealerId, created_at: createdAt }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`follow ${response.status} ${body}`);
+    }
+  };
+
+  const sees = async (token, id) => {
+    const read = await api(`/rest/v1/listings?id=eq.${id}&select=id`, { token });
+    return Array.isArray(read.body) && read.body.some((row) => row.id === id);
+  };
+
+  const statsFor = (token, dealerId) =>
+    api('/rest/v1/rpc/dealer_stats', {
+      token,
+      method: 'POST',
+      body: { p_dealer_id: dealerId },
+    });
+
+  try {
+    const gateClaimer = await createUser(`gate-claimer-${stamp}@example.com`);
+    const gateFormer = await createUser(`gate-former-${stamp}@example.com`);
+    const gateImporter = await createUser(`gate-importer-${stamp}@example.com`);
+    const gateOperator = await createUser(`gate-operator-${stamp}@example.com`);
+    const gateBuyer = await createUser(`gate-buyer-${stamp}@example.com`);
+    createdUsers.push(gateClaimer, gateFormer, gateImporter, gateOperator, gateBuyer);
+
+    const operatorRow = await fetch(`${URL}/rest/v1/operators`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: JSON.stringify({ user_id: gateOperator.id }),
+    });
+    if (!operatorRow.ok) {
+      const body = await operatorRow.text();
+      throw new Error(`operator ${operatorRow.status} ${body}`);
+    }
+
+    const deckShop = await insertShop({
+      name: `Gate Deck ${stamp}`,
+      website: `https://gate-deck-${stamp}.test`,
+      permission: 'approved',
+      claimed_by: gateClaimer.id,
+      created_by: gateFormer.id,
+    });
+    const pausedShop = await insertShop({
+      name: `Gate Paused ${stamp}`,
+      website: `https://gate-paused-${stamp}.test`,
+      permission: 'approved',
+      claimed_by: gateClaimer.id,
+      created_by: gateFormer.id,
+    });
+    const lateShop = await insertShop({
+      name: `Gate Late ${stamp}`,
+      website: `https://gate-late-${stamp}.test`,
+      permission: 'approved',
+      created_by: gateFormer.id,
+    });
+
+    const watch = async (shopId, extra = {}, photos = 3) => {
+      const response = await fetch(`${URL}/rest/v1/listings?select=id`, {
+        method: 'POST',
+        headers: serviceHeaders,
+        body: JSON.stringify({
+          dealer_id: shopId,
+          imported_by: gateImporter.id,
+          brand: 'Omega',
+          model: 'Seamaster',
+          year: 1970,
+          created_at: at(DAY),
+          ...extra,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(`listing ${response.status} ${JSON.stringify(body)}`);
+      const id = body?.[0]?.id;
+      if (!id) throw new Error(`listing missing id ${JSON.stringify(body)}`);
+      const photosStatus = await attachGallery(id, photos);
+      if (photosStatus < 200 || photosStatus >= 300) {
+        throw new Error(`photos ${photosStatus} for ${id}`);
+      }
+      return id;
+    };
+
+    const good = await watch(deckShop.id);
+    const exact = await watch(deckShop.id, { created_at: at(14 * DAY) });
+    const year1985 = await watch(deckShop.id, { year: 1985 });
+    const nullYear = await watch(deckShop.id, { year: null });
+    const rolex = await watch(deckShop.id, { brand: 'Rolex', year: 1960, imported_by: gateFormer.id });
+    const rolexOther = await watch(deckShop.id, { brand: 'Rolex', year: 1960 });
+    const year1990 = await watch(deckShop.id, { year: 1990 });
+    const thin = await watch(deckShop.id, {}, 1);
+    const hidden = await watch(deckShop.id, { status: 'hidden' });
+    const sold = await watch(deckShop.id, { sold_at: P_NOW });
+    const pausedWatch = await watch(pausedShop.id);
+    const stale = await watch(deckShop.id, { created_at: at(15 * DAY) });
+    const beforeFollow = await watch(lateShop.id, { created_at: at(2 * DAY) });
+    const atFollow = await watch(lateShop.id, { created_at: at(60 * 60 * 1000) });
+
+    const oldFollow = at(30 * DAY);
+    const lateFollow = at(60 * 60 * 1000);
+    for (const userId of [gateBuyer.id, gateClaimer.id]) {
+      await follow(userId, deckShop.id, oldFollow);
+      await follow(userId, pausedShop.id, oldFollow);
+    }
+    await follow(gateBuyer.id, lateShop.id, lateFollow);
+
+    const paused = await fetch(`${URL}/rest/v1/dealers?id=eq.${pausedShop.id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ permission: 'paused' }),
+    });
+    if (!paused.ok) throw new Error(`pause ${paused.status}`);
+
+    check('the buyer-gate fixture seeded', true);
+
+    const candidates = await serviceRpc({ p_now: P_NOW });
+    const got = new Set((Array.isArray(candidates.body) ? candidates.body : []).map((row) => row.id));
+    const present = { good, exact, year1985, nullYear, beforeFollow, atFollow };
+    const absent = { rolex, rolexOther, year1990, thin, hidden, sold, pausedWatch, stale };
+    const missing = Object.entries(present).filter(([, id]) => !got.has(id)).map(([name]) => name);
+    const leaked = Object.entries(absent).filter(([, id]) => got.has(id)).map(([name]) => name);
+    check(
+      'drop candidates include the on-deck window',
+      candidates.status < 300 && missing.length === 0,
+      `status ${candidates.status} missing ${missing.join(', ')} ${JSON.stringify(candidates.body)?.slice(0, 180)}`,
+    );
+    check(
+      'drop candidates omit watches the deck would hide',
+      leaked.length === 0,
+      `present ${leaked.join(', ')}`,
+    );
+
+    const refused = (result) =>
+      result.status >= 400 && !(Array.isArray(result.body) && result.body.some((row) => row.id === good));
+    const anonCall = await api('/rest/v1/rpc/drop_candidate_listings', {
+      method: 'POST',
+      body: { p_now: P_NOW },
+    });
+    const buyerCall = await api('/rest/v1/rpc/drop_candidate_listings', {
+      token: gateBuyer.token,
+      method: 'POST',
+      body: { p_now: P_NOW },
+    });
+    check(
+      'anon cannot read drop candidates',
+      refused(anonCall),
+      `status ${anonCall.status} ${JSON.stringify(anonCall.body)?.slice(0, 160)}`,
+    );
+    check(
+      'a buyer cannot read drop candidates',
+      refused(buyerCall),
+      `status ${buyerCall.status} ${JSON.stringify(buyerCall.body)?.slice(0, 160)}`,
+    );
+    const missingNow = await serviceRpc({ p_now: null });
+    check('drop candidates refuse a null clock', missingNow.status >= 400, `got ${missingNow.status}`);
+
+    const claimerReads = {
+      rolex: await sees(gateClaimer.token, rolex),
+      year1990: await sees(gateClaimer.token, year1990),
+      thin: await sees(gateClaimer.token, thin),
+      hidden: await sees(gateClaimer.token, hidden),
+      pausedWatch: await sees(gateClaimer.token, pausedWatch),
+    };
+    check(
+      'the claimer reads watches the deck hides',
+      Object.values(claimerReads).every(Boolean),
+      JSON.stringify(claimerReads),
+    );
+
+    const operatorSeesRolex = await sees(gateOperator.token, rolex);
+    const operatorSeesPaused = await sees(gateOperator.token, pausedWatch);
+    check('an operator reads a Rolex on an approved shop', operatorSeesRolex);
+    check('an operator does not read a paused shop from listings', !operatorSeesPaused);
+
+    const pausedList = await api('/rest/v1/rpc/operator_listings', {
+      token: gateOperator.token,
+      method: 'POST',
+      body: { p_dealer_id: pausedShop.id },
+    });
+    check(
+      'operator_listings includes a paused shop watch',
+      Array.isArray(pausedList.body) && pausedList.body.some((row) => row.id === pausedWatch),
+      `${pausedList.status} ${JSON.stringify(pausedList.body)?.slice(0, 180)}`,
+    );
+
+    const formerReads = {
+      rolexOther: await sees(gateFormer.token, rolexOther),
+      year1990: await sees(gateFormer.token, year1990),
+      pausedWatch: await sees(gateFormer.token, pausedWatch),
+      rolex: await sees(gateFormer.token, rolex),
+      thin: await sees(gateFormer.token, thin),
+      hidden: await sees(gateFormer.token, hidden),
+    };
+    check(
+      'the original creator loses rows they did not import',
+      !formerReads.rolexOther && !formerReads.year1990 && !formerReads.pausedWatch,
+      JSON.stringify(formerReads),
+    );
+    check('the original creator still reads a watch they imported', formerReads.rolex, JSON.stringify(formerReads));
+    check(
+      'the original creator still reads an on-deck thin and hidden watch',
+      formerReads.thin && formerReads.hidden,
+      JSON.stringify(formerReads),
+    );
+
+    const buyerSeesGood = await sees(gateBuyer.token, good);
+    const buyerSeesRolex = await sees(gateBuyer.token, rolex);
+    const buyerSees1990 = await sees(gateBuyer.token, year1990);
+    check('a buyer reads an on-deck watch', buyerSeesGood);
+    check(
+      'a buyer does not read a Rolex or a post-1985 watch',
+      !buyerSeesRolex && !buyerSees1990,
+      JSON.stringify({ buyerSeesRolex, buyerSees1990 }),
+    );
+
+    const operatorUnclaimed = await statsFor(gateOperator.token, lateShop.id);
+    check(
+      'an operator reads stats for an unclaimed shop they did not add',
+      operatorUnclaimed.status === 200,
+      `got ${operatorUnclaimed.status}`,
+    );
+
+    const claimed = await fetch(`${URL}/rest/v1/dealers?id=eq.${lateShop.id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: JSON.stringify({ claimed_by: gateClaimer.id }),
+    });
+    const operatorClaimed = claimed.ok ? await statsFor(gateOperator.token, lateShop.id) : { status: 0 };
+    const formerClaimed = claimed.ok ? await statsFor(gateFormer.token, lateShop.id) : { status: 0 };
+    const claimerClaimed = claimed.ok ? await statsFor(gateClaimer.token, lateShop.id) : { status: 0 };
+    check(
+      'a claim ends stats for the operator and the original creator',
+      claimed.ok &&
+        operatorClaimed.status >= 400 &&
+        formerClaimed.status >= 400 &&
+        claimerClaimed.status === 200,
+      `claim ${claimed.status} operator ${operatorClaimed.status} former ${formerClaimed.status} claimer ${claimerClaimed.status}`,
+    );
+  } catch (error) {
+    check(
+      'the buyer-gate fixture seeded',
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
+  } finally {
+    const admin = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+    for (const id of createdShops) {
+      await fetch(`${URL}/rest/v1/dealers?id=eq.${id}`, { method: 'DELETE', headers: admin });
+    }
+    for (const user of createdUsers) {
+      if (user?.id) {
+        await fetch(`${URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: admin });
+      }
+    }
+  }
+})();
 
 await cleanUp();
 
