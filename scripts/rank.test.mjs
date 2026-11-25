@@ -304,21 +304,28 @@ function definition(name) {
 }
 
 test('the database functions use these weights and seats', () => {
-  for (const name of ['buyer_taste', 'rank_weights']) {
-    const sql = definition(name);
-    assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.click}`));
-    assert.match(sql, new RegExp(`when 'save' then ${RANK.save}`));
-    assert.match(sql, new RegExp(`when 'pass' then ${RANK.pass}`));
-    assert.match(sql, new RegExp(`when 'dealer_click' then ${RANK.clickFacet}`));
-    assert.match(sql, new RegExp(`when 'save' then ${RANK.saveFacet}`));
-    assert.match(sql, new RegExp(`when 'pass' then ${RANK.passFacet}`));
-    assert.match(sql, /rank_bump\(weights, 'style', sty, facet\)/);
-    assert.match(sql, /rank_bump\(weights, 'band', band, facet\)/);
-    assert.match(sql, new RegExp(`${RANK.brandPick}`));
-    assert.match(sql, new RegExp(`${RANK.stylePick}`));
-    assert.match(sql, new RegExp(`${RANK.bandPick}`));
-    assert.match(sql, /ev.kind = 'undo'/);
-  }
+  const taste = definition('buyer_taste');
+  assert.match(taste, new RegExp(`when 'dealer_click' then ${RANK.click}`));
+  assert.match(taste, new RegExp(`when 'save' then ${RANK.save}`));
+  assert.match(taste, new RegExp(`when 'pass' then ${RANK.pass}`));
+  assert.match(taste, new RegExp(`when 'dealer_click' then ${RANK.clickFacet}`));
+  assert.match(taste, new RegExp(`when 'save' then ${RANK.saveFacet}`));
+  assert.match(taste, new RegExp(`when 'pass' then ${RANK.passFacet}`));
+  assert.match(taste, /public\.net_taste_actions\(/);
+  assert.match(taste, /join public\.listings l on l\.id = s\.listing_id/);
+
+  const net = definition('net_taste_actions');
+  assert.match(net, /kind = 'undo'/);
+  assert.match(net, /kind = 'unsave'/);
+  assert.match(net, /stack\[index\] = 'save'/);
+
+  const weights = definition('rank_weights');
+  assert.match(weights, /public\.buyer_taste\(\)/);
+  assert.match(weights, new RegExp(`${RANK.brandPick}`));
+  assert.match(weights, new RegExp(`${RANK.stylePick}`));
+  assert.match(weights, new RegExp(`${RANK.bandPick}`));
+  assert.match(weights, /rank_bump\(weights, 'style', item,/);
+  assert.match(weights, /rank_bump\(weights, 'band', band,/);
 
   const feedSql = definition('rank_buy_feed');
   assert.match(feedSql, new RegExp(`then ${RANK.follow}`));
@@ -331,6 +338,11 @@ test('the database functions use these weights and seats', () => {
   assert.match(feedSql, /interval '30 days'/);
   assert.match(feedSql, /interval '90 days'/);
   assert.match(feedSql, /from public\.shop_mix\(/);
+  assert.match(feedSql, /l\.photo_count as photos/);
+  assert.match(feedSql, /public\.listing_matches\(l, args\.spec\)/);
+  assert.match(feedSql, /public\.rank_open_cursor\(p_cursor, coalesce\(p_seed, '\{\}'::jsonb\)\)/);
+  assert.match(feedSql, /\(select w\.taste from weights w\)/);
+  assert.doesNotMatch(feedSql, /group by p\.listing_id/);
 
   const mixSql = definition('shop_mix');
   assert.match(mixSql, /coalesce\(nullif\(i\.brand_key, ''\), i\.id::text\) as brand/);
@@ -345,7 +357,7 @@ test('the database functions use these weights and seats', () => {
 
 test('buyer_taste still scores only the signed-in account', () => {
   const sql = definition('buyer_taste');
-  assert.match(sql, /e\.user_id = uid/);
+  assert.match(sql, /e\.user_id = caller\.uid/);
   assert.doesNotMatch(sql, /or e\.user_id is null/);
 });
 

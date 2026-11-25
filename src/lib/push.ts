@@ -1,5 +1,4 @@
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { isDemo } from './demo';
@@ -9,20 +8,33 @@ import { supabase } from './supabase';
 /** Matches the channel created for Android 13 and the `channelId` on each push. */
 export const PUSH_CHANNEL_ID = 'watch-updates';
 
-const allowed = (settings: Notifications.NotificationPermissionsStatus) =>
-  settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+type NotificationsModule = typeof import('expo-notifications');
+type PushResponse = {
+  notification: { request: { content: { data?: unknown } } };
+} | null;
 
-if (Platform.OS !== 'web') {
+const allowed = (
+  Notifications: NotificationsModule,
+  settings: Awaited<ReturnType<NotificationsModule['getPermissionsAsync']>>,
+) => settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+
+if (process.env.EXPO_OS !== 'web') {
   // Without a handler, a reply that arrives while Graham is open is swallowed
   // on iOS. The banner is the system one; we do not draw our own.
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+  void import('expo-notifications').then((Notifications) => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
   });
+}
+
+async function notifications(): Promise<NotificationsModule> {
+  return import('expo-notifications');
 }
 
 function projectId(): string | null {
@@ -33,6 +45,7 @@ function projectId(): string | null {
 /** Android 13 will not prompt, and will not show a push, until a channel exists. */
 export async function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  const Notifications = await notifications();
   await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
     name: 'Watch updates',
     description: 'New watches from dealers you follow, and replies.',
@@ -45,6 +58,7 @@ let currentToken: string | null = null;
 async function readToken(): Promise<string | null> {
   const id = projectId();
   if (!id) return null;
+  const Notifications = await notifications();
   const token = await Notifications.getExpoPushTokenAsync({ projectId: id });
   return token.data || null;
 }
@@ -60,8 +74,9 @@ export async function syncPushRegistration(): Promise<void> {
   if (!data.session) return;
 
   await ensureAndroidChannel();
+  const Notifications = await notifications();
   const settings = await Notifications.getPermissionsAsync();
-  if (!allowed(settings)) return;
+  if (!allowed(Notifications, settings)) return;
 
   const token = await readToken();
   if (!token) return;
@@ -81,8 +96,9 @@ export async function releasePushToken(): Promise<void> {
 
   let token = currentToken;
   if (!token) {
+    const Notifications = await notifications();
     const settings = await Notifications.getPermissionsAsync();
-    if (!allowed(settings)) return;
+    if (!allowed(Notifications, settings)) return;
     token = await readToken();
   }
   if (!token) return;
@@ -92,15 +108,11 @@ export async function releasePushToken(): Promise<void> {
   if (error) throw error;
 }
 
-export function routeFromNotification(
-  response: Notifications.NotificationResponse | null,
-): PushRoute | null {
+export function routeFromNotification(response: PushResponse): PushRoute | null {
   return routeFromPushData(response?.notification.request.content.data);
 }
 
-export function conversationIdFromNotification(
-  response: Notifications.NotificationResponse | null,
-): string | null {
+export function conversationIdFromNotification(response: PushResponse): string | null {
   const route = routeFromNotification(response);
   return route?.type === 'conversation' ? route.conversationId : null;
 }

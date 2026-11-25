@@ -8,7 +8,7 @@ import {
 } from 'expo-router';
 import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo } from 'react';
+import { type ComponentType, type PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -16,7 +16,6 @@ import { useIsDesktopWeb } from '@/lib/layout';
 import { useOnboardingGate } from '@/data/profile';
 import { GuestProvider } from '@/features/auth/GuestProvider';
 import { FilterProvider } from '@/features/filters/provider';
-import { PushBridge } from '@/features/notifications/PushBridge';
 import { Telemetry } from '@/features/telemetry/Telemetry';
 import { haasFonts } from '@/lib/fonts';
 import { installErrorReporter } from '@/lib/report';
@@ -26,11 +25,33 @@ import { bindVisibleViewport } from '@/lib/visibleViewport';
 installErrorReporter();
 if (Platform.OS === 'web') bindVisibleViewport();
 import { QueryProvider } from '@/providers/query';
-import { RevenueCatProvider } from '@/providers/revenuecat';
 import { SessionProvider, useSession } from '@/providers/session';
 import { ThemeProvider, useTheme } from '@/providers/theme';
 
 SplashScreen.preventAutoHideAsync();
+
+function NativeBridges({ children }: PropsWithChildren) {
+  const [Bridge, setBridge] = useState<ComponentType | null>(null);
+
+  useEffect(() => {
+    if (process.env.EXPO_OS === 'web') return;
+    let alive = true;
+    void import('@/providers/nativeBridges').then((mod) => {
+      if (alive) setBridge(() => mod.NativeBridges);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (process.env.EXPO_OS === 'web' || !Bridge) return children;
+  return (
+    <>
+      {children}
+      <Bridge />
+    </>
+  );
+}
 
 // Catches what the per-screen boundaries cannot: a provider failing before any
 // screen exists. Without it that case is a white screen with no way out.
@@ -49,16 +70,15 @@ export default function RootLayout() {
       <ThemeProvider>
         <QueryProvider>
           <SessionProvider>
-            <RevenueCatProvider>
+            <NativeBridges>
               <GuestProvider>
                 <FilterProvider>
                   <SplashScreenController />
                   <Telemetry />
-                  <PushBridge />
                   <Chrome />
                 </FilterProvider>
               </GuestProvider>
-            </RevenueCatProvider>
+            </NativeBridges>
           </SessionProvider>
         </QueryProvider>
       </ThemeProvider>

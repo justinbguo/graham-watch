@@ -1,14 +1,6 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { ensureAndroidChannel, syncPushRegistration } from '@/lib/push';
-
-function isAllowed(settings: Notifications.NotificationPermissionsStatus): boolean {
-  return (
-    settings.granted ||
-    settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-  );
-}
 
 /**
  * Requests the operating-system permission shown on the final onboarding step.
@@ -18,7 +10,12 @@ function isAllowed(settings: Notifications.NotificationPermissionsStatus): boole
  * mobile app is the notification surface until browser push is built.
  */
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  if (process.env.EXPO_OS === 'web' || Platform.OS === 'web') return false;
+
+  const Notifications = await import('expo-notifications');
+  const isAllowed = (settings: Awaited<ReturnType<typeof Notifications.getPermissionsAsync>>) =>
+    settings.granted ||
+    settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 
   await ensureAndroidChannel();
 

@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Purchases, { type CustomerInfo, type PurchasesPackage } from 'react-native-purchases';
+import type { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 
 import { grahamProEntitlement, hasGrahamPro } from '@/features/subscriptions/entitlement';
-import { subscriptionErrorMessage } from '@/features/subscriptions/errors';
 import { isRevenueCatEnabled } from '@/lib/revenuecat';
 
 import { keys } from './keys';
@@ -25,7 +24,16 @@ function statusFromCustomerInfo(info: CustomerInfo): GrahamProStatus {
   };
 }
 
+async function nativePurchases() {
+  if (process.env.EXPO_OS === 'web') {
+    throw new Error('RevenueCat runs in the iOS and Android app.');
+  }
+  const { default: Purchases } = await import('react-native-purchases');
+  return Purchases;
+}
+
 async function loadCustomerInfo(): Promise<CustomerInfo> {
+  const Purchases = await nativePurchases();
   return Purchases.getCustomerInfo();
 }
 
@@ -46,7 +54,7 @@ export function useOfferings() {
 
   return useQuery({
     queryKey: keys.offerings(),
-    queryFn: () => Purchases.getOfferings(),
+    queryFn: async () => (await nativePurchases()).getOfferings(),
     enabled,
     staleTime: 300_000,
   });
@@ -70,7 +78,7 @@ export function useRestorePurchases() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => Purchases.restorePurchases(),
+    mutationFn: async () => (await nativePurchases()).restorePurchases(),
     onSuccess: (customerInfo) => {
       queryClient.setQueryData(keys.customerInfo(), customerInfo);
       queryClient.setQueryData(keys.subscription(), statusFromCustomerInfo(customerInfo));
@@ -83,6 +91,7 @@ export function usePurchasePackage() {
 
   return useMutation({
     mutationFn: async (pkg: PurchasesPackage) => {
+      const Purchases = await nativePurchases();
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       return customerInfo;
     },

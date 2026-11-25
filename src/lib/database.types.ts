@@ -1249,6 +1249,7 @@ export type Database = {
           import_job_id: string | null
           imported_by: string | null
           model: string | null
+          photo_count: number
           price_cents: number | null
           reference: string | null
           sold_at: string | null
@@ -1281,6 +1282,7 @@ export type Database = {
           import_job_id?: string | null
           imported_by?: string | null
           model?: string | null
+          photo_count?: number
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
@@ -1313,6 +1315,7 @@ export type Database = {
           import_job_id?: string | null
           imported_by?: string | null
           model?: string | null
+          photo_count?: number
           price_cents?: number | null
           reference?: string | null
           sold_at?: string | null
@@ -2158,6 +2161,7 @@ export type Database = {
           import_job_id: string | null
           imported_by: string | null
           model: string | null
+          photo_count: number
           price_cents: number | null
           reference: string | null
           sold_at: string | null
@@ -2326,6 +2330,7 @@ export type Database = {
           website: string
         }[]
       }
+      net_taste_actions: { Args: { kinds: string[] }; Returns: string[] }
       operator_account: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: Json
@@ -2620,6 +2625,8 @@ export type Database = {
           p_spec?: Json
         }
         Returns: {
+          cover_source_url: string
+          cover_storage_path: string
           cursor: string
           listing: Database["public"]["Tables"]["listings"]["Row"]
         }[]
@@ -2778,6 +2785,7 @@ export type Database = {
           import_job_id: string | null
           imported_by: string | null
           model: string | null
+          photo_count: number
           price_cents: number | null
           reference: string | null
           sold_at: string | null
