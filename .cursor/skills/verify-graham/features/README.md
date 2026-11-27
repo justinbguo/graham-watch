@@ -57,7 +57,7 @@ Each feature file starts with an H1 and one paragraph a buyer or dealer would re
 - Guests. Operator console. Local. The harness does not open the screen. Recipe: [guests.md](./guests.md).
 - Fixture import. `$VG import`. Local only. Hosted refuses `action: "fixture"`.
 - Import screen. `/import-inventory`. No command opens it.
-- Nightly refresh. `npm run refresh` against the local stack. One shop skips purge and seal.
+- Nightly refresh. `npm run refresh` against the local stack. One shop skips purge and seal. A finished catalogue read writes held and stale `source_items` 100 ids at a time and calls `sync_source_availability` with at most 2000 seen ids. Past that, each slice passes `p_read_complete` false and one last call passes the first id with `p_read_complete` true, so missing watches retire by the shared `last_seen_at` stamp. `npm run test:refresh-chunk` proves the unchunked update is canceled. It needs the local database container and rolls back. The fixture `import` is one watch and does not exercise this.
 - Catalogue audit. `npm run catalogue:audit`. Writes nothing.
 - Claim. `/apply` and `claim-dealer`. No command sends the code.
 - Community and Messages. `/community`, `/messages`. Local. Pause banner is expected.

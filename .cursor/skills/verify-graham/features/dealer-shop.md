@@ -29,3 +29,4 @@ Preconditions:
 - Approving the shop is the operator console, not a control on this page.
 - Profile does not show `Do you run a shop listed here?`. `Claim this shop` shows when the signed-in email is the address published on the shop. `/apply` still starts a claim.
 - The Messages section of Deal shows `Not in scope right now, but you're free to test.` The banner is not a control. Listings, Analytics, Payments, and Support do not show it.
+- `Refresh from site` uses the same catalogue write as the nightly refresh. Held rows and stale rows update 100 ids at a time, and availability is at most 2000 ids per call. The fixture `import` is one watch and does not split that call. A green fixture import is not proof that a large shop finishes inside `statement_timeout`. The local proof is `npm run test:refresh-chunk`. It rolls back.
