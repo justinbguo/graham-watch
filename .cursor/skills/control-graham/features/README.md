@@ -25,4 +25,12 @@ Demo launch and driving rules for the buyer app. The feature index is the [verif
 
 ## Features
 
-The feature index is the [verify-graham map](../../verify-graham/features/README.md). Read that list, then the recipe file for the row you are proving.
+The feature index is the [verify-graham map](../../verify-graham/features/README.md). Read that list, then the recipe file for the row you are proving. Demo recipes in this directory:
+
+- [deck-swipe.md](./deck-swipe.md)
+- [feedback.md](./feedback.md)
+- [guest-signin.md](./guest-signin.md)
+- [listing-detail.md](./listing-detail.md)
+- [new.md](./new.md)
+- [search.md](./search.md)
+- [wishlist.md](./wishlist.md)

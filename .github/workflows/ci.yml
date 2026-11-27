@@ -200,6 +200,9 @@ jobs:
       - name: rank feed
         run: npm run test:rank
 
+      - name: refresh chunk
+        run: npm run test:refresh-chunk
+
       - name: generated types match the schema
         run: |
           npm run db:types
