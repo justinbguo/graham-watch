@@ -21,8 +21,12 @@ type Row = {
 
 function memory() {
   const rows: Row[] = [];
+  const writes: number[] = [];
+  const availability: Array<{ count: number; complete: boolean }> = [];
   return {
     rows,
+    writes,
+    availability,
     from(table: string) {
       if (table !== 'source_items') throw new Error(table);
       const filters: Array<(row: Row) => boolean> = [];
@@ -47,6 +51,19 @@ function memory() {
           if (operator === 'is' && value === null) {
             filters.push((row) => row[column] != null);
           }
+          return chain;
+        },
+        in(column: keyof Row, values: unknown[]) {
+          const allowed = new Set(values);
+          filters.push((row) => allowed.has(row[column]));
+          return chain;
+        },
+        or(expression: string) {
+          const checks = expression.split(',').map((part) => {
+            const [column, op, raw] = part.split('.');
+            return (row: Row) => op === 'eq' && String(row[column as keyof Row]) === raw;
+          });
+          filters.push((row) => checks.some((check) => check(row)));
           return chain;
         },
         order() {
@@ -76,9 +93,9 @@ function memory() {
         then(resolve: (value: { error: null }) => void, reject?: (reason: unknown) => void) {
           try {
             if (patch) {
-              for (const row of rows) {
-                if (filters.every((keep) => keep(row))) Object.assign(row, patch);
-              }
+              const matched = rows.filter((row) => filters.every((keep) => keep(row)));
+              writes.push(matched.length);
+              for (const row of matched) Object.assign(row, patch);
             }
             resolve({ error: null });
           } catch (error) {
@@ -88,9 +105,13 @@ function memory() {
       };
       return chain;
     },
-    rpc(name: string) {
+    rpc(name: string, args?: { p_seen_ids?: string[]; p_read_complete?: boolean }) {
       if (name === 'adopt_existing_listings') return Promise.resolve({ data: 0, error: null });
       if (name === 'sync_source_availability') {
+        availability.push({
+          count: args?.p_seen_ids?.length ?? 0,
+          complete: args?.p_read_complete === true,
+        });
         return Promise.resolve({ data: { retired: 0, relisted: 0 }, error: null });
       }
       return Promise.resolve({ data: null, error: { message: name } });
@@ -216,4 +237,52 @@ Deno.test('an 800-watch feed finishes a page at a time and a retry adds nothing'
   assertEquals(replayed, 0);
   assertEquals(db.rows.length, total);
   assertEquals(db.rows.every((row) => row.available), true);
+});
+
+Deno.test('a shop under the availability chunk still retires in one call', async () => {
+  const db = memory();
+  await syncPage(db, [[watch(1), watch(2), watch(3)]], 1, 10);
+  assertEquals(db.availability, [{ count: 3, complete: true }]);
+});
+
+Deno.test('queued holds are unpublished in bounded writes and a rerun writes none', async () => {
+  const total = 250;
+  const pages = [Array.from({ length: total }, (_, index) => watch(index + 1, { product_type: 'Straps' }))];
+  const db = memory();
+  await syncPage(db, pages, 1, total);
+  assertEquals(db.rows.length, total);
+  assertEquals(db.rows.every((row) => row.hold_reason != null), true);
+  for (const row of db.rows) row.publish = true;
+  db.writes.length = 0;
+
+  await syncPage(db, pages, 1, total);
+  assertEquals(db.rows.every((row) => row.publish === false), true);
+  assertEquals(db.writes.length > 1, true);
+  assertEquals(db.writes.every((count) => count > 0 && count <= 100), true);
+  assertEquals(db.writes.reduce((sum, count) => sum + count, 0), total);
+
+  db.writes.length = 0;
+  await syncPage(db, pages, 1, total);
+  assertEquals(db.writes, []);
+  assertEquals(db.rows.every((row) => row.publish === false), true);
+});
+
+Deno.test('a catalogue larger than one availability call still marks the read complete once', async () => {
+  const pageSize = 250;
+  const total = 2001;
+  const pages: Json[][] = [];
+  for (let id = 1; id <= total; id += pageSize) {
+    pages.push(Array.from({ length: Math.min(pageSize, total - id + 1) }, (_, index) => watch(id + index)));
+  }
+  const db = memory();
+  await syncCatalog(db as never, DEALER, ORIGIN, 10_000, {
+    pageSize,
+    fetchText: shop(pages),
+    pause: async () => {},
+  });
+  assertEquals(db.rows.length, total);
+  assertEquals(db.availability.length > 1, true);
+  assertEquals(db.availability.every((call) => call.count <= 2000), true);
+  const finished = db.availability.filter((call) => call.complete);
+  assertEquals(finished, [{ count: 1, complete: true }]);
 });
