@@ -37,6 +37,8 @@ const MIN_PHOTOS_IN_CATALOG = 1;
 /** Rows per upsert. Each carries the shop's full prose for one watch. */
 const UPSERT_CHUNK = 100;
 
+const AVAILABILITY_CHUNK = 2000;
+
 /**
  * PostgREST returns at most this many rows when the caller does not ask for
  * the next page. Danny's catalogue is about 4,300 rows. Treating the first
@@ -66,6 +68,57 @@ export async function everyRow<T extends { id: string }>(
     }
     if (fresh === 0 || page.length < PAGE_ROWS) return rows;
   }
+}
+
+async function writeSourceItems(
+  supabase: SupabaseClient,
+  ids: string[],
+  patch: { publish?: boolean; available?: boolean }
+) {
+  for (let start = 0; start < ids.length; start += UPSERT_CHUNK) {
+    const { error } = await supabase
+      .from('source_items')
+      .update(patch)
+      .in('id', ids.slice(start, start + UPSERT_CHUNK));
+    if (error) throw new Error(error.message);
+  }
+}
+
+async function syncAvailability(
+  supabase: SupabaseClient,
+  dealerId: string,
+  ids: string[],
+  complete: boolean
+) {
+  const call = async (part: string[], readComplete: boolean) => {
+    const availability = await supabase.rpc('sync_source_availability', {
+      p_dealer_id: dealerId,
+      p_seen_ids: part,
+      p_read_complete: readComplete,
+    });
+    if (availability.error) throw new Error(availability.error.message);
+    const counts = (availability.data ?? {}) as { retired?: number; relisted?: number };
+    return {
+      retired: Number(counts.retired ?? 0),
+      relisted: Number(counts.relisted ?? 0),
+    };
+  };
+
+  if (ids.length <= AVAILABILITY_CHUNK) return call(ids, complete);
+
+  let retired = 0;
+  let relisted = 0;
+  for (let start = 0; start < ids.length; start += AVAILABILITY_CHUNK) {
+    const counts = await call(ids.slice(start, start + AVAILABILITY_CHUNK), false);
+    retired += counts.retired;
+    relisted += counts.relisted;
+  }
+  if (complete && ids.length > 0) {
+    const counts = await call([ids[0]], true);
+    retired += counts.retired;
+    relisted += counts.relisted;
+  }
+  return { retired, relisted };
 }
 
 /** The stamp for this refresh. A caller-supplied time has to be from this run. */
@@ -348,12 +401,17 @@ export async function syncCatalog(
   // Which rows this read actually saw, by the stamp the upsert just wrote.
   // PostgREST returns 1000 rows unless the caller pages. Danny's catalogue is
   // about 4,300, and the first page is not the shop.
-  const held = await supabase
-    .from('source_items')
-    .update({ publish: false })
-    .eq('dealer_id', dealerId)
-    .not('hold_reason', 'is', null);
-  if (held.error) throw new Error(held.error.message);
+  const queuedHolds = await everyRow<{ id: string }>((from, to) =>
+    supabase
+      .from('source_items')
+      .select('id')
+      .eq('dealer_id', dealerId)
+      .eq('publish', true)
+      .not('hold_reason', 'is', null)
+      .order('id')
+      .range(from, to)
+  );
+  await writeSourceItems(supabase, queuedHolds.map((row) => row.id), { publish: false });
 
   const seen = await everyRow<{ id: string }>((from, to) =>
     supabase
@@ -367,26 +425,32 @@ export async function syncCatalog(
 
   const feedEnded = nextPage == null && catalogueComplete({ items, complete: feedComplete }, limit);
   const complete = feedEnded;
-  const availability = await supabase.rpc('sync_source_availability', {
-    p_dealer_id: dealerId,
-    p_seen_ids: (seen ?? []).map((row) => row.id),
-    p_read_complete: complete,
-  });
-  if (availability.error) throw new Error(availability.error.message);
-
-  const counts = (availability.data ?? {}) as { retired?: number; relisted?: number };
-  const retired = Number(counts.retired ?? 0);
-  const relisted = Number(counts.relisted ?? 0);
+  const counts = await syncAvailability(
+    supabase,
+    dealerId,
+    (seen ?? []).map((row) => row.id),
+    complete
+  );
+  const retired = counts.retired;
+  const relisted = counts.relisted;
 
   // A product that left a finished feed stays available in source_items
   // otherwise, and the catalogue count keeps offering it.
   if (complete) {
-    const stale = await supabase
-      .from('source_items')
-      .update({ available: false, publish: false })
-      .eq('dealer_id', dealerId)
-      .lt('last_seen_at', readAt);
-    if (stale.error) throw new Error(stale.error.message);
+    const stale = await everyRow<{ id: string }>((from, to) =>
+      supabase
+        .from('source_items')
+        .select('id')
+        .eq('dealer_id', dealerId)
+        .lt('last_seen_at', readAt)
+        .or('available.eq.true,publish.eq.true')
+        .order('id')
+        .range(from, to)
+    );
+    await writeSourceItems(supabase, stale.map((row) => row.id), {
+      available: false,
+      publish: false,
+    });
   }
 
   const watches = items.filter((item) => !item.holdReason);
